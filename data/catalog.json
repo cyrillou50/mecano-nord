@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T22:32:12.065Z",
+  "updatedAt": "2026-08-02T22:34:03.428Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -114,11 +114,6 @@
       "id": "kits",
       "name": "Dépannage",
       "icon": "i-wrench"
-    },
-    {
-      "id": "pneumatique",
-      "name": "Pneumatique",
-      "icon": "i-tire-offroad"
     }
   ],
   "items": [
@@ -174,7 +169,7 @@
     {
       "id": "kit-fumee-pneus",
       "name": "Kit Fumée Pneus",
-      "category": "pneumatique",
+      "category": "kits",
       "icon": "assets/img/meca_fumee.png",
       "enabled": true,
       "note": "",
@@ -186,7 +181,7 @@
     {
       "id": "pneus-tout-terrain",
       "name": "Pneus Tout-Terrain",
-      "category": "pneumatique",
+      "category": "kits",
       "icon": "assets/img/meca_pneus_offroad.png",
       "enabled": true,
       "note": "",
@@ -197,7 +192,7 @@
     {
       "id": "jantes-motos",
       "name": "Set de Jantes MOTOS",
-      "category": "pneumatique",
+      "category": "kits",
       "icon": "assets/img/meca_jantes.png",
       "enabled": true,
       "note": "",
@@ -208,7 +203,7 @@
     {
       "id": "jantes-voitures",
       "name": "Set de Jantes VOITURES",
-      "category": "pneumatique",
+      "category": "kits",
       "icon": "assets/img/meca_jantes.png",
       "enabled": true,
       "note": "",
@@ -219,7 +214,7 @@
     {
       "id": "jantes-camions",
       "name": "Set de Jantes CAMIONS",
-      "category": "pneumatique",
+      "category": "kits",
       "icon": "assets/img/meca_jantes.png",
       "enabled": true,
       "note": "",
