@@ -97,24 +97,28 @@ ul { margin: 0; padding: 0; list-style: none; }
     radial-gradient(900px 600px at -10% 92%, rgba(194, 85, 31, .12), transparent 70%);
 }
 
+/* Pas de mix-blend-mode ici : un mélange sur un calque plein écran oblige le
+   navigateur à recomposer toute la page à chaque image. Un simple dégradé
+   translucide donne le même rendu pour un coût nul. */
 .fx__scan {
   position: absolute;
   inset: 0;
-  opacity: .5;
   background: repeating-linear-gradient(
     to bottom,
-    rgba(255, 255, 255, .022) 0 1px,
+    rgba(255, 255, 255, .014) 0 1px,
     transparent 1px 3px
   );
-  mix-blend-mode: overlay;
 }
 
+/* Grain fixe. Il était animé (700 ms en boucle) sur une surface de 4 écrans :
+   c'était la principale source de ralentissement, pour un effet à peine
+   perceptible. Pour le réanimer malgré tout, remettre
+   `inset: -50%` et `animation: grain 700ms steps(3) infinite;`. */
 .fx__grain {
   position: absolute;
-  inset: -50%;
-  opacity: .045;
+  inset: 0;
+  opacity: .05;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
-  animation: grain 700ms steps(3) infinite;
 }
 
 .fx__vign {
@@ -131,7 +135,6 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fx__grain { animation: none; }
   * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
 
@@ -146,8 +149,9 @@ ul { margin: 0; padding: 0; list-style: none; }
   align-items: center;
   gap: 18px;
   padding: 0 clamp(14px, 3vw, 28px);
-  background: rgba(8, 6, 13, .82);
-  backdrop-filter: blur(14px);
+  /* Fond quasi opaque plutôt qu'un backdrop-filter : le flou d'arrière-plan
+     oblige le navigateur à relire et flouter la zone à chaque défilement. */
+  background: rgba(9, 7, 14, .96);
   border-bottom: 1px solid var(--line);
 }
 
@@ -520,8 +524,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   position: fixed; inset: 0; z-index: 1000;
   display: grid; place-items: center;
   padding: 20px;
-  background: rgba(4, 3, 7, .8);
-  backdrop-filter: blur(6px);
+  background: rgba(4, 3, 7, .88);
   animation: fade .16s ease;
 }
 @keyframes fade { from { opacity: 0; } }

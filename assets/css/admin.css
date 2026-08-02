@@ -20,9 +20,8 @@
   margin: 0 auto;
   padding: 12px clamp(14px, 3vw, 28px);
   width: 100%;
-  background: linear-gradient(90deg, rgba(255, 169, 46, .13), rgba(255, 43, 209, .1));
+  background: linear-gradient(90deg, #1d1710, #16101c);
   border-bottom: 1px solid rgba(255, 169, 46, .3);
-  backdrop-filter: blur(10px);
 }
 .draftbar__dot {
   width: 9px; height: 9px; flex: none;

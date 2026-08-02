@@ -10,6 +10,7 @@
   const svg = MNUI.svg, esc = MNUI.esc, num = MNUI.num;
 
   let cart = {};
+  let lastResKey = "";
   let activeCat = localStorage.getItem("mn.cat") || "all";
   let showCosts = localStorage.getItem("mn.showCosts") === "1";
   let canBT = false;
@@ -36,8 +37,15 @@
     syncDockHeight();
   }
 
-  const syncDockHeight = () =>
-    document.documentElement.style.setProperty("--dock-h", $("#dock").offsetHeight + "px");
+  /* Écrire une variable CSS sur <html> invalide les styles de toute la page :
+     on ne le fait que si la valeur a réellement changé. */
+  let lastDockH = -1;
+  function syncDockHeight() {
+    const h = $("#dock").offsetHeight;
+    if (h === lastDockH) return;
+    lastDockH = h;
+    document.documentElement.style.setProperty("--dock-h", h + "px");
+  }
 
   /* ---- Affichage des coûts -------------------------------------------------- */
 
@@ -85,12 +93,35 @@
         .join("");
 
     host.querySelectorAll("[data-cat]").forEach(b => b.addEventListener("click", () => {
+      if (activeCat === b.dataset.cat) return;
       activeCat = b.dataset.cat;
       localStorage.setItem("mn.cat", activeCat);
-      renderTabs();
+      host.querySelectorAll("[data-cat]").forEach(x => x.classList.toggle("is-active", x === b));
       renderCatalog();
-      b.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
     }));
+  }
+
+  /**
+   * Met à jour uniquement les pastilles de quantité des onglets.
+   * Reconstruire toute la barre à chaque clic recréait les images des
+   * catégories — inutile et coûteux.
+   */
+  function updateTabBadges() {
+    const all = visibleItems();
+    $("#cattabs").querySelectorAll("[data-cat]").forEach(btn => {
+      const id = btn.dataset.cat;
+      const items = id === "all" ? all : all.filter(i => i.category === id);
+      const picked = items.reduce((n, i) => n + (cart[i.id] || 0), 0);
+      let dot = btn.querySelector(".cattab__dot");
+
+      if (!picked) { if (dot) dot.remove(); return; }
+      if (!dot) {
+        dot = document.createElement("span");
+        dot.className = "cattab__dot";
+        btn.appendChild(dot);
+      }
+      if (dot.textContent !== String(picked)) dot.textContent = picked;
+    });
   }
 
   /* ---- Catalogue ----------------------------------------------------------- */
@@ -183,7 +214,7 @@
     if (q) cart[id] = q; else delete cart[id];
     cart = MNStore.setCart(cart);
     patchCard(id);
-    renderTabs();
+    updateTabBadges();
     renderDock();
   }
 
@@ -225,15 +256,29 @@
 
     if (!t.resources.length) {
       res.innerHTML = "";
+      lastResKey = "";
       $("#dock-empty").hidden = false;
     } else {
       $("#dock-empty").hidden = true;
-      res.innerHTML = t.resources.map(r =>
-        '<div class="res">' +
-          '<div class="res__ico" style="color:' + esc(r.resource.color) + '">' + mnIcon(r.resource.icon) + "</div>" +
-          '<div class="res__txt"><b>' + esc(r.resource.name) + "</b><span>×" + num(r.qty) + "</span></div>" +
-        "</div>"
-      ).join("");
+      const key = t.resources.map(r => r.resource.id).join("|");
+
+      /* Tant que ce sont les mêmes ressources, on ne remplace que les nombres :
+         inutile de recréer les icônes à chaque clic. */
+      if (key === lastResKey) {
+        const vals = res.querySelectorAll(".res__txt span");
+        t.resources.forEach((r, i) => {
+          const txt = "×" + num(r.qty);
+          if (vals[i] && vals[i].textContent !== txt) vals[i].textContent = txt;
+        });
+      } else {
+        lastResKey = key;
+        res.innerHTML = t.resources.map(r =>
+          '<div class="res">' +
+            '<div class="res__ico" style="color:' + esc(r.resource.color) + '">' + mnIcon(r.resource.icon) + "</div>" +
+            '<div class="res__txt"><b>' + esc(r.resource.name) + "</b><span>×" + num(r.qty) + "</span></div>" +
+          "</div>"
+        ).join("");
+      }
     }
 
     $("#btn-save").disabled = !t.count || !canBT;

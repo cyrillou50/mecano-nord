@@ -92,7 +92,9 @@
   background: linear-gradient(180deg, var(--surface-2), #100d18);
   border: 1px solid var(--line);
   border-radius: 14px;
-  transition: border-color .16s, box-shadow .16s, transform .12s, background .16s;
+  /* box-shadow volontairement hors transition : l'animer force un repaint de
+     la carte à chaque survol. */
+  transition: border-color .16s, transform .12s, background .16s;
 }
 .item:hover {
   border-color: rgba(255, 255, 255, .18);
@@ -200,10 +202,11 @@
   position: fixed;
   left: 0; right: 0; bottom: 0;
   z-index: 500;
-  background: linear-gradient(180deg, rgba(17, 13, 25, .97), rgba(8, 6, 12, .99));
+  /* Fond opaque : c'est la plus grande surface de la page, un backdrop-filter
+     ici coûtait un flou plein écran à chaque défilement. */
+  background: linear-gradient(180deg, #110d19, #08060c);
   border-top: 1px solid rgba(255, 43, 209, .38);
   box-shadow: 0 -12px 40px -18px rgba(255, 43, 209, .45), 0 -20px 60px -30px #000;
-  backdrop-filter: blur(14px);
   transition: transform .26s cubic-bezier(.3, .8, .3, 1);
 }
 .dock::before {

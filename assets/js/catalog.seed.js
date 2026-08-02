@@ -8,42 +8,114 @@
 window.MN_CATALOG_SEED =
 {
   "version": 1,
-  "updatedAt": "2026-08-02T21:40:59.045Z",
+  "updatedAt": "2026-08-02T22:09:08.131Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
       "tagline": "Day of Decay",
-      "logo": ""
+      "logo": "assets/img/logo.png"
     },
     "auth": {
       "allowGuests": false,
-      "guestPerms": ["bt"],
+      "guestPerms": [
+        "bt"
+      ],
       "sessionDays": 30,
       "bootstrapFirstUser": true
     },
     "github": {
-      "owner": "",
-      "repo": "",
+      "owner": "cyrillou50",
+      "repo": "mecano-nord",
       "branch": "main",
       "path": "data/catalog.json"
     }
   },
-  "users": [],
+  "users": [
+    {
+      "id": "cyrillou",
+      "pseudo": "Cyrillou",
+      "role": "Patron",
+      "perms": [
+        "admin"
+      ],
+      "pin": null,
+      "active": true,
+      "createdAt": "2026-08-02T21:50:24.604Z"
+    }
+  ],
   "resources": [
-    { "id": "plastique", "name": "Plastiques", "icon": "assets/img/plastique.png", "color": "#9fb0c4" },
-    { "id": "verre", "name": "Verres", "icon": "assets/img/verre.png", "color": "#7fd7e8" },
-    { "id": "ferraille", "name": "Ferrailles", "icon": "assets/img/scrap.png", "color": "#b8c4d4" },
-    { "id": "piece-detachee", "name": "Pièces Détachées", "icon": "assets/img/vehicleparts.png", "color": "#d7b98a" },
-    { "id": "tissu", "name": "Tissu", "icon": "assets/img/fabric.png", "color": "#6ec8ff" },
-    { "id": "spray", "name": "Spray", "icon": "assets/img/veh_spray_color.png", "color": "#ff7ad9" },
-    { "id": "charbon", "name": "Charbons", "icon": "assets/img/charcoal.png", "color": "#8d8496" },
-    { "id": "roue-moto", "name": "Roues Motos", "icon": "assets/img/bike_tire.png", "color": "#9aa4b8" },
-    { "id": "roue-voiture", "name": "Roues Voitures", "icon": "assets/img/car_tire.png", "color": "#8f9ab0" },
-    { "id": "roue-camion", "name": "Roues Camions", "icon": "assets/img/truck_tire.png", "color": "#7e8698" }
+    {
+      "id": "plastique",
+      "name": "Plastiques",
+      "icon": "assets/img/plastique.png",
+      "color": "#9fb0c4"
+    },
+    {
+      "id": "verre",
+      "name": "Verres",
+      "icon": "assets/img/verre.png",
+      "color": "#7fd7e8"
+    },
+    {
+      "id": "ferraille",
+      "name": "Ferrailles",
+      "icon": "assets/img/scrap.png",
+      "color": "#b8c4d4"
+    },
+    {
+      "id": "piece-detachee",
+      "name": "Pièces Détachées",
+      "icon": "assets/img/vehicleparts.png",
+      "color": "#d7b98a"
+    },
+    {
+      "id": "tissu",
+      "name": "Tissu",
+      "icon": "assets/img/fabric.png",
+      "color": "#6ec8ff"
+    },
+    {
+      "id": "spray",
+      "name": "Spray",
+      "icon": "assets/img/veh_spray_color.png",
+      "color": "#ff7ad9"
+    },
+    {
+      "id": "charbon",
+      "name": "Charbons",
+      "icon": "assets/img/charcoal.png",
+      "color": "#8d8496"
+    },
+    {
+      "id": "roue-moto",
+      "name": "Roues Motos",
+      "icon": "assets/img/bike_tire.png",
+      "color": "#9aa4b8"
+    },
+    {
+      "id": "roue-voiture",
+      "name": "Roues Voitures",
+      "icon": "assets/img/car_tire.png",
+      "color": "#8f9ab0"
+    },
+    {
+      "id": "roue-camion",
+      "name": "Roues Camions",
+      "icon": "assets/img/truck_tire.png",
+      "color": "#7e8698"
+    }
   ],
   "categories": [
-    { "id": "kits", "name": "Kits principaux", "icon": "i-wrench" },
-    { "id": "pneumatique", "name": "Pneumatique", "icon": "i-tire-offroad" }
+    {
+      "id": "kits",
+      "name": "Kits principaux",
+      "icon": "i-wrench"
+    },
+    {
+      "id": "pneumatique",
+      "name": "Pneumatique",
+      "icon": "i-tire-offroad"
+    }
   ],
   "items": [
     {
@@ -52,7 +124,12 @@ window.MN_CATALOG_SEED =
       "category": "kits",
       "icon": "assets/img/veh_xenon.png",
       "enabled": true,
-      "cost": { "verre": 8, "piece-detachee": 6, "plastique": 20 }
+      "note": "",
+      "cost": {
+        "verre": 8,
+        "piece-detachee": 6,
+        "plastique": 20
+      }
     },
     {
       "id": "kit-accessoires",
@@ -60,7 +137,12 @@ window.MN_CATALOG_SEED =
       "category": "kits",
       "icon": "assets/img/meca_extras.png",
       "enabled": true,
-      "cost": { "plastique": 40, "tissu": 15, "piece-detachee": 5 }
+      "note": "",
+      "cost": {
+        "plastique": 40,
+        "tissu": 15,
+        "piece-detachee": 5
+      }
     },
     {
       "id": "kit-carrosserie",
@@ -68,7 +150,12 @@ window.MN_CATALOG_SEED =
       "category": "kits",
       "icon": "assets/img/meca_cosmetique.png",
       "enabled": true,
-      "cost": { "ferraille": 40, "plastique": 30, "piece-detachee": 10 }
+      "note": "",
+      "cost": {
+        "ferraille": 40,
+        "plastique": 30,
+        "piece-detachee": 10
+      }
     },
     {
       "id": "kit-peinture",
@@ -76,7 +163,11 @@ window.MN_CATALOG_SEED =
       "category": "kits",
       "icon": "assets/img/meca_peinture.png",
       "enabled": true,
-      "cost": { "spray": 1, "plastique": 10 }
+      "note": "",
+      "cost": {
+        "spray": 1,
+        "plastique": 10
+      }
     },
     {
       "id": "kit-fumee-pneus",
@@ -84,7 +175,11 @@ window.MN_CATALOG_SEED =
       "category": "pneumatique",
       "icon": "assets/img/meca_fumee.png",
       "enabled": true,
-      "cost": { "plastique": 50, "charbon": 60 }
+      "note": "",
+      "cost": {
+        "plastique": 50,
+        "charbon": 60
+      }
     },
     {
       "id": "pneus-tout-terrain",
@@ -92,7 +187,11 @@ window.MN_CATALOG_SEED =
       "category": "pneumatique",
       "icon": "assets/img/meca_pneus_offroad.png",
       "enabled": true,
-      "cost": { "roue-voiture": 4, "charbon": 20 }
+      "note": "",
+      "cost": {
+        "roue-voiture": 4,
+        "charbon": 20
+      }
     },
     {
       "id": "jantes-motos",
@@ -100,7 +199,11 @@ window.MN_CATALOG_SEED =
       "category": "pneumatique",
       "icon": "assets/img/meca_jantes.png",
       "enabled": true,
-      "cost": { "roue-moto": 2, "ferraille": 10 }
+      "note": "",
+      "cost": {
+        "roue-moto": 2,
+        "ferraille": 10
+      }
     },
     {
       "id": "jantes-voitures",
@@ -108,7 +211,11 @@ window.MN_CATALOG_SEED =
       "category": "pneumatique",
       "icon": "assets/img/meca_jantes.png",
       "enabled": true,
-      "cost": { "roue-voiture": 4, "ferraille": 20 }
+      "note": "",
+      "cost": {
+        "roue-voiture": 4,
+        "ferraille": 20
+      }
     },
     {
       "id": "jantes-camions",
@@ -116,7 +223,11 @@ window.MN_CATALOG_SEED =
       "category": "pneumatique",
       "icon": "assets/img/meca_jantes.png",
       "enabled": true,
-      "cost": { "roue-camion": 6, "ferraille": 40 }
+      "note": "",
+      "cost": {
+        "roue-camion": 6,
+        "ferraille": 40
+      }
     }
   ]
 };

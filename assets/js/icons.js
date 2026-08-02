@@ -69,7 +69,7 @@ window.mnIcon = function (id, cls) {
 
   if (/^(https?:\/\/|\.{0,2}\/|data:image)/i.test(id) || /\.(png|jpe?g|webp|gif|svg|avif)$/i.test(id)) {
     const safe = String(id).replace(/"/g, "&quot;").replace(/</g, "&lt;");
-    return '<img' + klass + ' src="' + safe + '" alt="" loading="lazy">';
+    return '<img' + klass + ' src="' + safe + '" alt="" loading="lazy" decoding="async">';
   }
 
   const txt = String(id).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
