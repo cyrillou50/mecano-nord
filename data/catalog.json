@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T23:05:40.652Z",
+  "updatedAt": "2026-08-02T23:07:28.711Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -191,6 +191,11 @@
       "id": "depannage",
       "name": "Dépannage",
       "icon": "i-tire-offroad"
+    },
+    {
+      "id": "vente-soon",
+      "name": "Vente (soon)",
+      "icon": "i-sticker"
     }
   ],
   "items": [
