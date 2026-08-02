@@ -1,0 +1,122 @@
+/* ==========================================================================
+   COPIE DE SECOURS du catalogue.
+   Utilisée UNIQUEMENT si data/catalog.json n'a pas pu être chargé
+   (typiquement : ouverture de index.html par double-clic, en file://).
+   La vraie source de vérité reste  data/catalog.json .
+   ========================================================================== */
+
+window.MN_CATALOG_SEED =
+{
+  "version": 1,
+  "updatedAt": "2026-08-02T21:40:59.045Z",
+  "settings": {
+    "brand": {
+      "name": "Mécano Nord",
+      "tagline": "Day of Decay",
+      "logo": ""
+    },
+    "auth": {
+      "allowGuests": false,
+      "guestPerms": ["bt"],
+      "sessionDays": 30,
+      "bootstrapFirstUser": true
+    },
+    "github": {
+      "owner": "",
+      "repo": "",
+      "branch": "main",
+      "path": "data/catalog.json"
+    }
+  },
+  "users": [],
+  "resources": [
+    { "id": "plastique", "name": "Plastiques", "icon": "assets/img/plastique.png", "color": "#9fb0c4" },
+    { "id": "verre", "name": "Verres", "icon": "assets/img/verre.png", "color": "#7fd7e8" },
+    { "id": "ferraille", "name": "Ferrailles", "icon": "assets/img/scrap.png", "color": "#b8c4d4" },
+    { "id": "piece-detachee", "name": "Pièces Détachées", "icon": "assets/img/vehicleparts.png", "color": "#d7b98a" },
+    { "id": "tissu", "name": "Tissu", "icon": "assets/img/fabric.png", "color": "#6ec8ff" },
+    { "id": "spray", "name": "Spray", "icon": "assets/img/veh_spray_color.png", "color": "#ff7ad9" },
+    { "id": "charbon", "name": "Charbons", "icon": "assets/img/charcoal.png", "color": "#8d8496" },
+    { "id": "roue-moto", "name": "Roues Motos", "icon": "assets/img/bike_tire.png", "color": "#9aa4b8" },
+    { "id": "roue-voiture", "name": "Roues Voitures", "icon": "assets/img/car_tire.png", "color": "#8f9ab0" },
+    { "id": "roue-camion", "name": "Roues Camions", "icon": "assets/img/truck_tire.png", "color": "#7e8698" }
+  ],
+  "categories": [
+    { "id": "kits", "name": "Kits principaux", "icon": "i-wrench" },
+    { "id": "pneumatique", "name": "Pneumatique", "icon": "i-tire-offroad" }
+  ],
+  "items": [
+    {
+      "id": "kit-phares-xenon",
+      "name": "Kit Phares Xénon",
+      "category": "kits",
+      "icon": "assets/img/veh_xenon.png",
+      "enabled": true,
+      "cost": { "verre": 8, "piece-detachee": 6, "plastique": 20 }
+    },
+    {
+      "id": "kit-accessoires",
+      "name": "Kit Accessoires (Extra)",
+      "category": "kits",
+      "icon": "assets/img/meca_extras.png",
+      "enabled": true,
+      "cost": { "plastique": 40, "tissu": 15, "piece-detachee": 5 }
+    },
+    {
+      "id": "kit-carrosserie",
+      "name": "Kit Carrosserie (Cosmétique)",
+      "category": "kits",
+      "icon": "assets/img/meca_cosmetique.png",
+      "enabled": true,
+      "cost": { "ferraille": 40, "plastique": 30, "piece-detachee": 10 }
+    },
+    {
+      "id": "kit-peinture",
+      "name": "Kit Peinture",
+      "category": "kits",
+      "icon": "assets/img/meca_peinture.png",
+      "enabled": true,
+      "cost": { "spray": 1, "plastique": 10 }
+    },
+    {
+      "id": "kit-fumee-pneus",
+      "name": "Kit Fumée Pneus",
+      "category": "pneumatique",
+      "icon": "assets/img/meca_fumee.png",
+      "enabled": true,
+      "cost": { "plastique": 50, "charbon": 60 }
+    },
+    {
+      "id": "pneus-tout-terrain",
+      "name": "Pneus Tout-Terrain",
+      "category": "pneumatique",
+      "icon": "assets/img/meca_pneus_offroad.png",
+      "enabled": true,
+      "cost": { "roue-voiture": 4, "charbon": 20 }
+    },
+    {
+      "id": "jantes-motos",
+      "name": "Set de Jantes MOTOS",
+      "category": "pneumatique",
+      "icon": "assets/img/meca_jantes.png",
+      "enabled": true,
+      "cost": { "roue-moto": 2, "ferraille": 10 }
+    },
+    {
+      "id": "jantes-voitures",
+      "name": "Set de Jantes VOITURES",
+      "category": "pneumatique",
+      "icon": "assets/img/meca_jantes.png",
+      "enabled": true,
+      "cost": { "roue-voiture": 4, "ferraille": 20 }
+    },
+    {
+      "id": "jantes-camions",
+      "name": "Set de Jantes CAMIONS",
+      "category": "pneumatique",
+      "icon": "assets/img/meca_jantes.png",
+      "enabled": true,
+      "cost": { "roue-camion": 6, "ferraille": 40 }
+    }
+  ]
+};
