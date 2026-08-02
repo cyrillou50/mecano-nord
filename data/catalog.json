@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T22:47:20.460Z",
+  "updatedAt": "2026-08-02T22:48:14.339Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -50,25 +50,25 @@
   "resources": [
     {
       "id": "plastique",
-      "name": "Plastiques",
+      "name": "Plastique",
       "icon": "assets/img/plastique.png",
       "color": "#9fb0c4"
     },
     {
       "id": "verre",
-      "name": "Verres",
+      "name": "Verre",
       "icon": "assets/img/verre.png",
       "color": "#7fd7e8"
     },
     {
       "id": "ferraille",
-      "name": "Ferrailles",
+      "name": "Ferraille",
       "icon": "assets/img/scrap.png",
       "color": "#b8c4d4"
     },
     {
       "id": "piece-detachee",
-      "name": "Pièces Détachées",
+      "name": "Pièce Détachée",
       "icon": "assets/img/vehicleparts.png",
       "color": "#d7b98a"
     },
@@ -86,25 +86,25 @@
     },
     {
       "id": "charbon",
-      "name": "Charbons",
+      "name": "Charbon",
       "icon": "assets/img/charcoal.png",
       "color": "#8d8496"
     },
     {
       "id": "roue-moto",
-      "name": "Roues Motos",
+      "name": "Roue Moto",
       "icon": "assets/img/bike_tire.png",
       "color": "#9aa4b8"
     },
     {
       "id": "roue-voiture",
-      "name": "Roues Voitures",
+      "name": "Roue Voiture",
       "icon": "assets/img/car_tire.png",
       "color": "#8f9ab0"
     },
     {
       "id": "roue-camion",
-      "name": "Roues Camions",
+      "name": "Roue Camion",
       "icon": "assets/img/truck_tire.png",
       "color": "#7e8698"
     }
