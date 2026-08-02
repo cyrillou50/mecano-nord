@@ -85,7 +85,7 @@
     };
 
     host.innerHTML =
-      tab("all", "Tout", null, all) +
+      tab("all", "Customs", null, all) +
       cat.categories
         .map(c => ({ c, items: all.filter(i => i.category === c.id) }))
         .filter(x => x.items.length)
