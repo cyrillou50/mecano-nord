@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T22:49:41.618Z",
+  "updatedAt": "2026-08-02T22:50:54.266Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -61,13 +61,13 @@
   "resources": [
     {
       "id": "plastique",
-      "name": "Plastiques",
+      "name": "Plastique",
       "icon": "assets/img/plastique.png",
       "color": "#9fb0c4"
     },
     {
       "id": "verre",
-      "name": "Verres",
+      "name": "Verre",
       "icon": "assets/img/verre.png",
       "color": "#7fd7e8"
     },
