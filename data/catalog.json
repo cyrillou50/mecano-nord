@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T21:59:42.102Z",
+  "updatedAt": "2026-08-02T22:00:18.376Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -26,11 +26,11 @@
     {
       "id": "cyrillou",
       "pseudo": "Cyrillou",
-      "role": "Patron",
+      "role": "Créateur du Site",
       "perms": [
         "admin"
       ],
-      "pin": null,
+      "pin": "04d8f2bfadde9dd1bbed6f931f6dcba03c994ee7c6f4fe6c8ec14e696c4d6773",
       "active": true,
       "createdAt": "2026-08-02T21:50:24.604Z"
     }
