@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T21:54:12.652Z",
+  "updatedAt": "2026-08-02T21:59:42.102Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
       "tagline": "Day of Decay",
-      "logo": ""
+      "logo": "assets/img/logo.png"
     },
     "auth": {
       "allowGuests": false,
