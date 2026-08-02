@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T23:07:28.711Z",
+  "updatedAt": "2026-08-02T23:09:40.749Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -380,6 +380,15 @@
       "cost": {
         "ressource": 100
       }
+    },
+    {
+      "id": "sdq",
+      "name": "sdq",
+      "category": "kits",
+      "icon": "i-box",
+      "enabled": true,
+      "note": "",
+      "cost": {}
     }
   ]
 }
