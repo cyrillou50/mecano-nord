@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T22:54:21.787Z",
+  "updatedAt": "2026-08-02T23:05:40.652Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -173,13 +173,24 @@
       "name": "Roue de camion",
       "icon": "assets/img/truck_tire.png",
       "color": "#7e8698"
+    },
+    {
+      "id": "ressource",
+      "name": "Ressource",
+      "icon": "i-wheels-truck",
+      "color": "#9fb0c4"
     }
   ],
   "categories": [
     {
       "id": "kits",
-      "name": "Dépannage",
+      "name": "Customisation",
       "icon": "i-wrench"
+    },
+    {
+      "id": "depannage",
+      "name": "Dépannage",
+      "icon": "i-tire-offroad"
     }
   ],
   "items": [
@@ -197,11 +208,11 @@
     },
     {
       "id": "kit-accessoires",
-      "name": "Kit Accessoires (Extra)",
+      "name": "Kit Accessoires",
       "category": "kits",
       "icon": "assets/img/meca_extras.png",
       "enabled": true,
-      "note": "",
+      "note": "(Extra)",
       "cost": {
         "ferraille": 60,
         "piece-detachee": 90,
@@ -210,11 +221,11 @@
     },
     {
       "id": "kit-carrosserie",
-      "name": "Kit Carrosserie (Cosmétique)",
+      "name": "Kit Carrosserie",
       "category": "kits",
       "icon": "assets/img/meca_cosmetique.png",
       "enabled": true,
-      "note": "",
+      "note": "(Cosmétique et livré)",
       "cost": {
         "ferraille": 60,
         "plastique": 100
@@ -226,7 +237,7 @@
       "category": "kits",
       "icon": "assets/img/meca_peinture.png",
       "enabled": true,
-      "note": "",
+      "note": "(Couleur et vitre teintée)",
       "cost": {
         "tissu": 30,
         "spray": 1
@@ -234,11 +245,11 @@
     },
     {
       "id": "kit-fumee-pneus",
-      "name": "Kit Fumée Pneus",
+      "name": "Kit fumée de pneus",
       "category": "kits",
       "icon": "assets/img/meca_fumee.png",
       "enabled": true,
-      "note": "",
+      "note": "(Dans la catégorie couleur)",
       "cost": {
         "plastique": 50,
         "charbon": 60
@@ -246,7 +257,7 @@
     },
     {
       "id": "pneus-tout-terrain",
-      "name": "Pneus Tout-Terrain",
+      "name": "Pneus tout-terrain",
       "category": "kits",
       "icon": "assets/img/meca_pneus_offroad.png",
       "enabled": true,
@@ -286,6 +297,83 @@
       "note": "",
       "cost": {
         "roue-camion": 6
+      }
+    },
+    {
+      "id": "deplacement",
+      "name": "Déplacement",
+      "category": "depannage",
+      "icon": "r-screw",
+      "enabled": true,
+      "note": "(hors Cayo et Manor)",
+      "cost": {
+        "ressource": 25
+      }
+    },
+    {
+      "id": "deplacement-eloigne",
+      "name": "Déplacement éloigné",
+      "category": "depannage",
+      "icon": "r-screw",
+      "enabled": true,
+      "note": "(Cayo et Manor uniquement)",
+      "cost": {
+        "ressource": 50
+      }
+    },
+    {
+      "id": "carburant",
+      "name": "Carburant",
+      "category": "depannage",
+      "icon": "i-engine",
+      "enabled": true,
+      "note": "(Essence ou diesel)",
+      "cost": {
+        "ressource": 2
+      }
+    },
+    {
+      "id": "kit-de-reparation",
+      "name": "Kit de réparation",
+      "category": "depannage",
+      "icon": "i-wheels-moto",
+      "enabled": true,
+      "note": "",
+      "cost": {
+        "ressource": 50
+      }
+    },
+    {
+      "id": "roue",
+      "name": "Roue",
+      "category": "depannage",
+      "icon": "i-box",
+      "enabled": true,
+      "note": "(Moto, voiture et camion)",
+      "cost": {
+        "ressource": 15
+      }
+    },
+    {
+      "id": "cric",
+      "name": "Cric",
+      "category": "depannage",
+      "icon": "i-wrench",
+      "enabled": true,
+      "note": "",
+      "cost": {
+        "ressource": 10
+      }
+    },
+    {
+      "id": "remorquage",
+      "name": "Remorquage",
+      "category": "depannage",
+      "icon": "i-key",
+      "enabled": true,
+      "note": "(Seulement avec formation)",
+      "cost": {
+        "ressource": 100
       }
     }
   ]
