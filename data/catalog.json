@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T22:34:03.428Z",
+  "updatedAt": "2026-08-02T22:47:20.460Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -112,7 +112,7 @@
   "categories": [
     {
       "id": "kits",
-      "name": "Dépannage",
+      "name": "Customs",
       "icon": "i-wrench"
     }
   ],
