@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T22:00:18.376Z",
+  "updatedAt": "2026-08-02T22:18:01.121Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -119,8 +119,7 @@
       "note": "",
       "cost": {
         "verre": 8,
-        "piece-detachee": 6,
-        "plastique": 20
+        "plastique": 30
       }
     },
     {
@@ -131,9 +130,9 @@
       "enabled": true,
       "note": "",
       "cost": {
-        "plastique": 40,
-        "tissu": 15,
-        "piece-detachee": 5
+        "ferraille": 60,
+        "piece-detachee": 90,
+        "plastique": 80
       }
     },
     {
@@ -144,9 +143,8 @@
       "enabled": true,
       "note": "",
       "cost": {
-        "ferraille": 40,
-        "plastique": 30,
-        "piece-detachee": 10
+        "ferraille": 60,
+        "plastique": 100
       }
     },
     {
@@ -157,8 +155,8 @@
       "enabled": true,
       "note": "",
       "cost": {
-        "spray": 1,
-        "plastique": 10
+        "tissu": 30,
+        "spray": 1
       }
     },
     {
@@ -181,8 +179,7 @@
       "enabled": true,
       "note": "",
       "cost": {
-        "roue-voiture": 4,
-        "charbon": 20
+        "plastique": 120
       }
     },
     {
@@ -193,8 +190,7 @@
       "enabled": true,
       "note": "",
       "cost": {
-        "roue-moto": 2,
-        "ferraille": 10
+        "roue-moto": 2
       }
     },
     {
@@ -205,8 +201,7 @@
       "enabled": true,
       "note": "",
       "cost": {
-        "roue-voiture": 4,
-        "ferraille": 20
+        "roue-voiture": 4
       }
     },
     {
@@ -217,8 +212,7 @@
       "enabled": true,
       "note": "",
       "cost": {
-        "roue-camion": 6,
-        "ferraille": 40
+        "roue-camion": 6
       }
     }
   ]
