@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T22:51:55.950Z",
+  "updatedAt": "2026-08-02T22:54:21.787Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -56,6 +56,61 @@
       "pin": null,
       "active": true,
       "createdAt": "2026-08-02T22:47:59.170Z"
+    },
+    {
+      "id": "lexa",
+      "pseudo": "Lexa",
+      "role": "Garagiste",
+      "perms": [
+        "bt"
+      ],
+      "pin": null,
+      "active": true,
+      "createdAt": "2026-08-02T22:53:33.679Z"
+    },
+    {
+      "id": "tony",
+      "pseudo": "Tony",
+      "role": "Garagiste",
+      "perms": [
+        "bt"
+      ],
+      "pin": null,
+      "active": true,
+      "createdAt": "2026-08-02T22:53:41.495Z"
+    },
+    {
+      "id": "dylan",
+      "pseudo": "Dylan",
+      "role": "Apprenti",
+      "perms": [
+        "bt"
+      ],
+      "pin": null,
+      "active": true,
+      "createdAt": "2026-08-02T22:53:55.623Z"
+    },
+    {
+      "id": "hakim",
+      "pseudo": "Hakim",
+      "role": "Garagiste",
+      "perms": [
+        "bt"
+      ],
+      "pin": null,
+      "active": true,
+      "createdAt": "2026-08-02T22:54:09.952Z"
+    },
+    {
+      "id": "toma",
+      "pseudo": "Toma",
+      "role": "Apprenti",
+      "perms": [
+        "bt"
+      ],
+      "pin": null,
+      "active": true,
+      "createdAt": "2026-08-02T22:54:21.786Z"
     }
   ],
   "resources": [
@@ -115,7 +170,7 @@
     },
     {
       "id": "roue-camion",
-      "name": "Roues de camion",
+      "name": "Roue de camion",
       "icon": "assets/img/truck_tire.png",
       "color": "#7e8698"
     }
