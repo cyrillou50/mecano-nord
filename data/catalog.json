@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T22:48:57.727Z",
+  "updatedAt": "2026-08-02T22:49:41.618Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -45,30 +45,41 @@
       "pin": "5d3fd60e0b9ed92ce9b5a715842c017e867cacbc463800c11ca5e4f49d95359b",
       "active": true,
       "createdAt": "2026-08-02T22:19:25.028Z"
+    },
+    {
+      "id": "mika",
+      "pseudo": "Mika",
+      "role": "Patron",
+      "perms": [
+        "bt"
+      ],
+      "pin": null,
+      "active": true,
+      "createdAt": "2026-08-02T22:47:59.170Z"
     }
   ],
   "resources": [
     {
       "id": "plastique",
-      "name": "Plastique",
+      "name": "Plastiques",
       "icon": "assets/img/plastique.png",
       "color": "#9fb0c4"
     },
     {
       "id": "verre",
-      "name": "Verre",
+      "name": "Verres",
       "icon": "assets/img/verre.png",
       "color": "#7fd7e8"
     },
     {
       "id": "ferraille",
-      "name": "Ferraille",
+      "name": "Ferrailles",
       "icon": "assets/img/scrap.png",
       "color": "#b8c4d4"
     },
     {
       "id": "piece-detachee",
-      "name": "Pièce Détachée",
+      "name": "Pièces Détachées",
       "icon": "assets/img/vehicleparts.png",
       "color": "#d7b98a"
     },
@@ -86,25 +97,25 @@
     },
     {
       "id": "charbon",
-      "name": "Charbon",
+      "name": "Charbons",
       "icon": "assets/img/charcoal.png",
       "color": "#8d8496"
     },
     {
       "id": "roue-moto",
-      "name": "Roue Moto",
+      "name": "Roues Motos",
       "icon": "assets/img/bike_tire.png",
       "color": "#9aa4b8"
     },
     {
       "id": "roue-voiture",
-      "name": "Roue Voiture",
+      "name": "Roues Voitures",
       "icon": "assets/img/car_tire.png",
       "color": "#8f9ab0"
     },
     {
       "id": "roue-camion",
-      "name": "Roue Camion",
+      "name": "Roues Camions",
       "icon": "assets/img/truck_tire.png",
       "color": "#7e8698"
     }
@@ -112,7 +123,7 @@
   "categories": [
     {
       "id": "kits",
-      "name": "Customs",
+      "name": "Dépannage",
       "icon": "i-wrench"
     }
   ],
