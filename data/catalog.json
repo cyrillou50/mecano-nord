@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T22:18:01.121Z",
+  "updatedAt": "2026-08-02T22:19:25.029Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -33,6 +33,18 @@
       "pin": "04d8f2bfadde9dd1bbed6f931f6dcba03c994ee7c6f4fe6c8ec14e696c4d6773",
       "active": true,
       "createdAt": "2026-08-02T21:50:24.604Z"
+    },
+    {
+      "id": "ecumeria",
+      "pseudo": "Écuméria",
+      "role": "Secrétaire",
+      "perms": [
+        "bt",
+        "admin"
+      ],
+      "pin": "5d3fd60e0b9ed92ce9b5a715842c017e867cacbc463800c11ca5e4f49d95359b",
+      "active": true,
+      "createdAt": "2026-08-02T22:19:25.028Z"
     }
   ],
   "resources": [
