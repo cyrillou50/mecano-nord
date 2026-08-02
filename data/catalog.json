@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T23:26:07.851Z",
+  "updatedAt": "2026-08-02T23:34:51.606Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -179,6 +179,18 @@
       "name": "Ressource",
       "icon": "i-wheels-truck",
       "color": "#9fb0c4"
+    },
+    {
+      "id": "huile-moteur",
+      "name": "Huile moteur",
+      "icon": "assets/img/huilemoteur.png",
+      "color": "#9fb0c4"
+    },
+    {
+      "id": "fer",
+      "name": "Fer",
+      "icon": "assets/img/fer.png",
+      "color": "#9fb0c4"
     }
   ],
   "categories": [
@@ -352,7 +364,7 @@
       "id": "roue",
       "name": "Roue",
       "category": "depannage",
-      "icon": "i-box",
+      "icon": "assets/img/meca_jantes.png",
       "enabled": true,
       "note": "(Moto, voiture et camion)",
       "cost": {
@@ -374,7 +386,7 @@
       "id": "remorquage",
       "name": "Remorquage",
       "category": "depannage",
-      "icon": "i-key",
+      "icon": "assets/img/wastelander.png",
       "enabled": true,
       "note": "(Seulement avec formation)",
       "cost": {
@@ -397,6 +409,15 @@
       "name": "Cric",
       "category": "vente-soon",
       "icon": "assets/img/cric.png",
+      "enabled": true,
+      "note": "",
+      "cost": {}
+    },
+    {
+      "id": "sangle-de-remorquage",
+      "name": "Sangle de remorquage",
+      "category": "vente-soon",
+      "icon": "assets/img/sanglederemorquage.png",
       "enabled": true,
       "note": "",
       "cost": {}
