@@ -84,13 +84,13 @@
       "</button>";
     };
 
-    host.innerHTML =
-      tab("all", "Customs", null, all) +
-      cat.categories
-        .map(c => ({ c, items: all.filter(i => i.category === c.id) }))
-        .filter(x => x.items.length)
-        .map(x => tab(x.c.id, x.c.name, x.c.icon, x.items))
-        .join("");
+    // host.innerHTML =
+    //   tab("all", "Customs", null, all) +
+    //   cat.categories
+    //     .map(c => ({ c, items: all.filter(i => i.category === c.id) }))
+    //     .filter(x => x.items.length)
+    //     .map(x => tab(x.c.id, x.c.name, x.c.icon, x.items))
+    //     .join("");
 
     host.querySelectorAll("[data-cat]").forEach(b => b.addEventListener("click", () => {
       if (activeCat === b.dataset.cat) return;
