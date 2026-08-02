@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T23:34:51.606Z",
+  "updatedAt": "2026-08-02T23:38:15.246Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -411,7 +411,12 @@
       "icon": "assets/img/cric.png",
       "enabled": true,
       "note": "",
-      "cost": {}
+      "cost": {
+        "huile-moteur": 30,
+        "fer": 60,
+        "plastique": 60,
+        "ferraille": 240
+      }
     },
     {
       "id": "sangle-de-remorquage",
@@ -420,7 +425,10 @@
       "icon": "assets/img/sanglederemorquage.png",
       "enabled": true,
       "note": "",
-      "cost": {}
+      "cost": {
+        "tissu": 120,
+        "ferraille": 120
+      }
     }
   ]
 }
