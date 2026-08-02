@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T23:09:40.749Z",
+  "updatedAt": "2026-08-02T23:26:07.851Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -330,7 +330,7 @@
       "id": "carburant",
       "name": "Carburant",
       "category": "depannage",
-      "icon": "i-engine",
+      "icon": "assets/img/carburant.png",
       "enabled": true,
       "note": "(Essence ou diesel)",
       "cost": {
@@ -341,7 +341,7 @@
       "id": "kit-de-reparation",
       "name": "Kit de réparation",
       "category": "depannage",
-      "icon": "i-wheels-moto",
+      "icon": "assets/img/repairkit.png",
       "enabled": true,
       "note": "",
       "cost": {
@@ -363,7 +363,7 @@
       "id": "cric",
       "name": "Cric",
       "category": "depannage",
-      "icon": "i-wrench",
+      "icon": "assets/img/cric.png",
       "enabled": true,
       "note": "",
       "cost": {
@@ -382,10 +382,21 @@
       }
     },
     {
-      "id": "sdq",
-      "name": "sdq",
-      "category": "kits",
-      "icon": "i-box",
+      "id": "kit-de-reparation-2",
+      "name": "Kit de réparation",
+      "category": "vente-soon",
+      "icon": "assets/img/repairkit.png",
+      "enabled": true,
+      "note": "",
+      "cost": {
+        "ressource": 50
+      }
+    },
+    {
+      "id": "cric-2",
+      "name": "Cric",
+      "category": "vente-soon",
+      "icon": "assets/img/cric.png",
       "enabled": true,
       "note": "",
       "cost": {}
