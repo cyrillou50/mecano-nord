@@ -1,10 +1,6 @@
 {
   "version": 1,
-<<<<<<< HEAD
-  "updatedAt": "2026-08-02T22:09:08.131Z",
-=======
-  "updatedAt": "2026-08-02T22:00:18.376Z",
->>>>>>> 1ed37b82bc51528676d8cf0e438b6a8592c2cd31
+  "updatedAt": "2026-08-02T22:34:03.428Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -37,6 +33,18 @@
       "pin": "04d8f2bfadde9dd1bbed6f931f6dcba03c994ee7c6f4fe6c8ec14e696c4d6773",
       "active": true,
       "createdAt": "2026-08-02T21:50:24.604Z"
+    },
+    {
+      "id": "ecumeria",
+      "pseudo": "Écuméria",
+      "role": "Secrétaire",
+      "perms": [
+        "bt",
+        "admin"
+      ],
+      "pin": "5d3fd60e0b9ed92ce9b5a715842c017e867cacbc463800c11ca5e4f49d95359b",
+      "active": true,
+      "createdAt": "2026-08-02T22:19:25.028Z"
     }
   ],
   "resources": [
@@ -104,13 +112,8 @@
   "categories": [
     {
       "id": "kits",
-      "name": "Kits principaux",
+      "name": "Dépannage",
       "icon": "i-wrench"
-    },
-    {
-      "id": "pneumatique",
-      "name": "Pneumatique",
-      "icon": "i-tire-offroad"
     }
   ],
   "items": [
@@ -123,8 +126,7 @@
       "note": "",
       "cost": {
         "verre": 8,
-        "piece-detachee": 6,
-        "plastique": 20
+        "plastique": 30
       }
     },
     {
@@ -135,9 +137,9 @@
       "enabled": true,
       "note": "",
       "cost": {
-        "plastique": 40,
-        "tissu": 15,
-        "piece-detachee": 5
+        "ferraille": 60,
+        "piece-detachee": 90,
+        "plastique": 80
       }
     },
     {
@@ -148,9 +150,8 @@
       "enabled": true,
       "note": "",
       "cost": {
-        "ferraille": 40,
-        "plastique": 30,
-        "piece-detachee": 10
+        "ferraille": 60,
+        "plastique": 100
       }
     },
     {
@@ -161,14 +162,14 @@
       "enabled": true,
       "note": "",
       "cost": {
-        "spray": 1,
-        "plastique": 10
+        "tissu": 30,
+        "spray": 1
       }
     },
     {
       "id": "kit-fumee-pneus",
       "name": "Kit Fumée Pneus",
-      "category": "pneumatique",
+      "category": "kits",
       "icon": "assets/img/meca_fumee.png",
       "enabled": true,
       "note": "",
@@ -180,49 +181,45 @@
     {
       "id": "pneus-tout-terrain",
       "name": "Pneus Tout-Terrain",
-      "category": "pneumatique",
+      "category": "kits",
       "icon": "assets/img/meca_pneus_offroad.png",
       "enabled": true,
       "note": "",
       "cost": {
-        "roue-voiture": 4,
-        "charbon": 20
+        "plastique": 120
       }
     },
     {
       "id": "jantes-motos",
       "name": "Set de Jantes MOTOS",
-      "category": "pneumatique",
+      "category": "kits",
       "icon": "assets/img/meca_jantes.png",
       "enabled": true,
       "note": "",
       "cost": {
-        "roue-moto": 2,
-        "ferraille": 10
+        "roue-moto": 2
       }
     },
     {
       "id": "jantes-voitures",
       "name": "Set de Jantes VOITURES",
-      "category": "pneumatique",
+      "category": "kits",
       "icon": "assets/img/meca_jantes.png",
       "enabled": true,
       "note": "",
       "cost": {
-        "roue-voiture": 4,
-        "ferraille": 20
+        "roue-voiture": 4
       }
     },
     {
       "id": "jantes-camions",
       "name": "Set de Jantes CAMIONS",
-      "category": "pneumatique",
+      "category": "kits",
       "icon": "assets/img/meca_jantes.png",
       "enabled": true,
       "note": "",
       "cost": {
-        "roue-camion": 6,
-        "ferraille": 40
+        "roue-camion": 6
       }
     }
   ]
