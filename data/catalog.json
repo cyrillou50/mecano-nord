@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T23:48:55.532Z",
+  "updatedAt": "2026-08-02T23:53:40.895Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -320,7 +320,7 @@
       "id": "deplacement",
       "name": "Déplacement",
       "category": "depannage",
-      "icon": "assets/img/deplacement.png",
+      "icon": "assets/img/deplacement2.png",
       "enabled": true,
       "note": "(hors Cayo et Manor)",
       "cost": {
@@ -331,7 +331,7 @@
       "id": "deplacement-eloigne",
       "name": "Déplacement éloigné",
       "category": "depannage",
-      "icon": "assets/img/deplacement.png",
+      "icon": "assets/img/deplacement2.png",
       "enabled": true,
       "note": "(Cayo et Manor uniquement)",
       "cost": {
