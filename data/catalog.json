@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-03T02:35:44.368Z",
+  "updatedAt": "2026-08-03T04:34:31.303Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -36,7 +36,7 @@
     },
     {
       "id": "ecumeria",
-      "pseudo": "Écuméria",
+      "pseudo": "Écuméria Sereinécaille",
       "role": "Secrétaire",
       "perms": [
         "bt",
@@ -48,7 +48,7 @@
     },
     {
       "id": "mika",
-      "pseudo": "Mika",
+      "pseudo": "Mika Walker",
       "role": "Patron",
       "perms": [
         "bt"
@@ -59,7 +59,7 @@
     },
     {
       "id": "lexa",
-      "pseudo": "Lexa",
+      "pseudo": "Lexa Storm",
       "role": "Garagiste",
       "perms": [
         "bt"
@@ -70,7 +70,7 @@
     },
     {
       "id": "tony",
-      "pseudo": "Tony",
+      "pseudo": "Tony Dino",
       "role": "Garagiste",
       "perms": [
         "bt"
