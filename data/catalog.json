@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-03T15:04:15.216Z",
+  "updatedAt": "2026-08-03T15:05:15.318Z",
   "settings": {
     "webhook": {
       "bt": "https://discord.com/api/webhooks/1533845560908316924/qbc5rNdjgsrpChsNptayDj65kTvAbhBFXllsBaiA5eWl6LpT4fG03VzF2fQOYnLUbHwe",
@@ -92,7 +92,7 @@
       "roleId": "createur-du-site",
       "pin": "04d8f2bfadde9dd1bbed6f931f6dcba03c994ee7c6f4fe6c8ec14e696c4d6773",
       "active": true,
-      "hidden": false,
+      "hidden": true,
       "createdAt": "2026-08-02T21:50:24.604Z",
       "hiredAt": "2026-08-02",
       "trainings": [],
