@@ -339,10 +339,12 @@
 
 .panel + .panel, .pubstate + .panel { margin-top: 0; }
 
+/* Chevron texte des <details> simples (aperçu JSON…). Les semaines de service
+   ont leur propre chevron : on les exclut, sinon les deux se cumulent. */
 details > summary { list-style: none; }
 details > summary::-webkit-details-marker { display: none; }
-details > summary::before { content: "▸ "; color: var(--pink); }
-details[open] > summary::before { content: "▾ "; }
+details:not(.svcweek) > summary::before { content: "▸ "; color: var(--pink); }
+details[open]:not(.svcweek) > summary::before { content: "▾ "; }
 
 /* ---- Service ---------------------------------------------------------------- */
 
@@ -388,6 +390,9 @@ details[open] > summary::before { content: "▾ "; }
 
 /* ---- Équipe : menu de gauche ------------------------------------------------- */
 
+/* Colonne plus large : les noms complets tiennent sans être coupés. */
+.admin--staff { grid-template-columns: 310px minmax(0, 1fr); }
+
 .stafflist {
   position: sticky;
   top: calc(var(--topbar-h) + 22px);
@@ -413,8 +418,13 @@ details[open] > summary::before { content: "▾ "; }
 .staffrow:hover { background: rgba(255, 255, 255, .05); }
 .staffrow.is-active { background: var(--pink-ink); box-shadow: inset 2px 0 0 var(--pink); }
 .staffrow.is-off { opacity: .45; }
-.staffrow__txt { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.25; }
-.staffrow__txt b { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.staffrow__txt { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.28; }
+/* Les prénoms + noms longs passent à la ligne plutôt que d'être coupés. */
+.staffrow__txt b {
+  font-size: 13.5px; font-weight: 600;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .staffrow__txt i {
   font-style: normal; font-size: 11px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -468,6 +478,105 @@ details[open] > summary::before { content: "▾ "; }
   margin-bottom: 5px;
 }
 .stat__v { font-family: var(--font-display); font-size: 17px; font-weight: 800; }
+
+/* ---- Historique de service, groupé par mois puis par jour ------------------- */
+
+.svc { display: flex; flex-direction: column; gap: 16px; }
+
+/* une semaine repliable */
+.svcweek {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+  background: rgba(255, 255, 255, .012);
+}
+.svcweek[open] { border-color: var(--line-2); }
+
+.svcweek__head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px;
+  cursor: pointer;
+  list-style: none;
+  background: rgba(255, 255, 255, .04);
+  transition: background .14s;
+}
+/* On masque la flèche native du <summary> : la nôtre suffit. */
+.svcweek__head::-webkit-details-marker { display: none; }
+.svcweek__head::marker { content: ""; }
+.svcweek__head::before { content: none; }
+.svcweek__head:hover { background: rgba(255, 255, 255, .07); }
+.svcweek[open] .svcweek__head { border-bottom: 1px solid var(--line); }
+
+.svcweek__chev { display: grid; place-items: center; color: var(--dim); transition: transform .18s; }
+.svcweek__chev svg { width: 15px; height: 15px; }
+.svcweek[open] .svcweek__chev { transform: rotate(180deg); color: var(--pink-soft); }
+
+.svcweek__label {
+  flex: 1; min-width: 0;
+  font-family: var(--font-display);
+  font-size: 13px; font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--txt);
+}
+.svcweek__meta { font-size: 12px; color: var(--dim); white-space: nowrap; }
+.svcweek__tot {
+  font-family: var(--font-display);
+  font-size: 14px; font-weight: 800;
+  color: var(--pink-soft);
+  white-space: nowrap;
+}
+
+.svcweek__recap {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 9px 14px;
+  border-top: 1px dashed var(--line);
+  font-size: 12.5px;
+  color: var(--dim);
+}
+.svcweek__recap b { font-family: var(--font-display); font-size: 13px; color: var(--muted); }
+
+.svc__day {
+  display: grid;
+  grid-template-columns: 108px 1fr auto;
+  align-items: center; gap: 12px;
+  padding: 9px 14px;
+}
+.svc__day + .svc__day { border-top: 1px solid rgba(255, 255, 255, .045); }
+.svc__day:nth-child(even) { background: rgba(255, 255, 255, .014); }
+
+.svc__date {
+  font-size: 12.5px;
+  color: var(--muted);
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.svc__slots { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.svc__slot {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.svc__tot {
+  font-family: var(--font-display);
+  font-size: 13px; font-weight: 800;
+  color: var(--txt);
+  white-space: nowrap;
+}
+
+@media (max-width: 620px) {
+  .svc__day { grid-template-columns: 1fr auto; }
+  .svc__slots { grid-column: 1 / -1; }
+}
+
+/* mode réorganisation de la liste d'équipe */
+.stafflist__body.is-sorting .staffrow { cursor: default; }
+.staffrow .ord { margin-right: -2px; }
+.staffrow .ord button { width: 20px; height: 15px; }
+.staffrow .ord svg { width: 10px; height: 10px; }
 
 /* compteur qui tourne pendant que la personne est en service */
 .stat--live {
@@ -526,7 +635,7 @@ details[open] > summary::before { content: "▾ "; }
 /* ---- Responsive ------------------------------------------------------------ */
 
 @media (max-width: 900px) {
-  .admin { grid-template-columns: 1fr; gap: 16px; }
+  .admin, .admin--staff { grid-template-columns: 1fr; gap: 16px; }
   .stafflist { position: static; max-height: 340px; }
   .staffhead { padding: 16px; }
   .staffhead__av { width: 52px; height: 52px; font-size: 19px; }

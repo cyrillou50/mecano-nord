@@ -36,7 +36,9 @@ window.MNDuty = (function () {
         roleId: String(e.roleId || ""),
         in: e.in || null,
         out: e.out || null,
-        minutes: Math.max(0, Math.round(Number(e.minutes) || 0))
+        minutes: Math.max(0, Math.round(Number(e.minutes) || 0)),
+        /* conservé : c'est ce qui distingue un oubli clôturé par un gérant */
+        forced: e.forced === true
       }))
     };
   }

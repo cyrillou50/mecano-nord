@@ -101,9 +101,30 @@ pour les autres, le pointage part sur Discord et le site le signale.
 Dans **Admin → Discord**, deux adresses : une pour les bons de travail, une
 pour les services. Un bouton **Envoyer un test** valide la configuration.
 
-⚠️ **L'adresse du webhook est enregistrée dans le fichier de données, qui est
-public.** Quelqu'un qui sait chercher peut donc écrire dans le salon. Utilise
-un salon dédié sans enjeu, et régénère le webhook depuis Discord si besoin.
+Tu peux aussi donner au bot un **logo** et un **nom** propres (section
+« Apparence du bot »). Le logo doit être une image **déjà publiée en ligne** :
+c'est Discord qui va la chercher.
+
+### Confidentialité des webhooks
+
+Les adresses sont **brouillées** dans `data/catalog.json` : on ne les trouve
+plus en cherchant « discord.com » dedans.
+
+⚠️ **Ce n'est pas une protection, juste un ralentisseur.** Le site doit
+pouvoir lire l'adresse pour envoyer les messages, donc quelqu'un de motivé
+peut la retrouver. Même chose pour l'inspecteur du navigateur : il est
+impossible de le bloquer, et tout le code d'un site statique est public par
+construction.
+
+**La seule vraie parade** est le relais : un petit service qui garde les
+adresses de son côté. Le fichier `relais-webhook.js` à la racine est prêt à
+déployer sur Cloudflare Workers (gratuit, ~10 minutes, sans carte bancaire) —
+les instructions sont en tête du fichier. Une fois en place, tu colles
+l'adresse du relais dans **Admin → Discord** et tu vides les champs Discord :
+les webhooks ne sont alors plus du tout dans le dépôt.
+
+En attendant, utilise un salon dédié sans enjeu, et régénère le webhook depuis
+Discord au moindre doute.
 
 ### Limiter les quantités
 

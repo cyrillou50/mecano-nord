@@ -412,8 +412,7 @@
       body: recap + form,
       actions: [
         { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
-        { label: "Enregistrer", variant: "btn--primary", icon: "save", onClick: (c, b) => { save(b, false); c(); } },
-        { label: "Enregistrer + copier", variant: "btn--solid", icon: "copy", onClick: (c, b) => { save(b, true); c(); } }
+        { label: "Enregistrer", variant: "btn--solid", icon: "save", onClick: (c, b) => { save(b, false); c(); } }
       ]
     });
 

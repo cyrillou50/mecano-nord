@@ -1,26 +1,75 @@
 /* ==========================================================================
    Envoi de messages sur Discord via webhook.
 
-   ⚠ À savoir : l'adresse du webhook est enregistrée dans data/catalog.json,
-   qui est public. N'importe qui sachant regarder peut donc écrire dans le
-   salon concerné. Utilise un salon dédié, sans enjeu, et régénère l'adresse
-   depuis Discord si tu vois passer n'importe quoi.
+   ⚠ À LIRE, c'est important.
+   L'adresse du webhook est enregistrée dans data/catalog.json, qui est
+   public : le site doit pouvoir l'utiliser, donc il doit pouvoir la lire, et
+   ce qu'un navigateur peut lire, une personne le peut aussi.
+
+   Elle est brouillée (voir `pack`/`unpack` plus bas) pour qu'on ne la trouve
+   pas en cherchant simplement « discord.com/api/webhooks » dans le fichier.
+   C'est un ralentisseur, PAS une protection : quelqu'un de motivé la
+   retrouvera. Utilise un salon dédié sans enjeu, et régénère l'adresse depuis
+   Discord au moindre doute.
+
+   La seule vraie parade est de passer par un relais qui garde l'adresse
+   côté serveur — voir le champ « proxy » et le README.
    ========================================================================== */
 
 window.MNWebhook = (function () {
   "use strict";
 
   const RE = /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+$/i;
+  const TAG = "enc:";
+  const KEY = "MecanoNord/DayOfDecay";
 
   const conf = () => {
     try { return MNStore.settings().webhook || {}; } catch (_) { return {}; }
   };
 
-  /** L'adresse ressemble-t-elle à un webhook Discord ? */
-  const isValid = url => RE.test(String(url || "").trim());
+  /* ---- Brouillage de l'adresse ---------------------------------------------
+     XOR + base64. Réversible par construction : le but est seulement d'éviter
+     qu'une adresse de webhook traîne en clair et se retrouve indexée ou
+     copiée d'un coup d'œil. Ce n'est pas du chiffrement. */
+
+  function xor(s) {
+    let out = "";
+    for (let i = 0; i < s.length; i++) {
+      out += String.fromCharCode(s.charCodeAt(i) ^ KEY.charCodeAt(i % KEY.length));
+    }
+    return out;
+  }
+
+  const b64 = s => btoa(String.fromCharCode.apply(null, new TextEncoder().encode(s)));
+  const unb64 = s => new TextDecoder().decode(Uint8Array.from(atob(s), c => c.charCodeAt(0)));
+
+  /** Adresse en clair → forme brouillée stockée dans le catalogue. */
+  function pack(url) {
+    const u = String(url || "").trim();
+    if (!u || u.indexOf(TAG) === 0) return u;
+    try { return TAG + b64(xor(u)); } catch (_) { return u; }
+  }
+
+  /** Forme stockée → adresse utilisable. */
+  function unpack(v) {
+    const s = String(v || "").trim();
+    if (s.indexOf(TAG) !== 0) return s;
+    try { return xor(unb64(s.slice(TAG.length))); } catch (_) { return ""; }
+  }
+
+  /** L'adresse ressemble-t-elle à un webhook Discord ? (brouillée ou non) */
+  const isValid = url => RE.test(unpack(url));
 
   /** Un webhook est-il configuré pour ce type de message ? */
   const has = kind => isValid(conf()[kind]);
+
+  /** Chemin relatif → adresse absolue, indispensable pour l'avatar Discord. */
+  function absUrl(u) {
+    const s = String(u || "").trim();
+    if (!s) return "";
+    if (/^https?:\/\//i.test(s)) return s;
+    return location.origin + location.pathname.replace(/[^/]*$/, "") + s.replace(/^\.?\//, "");
+  }
 
   const COLORS = {
     bt: 0xff2bd1,        // rose : bon de travail
@@ -35,30 +84,44 @@ window.MNWebhook = (function () {
    * @returns {Promise<{ok:boolean, skipped?:boolean, error?:string}>}
    */
   async function send(kind, embed) {
-    const url = String(conf()[kind] || "").trim();
-    if (!url) return { ok: false, skipped: true };
-    if (!isValid(url)) return { ok: false, error: "Adresse de webhook invalide." };
+    const c = conf();
+    const stored = String(c[kind] || "").trim();
+    if (!stored) return { ok: false, skipped: true };
+    if (!isValid(stored)) return { ok: false, error: "Adresse de webhook invalide." };
 
     const brand = MNStore.brand();
+    const avatar = absUrl(c.avatar || brand.logo);
+
     const body = {
-      username: brand.name,
+      username: String(c.name || brand.name).slice(0, 80),
       embeds: [Object.assign({
         color: COLORS.bt,
         timestamp: new Date().toISOString(),
-        footer: { text: brand.name + " · " + brand.tagline }
+        footer: Object.assign(
+          { text: brand.name + " · " + brand.tagline },
+          avatar ? { icon_url: avatar } : {}
+        )
       }, embed)]
     };
-    const mention = String(conf().mention || "").trim();
+    if (avatar) body.avatar_url = avatar;
+
+    const mention = String(c.mention || "").trim();
     if (mention) {
       body.content = mention;
       body.allowed_mentions = { parse: ["roles", "users"] };
     }
 
+    /* Un relais garde l'adresse du webhook côté serveur : c'est la seule
+       façon qu'elle ne soit pas dans le dépôt. Sans relais, envoi direct. */
+    const proxy = String(c.proxy || "").trim();
+    const target = proxy || unpack(stored);
+    const payload = proxy ? { kind, message: body } : body;
+
     try {
-      const r = await fetch(url, {
+      const r = await fetch(target, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
+        body: JSON.stringify(payload)
       });
       if (r.ok || r.status === 204) return { ok: true };
       if (r.status === 401 || r.status === 404) {
@@ -126,5 +189,5 @@ window.MNWebhook = (function () {
     });
   }
 
-  return { isValid, has, send, sendBT, sendDuty, sendTest };
+  return { isValid, has, send, sendBT, sendDuty, sendTest, pack, unpack, absUrl };
 })();

@@ -14,30 +14,24 @@
   let sel = null;
   let filter = "";
   let canEdit = false;
+  let canSeeNotes = false;
   let showHidden = false;
+  let reorder = false;
 
   MNUI.start({ page: "equipe", title: "Équipe", onReady: init });
 
+  /* La page est ouverte à toute l'équipe : chacun peut consulter les fiches.
+     Seuls les responsables peuvent modifier quoi que ce soit. */
   async function init(session) {
     me = session;
-    if (!MNAuth.canAny("staff", "promote", "users")) return denied();
-
     canEdit = MNAuth.canAny("promote", "users");
+    canSeeNotes = MNAuth.canAny("staff", "promote", "users");
     draft = MNStore.clone(MNStore.catalog());
     const first = visibleUsers()[0];
     sel = first ? first.id : null;
 
     await MNDuty.load(false).catch(() => {});
     render();
-  }
-
-  function denied() {
-    $("#staff-root").innerHTML =
-      '<div class="denied"><div class="denied__in">' + svg("lock") +
-        "<h2>Accès refusé</h2><p>Ton rôle (" + esc(me.role) + ") ne donne pas accès aux fiches " +
-        "de l'équipe. Demande la permission « Voir les fiches » à un responsable.</p>" +
-        '<a class="btn btn--primary" href="index.html">Retour à la facturation</a>' +
-      "</div></div>";
   }
 
   /* ---- Enregistrement --------------------------------------------------------- */
@@ -83,7 +77,7 @@
   function render() {
     renderDraftbar();
     $("#staff-root").innerHTML =
-      '<div class="wrap admin">' +
+      '<div class="wrap admin admin--staff">' +
         '<nav class="stafflist" id="staff-nav"></nav>' +
         '<div class="pane" id="staff-pane"></div>' +
       "</div>";
@@ -107,26 +101,47 @@
       !f || u.pseudo.toLowerCase().indexOf(f) !== -1 || roleOf(u).name.toLowerCase().indexOf(f) !== -1);
     const nHidden = hiddenCount();
 
+    /* Réorganiser n'a de sens que sur la liste entière, sans filtre. */
+    const canSort = canEdit && reorder && !filter;
+
     nav.innerHTML =
       '<div class="stafflist__top">' +
         '<input class="input" id="s-find" placeholder="Chercher…" value="' + esc(filter) + '">' +
-        (canEdit ? '<button class="btn btn--primary btn--sm btn--block" id="s-add" style="margin-top:8px">' +
-          svg("plus") + "<span>Nouvel employé</span></button>" : "") +
+        (canEdit
+          ? '<div class="row" style="margin-top:8px;gap:6px">' +
+              '<button class="btn btn--primary btn--sm" id="s-add" style="flex:1">' +
+                svg("plus") + "<span>Employé</span></button>" +
+              '<button class="btn btn--sm ' + (reorder ? "btn--solid" : "btn--ghost") + '" id="s-sort"' +
+                ' title="Réorganiser la liste">' + svg(reorder ? "check" : "layers") + "</button>" +
+            "</div>"
+          : "") +
+        (reorder && filter
+          ? '<p class="hint hint--warn" style="margin-top:8px">Vide la recherche pour réorganiser.</p>'
+          : "") +
       "</div>" +
-      '<div class="stafflist__body">' +
+      '<div class="stafflist__body' + (canSort ? " is-sorting" : "") + '">' +
         (list.length ? list.map(u => {
           const r = roleOf(u);
           const on = MNDuty.isOn(u.id);
-          return '<button class="staffrow' + (u.id === sel ? " is-active" : "") +
+          const i = draft.users.indexOf(u);
+          return '<div class="staffrow' + (u.id === sel ? " is-active" : "") +
             (u.active ? "" : " is-off") + (u.hidden ? " is-hidden" : "") +
-            '" data-u="' + esc(u.id) + '">' +
+            '" data-u="' + esc(u.id) + '" role="button" tabindex="0">' +
+            (canSort
+              ? '<span class="ord">' +
+                  '<button data-mv="up"' + (i === 0 ? " disabled" : "") + ' aria-label="Monter">' +
+                    svg("chevUp") + "</button>" +
+                  '<button data-mv="down"' + (i === draft.users.length - 1 ? " disabled" : "") +
+                    ' aria-label="Descendre">' + svg("chevDown") + "</button>" +
+                "</span>"
+              : "") +
             '<span class="userchip__av" style="width:34px;height:34px;flex:none;background:' +
               esc(r.color) + '">' + esc(MNUI.initials(u.pseudo)) + "</span>" +
             '<span class="staffrow__txt"><b>' + esc(u.pseudo) + "</b>" +
               '<i style="color:' + esc(r.color) + '">' + esc(r.name) + "</i></span>" +
             (u.hidden ? '<span class="staffrow__eye" title="Masqué de l\'équipe">' + svg("lock") + "</span>" : "") +
             (on ? '<span class="dutydot" title="En service"></span>' : "") +
-          "</button>";
+          "</div>";
         }).join("") : '<p class="hint" style="padding:12px">Personne ne correspond.</p>') +
       "</div>" +
       '<div class="stafflist__foot">' +
@@ -137,6 +152,26 @@
             (nHidden > 1 ? "s" : "") + "</span></button>"
           : "") +
       "</div>";
+
+    const sortBtn = $("#s-sort");
+    if (sortBtn) sortBtn.addEventListener("click", () => {
+      reorder = !reorder;
+      renderList();
+      MNUI.toast(reorder ? "Réorganisation : utilise les flèches" : "Réorganisation terminée", "info");
+    });
+
+    nav.querySelectorAll("[data-mv]").forEach(b => b.addEventListener("click", e => {
+      e.stopPropagation();
+      if (b.disabled) return;
+      const id = b.closest("[data-u]").dataset.u;
+      const i = draft.users.findIndex(x => x.id === id);
+      const j = i + (b.dataset.mv === "up" ? -1 : 1);
+      if (j < 0 || j >= draft.users.length) return;
+      draft.users.splice(j, 0, draft.users.splice(i, 1)[0]);
+      draft = MNStore.saveDraft(draft);
+      renderDraftbar();
+      renderList();
+    }));
 
     const hb = $("#s-hidden");
     if (hb) hb.addEventListener("click", () => {
@@ -159,11 +194,13 @@
     const add = $("#s-add");
     if (add) add.addEventListener("click", newUser);
 
-    nav.querySelectorAll("[data-u]").forEach(b => b.addEventListener("click", () => {
-      sel = b.dataset.u;
-      renderList();
-      renderCard();
-    }));
+    nav.querySelectorAll("[data-u]").forEach(b => {
+      const pick = () => { sel = b.dataset.u; renderList(); renderCard(); };
+      b.addEventListener("click", pick);
+      b.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); }
+      });
+    });
   }
 
   /* ---- Fiche ------------------------------------------------------------------ */
@@ -209,20 +246,6 @@
             stat("Formations", String((u.trainings || []).length)) +
           "</div>" +
 
-          '<h3 class="section-title" style="margin-top:24px">Formations' +
-            '<span class="count">' + (u.trainings || []).length + "</span></h3>" +
-          ((u.trainings || []).length
-            ? '<div class="permtags">' + u.trainings.map(t =>
-                '<span class="permtag">' + esc(t) + "</span>").join("") + "</div>"
-            : '<p class="hint">Aucune formation enregistrée.</p>') +
-
-          (u.note
-            ? '<h3 class="section-title" style="margin-top:24px">Note</h3>' +
-              '<p class="hint" style="white-space:pre-wrap">' + esc(u.note) + "</p>"
-            : "") +
-
-          serviceSection(u, on) +
-
           '<h3 class="section-title" style="margin-top:24px">Carrière' +
             '<span class="count">' + hist.length + "</span></h3>" +
           '<ol class="timeline">' + hist.map((h, i) => {
@@ -238,6 +261,20 @@
                   (h.note ? " · " + esc(h.note) : "") + "</div>" +
               "</div></li>";
           }).join("") + "</ol>" +
+
+          '<h3 class="section-title" style="margin-top:24px">Formations' +
+            '<span class="count">' + (u.trainings || []).length + "</span></h3>" +
+          ((u.trainings || []).length
+            ? '<div class="permtags">' + u.trainings.map(t =>
+                '<span class="permtag">' + esc(t) + "</span>").join("") + "</div>"
+            : '<p class="hint">Aucune formation enregistrée.</p>') +
+
+          serviceSection(u, on) +
+
+          (u.note && canSeeNotes
+            ? '<h3 class="section-title" style="margin-top:24px">Note interne</h3>' +
+              '<p class="hint" style="white-space:pre-wrap">' + esc(u.note) + "</p>"
+            : "") +
         "</div>" +
       "</div>";
 
@@ -245,37 +282,103 @@
     const e = $("#c-edit"); if (e) e.addEventListener("click", () => editCard(u));
   }
 
-  /** Historique complet des services de la personne. */
-  function serviceSection(u, on) {
-    const log = MNDuty.logOf(u.id);
-    const shown = log.slice(0, 40);
+  const hhmm = d => new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
-    return '<h3 class="section-title" style="margin-top:24px">Historique de service' +
-        '<span class="count">' + log.length + "</span></h3>" +
+  /**
+   * Historique de service, regroupé par mois puis par jour : une ligne par
+   * journée avec ses créneaux et son total, plutôt qu'une longue liste plate.
+   */
+  function serviceSection(u, on) {
+    const log = MNDuty.logOf(u.id).slice(0, 200);
+
+    const head = '<h3 class="section-title" style="margin-top:24px">Historique de service' +
+      '<span class="count">' + log.length + "</span></h3>" +
       (on
-        ? '<div class="alert alert--ok" style="margin-bottom:10px">' + svg("check") +
-          "<span><b>En service actuellement</b> depuis " +
-          new Date(MNDuty.entryOf(u.id).since).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) +
+        ? '<div class="alert alert--ok" style="margin-bottom:12px">' + svg("check") +
+          "<span><b>En service actuellement</b> depuis " + hhmm(MNDuty.entryOf(u.id).since) +
           " — " + MNDuty.sinceHuman(MNDuty.entryOf(u.id).since) + ".</span></div>"
-        : "") +
-      (shown.length
-        ? '<div class="rows">' + shown.map(e =>
-            '<div class="trow"><div class="trow__main">' +
-              "<b>" + new Date(e.in).toLocaleDateString("fr-FR",
-                { weekday: "long", day: "2-digit", month: "long" }) + "</b>" +
-              '<div class="trow__meta"><i>' +
-                new Date(e.in).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) +
-                " → " + new Date(e.out).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) +
-                "</i>" + (e.forced ? '<span class="permtag">clôturé par un gérant</span>' : "") +
-              "</div></div>" +
-              '<span class="trow__price tnum">' + MNDuty.human(e.minutes) + "</span></div>"
-          ).join("") + "</div>" +
-          (log.length > shown.length
-            ? '<p class="hint" style="margin-top:8px">' + (log.length - shown.length) +
-              " service(s) plus ancien(s) non affiché(s).</p>"
-            : "")
-        : '<p class="hint">Aucun service terminé enregistré' +
-          (MNDuty.canShare() ? "" : " (le tableau partagé n'est pas accessible depuis cet appareil)") + ".</p>");
+        : "");
+
+    if (!log.length) {
+      return head + '<p class="hint">Aucun service terminé enregistré' +
+        (MNDuty.canShare() ? "" : " (le tableau partagé n'est pas accessible depuis cet appareil)") + ".</p>";
+    }
+
+    /* Regroupement : semaine → jour → créneaux */
+    const weeks = [];
+    const thisWeek = MNDuty.weekStart();
+
+    log.forEach(e => {
+      const d = new Date(e.in);
+      const mon = new Date(d);
+      mon.setHours(0, 0, 0, 0);
+      mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
+      const wKey = mon.getTime();
+      const dKey = d.toDateString();
+
+      let wk = weeks.find(x => x.key === wKey);
+      if (!wk) {
+        wk = { key: wKey, minutes: 0, sessions: 0, days: [], label: weekLabel(mon) };
+        weeks.push(wk);
+      }
+      wk.minutes += e.minutes;
+      wk.sessions++;
+
+      let day = wk.days.find(x => x.key === dKey);
+      if (!day) {
+        day = {
+          key: dKey, minutes: 0, slots: [], forced: false,
+          label: d.toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "2-digit" })
+        };
+        wk.days.push(day);
+      }
+      day.minutes += e.minutes;
+      day.slots.push(hhmm(e.in) + "–" + hhmm(e.out));
+      if (e.forced) day.forced = true;
+    });
+
+    /* La semaine en cours est dépliée, les précédentes repliées. */
+    return head + '<div class="svc">' + weeks.map(wk =>
+      "<details class=\"svcweek\"" + (wk.key === thisWeek ? " open" : "") + ">" +
+        '<summary class="svcweek__head">' +
+          '<span class="svcweek__chev">' + svg("chevDown") + "</span>" +
+          '<span class="svcweek__label">' + esc(wk.label) +
+            (wk.key === thisWeek ? ' <span class="pill pill--ok">en cours</span>' : "") + "</span>" +
+          '<span class="svcweek__meta">' + wk.days.length + " j · " + wk.sessions + " service" +
+            (wk.sessions > 1 ? "s" : "") + "</span>" +
+          '<b class="svcweek__tot tnum">' + MNDuty.human(wk.minutes) + "</b>" +
+        "</summary>" +
+        '<div class="svcweek__body">' +
+          wk.days.map(d =>
+            '<div class="svc__day">' +
+              '<span class="svc__date">' + esc(d.label) + "</span>" +
+              '<span class="svc__slots">' + d.slots.map(s =>
+                '<span class="svc__slot tnum">' + esc(s) + "</span>").join("") +
+                (d.forced ? '<span class="permtag">clôturé par un gérant</span>' : "") +
+              "</span>" +
+              '<span class="svc__tot tnum">' + MNDuty.human(d.minutes) + "</span>" +
+            "</div>"
+          ).join("") +
+          '<div class="svcweek__recap">' +
+            "<span>Moyenne par jour travaillé</span>" +
+            '<b class="tnum">' + MNDuty.human(Math.round(wk.minutes / wk.days.length)) + "</b>" +
+          "</div>" +
+        "</div>" +
+      "</details>"
+    ).join("") + "</div>";
+  }
+
+  /** « Semaine du 3 au 9 août 2026 », en évitant les répétitions inutiles. */
+  function weekLabel(monday) {
+    const sunday = new Date(monday);
+    sunday.setDate(sunday.getDate() + 6);
+    const sameMonth = monday.getMonth() === sunday.getMonth();
+    const sameYear = monday.getFullYear() === sunday.getFullYear();
+
+    const a = monday.toLocaleDateString("fr-FR",
+      sameMonth && sameYear ? { day: "numeric" } : { day: "numeric", month: "long" });
+    const b = sunday.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+    return "Semaine du " + a + " au " + b;
   }
 
   const stat = (label, value, live) =>

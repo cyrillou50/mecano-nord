@@ -899,7 +899,7 @@
 
     host.innerHTML =
       '<div class="toolbar">' +
-        '<span class="subtitle">Qui peut se connecter, et avec quels droits</span>' +
+        '<span class="subtitle">Qui peut se connecter, et avec quels droits — les flèches réordonnent la liste</span>' +
         '<span class="spacer"></span>' +
         '<button class="btn btn--primary" id="add">' + svg("plus") + "<span>Nouvel employé</span></button>" +
       "</div>" +
@@ -937,7 +937,14 @@
             }).join(""))
       : '<span class="permtag permtag--none">aucun droit</span>';
 
+    const idx = draft.users.indexOf(u);
+
     return '<div class="trow' + (u.active ? "" : " is-off") + '" data-row="' + esc(u.id) + '">' +
+      '<div class="ord">' +
+        '<button data-a="up"' + (idx === 0 ? " disabled" : "") + ' aria-label="Monter">' + svg("chevUp") + "</button>" +
+        '<button data-a="down"' + (idx === draft.users.length - 1 ? " disabled" : "") +
+          ' aria-label="Descendre">' + svg("chevDown") + "</button>" +
+      "</div>" +
       '<div class="userchip__av" style="width:38px;height:38px;flex:none;background:' +
         esc(role.color) + '">' + esc(MNUI.initials(u.pseudo)) + "</div>" +
       '<div class="trow__main">' +
@@ -1446,6 +1453,8 @@
     const w = draft.settings.webhook;
     const me = MNAuth.session();
 
+    /* Les champs affichent l'adresse en clair ; le brouillage se fait à
+       l'enregistrement, de façon transparente. */
     const block = (key, title, desc) =>
       '<div class="panel"><div class="panel__head"><h2>' + title + "</h2>" +
         (MNWebhook.isValid(w[key]) ? '<span class="pill pill--ok">configuré</span>' : '<span class="pill pill--dim">vide</span>') +
@@ -1453,7 +1462,7 @@
       '<div class="panel__body editor">' +
         '<p class="hint">' + desc + "</p>" +
         '<div class="field"><label class="label" for="w-' + key + '">Adresse du webhook</label>' +
-          '<input class="input mono" id="w-' + key + '" value="' + esc(w[key]) +
+          '<input class="input mono" id="w-' + key + '" value="' + esc(MNWebhook.unpack(w[key])) +
             '" placeholder="https://discord.com/api/webhooks/..."></div>' +
         '<div class="row row--wrap">' +
           '<button class="btn btn--ghost btn--sm" data-test="' + key + '">' + svg("cloud") +
@@ -1476,14 +1485,45 @@
       block("duty", "Prises de service",
         "Chaque arrivée et chaque départ de l'atelier y est annoncé, avec la durée du service.") +
 
-      '<div class="panel"><div class="panel__head"><h2>Mention</h2></div>' +
+      '<div class="panel"><div class="panel__head"><h2>Apparence du bot</h2></div>' +
         '<div class="panel__body editor">' +
-          '<div class="field"><label class="label" for="w-mention">Texte de mention (facultatif)</label>' +
-            '<input class="input mono" id="w-mention" value="' + esc(w.mention) +
-              '" placeholder="&lt;@&amp;123456789012345678&gt;" maxlength="80"></div>' +
-          '<p class="hint">Ajouté avant chaque message. Pour mentionner un rôle : clic droit sur le rôle ' +
-            "dans Discord → Copier l'identifiant, puis écris <code>&lt;@&amp;identifiant&gt;</code>. " +
-            "Laisse vide pour ne mentionner personne.</p>" +
+          '<div class="iconpick">' +
+            '<div class="iconpick__preview" id="w-ava-prev">' +
+              mnIcon(w.avatar || draft.settings.brand.logo || "i-wrench") + "</div>" +
+            '<div style="flex:1;display:flex;flex-direction:column;gap:8px">' +
+              '<div class="row row--wrap">' +
+                '<button class="btn btn--ghost btn--sm" id="w-ava-pick" type="button">' + svg("upload") +
+                  "<span>Choisir un logo</span></button>" +
+                '<button class="btn btn--ghost btn--sm" id="w-ava-clear" type="button"' +
+                  (w.avatar ? "" : " disabled") + ">" + svg("x") + "<span>Reprendre le logo du site</span></button>" +
+              "</div>" +
+              '<p class="hint">Photo de profil du bot sur Discord. Vide = le logo de l\'atelier. ' +
+                "Discord doit pouvoir la télécharger : elle doit donc être déjà <b>publiée en ligne</b>.</p>" +
+            "</div>" +
+          "</div>" +
+          '<div class="editor__grid">' +
+            '<div class="field"><label class="label" for="w-name">Nom affiché</label>' +
+              '<input class="input" id="w-name" value="' + esc(w.name) + '" maxlength="70" placeholder="' +
+                esc(draft.settings.brand.name) + '"></div>' +
+            '<div class="field"><label class="label" for="w-mention">Mention (facultatif)</label>' +
+              '<input class="input mono" id="w-mention" value="' + esc(w.mention) +
+                '" placeholder="&lt;@&amp;123456789012345678&gt;" maxlength="80"></div>' +
+          "</div>" +
+          '<p class="hint">La mention est ajoutée avant chaque message. Pour un rôle : clic droit sur le rôle ' +
+            "dans Discord → Copier l'identifiant, puis écris <code>&lt;@&amp;identifiant&gt;</code>.</p>" +
+        "</div></div>" +
+
+      '<div class="panel"><div class="panel__head"><h2>Confidentialité des adresses</h2></div>' +
+        '<div class="panel__body editor">' +
+          '<p class="hint">Les adresses sont <b>brouillées</b> dans le fichier de données : on ne les ' +
+            "trouve pas en cherchant « discord.com » dedans. C'est un ralentisseur, pas une protection — " +
+            "le site doit pouvoir les lire, donc quelqu'un de motivé le peut aussi.</p>" +
+          '<div class="field"><label class="label" for="w-proxy">Relais (facultatif, la vraie parade)</label>' +
+            '<input class="input mono" id="w-proxy" value="' + esc(w.proxy) +
+              '" placeholder="https://mon-relais.workers.dev"></div>' +
+          '<p class="hint">Si tu renseignes un relais, le site lui envoie les messages et c\'est <b>lui</b> ' +
+            "qui connaît les adresses Discord — elles ne sont alors plus du tout dans le dépôt. " +
+            "Le code prêt à déployer est dans <code>relais-webhook.js</code> à la racine du projet.</p>" +
         "</div></div>" +
 
       '<div class="panel"><div class="panel__head"><h2>Créer un webhook</h2></div>' +
@@ -1499,10 +1539,24 @@
       '<div class="row" style="justify-content:flex-end">' +
         '<button class="btn btn--primary" id="w-save">' + svg("save") + "<span>Enregistrer</span></button></div>";
 
+    let avatar = w.avatar;
+    const avaPrev = $("#w-ava-prev");
+    const paintAva = () => {
+      avaPrev.innerHTML = mnIcon(avatar || draft.settings.brand.logo || "i-wrench");
+      $("#w-ava-clear").disabled = !avatar;
+    };
+    $("#w-ava-pick").addEventListener("click", () =>
+      pickIcon(avatar || draft.settings.brand.logo || "i-wrench", v => { avatar = v; paintAva(); }));
+    $("#w-ava-clear").addEventListener("click", () => { avatar = ""; paintAva(); });
+
+    /* Ce qu'on enregistre : adresses brouillées, le reste tel quel. */
     const read = () => ({
-      bt: $("#w-bt").value.trim(),
-      duty: $("#w-duty").value.trim(),
-      mention: $("#w-mention").value.trim()
+      bt: MNWebhook.pack($("#w-bt").value.trim()),
+      duty: MNWebhook.pack($("#w-duty").value.trim()),
+      mention: $("#w-mention").value.trim(),
+      name: $("#w-name").value.trim(),
+      avatar,
+      proxy: $("#w-proxy").value.trim()
     });
 
     $("#w-save").addEventListener("click", () => {
@@ -1511,6 +1565,9 @@
         if (v[k] && !MNWebhook.isValid(v[k])) {
           return MNUI.toast("Adresse de webhook invalide (" + (k === "bt" ? "BT" : "services") + ")", "err");
         }
+      }
+      if (v.proxy && !/^https:\/\/.+/i.test(v.proxy)) {
+        return MNUI.toast("L'adresse du relais doit commencer par https://", "err");
       }
       draft.settings.webhook = v;
       commit();

@@ -55,9 +55,15 @@ window.MNStore = (function () {
     const b = s.brand || {}, a = s.auth || {}, g = s.github || {}, w = s.webhook || {};
     c.settings = {
       webhook: {
+        /* Adresses brouillées au repos — voir assets/js/webhook.js */
         bt: String(w.bt || ""),
         duty: String(w.duty || ""),
-        mention: String(w.mention || "")
+        mention: String(w.mention || ""),
+        /* Identité du bot Discord : vide = nom et logo de l'atelier */
+        name: String(w.name || ""),
+        avatar: String(w.avatar || ""),
+        /* Relais facultatif qui garde les adresses côté serveur */
+        proxy: String(w.proxy || "")
       },
       brand: {
         name: String(b.name || D().brand.name),
