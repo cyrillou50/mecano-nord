@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-03T21:42:03.610Z",
+  "updatedAt": "2026-08-03T21:47:15.729Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -654,6 +654,17 @@
         "tissu": 4,
         "gourde-d-eau": 6
       }
+    },
+    {
+      "id": "test",
+      "name": "test",
+      "category": "vente-soon",
+      "icon": "i-box",
+      "enabled": true,
+      "note": "",
+      "max": 0,
+      "excludes": [],
+      "cost": {}
     }
   ]
 }
