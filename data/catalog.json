@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-03T00:25:38.185Z",
+  "updatedAt": "2026-08-03T02:35:44.368Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -219,7 +219,7 @@
   "items": [
     {
       "id": "kit-phares-xenon",
-      "name": "Kit Phares Xénon",
+      "name": "Kit phares xénon",
       "category": "kits",
       "icon": "assets/img/veh_xenon.png",
       "enabled": true,
@@ -231,7 +231,7 @@
     },
     {
       "id": "kit-accessoires",
-      "name": "Kit Accessoires",
+      "name": "Kit accessoires",
       "category": "kits",
       "icon": "assets/img/meca_extras.png",
       "enabled": true,
@@ -244,7 +244,7 @@
     },
     {
       "id": "kit-carrosserie",
-      "name": "Kit Carrosserie",
+      "name": "Kit carrosserie",
       "category": "kits",
       "icon": "assets/img/meca_cosmetique.png",
       "enabled": true,
@@ -437,18 +437,9 @@
       }
     },
     {
-      "id": "kit-de-nettoyage",
-      "name": "Kit de nettoyage",
-      "category": "vente-soon",
-      "icon": "i-box",
-      "enabled": true,
-      "note": "",
-      "cost": {}
-    },
-    {
       "id": "kit-de-nettoyage-2",
       "name": "Kit de nettoyage",
-      "category": "kits",
+      "category": "vente-soon",
       "icon": "assets/img/kitdenettoyage.png",
       "enabled": true,
       "note": "",
