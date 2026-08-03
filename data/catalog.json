@@ -1,11 +1,14 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-03T14:34:48.940Z",
+  "updatedAt": "2026-08-03T15:04:15.216Z",
   "settings": {
     "webhook": {
       "bt": "https://discord.com/api/webhooks/1533845560908316924/qbc5rNdjgsrpChsNptayDj65kTvAbhBFXllsBaiA5eWl6LpT4fG03VzF2fQOYnLUbHwe",
       "duty": "https://discord.com/api/webhooks/1533841309620764833/FfVFoajWQaw7MPT5l4lW8RpxdCCAaEcsmvEBRQj44Ck0BpQD6Qmq7E7SokfjMmJsLCgY",
-      "mention": ""
+      "mention": "",
+      "name": "",
+      "avatar": "",
+      "proxy": ""
     },
     "brand": {
       "name": "Mécano Nord",
@@ -105,27 +108,6 @@
       ]
     },
     {
-      "id": "ecumeria",
-      "pseudo": "Écuméria Sereinécaille",
-      "roleId": "secretaire",
-      "pin": "5d3fd60e0b9ed92ce9b5a715842c017e867cacbc463800c11ca5e4f49d95359b",
-      "active": true,
-      "hidden": false,
-      "createdAt": "2026-08-02T22:19:25.028Z",
-      "hiredAt": "2026-08-02",
-      "trainings": [],
-      "note": "",
-      "history": [
-        {
-          "roleId": "secretaire",
-          "roleName": "Secrétaire",
-          "at": "2026-08-02T22:19:25.028Z",
-          "by": "",
-          "note": "Entrée dans l'entreprise"
-        }
-      ]
-    },
-    {
       "id": "mika",
       "pseudo": "Mika Walker",
       "roleId": "patron",
@@ -141,6 +123,27 @@
           "roleId": "patron",
           "roleName": "Patron",
           "at": "2026-08-02T22:47:59.170Z",
+          "by": "",
+          "note": "Entrée dans l'entreprise"
+        }
+      ]
+    },
+    {
+      "id": "ecumeria",
+      "pseudo": "Écuméria Sereinécaille",
+      "roleId": "secretaire",
+      "pin": "5d3fd60e0b9ed92ce9b5a715842c017e867cacbc463800c11ca5e4f49d95359b",
+      "active": true,
+      "hidden": false,
+      "createdAt": "2026-08-02T22:19:25.028Z",
+      "hiredAt": "2026-08-02",
+      "trainings": [],
+      "note": "",
+      "history": [
+        {
+          "roleId": "secretaire",
+          "roleName": "Secrétaire",
+          "at": "2026-08-02T22:19:25.028Z",
           "by": "",
           "note": "Entrée dans l'entreprise"
         }
@@ -189,27 +192,6 @@
       ]
     },
     {
-      "id": "dylan",
-      "pseudo": "Dylan Evergarden",
-      "roleId": "apprenti",
-      "pin": "4d516b07a0ff58529bb6630563c06d5252fb20455f5a5c45748eaf4a7366c57d",
-      "active": true,
-      "hidden": false,
-      "createdAt": "2026-08-02T22:53:55.623Z",
-      "hiredAt": "2026-08-02",
-      "trainings": [],
-      "note": "",
-      "history": [
-        {
-          "roleId": "apprenti",
-          "roleName": "Apprenti",
-          "at": "2026-08-02T22:53:55.623Z",
-          "by": "",
-          "note": "Entrée dans l'entreprise"
-        }
-      ]
-    },
-    {
       "id": "hakim",
       "pseudo": "Hakim Skyfou",
       "roleId": "garagiste",
@@ -225,6 +207,27 @@
           "roleId": "garagiste",
           "roleName": "Garagiste",
           "at": "2026-08-02T22:54:09.952Z",
+          "by": "",
+          "note": "Entrée dans l'entreprise"
+        }
+      ]
+    },
+    {
+      "id": "dylan",
+      "pseudo": "Dylan Evergarden",
+      "roleId": "apprenti",
+      "pin": "4d516b07a0ff58529bb6630563c06d5252fb20455f5a5c45748eaf4a7366c57d",
+      "active": true,
+      "hidden": false,
+      "createdAt": "2026-08-02T22:53:55.623Z",
+      "hiredAt": "2026-08-02",
+      "trainings": [],
+      "note": "",
+      "history": [
+        {
+          "roleId": "apprenti",
+          "roleName": "Apprenti",
+          "at": "2026-08-02T22:53:55.623Z",
           "by": "",
           "note": "Entrée dans l'entreprise"
         }
