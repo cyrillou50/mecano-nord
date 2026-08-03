@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-03T15:39:37.864Z",
+  "updatedAt": "2026-08-03T16:56:25.854Z",
   "settings": {
     "webhook": {
       "bt": "https://discord.com/api/webhooks/1533845560908316924/qbc5rNdjgsrpChsNptayDj65kTvAbhBFXllsBaiA5eWl6LpT4fG03VzF2fQOYnLUbHwe",
@@ -214,7 +214,7 @@
       "id": "hakim",
       "pseudo": "Hakim Skyfou",
       "roleId": "garagiste",
-      "pin": null,
+      "pin": "33ce5fca6a8a84351be660b6f6110a00cba12f3ec3127e7dffa31f90ff3c65b7",
       "active": true,
       "hidden": false,
       "createdAt": "2026-08-02T22:54:09.952Z",
@@ -259,7 +259,7 @@
       "id": "toma",
       "pseudo": "Toma Garcia",
       "roleId": "apprenti",
-      "pin": null,
+      "pin": "32710608011b4a76386a6e690318a171e559827d5aebaac332a2d4fca14b1139",
       "active": true,
       "hidden": false,
       "createdAt": "2026-08-02T22:54:21.786Z",
