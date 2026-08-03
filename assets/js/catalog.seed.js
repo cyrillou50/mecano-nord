@@ -8,7 +8,7 @@
 window.MN_CATALOG_SEED =
 {
     "version":  1,
-    "updatedAt":  "2026-08-03T20:21:03.709Z",
+    "updatedAt":  "2026-08-03T20:54:48.320Z",
     "settings":  {
                      "webhook":  {
                                      "bt":  "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -38,7 +38,8 @@ window.MN_CATALOG_SEED =
                                     "path":  "data/catalog.json"
                                 },
                      "relay":  "",
-                     "dutyUrl":  ""
+                     "dutyUrl":  "",
+                     "serveur":  ""
                  },
     "roles":  [
                   {

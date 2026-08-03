@@ -65,7 +65,7 @@
     if (!MNStore.hasDraft()) { bar.hidden = true; return; }
     bar.hidden = false;
 
-    const canPub = MNAuth.can("publish") && MNGitHub.hasToken() && MNGitHub.isConfigured();
+    const canPub = MNAuth.can("publish") && MNGitHub.canPublish();
     bar.innerHTML =
       '<span class="draftbar__dot"></span>' +
       '<div class="draftbar__txt"><b>Modifications non publiées.</b> ' +
@@ -264,10 +264,12 @@
 
         '<div class="panel__body">' +
           '<div class="statgrid">' +
-            stat("Ancienneté", seniority(u.hiredAt)) +
-            stat("Service cette semaine", MNDuty.dur(MNDuty.secondsFor(u.id, MNDuty.weekStart())), on, "week") +
-            stat("Service au total", MNDuty.dur(MNDuty.secondsFor(u.id)), on, "total") +
-            stat("Formations", String((u.trainings || []).length)) +
+            (() => { const a = seniority(u.hiredAt);
+              return stat("Ancienneté", a.texte, false, null, a.sous); })() +
+            stat("Service — semaine", MNDuty.dur(MNDuty.secondsFor(u.id, MNDuty.weekStart())), on, "week") +
+            stat("Service — total", MNDuty.dur(MNDuty.secondsFor(u.id)), on, "total") +
+            stat("Formations", String((u.trainings || []).length),
+              false, null, (u.trainings || []).length ? u.trainings.slice(0, 2).join(", ") : "aucune") +
           "</div>" +
 
           '<h3 class="section-title" style="margin-top:24px">Carrière' +
@@ -406,10 +408,11 @@
     return "Semaine du " + a + " au " + b;
   }
 
-  const stat = (label, value, live, key) =>
+  const stat = (label, value, live, key, sous) =>
     '<div class="stat' + (live ? " stat--live" : "") + '">' +
       '<span class="stat__l">' + esc(label) + "</span>" +
       '<b class="stat__v tnum"' + (key ? ' data-live="' + key + '"' : "") + ">" + esc(value) + "</b>" +
+      (sous ? '<span class="stat__s">' + esc(sous) + "</span>" : "") +
     "</div>";
 
   const fdatetime = d => {
@@ -422,13 +425,13 @@
    * longueur réelle de chaque mois (pas d'approximation à 30,44 jours).
    */
   function seniority(hiredAt) {
-    if (!hiredAt) return "—";
+    if (!hiredAt) return { texte: "—", sous: "" };
     const d = new Date(hiredAt + "T00:00:00");
-    if (isNaN(d)) return "—";
+    if (isNaN(d)) return { texte: "—", sous: "" };
 
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    if (d > now) return "à venir";
+    if (d > now) return { texte: "à venir", sous: "" };
 
     let years = now.getFullYear() - d.getFullYear();
     let months = now.getMonth() - d.getMonth();
@@ -442,15 +445,16 @@
     if (months < 0) { years--; months += 12; }
 
     const total = Math.round((now - d) / 86400000);
-    if (total === 0) return "aujourd'hui";
+    if (total === 0) return { texte: "aujourd'hui", sous: "recruté ce jour" };
 
     const p = [];
     if (years) p.push(years + " an" + (years > 1 ? "s" : ""));
     if (months) p.push(months + " mois");
-    if (days || !p.length) p.push(days + " jour" + (days > 1 ? "s" : ""));
+    if (days || !p.length) p.push(days + " j");
 
-    /* Le total en jours lève toute ambiguïté. */
-    return p.join(" ") + " (" + total + " j)";
+    /* Le total en jours va sur une seconde ligne : il lève l'ambiguïté sans
+       allonger la valeur principale. */
+    return { texte: p.join(" "), sous: total + " jour" + (total > 1 ? "s" : "") + " au total" };
   }
 
   /* ---- Montée de grade --------------------------------------------------------- */

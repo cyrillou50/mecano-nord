@@ -71,8 +71,7 @@
   /* ---- Publication automatique ---------------------------------------------- */
 
   const autoReady = () =>
-    localStorage.getItem(K_AUTO) === "1" && MNAuth.can("publish") &&
-    MNGitHub.hasToken() && MNGitHub.isConfigured();
+    localStorage.getItem(K_AUTO) === "1" && MNAuth.can("publish") && MNGitHub.canPublish();
 
   /** Replanifie un envoi : chaque nouvelle modif repousse le départ. */
   function queueAutoPublish() {
@@ -705,7 +704,7 @@
       if (!f) return;
 
       fileToIcon(f, async data => {
-        const canUpload = MNGitHub.hasToken() && MNGitHub.isConfigured() && MNAuth.can("publish");
+        const canUpload = MNGitHub.canPublish() && MNAuth.can("publish");
         if (!canUpload) {
           setSel(data, true);
           MNUI.toast("Image mise au gabarit et intégrée aux données (" + weight(data) + " ko)", "ok");
@@ -1176,6 +1175,9 @@
   }
 
   async function paneImages(host) {
+    /* Ajouter passe par le serveur ; renommer et supprimer exigent encore un
+       jeton personnel (le serveur n'autorise que l'écriture). */
+    const peutAjouter = MNGitHub.canPublish();
     const ready = MNGitHub.hasToken() && MNGitHub.isConfigured();
 
     host.innerHTML =
@@ -1199,7 +1201,7 @@
       e.target.value = "";
       if (!f) return;
       fileToIcon(f, async data => {
-        if (!ready) return MNUI.toast("Jeton GitHub requis pour déposer une image", "err");
+        if (!peutAjouter) return MNUI.toast("Serveur ou jeton GitHub requis pour déposer une image", "err");
         try {
           const path = await uploadToRepo(data, f.name);
           if (!path) return;
@@ -1959,25 +1961,44 @@
    * La base Firebase est la plus simple : aucun code à déployer.
    */
   function pointagePanel() {
+    const serveur = draft.settings.serveur || "";
     const base = draft.settings.dutyUrl || "";
     const relay = draft.settings.relay || "";
-    const auto = !!(base || relay);
+    const auto = !!(serveur || base || relay);
 
-    return '<div class="panel"><div class="panel__head">' + svg("users") + "<h2>Pointage de l'équipe</h2>" +
-        (auto ? '<span class="pill pill--ok">automatique</span>'
+    return '<div class="panel"><div class="panel__head">' + svg("cloud") + "<h2>Serveur de l'atelier</h2>" +
+        (auto ? '<span class="pill pill--ok">actif</span>'
               : '<span class="pill pill--warn">à configurer</span>') +
       "</div>" +
       '<div class="panel__body editor">' +
-        (auto
+        (serveur
           ? '<div class="alert alert--ok">' + svg("check") +
-            "<span><b>Tout est en place.</b> Les prises de service s'enregistrent pour toute l'équipe, " +
-            "et <b>personne n'a rien à installer</b> — ni jeton, ni réglage." +
-            (base ? " (base partagée)" : " (relais)") + "</span></div>"
-          : '<div class="alert alert--warn">' + svg("alert") +
-            "<span><b>Seuls les détenteurs d'un jeton apparaissent dans le tableau de service.</b> " +
-            "Choisis une des deux options ci-dessous : après ça, tout est automatique.</span></div>") +
+            "<span><b>Tout passe par ton serveur.</b> L'équipe pointe son service et les responsables " +
+            "publient depuis le site, <b>sans que personne n'ait de jeton</b>. Les adresses Discord " +
+            "restent chez toi.</span></div>"
+          : auto
+            ? '<div class="alert alert--ok">' + svg("check") +
+              "<span>Le pointage est partagé. Renseigne l'adresse du serveur ci-dessous pour que " +
+              "la <b>publication</b> se passe aussi de jeton.</span></div>"
+            : '<div class="alert alert--warn">' + svg("alert") +
+              "<span><b>Sans serveur, il faut un jeton GitHub par personne</b> — pour publier comme " +
+              "pour apparaître dans le tableau de service. Renseigne ton serveur ci-dessous et tout " +
+              "devient automatique.</span></div>") +
 
-        '<div class="field"><label class="label" for="w-duty">Base partagée — <b>le plus simple</b></label>' +
+        '<div class="field"><label class="label" for="w-serveur">Adresse de ton serveur</label>' +
+          '<div class="copyfield">' +
+            '<input class="input mono" id="w-serveur" value="' + esc(serveur) +
+              '" placeholder="https://mecano-nord.duckdns.org">' +
+            '<button class="btn btn--ghost" id="w-serveur-test">' + svg("cloud") + "<span>Tester</span></button>" +
+          "</div>" +
+          '<p class="hint">Une seule adresse suffit : le site en déduit tout le reste ' +
+            "(pointage, relais Discord, publication). Guide d'installation dans " +
+            "<code>serveur/README.md</code>.</p></div>" +
+        '<div id="w-serveur-msg"></div>' +
+
+        '<details><summary class="subtitle" style="cursor:pointer;padding:8px 0">' +
+          "Sans serveur : utiliser une base Firebase pour le seul pointage</summary>" +
+        '<div class="field" style="margin-top:10px"><label class="label" for="w-duty">Base partagée</label>' +
           '<div class="copyfield">' +
             '<input class="input mono" id="w-duty" value="' + esc(base) +
               '" placeholder="https://mon-projet-default-rtdb.europe-west1.firebasedatabase.app/duty">' +
@@ -1986,7 +2007,7 @@
         '<div id="w-duty-msg"></div>' +
 
         '<details><summary class="subtitle" style="cursor:pointer;padding:8px 0">' +
-          "Comment créer cette base (5 minutes, gratuit)</summary>" +
+          "Comment créer cette base Firebase (5 minutes, gratuit)</summary>" +
           '<div class="steps" style="margin-top:12px">' +
             '<div class="step"><p class="step__txt">Va sur <b>console.firebase.google.com</b> → ' +
               "<b>Créer un projet</b>. Donne-lui un nom, refuse Google Analytics.</p></div>" +
@@ -2006,18 +2027,17 @@
             "motivé pourrait salir le tableau de pointage.</p>" +
         "</details>" +
 
-        '<div class="field" style="margin-top:6px">' +
-          '<label class="label" for="w-relay">Relais — si tu veux aussi masquer les webhooks</label>' +
+        '<div class="field" style="margin-top:12px">' +
+          '<label class="label" for="w-relay">Relais Cloudflare (autre solution sans VPS)</label>' +
           '<div class="copyfield">' +
             '<input class="input mono" id="w-relay" value="' + esc(relay) +
               '" placeholder="https://mon-relais.workers.dev">' +
             '<button class="btn btn--ghost" id="w-relay-test">' + svg("cloud") + "<span>Tester</span></button>" +
           "</div></div>" +
         '<div id="w-relay-msg"></div>' +
-        '<p class="hint">Un petit service à déployer (code prêt dans <code>relais.js</code>, ' +
-          "~10 min). Il fait la même chose pour le pointage, <b>et en plus</b> il sort les adresses " +
-          "Discord du dépôt. Si les deux champs sont remplis, la base partagée est utilisée pour le " +
-          "pointage et le relais pour Discord.</p>" +
+        '<p class="hint">Code prêt dans <code>relais.js</code>. Ces deux champs ne servent que si ' +
+          "tu n'as pas de serveur : l'adresse du serveur ci-dessus les remplace tous les deux.</p>" +
+        "</details>" +
 
         '<details style="margin-top:6px"><summary class="subtitle" style="cursor:pointer;padding:6px 0">' +
           "Dépannage : partager mon jeton en attendant</summary>" +
@@ -2037,30 +2057,97 @@
   /** Écouteurs du bloc « Pointage de l'équipe ». */
   function bindPointage() {
     const lire = () => ({
+      serveur: $("#w-serveur").value.trim().replace(/\/+$/, ""),
       duty: $("#w-duty").value.trim(),
       relay: $("#w-relay").value.trim()
     });
 
     $("#w-pointage-save").addEventListener("click", () => {
       const v = lire();
-      for (const [champ, nom] of [[v.duty, "la base partagée"], [v.relay, "le relais"]]) {
-        if (champ && !/^https:\/\/.+/i.test(champ)) {
-          return MNUI.toast("L'adresse de " + nom + " doit commencer par https://", "err");
+      for (const [champ, nom] of [[v.serveur, "le serveur"],
+                                  [v.duty, "la base partagée"], [v.relay, "le relais"]]) {
+        if (champ && !/^https?:\/\/.+/i.test(champ)) {
+          return MNUI.toast("L'adresse de " + nom + " doit commencer par http:// ou https://", "err");
         }
       }
+      draft.settings.serveur = v.serveur;
       draft.settings.dutyUrl = v.duty;
       draft.settings.relay = v.relay;
       commit();
-      MNUI.toast("Réglages du pointage enregistrés dans le brouillon", "ok");
+
+      /* Une page en HTTPS ne peut pas appeler une adresse en HTTP :
+         le navigateur bloque, sans rien afficher. Mieux vaut le dire. */
+      const mixte = location.protocol === "https:" &&
+        [v.serveur, v.duty, v.relay].some(u => /^http:\/\//i.test(u));
+      if (mixte) {
+        MNUI.modal({
+          title: "Cette adresse ne fonctionnera pas ici",
+          body: '<div class="alert alert--err">' + svg("alert") +
+            "<span>Tu es sur une page <b>https://</b> et l'adresse saisie est en <b>http://</b>. " +
+            "Le navigateur bloquera l'appel sans message.</span></div>" +
+            '<p class="hint" style="margin-top:12px">Deux solutions : ouvrir le site depuis ton ' +
+            "serveur en <code>http://</code> lui aussi (tout sera alors cohérent), ou mettre un " +
+            "sous-domaine gratuit avec HTTPS devant ton IP. Les deux chemins sont détaillés dans " +
+            "<code>serveur/README.md</code>.</p>",
+          actions: [{ label: "Compris", variant: "btn--primary", onClick: c => c() }]
+        });
+      } else {
+        MNUI.toast("Réglages du pointage enregistrés dans le brouillon", "ok");
+      }
+    });
+
+    /* Test du serveur : /sante doit répondre, et on regarde ce qu'il sait faire. */
+    $("#w-serveur-test").addEventListener("click", async () => {
+      const box = $("#w-serveur-msg");
+      const url = $("#w-serveur").value.trim().replace(/\/+$/, "");
+      if (!/^https?:\/\/.+/i.test(url)) {
+        box.innerHTML = '<div class="alert alert--err">' + svg("alert") +
+          "<span>Colle l'adresse de ton serveur (http:// ou https://).</span></div>";
+        return;
+      }
+      box.innerHTML = '<div class="alert alert--info">' + svg("refresh") + "<span>Test en cours…</span></div>";
+      try {
+        const r = await fetch(url + "/sante", { cache: "no-store" });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.ok) throw new Error("réponse " + r.status);
+
+        /* On regarde si la publication est configurée côté serveur. */
+        let pub = "";
+        try {
+          const t = await fetch(url + "/publier", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: "interdit.txt", content: "x" })
+          });
+          const tj = await t.json().catch(() => ({}));
+          pub = t.status === 403 ? "ok"
+            : t.status === 501 ? "absent"
+            : "inconnu:" + t.status + (tj.error ? " " + tj.error : "");
+        } catch (_) { pub = "inconnu"; }
+
+        box.innerHTML = '<div class="alert alert--ok">' + svg("check") +
+          "<span>Serveur joignable" + (j.ops ? ", pointage sans conflit géré" : "") + ". " +
+          (pub === "ok"
+            ? "<b>La publication passera par lui</b> — plus besoin de jeton."
+            : pub === "absent"
+              ? "<b>La publication n'est pas configurée</b> : ajoute GH_TOKEN, GH_OWNER et GH_REPO " +
+                "dans le service, puis redémarre-le."
+              : "Publication : état indéterminé (" + esc(pub) + ").") +
+          "</span></div>";
+      } catch (e) {
+        box.innerHTML = '<div class="alert alert--err">' + svg("alert") +
+          "<span>Serveur injoignable. Vérifie l'adresse, que le service tourne " +
+          "(<code>systemctl status mecano-nord</code>) et que <code>ORIGINE</code> autorise ce site.</span></div>";
+      }
     });
 
     /* Test de la base : on lit la clé, ce qui valide adresse ET règles. */
     $("#w-duty-test").addEventListener("click", async () => {
       const box = $("#w-duty-msg");
       let url = $("#w-duty").value.trim().replace(/\/+$/, "");
-      if (!/^https:\/\/.+/i.test(url)) {
+      if (!/^https?:\/\/.+/i.test(url)) {
         box.innerHTML = '<div class="alert alert--err">' + svg("alert") +
-          "<span>Colle d'abord l'adresse de ta base (https://…).</span></div>";
+          "<span>Colle d'abord l'adresse de ta base (http:// ou https://).</span></div>";
         return;
       }
       if (!/\.json$/i.test(url)) url += ".json";
@@ -2097,9 +2184,9 @@
     $("#w-relay-test").addEventListener("click", async () => {
       const url = $("#w-relay").value.trim();
       const box = $("#w-relay-msg");
-      if (!/^https:\/\/.+/i.test(url)) {
+      if (!/^https?:\/\/.+/i.test(url)) {
         box.innerHTML = '<div class="alert alert--err">' + svg("alert") +
-          "<span>Colle d'abord l'adresse de ton relais (https://…).</span></div>";
+          "<span>Colle d'abord l'adresse de ton relais (http:// ou https://).</span></div>";
         return;
       }
       box.innerHTML = '<div class="alert alert--info">' + svg("refresh") + "<span>Test en cours…</span></div>";
@@ -2138,12 +2225,12 @@
 
     if (!MNAuth.can("publish")) return MNUI.toast("Tu n'as pas la permission de publier", "err");
 
-    if (!MNGitHub.hasToken() || !MNGitHub.isConfigured()) {
+    if (!MNGitHub.canPublish()) {
       if (auto) return;                       // rien à signaler, l'auto est simplement inactif
       tab = "publish"; render();
       MNUI.toast(MNGitHub.hasToken()
         ? "Renseigne le propriétaire et le nom du dépôt"
-        : "Configure d'abord le jeton GitHub (4 étapes ci-dessous)", "err");
+        : "Renseigne l'adresse de ton serveur, ou un jeton GitHub", "err");
       return;
     }
 

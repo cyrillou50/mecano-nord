@@ -17,11 +17,26 @@ window.MNDuty = (function () {
   const MAX_LOG = 120;
 
   let _board = null;
+  let _souci = "";           // dernier problème rencontré, affiché à l'écran
 
   const empty = () => ({ updatedAt: new Date(0).toISOString(), onDuty: [], log: [] });
 
   /** Écart exact en secondes entre deux horodatages. */
   const secBetween = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000));
+
+  /**
+   * fetch avec délai maximum. Sans ça, une adresse mal saisie ou un serveur
+   * injoignable laisse la page figée sur « Chargement… » indéfiniment.
+   */
+  async function fetchDelai(url, opts, ms) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms || 7000);
+    try {
+      return await fetch(url, Object.assign({}, opts, { signal: ctrl.signal }));
+    } finally {
+      clearTimeout(t);
+    }
+  }
 
   function normalize(raw) {
     const b = (raw && typeof raw === "object") ? raw : {};
@@ -61,22 +76,28 @@ window.MNDuty = (function () {
 
     let remote = null;
     const base = baseUrl();
+    _souci = "";
 
     /* La base partagée fait autorité quand elle est configurée. */
     if (base) {
       try {
-        const r = await fetch(base + "?t=" + Date.now(), { cache: "no-store" });
+        const r = await fetchDelai(base + "?t=" + Date.now(), { cache: "no-store" });
         if (r.ok) {
           const j = await r.json();
-          if (j) remote = normalize(j);
-          else remote = empty();      // base encore vide : ce n'est pas une erreur
+          remote = j ? normalize(j) : empty();   // base vide : ce n'est pas une erreur
+        } else {
+          _souci = "La base partagée a répondu " + r.status + ".";
         }
-      } catch (_) { /* hors ligne : on retombe sur le local */ }
+      } catch (e) {
+        _souci = e.name === "AbortError"
+          ? "La base partagée ne répond pas (délai dépassé)."
+          : "Base partagée injoignable.";
+      }
     }
 
     if (!remote) {
       try {
-        const r = await fetch(FILE + "?v=" + Date.now(), { cache: "no-store" });
+        const r = await fetchDelai(FILE + "?v=" + Date.now(), { cache: "no-store" });
         if (r.ok) remote = normalize(await r.json());
       } catch (_) { /* fichier absent ou file:// */ }
     }
@@ -102,7 +123,7 @@ window.MNDuty = (function () {
   const isOn = uid => !!entryOf(uid);
 
   const relayUrl = () => {
-    try { return String(MNStore.settings().relay || "").trim(); }
+    try { return MNStore.api("relais"); }
     catch (_) { return ""; }
   };
 
@@ -112,7 +133,7 @@ window.MNDuty = (function () {
    */
   function baseUrl() {
     let u = "";
-    try { u = String(MNStore.settings().dutyUrl || "").trim(); } catch (_) { return ""; }
+    try { u = MNStore.api("duty.json"); } catch (_) { return ""; }
     if (!u) return "";
     u = u.replace(/\/+$/, "");
     return /\.json$/i.test(u) ? u : u + ".json";
@@ -132,6 +153,48 @@ window.MNDuty = (function () {
   /** Le partage se fait-il sans que l'employé n'ait rien à installer ? */
   const isAuto = () => !!(baseUrl() || relayUrl());
 
+  /* ---- Opérations côté serveur ------------------------------------------------
+     Si le serveur sait appliquer les opérations lui-même, on lui envoie
+     « prends mon service » plutôt que tout le tableau. Deux personnes qui
+     pointent en même temps ne peuvent alors plus s'écraser. */
+
+  let _ops = null;          // null = pas encore su, true/false ensuite
+
+  /** Sonde une seule fois : le serveur annonce-t-il « ops » ? */
+  async function supporteOps() {
+    if (_ops !== null) return _ops;
+    const base = baseUrl();
+    if (!base) return (_ops = false);
+    try {
+      const sante = base.replace(/[^/]*$/, "") + "sante";
+      const r = await fetchDelai(sante, { cache: "no-store" }, 4000);
+      const j = r.ok ? await r.json() : null;
+      _ops = !!(j && j.ops);
+    } catch (_) {
+      _ops = false;
+    }
+    return _ops;
+  }
+
+  /** Envoie une opération. Renvoie null si ce mode n'est pas disponible. */
+  async function envoyerOp(op) {
+    if (!(await supporteOps())) return null;
+    try {
+      const r = await fetchDelai(baseUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(op)
+      });
+      if (!r.ok) return { ok: false, error: "Serveur : erreur " + r.status };
+      const j = await r.json();
+      if (j.board) { _board = normalize(j.board); saveLocal(_board); }
+      return { ok: true, deja: !!j.deja, seconds: j.seconds, retires: j.retires };
+    } catch (e) {
+      return { ok: false, error: e.name === "AbortError"
+        ? "Le serveur ne répond pas." : "Serveur injoignable." };
+    }
+  }
+
   /* ---- Écriture ------------------------------------------------------------ */
 
   function saveLocal(b) {
@@ -144,15 +207,16 @@ window.MNDuty = (function () {
     const base = baseUrl();
     if (base) {
       try {
-        const r = await fetch(base, {
+        const r = await fetchDelai(base, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(b)
         });
         if (r.ok) return { ok: true };
         return { ok: false, error: "Base de service : erreur " + r.status };
-      } catch (_) {
-        return { ok: false, error: "Base de service injoignable." };
+      } catch (e) {
+        return { ok: false, error: e.name === "AbortError"
+          ? "La base de service ne répond pas." : "Base de service injoignable." };
       }
     }
 
@@ -161,7 +225,7 @@ window.MNDuty = (function () {
     /* Le relais écrit à notre place : aucun jeton nécessaire côté employé. */
     if (relay) {
       try {
-        const r = await fetch(relay, {
+        const r = await fetchDelai(relay, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "duty", board: b, message })
@@ -170,8 +234,9 @@ window.MNDuty = (function () {
         let why = "relais : erreur " + r.status;
         try { const j = await r.json(); if (j && j.error) why = j.error; } catch (_) { /* rien */ }
         return { ok: false, error: why };
-      } catch (_) {
-        return { ok: false, error: "Relais injoignable." };
+      } catch (e) {
+        return { ok: false, error: e.name === "AbortError"
+          ? "Le relais ne répond pas." : "Relais injoignable." };
       }
     }
 
@@ -191,6 +256,16 @@ window.MNDuty = (function () {
    * @returns {Promise<{already?:boolean, shared:boolean, shareError?:string, discord:object}>}
    */
   async function clockIn(session) {
+    /* Chemin privilégié : le serveur applique l'opération lui-même. */
+    const op = await envoyerOp({
+      op: "in", id: session.uid, pseudo: session.pseudo, roleId: session.roleId || ""
+    });
+    if (op) {
+      if (op.deja) return { already: true, shared: true, discord: { skipped: true } };
+      const discord = await MNWebhook.sendDuty(session.pseudo, session.role, "in");
+      return { shared: op.ok, shareError: op.error, discord };
+    }
+
     await load(true);                       // on repart du tableau le plus frais
     const b = board();
     if (isOn(session.uid)) return { already: true, shared: false, discord: { skipped: true } };
@@ -211,6 +286,13 @@ window.MNDuty = (function () {
 
   /** Fin de service. */
   async function clockOut(session) {
+    const op = await envoyerOp({ op: "out", id: session.uid });
+    if (op) {
+      if (op.deja) return { already: true, shared: true, discord: { skipped: true } };
+      const discord = await MNWebhook.sendDuty(session.pseudo, session.role, "out", op.seconds);
+      return { shared: op.ok, shareError: op.error, discord, seconds: op.seconds };
+    }
+
     await load(true);
     const b = board();
     const i = b.onDuty.findIndex(e => e.id === session.uid);
@@ -235,6 +317,15 @@ window.MNDuty = (function () {
 
   /** Sortir quelqu'un de force (gérant). */
   async function forceOut(uid, byPseudo) {
+    const cible = entryOf(uid);
+    const op = await envoyerOp({ op: "out", id: uid, force: true });
+    if (op) {
+      if (op.deja) return { already: true };
+      const nom = cible ? cible.pseudo : uid;
+      await MNWebhook.sendDuty(nom + " (sorti par " + byPseudo + ")", "", "out", op.seconds);
+      return { shared: op.ok, shareError: op.error, seconds: op.seconds, pseudo: nom };
+    }
+
     await load(true);
     const b = board();
     const i = b.onDuty.findIndex(e => e.id === uid);
@@ -258,6 +349,15 @@ window.MNDuty = (function () {
 
   /** Mettre quelqu'un en service à sa place (gérant). */
   async function forceIn(user, byPseudo) {
+    const op = await envoyerOp({
+      op: "in", id: user.id, pseudo: user.pseudo, roleId: user.roleId || ""
+    });
+    if (op) {
+      if (op.deja) return { already: true };
+      await MNWebhook.sendDuty(user.pseudo + " (pointé par " + byPseudo + ")", "", "in");
+      return { shared: op.ok, shareError: op.error };
+    }
+
     await load(true);
     const b = board();
     if (isOn(user.id)) return { already: true };
@@ -278,6 +378,9 @@ window.MNDuty = (function () {
 
   /** Efface l'historique des pointages terminés (les personnes en service restent). */
   async function clearLog(byPseudo) {
+    const op = await envoyerOp({ op: "clear-log" });
+    if (op) return { removed: op.retires || 0, shared: op.ok, shareError: op.error };
+
     await load(true);
     const b = board();
     const n = b.log.length;
@@ -290,6 +393,13 @@ window.MNDuty = (function () {
 
   /** Supprime une ligne d'historique précise. */
   async function removeLog(index, byPseudo) {
+    const avant = board().log[index];
+    const op = await envoyerOp({ op: "remove-log", index });
+    if (op) {
+      if (op.deja) return { already: true };
+      return { shared: op.ok, shareError: op.error, pseudo: avant ? avant.pseudo : "" };
+    }
+
     await load(true);
     const b = board();
     if (index < 0 || index >= b.log.length) return { already: true };
@@ -382,6 +492,7 @@ window.MNDuty = (function () {
 
   return {
     load, board, isOn, entryOf, canShare, isAuto, relayUrl, baseUrl,
+    souci: () => _souci,
     clockIn, clockOut, forceOut, forceIn, clearLog, removeLog,
     logOf, secondsFor, weekStart,
     totals, dur, sinceDur, secBetween, minutesBetween

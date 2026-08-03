@@ -101,6 +101,70 @@ function nettoyer(b) {
 }
 
 const VIDE = { updatedAt: new Date(0).toISOString(), onDuty: [], log: [] };
+const MAX_LOG = 300;
+
+/* ---- Opérations de pointage, appliquées côté serveur -------------------------
+   Le site n'envoie plus tout le tableau mais seulement « ce qu'il veut faire ».
+   Le serveur lit, applique, écrit — le tout sérialisé. Deux personnes qui
+   pointent à la même seconde ne peuvent donc plus s'effacer mutuellement. */
+
+const secondes = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000));
+
+function appliquer(board, op) {
+  const maintenant = new Date().toISOString();
+  const b = {
+    updatedAt: maintenant,
+    onDuty: board.onDuty.slice(),
+    log: board.log.slice()
+  };
+
+  const id = texte(op.id, 60);
+  const i = b.onDuty.findIndex(e => e.id === id);
+
+  const cloturer = (indice, force) => {
+    const e = b.onDuty.splice(indice, 1)[0];
+    const sec = secondes(e.since, maintenant);
+    b.log.unshift({
+      id: e.id, pseudo: e.pseudo, roleId: e.roleId,
+      in: e.since, out: maintenant,
+      seconds: sec, minutes: Math.round(sec / 60),
+      forced: !!force
+    });
+    b.log = b.log.slice(0, MAX_LOG);
+    return sec;
+  };
+
+  switch (op.op) {
+    case "in":
+      if (!id) return { erreur: "identifiant manquant" };
+      if (i !== -1) return { board: b, deja: true };
+      b.onDuty.push({
+        id,
+        pseudo: texte(op.pseudo, 60) || "?",
+        roleId: texte(op.roleId, 60),
+        since: maintenant
+      });
+      return { board: b };
+
+    case "out":
+      if (i === -1) return { board: b, deja: true };
+      return { board: b, seconds: cloturer(i, op.force === true) };
+
+    case "clear-log":
+      b.log = [];
+      return { board: b, retires: board.log.length };
+
+    case "remove-log": {
+      const n = Math.round(Number(op.index));
+      if (!(n >= 0 && n < b.log.length)) return { board: b, deja: true };
+      b.log.splice(n, 1);
+      return { board: b };
+    }
+
+    default:
+      return { erreur: "opération inconnue : " + op.op };
+  }
+}
 
 /* ---- Lecture / écriture ------------------------------------------------------ */
 
@@ -110,6 +174,15 @@ async function lire() {
   } catch (_) {
     return VIDE;
   }
+}
+
+/* File d'attente : une seule écriture à la fois, dans l'ordre d'arrivée.
+   C'est ce qui garantit que deux pointages simultanés ne s'écrasent pas. */
+let queue = Promise.resolve();
+function enFile(travail) {
+  const suite = queue.then(travail, travail);
+  queue = suite.catch(() => {});
+  return suite;
 }
 
 /** Écriture atomique : on écrit à côté puis on renomme, jamais de fichier à moitié écrit. */
@@ -133,6 +206,53 @@ async function ecrire(board) {
   } catch (_) { /* la sauvegarde est un confort, pas un bloquant */ }
 
   await fsp.rename(tmp, FICHIER);
+}
+
+/* ---- Écriture sur GitHub ------------------------------------------------------
+   Le jeton reste ici. Le site n'en a jamais besoin : il demande au serveur,
+   le serveur écrit. C'est ce qui permet à toute l'équipe de publier. */
+
+const GH = {
+  token: process.env.GH_TOKEN || "",
+  owner: process.env.GH_OWNER || "",
+  repo: process.env.GH_REPO || "",
+  branche: process.env.GH_BRANCH || "main"
+};
+
+function b64(s) {
+  return Buffer.from(s, "utf8").toString("base64");
+}
+
+async function githubEcrire(chemin, contenuB64, message) {
+  const base = "https://api.github.com/repos/" + GH.owner + "/" + GH.repo +
+    "/contents/" + encodeURI(chemin);
+  const entetes = {
+    Authorization: "Bearer " + GH.token,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "mecano-nord",
+    "Content-Type": "application/json"
+  };
+
+  try {
+    let sha = null;
+    const lu = await fetch(base + "?ref=" + encodeURIComponent(GH.branche), { headers: entetes });
+    if (lu.ok) sha = (await lu.json()).sha || null;
+    else if (lu.status !== 404) return { ok: false, error: "GitHub a répondu " + lu.status };
+
+    const corps = { message, content: contenuB64, branch: GH.branche };
+    if (sha) corps.sha = sha;
+
+    const ecrit = await fetch(base, { method: "PUT", headers: entetes, body: JSON.stringify(corps) });
+    if (!ecrit.ok) {
+      const d = await ecrit.json().catch(() => ({}));
+      return { ok: false, error: "Écriture refusée (" + ecrit.status + ") " + (d.message || "") };
+    }
+    const d = await ecrit.json();
+    return { ok: true, commit: d.commit && d.commit.sha ? d.commit.sha.slice(0, 7) : null };
+  } catch (_) {
+    return { ok: false, error: "GitHub injoignable" };
+  }
 }
 
 /* ---- Utilitaires HTTP --------------------------------------------------------- */
@@ -199,7 +319,11 @@ const serveur = http.createServer(async (req, res) => {
   try {
     /* --- santé --- */
     if (chemin === "/sante" && req.method === "GET") {
-      return repondre(res, 200, { ok: true, depuis: Math.round(process.uptime()) + " s" }, req);
+      /* « ops: true » indique au site qu'il peut envoyer des opérations
+         plutôt que tout le tableau : c'est ce qui évite les écrasements. */
+      return repondre(res, 200, {
+        ok: true, ops: true, depuis: Math.round(process.uptime()) + " s"
+      }, req);
     }
 
     /* --- tableau de service --- */
@@ -208,14 +332,64 @@ const serveur = http.createServer(async (req, res) => {
 
       if (req.method === "PUT" || req.method === "POST") {
         const brut = await corpsJson(req);
+
+        /* Opération : le serveur lit, applique et écrit, sans concurrence. */
+        if (brut && brut.op) {
+          const r = await enFile(async () => {
+            const actuel = nettoyer(await lire()) || VIDE;
+            const res2 = appliquer(actuel, brut);
+            if (res2.erreur) return res2;
+            await ecrire(res2.board);
+            return res2;
+          });
+          if (r.erreur) return repondre(res, 400, { error: r.erreur }, req);
+          console.log(new Date().toISOString(), brut.op, "—",
+            r.board.onDuty.length, "en service");
+          return repondre(res, 200, {
+            ok: true, board: r.board, deja: !!r.deja,
+            seconds: r.seconds, retires: r.retires
+          }, req);
+        }
+
+        /* Sinon : remplacement complet (compatibilité). */
         const board = nettoyer(brut.board || brut);
         if (!board) return repondre(res, 400, { error: "Tableau de service invalide" }, req);
-        await ecrire(board);
-        console.log(new Date().toISOString(), "service mis à jour —",
+        await enFile(() => ecrire(board));
+        console.log(new Date().toISOString(), "service remplacé —",
           board.onDuty.length, "en service");
-        return repondre(res, 200, { ok: true }, req);
+        return repondre(res, 200, { ok: true, board }, req);
       }
       return repondre(res, 405, { error: "Méthode non autorisée" }, req);
+    }
+
+    /* --- publication vers GitHub --- */
+    if (chemin === "/publier" && req.method === "POST") {
+      if (!GH.token || !GH.owner || !GH.repo) {
+        return repondre(res, 501, {
+          error: "Publication non configurée : renseigne GH_TOKEN, GH_OWNER et GH_REPO"
+        }, req);
+      }
+      const c = await corpsJson(req);
+      const cible = texte(c.path, 200);
+
+      /* On n'autorise QUE les fichiers de données et les images : personne
+         ne peut réécrire le code du site par cette porte. */
+      const permis = cible === "data/catalog.json" ||
+        cible === "assets/img/index.json" ||
+        /^assets\/img\/[\w.-]+\.(png|jpe?g|webp|gif|svg|avif)$/i.test(cible);
+      if (!permis) return repondre(res, 403, { error: "Chemin non autorisé : " + cible }, req);
+
+      /* `content` est du texte, `base64` une image déjà encodée. */
+      const contenu = typeof c.base64 === "string"
+        ? c.base64.replace(/^data:[^,]*,/, "")
+        : b64(String(c.content || ""));
+      if (!contenu) return repondre(res, 400, { error: "Contenu vide" }, req);
+
+      const r = await githubEcrire(cible, contenu, texte(c.message, 150) ||
+        ("Mise à jour de " + cible));
+      if (!r.ok) return repondre(res, 502, { error: r.error }, req);
+      console.log(new Date().toISOString(), "publié :", cible, r.commit || "");
+      return repondre(res, 200, { ok: true, commit: r.commit }, req);
     }
 
     /* --- relais Discord --- */

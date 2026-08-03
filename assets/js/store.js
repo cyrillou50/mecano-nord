@@ -65,11 +65,12 @@ window.MNStore = (function () {
         /* Ancien emplacement du relais, repris ci-dessous */
         proxy: ""
       },
-      /* Relais : garde le jeton et les webhooks côté serveur. Une fois
-         renseigné, plus personne n'a besoin de jeton pour pointer. */
+      /* Adresse de ton serveur (VPS). Une seule à renseigner : le site en
+         déduit /duty.json, /relais, /publier et /sante. Avec elle, personne
+         n'a besoin de jeton — ni pour pointer, ni pour publier. */
+      serveur: String(s.serveur || "").replace(/\/+$/, ""),
+      /* Réglages détaillés, si tu veux viser des adresses différentes. */
       relay: String(s.relay || w.proxy || ""),
-      /* Base partagée pour le tableau de service (Firebase). Encore plus
-         simple que le relais : aucun code à déployer. */
       dutyUrl: String(s.dutyUrl || ""),
       brand: {
         name: String(b.name || D().brand.name),
@@ -320,6 +321,15 @@ window.MNStore = (function () {
   const settings = () => (_catalog ? _catalog.settings : normalize({}).settings);
   const brand = () => settings().brand;
 
+  /** Adresse d'un service du serveur, ou "" s'il n'est pas configuré. */
+  function api(quoi) {
+    const s = settings();
+    if (s.serveur) return s.serveur + "/" + quoi;
+    if (quoi === "duty.json" && s.dutyUrl) return s.dutyUrl;
+    if (quoi === "relais" && s.relay) return s.relay;
+    return "";
+  }
+
   const roleById = id => (_catalog.roles || []).find(r => r.id === id) || null;
   const roleOf = user => (user && roleById(user.roleId)) ||
     { id: "", name: "Sans rôle", color: "#6a6280", perms: [] };
@@ -378,7 +388,7 @@ window.MNStore = (function () {
   return {
     load, normalize, slugify, uniqueId, clone, onChange, recordPromotion,
     saveDraft, discardDraft, toJSON, download,
-    catalog, published, hasDraft, origin, settings, brand,
+    catalog, published, hasDraft, origin, settings, brand, api,
     roleById, roleOf, itemById, resourceById, categoryById, totals,
     getCart, setCart, getBTs, addBT, removeBT, clearBTs
   };

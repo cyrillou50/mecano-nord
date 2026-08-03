@@ -397,7 +397,27 @@ window.MNUI = (function () {
     if (app) app.hidden = false;
 
     mountTopbar(opt.page);
-    opt.onReady(MNAuth.session());
+
+    /* Une page dont l'initialisation échoue doit le dire, pas rester figée
+       sur un écran de chargement. */
+    try {
+      const r = opt.onReady(MNAuth.session());
+      if (r && typeof r.catch === "function") r.catch(pageCassee);
+    } catch (e) {
+      pageCassee(e);
+    }
+  }
+
+  function pageCassee(e) {
+    console.error(e);
+    toast("Un problème est survenu : " + (e && e.message ? e.message : e), "err");
+    document.querySelectorAll(".hint").forEach(n => {
+      if (/Chargement/i.test(n.textContent)) {
+        n.outerHTML = '<div class="alert alert--err" style="margin:30px auto;max-width:640px">' +
+          svg("alert") + "<span><b>La page n'a pas pu se charger.</b> " +
+          esc(e && e.message ? e.message : String(e)) + "</span></div>";
+      }
+    });
   }
 
   return {

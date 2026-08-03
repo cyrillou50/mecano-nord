@@ -18,9 +18,27 @@
     me = session;
     if (!MNAuth.canAny("duty", "duty_view", "duty_manage")) return denied();
 
-    $("#service-root").innerHTML = '<p class="hint" style="padding:40px 0;text-align:center">Chargement du tableau…</p>';
-    await MNDuty.load(true);
-    render();
+    $("#service-root").innerHTML =
+      '<p class="hint" style="padding:40px 0;text-align:center">Chargement du tableau…</p>';
+
+    /* Quoi qu'il arrive, on affiche la page : un tableau distant en panne ne
+       doit jamais empêcher quelqu'un de pointer. */
+    try {
+      await MNDuty.load(true);
+    } catch (e) {
+      console.error(e);
+    }
+
+    try {
+      render();
+    } catch (e) {
+      console.error(e);
+      $("#service-root").innerHTML =
+        '<div class="alert alert--err" style="margin:30px 0">' + svg("alert") +
+        "<span><b>Impossible d'afficher le tableau.</b> " + esc(e.message) + "</span></div>" +
+        '<div class="row"><a class="btn btn--primary" href="index.html">Retour à la facturation</a></div>';
+      return;
+    }
 
     /* Les compteurs avancent à la seconde. */
     clearInterval(ticker);
@@ -50,6 +68,11 @@
       '<p class="page-sub">Pointage de l\'atelier</p>' +
 
       (canPoint ? myCard(mine) : "") +
+      (MNDuty.souci()
+        ? '<div class="alert alert--err" style="margin-bottom:18px">' + svg("alert") +
+          "<span><b>" + esc(MNDuty.souci()) + "</b> Le tableau affiché peut être incomplet. " +
+          "Vérifie l'adresse dans le panneau admin (Publier → Pointage de l'équipe).</span></div>"
+        : "") +
       (MNDuty.canShare() ? "" : shareWarning()) +
       (canView ? boardPanel(onDuty, canManage) + statsPanel(canManage) : teamCount(onDuty));
 

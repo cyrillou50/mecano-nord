@@ -20,6 +20,46 @@ window.MNGitHub = (function () {
 
   const getToken = () => localStorage.getItem(K_TOKEN) || "";
   const hasToken = () => !!getToken();
+
+  /* ---- Publication par le serveur ---------------------------------------------
+     Quand un serveur est configuré, c'est LUI qui détient le jeton GitHub :
+     n'importe quel responsable peut publier depuis le site, sans rien
+     installer. Le jeton personnel devient un simple secours. */
+
+  const serveurUrl = () => {
+    try { return MNStore.api("publier"); } catch (_) { return ""; }
+  };
+
+  /** Peut-on publier, d'une façon ou d'une autre ? */
+  const canPublish = () => !!serveurUrl() || (hasToken() && isConfigured());
+
+  /** Envoie un fichier au serveur, qui l'écrira sur GitHub. */
+  async function viaServeur(chemin, contenu, message, base64) {
+    const url = serveurUrl();
+    const corps = { path: chemin, message };
+    if (base64) corps.base64 = contenu; else corps.content = contenu;
+
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 20000);
+    let r;
+    try {
+      r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(corps),
+        signal: ctrl.signal
+      });
+    } catch (e) {
+      throw err("serveur", e.name === "AbortError"
+        ? "Le serveur ne répond pas." : "Serveur injoignable.");
+    } finally {
+      clearTimeout(t);
+    }
+
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw err("serveur", j.error || ("Serveur : erreur " + r.status));
+    return { commit: { sha: j.commit || "" }, html_url: "" };
+  }
   function setToken(t) {
     const v = String(t || "").trim();
     if (v) localStorage.setItem(K_TOKEN, v); else localStorage.removeItem(K_TOKEN);
@@ -164,7 +204,8 @@ window.MNGitHub = (function () {
   }
 
   /** Écrit un fichier texte du dépôt. */
-  const putText = (path, text, message) => putFile(path, b64(text), message);
+  const putText = (path, text, message) =>
+    serveurUrl() ? viaServeur(path, text, message, false) : putFile(path, b64(text), message);
 
   /** Liste le contenu d'un dossier du dépôt. */
   async function listDir(dir) {
@@ -210,7 +251,9 @@ window.MNGitHub = (function () {
   function uploadImage(path, dataUri, message) {
     const i = String(dataUri).indexOf(",");
     if (i === -1) throw err("bad-data", "Image invalide.");
-    return putFile(path, String(dataUri).slice(i + 1), message || ("Ajout de l'image " + path));
+    const brut = String(dataUri).slice(i + 1);
+    const msg = message || ("Ajout de l'image " + path);
+    return serveurUrl() ? viaServeur(path, brut, msg, true) : putFile(path, brut, msg);
   }
 
   /**
@@ -220,10 +263,12 @@ window.MNGitHub = (function () {
    */
   async function publish(json, message) {
     const c = repoConfig();
-    const res = await putFile(
-      c.path, b64(json),
-      message || "Mise à jour du catalogue depuis le panneau admin"
-    );
+    const msg = message || "Mise à jour du catalogue depuis le panneau admin";
+
+    /* Le serveur d'abord : il a le jeton, l'utilisateur n'en a pas besoin. */
+    const res = serveurUrl()
+      ? await viaServeur(c.path, json, msg, false)
+      : await putFile(c.path, b64(json), msg);
 
     const info = {
       at: Date.now(),
@@ -243,6 +288,7 @@ window.MNGitHub = (function () {
     getToken, setToken, hasToken, forgetToken,
     detect, repoConfig, isConfigured,
     check, publish, lastPublish,
-    putFile, putText, listDir, uploadImage, getFile, deleteFile, renameFile
+    putFile, putText, listDir, uploadImage, getFile, deleteFile, renameFile,
+    serveurUrl, canPublish
   };
 })();

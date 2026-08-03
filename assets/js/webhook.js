@@ -62,7 +62,7 @@ window.MNWebhook = (function () {
 
   /** Adresse du relais, s'il y en a un. */
   function relayUrl() {
-    try { return String(MNStore.settings().relay || "").trim(); }
+    try { return MNStore.api("relais"); }
     catch (_) { return ""; }
   }
 
