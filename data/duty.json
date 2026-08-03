@@ -1,6 +1,13 @@
 {
-  "updatedAt": "2026-08-03T20:15:33.977Z",
-  "onDuty": [],
+  "updatedAt": "2026-08-03T20:36:10.119Z",
+  "onDuty": [
+    {
+      "id": "cyrillou",
+      "pseudo": "Cyrillou",
+      "roleId": "createur-du-site",
+      "since": "2026-08-03T20:36:10.119Z"
+    }
+  ],
   "log": [
     {
       "id": "ecumeria",
@@ -8,7 +15,9 @@
       "roleId": "secretaire",
       "in": "2026-08-03T18:23:18.190Z",
       "out": "2026-08-03T20:15:33.977Z",
-      "minutes": 112
+      "seconds": 6736,
+      "minutes": 112,
+      "forced": false
     },
     {
       "id": "ecumeria",
@@ -16,6 +25,7 @@
       "roleId": "secretaire",
       "in": "2026-08-03T14:36:53.915Z",
       "out": "2026-08-03T17:18:29.121Z",
+      "seconds": 9695,
       "minutes": 162,
       "forced": false
     }
