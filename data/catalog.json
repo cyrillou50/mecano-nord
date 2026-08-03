@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-02T23:53:40.895Z",
+  "updatedAt": "2026-08-03T00:11:53.580Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -190,6 +190,12 @@
       "id": "fer",
       "name": "Fer",
       "icon": "assets/img/fer.png",
+      "color": "#9fb0c4"
+    },
+    {
+      "id": "gourde-d-eau",
+      "name": "Gourde d'eau",
+      "icon": "assets/img/gourdedeaupng.png",
       "color": "#9fb0c4"
     }
   ],
