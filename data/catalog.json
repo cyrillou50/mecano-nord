@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-03T15:23:15.619Z",
+  "updatedAt": "2026-08-03T15:24:59.615Z",
   "settings": {
     "webhook": {
       "bt": "https://discord.com/api/webhooks/1533845560908316924/qbc5rNdjgsrpChsNptayDj65kTvAbhBFXllsBaiA5eWl6LpT4fG03VzF2fQOYnLUbHwe",
@@ -61,6 +61,18 @@
       "icon": "i-clipboard",
       "perms": [
         "admin"
+      ]
+    },
+    {
+      "id": "chef-d-atelier",
+      "name": "Chef d'atelier",
+      "color": "#8b8bff",
+      "icon": "i-stripes",
+      "perms": [
+        "bt",
+        "duty",
+        "duty_view",
+        "staff"
       ]
     },
     {
@@ -477,7 +489,7 @@
       "id": "deplacement",
       "name": "Déplacement",
       "category": "depannage",
-      "icon": "assets/img/deplacement2.png",
+      "icon": "assets/img/deplacement.png",
       "enabled": true,
       "note": "(hors Cayo et Manor)",
       "max": 1,
@@ -489,7 +501,7 @@
       "id": "deplacement-eloigne",
       "name": "Déplacement éloigné",
       "category": "depannage",
-      "icon": "assets/img/deplacement2.png",
+      "icon": "assets/img/deplacement.png",
       "enabled": true,
       "note": "(Cayo et Manor uniquement)",
       "max": 1,
