@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-03T04:34:31.303Z",
+  "updatedAt": "2026-08-03T04:41:25.670Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -81,7 +81,7 @@
     },
     {
       "id": "dylan",
-      "pseudo": "Dylan",
+      "pseudo": "Dylan Evergarden",
       "role": "Apprenti",
       "perms": [
         "bt"
@@ -92,7 +92,7 @@
     },
     {
       "id": "hakim",
-      "pseudo": "Hakim",
+      "pseudo": "Hakim Skyfou",
       "role": "Garagiste",
       "perms": [
         "bt"
@@ -103,7 +103,7 @@
     },
     {
       "id": "toma",
-      "pseudo": "Toma",
+      "pseudo": "Toma Garcia",
       "role": "Apprenti",
       "perms": [
         "bt"
