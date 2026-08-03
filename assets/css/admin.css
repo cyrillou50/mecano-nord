@@ -344,6 +344,171 @@ details > summary::-webkit-details-marker { display: none; }
 details > summary::before { content: "▸ "; color: var(--pink); }
 details[open] > summary::before { content: "▾ "; }
 
+/* ---- Service ---------------------------------------------------------------- */
+
+.dutydot {
+  width: 10px; height: 10px; flex: none;
+  border-radius: 50%;
+  background: var(--toxic);
+  box-shadow: 0 0 10px var(--toxic);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+/* pastille de rôle colorée */
+.rolechip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-family: var(--font-display);
+  font-size: 11.5px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase;
+}
+.rolechip::before {
+  content: "";
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+/* variante avec écusson : l'icône remplace la pastille */
+.rolechip--ico::before { display: none; }
+.rolechip--ico svg { width: 16px; height: 16px; }
+.rolechip--ico img { width: 17px; height: 17px; object-fit: contain; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform .12s, border-color .12s;
+}
+.swatch:hover { transform: scale(1.12); }
+.swatch.is-on { border-color: #fff; transform: scale(1.12); }
+
+/* ---- Équipe : menu de gauche ------------------------------------------------- */
+
+.stafflist {
+  position: sticky;
+  top: calc(var(--topbar-h) + 22px);
+  display: flex; flex-direction: column;
+  max-height: calc(100vh - var(--topbar-h) - 44px);
+  background: linear-gradient(180deg, var(--surface), #0c0912);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.stafflist__top { padding: 10px; border-bottom: 1px solid var(--line); }
+.stafflist__body { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 3px; }
+.stafflist__foot { padding: 9px 12px; border-top: 1px solid var(--line); }
+
+.staffrow {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 8px 9px;
+  border-radius: var(--r-sm);
+  text-align: left;
+  transition: background .13s;
+}
+.staffrow:hover { background: rgba(255, 255, 255, .05); }
+.staffrow.is-active { background: var(--pink-ink); box-shadow: inset 2px 0 0 var(--pink); }
+.staffrow.is-off { opacity: .45; }
+.staffrow__txt { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.25; }
+.staffrow__txt b { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.staffrow__txt i {
+  font-style: normal; font-size: 11px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.staffrow .dutydot { width: 8px; height: 8px; }
+.staffrow.is-hidden { opacity: .6; }
+.staffrow__eye { flex: none; color: var(--amber); display: grid; place-items: center; }
+.staffrow__eye svg { width: 13px; height: 13px; }
+
+.stafflist__foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+
+/* ---- Équipe : fiche ------------------------------------------------------------ */
+
+.staffhead {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 22px;
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(120% 180% at 0% 0%, color-mix(in srgb, var(--role) 16%, transparent), transparent 70%);
+}
+.staffhead__av {
+  width: 62px; height: 62px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 16px;
+  font-family: var(--font-display); font-weight: 800; font-size: 22px;
+  color: #10060e;
+}
+.staffhead__id { flex: 1; min-width: 200px; display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
+.staffhead__id h2 { width: 100%; font-size: 21px; letter-spacing: .04em; }
+.staffhead__acts { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.statgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.stat {
+  padding: 13px 15px;
+  background: rgba(255, 255, 255, .028);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.stat__l {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .13em; text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 5px;
+}
+.stat__v { font-family: var(--font-display); font-size: 17px; font-weight: 800; }
+
+/* compteur qui tourne pendant que la personne est en service */
+.stat--live {
+  border-color: rgba(168, 255, 82, .32);
+  background: rgba(168, 255, 82, .05);
+}
+.stat--live .stat__v { color: var(--toxic); }
+
+/* frise de carrière */
+.timeline { list-style: none; margin: 0; padding: 0 0 0 6px; }
+.tl { position: relative; padding: 0 0 20px 26px; }
+.tl:last-child { padding-bottom: 0; }
+.tl::before {
+  content: "";
+  position: absolute; left: 5px; top: 16px; bottom: 0;
+  width: 2px;
+  background: var(--line-2);
+}
+.tl:last-child::before { display: none; }
+.tl__dot {
+  position: absolute; left: 0; top: 5px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--role);
+}
+.tl.is-now .tl__dot { background: var(--role); box-shadow: 0 0 12px -1px var(--role); }
+.tl__body b { font-family: var(--font-display); font-size: 14.5px; letter-spacing: .04em; }
+.tl__meta { margin-top: 3px; font-size: 12.5px; color: var(--dim); }
+
+/* petite croix de retrait dans les étiquettes */
+.permtag button {
+  margin-left: 2px;
+  padding: 0 2px;
+  color: inherit;
+  opacity: .6;
+  font-size: 13px;
+  line-height: 1;
+}
+.permtag button:hover { opacity: 1; color: var(--danger); }
+
 /* ---- Écran refusé ---------------------------------------------------------- */
 
 .denied {
@@ -362,6 +527,9 @@ details[open] > summary::before { content: "▾ "; }
 
 @media (max-width: 900px) {
   .admin { grid-template-columns: 1fr; gap: 16px; }
+  .stafflist { position: static; max-height: 340px; }
+  .staffhead { padding: 16px; }
+  .staffhead__av { width: 52px; height: 52px; font-size: 19px; }
   .tabs {
     position: static;
     flex-direction: row;

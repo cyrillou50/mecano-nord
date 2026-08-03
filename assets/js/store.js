@@ -52,8 +52,13 @@ window.MNStore = (function () {
 
     /* --- réglages --- */
     const s = c.settings && typeof c.settings === "object" ? c.settings : {};
-    const b = s.brand || {}, a = s.auth || {}, g = s.github || {};
+    const b = s.brand || {}, a = s.auth || {}, g = s.github || {}, w = s.webhook || {};
     c.settings = {
+      webhook: {
+        bt: String(w.bt || ""),
+        duty: String(w.duty || ""),
+        mention: String(w.mention || "")
+      },
       brand: {
         name: String(b.name || D().brand.name),
         tagline: String(b.tagline || D().brand.tagline),
@@ -107,27 +112,116 @@ window.MNStore = (function () {
         icon: it.icon || "i-box",
         enabled: it.enabled !== false,
         note: it.note ? String(it.note) : "",
+        /* Quantité maximale par bon de travail. 0 = illimité. */
+        max: Math.max(0, Math.min(999, Math.round(Number(it.max) || 0))),
         cost
       };
     });
 
-    /* --- employés --- */
+    /* --- rôles ---
+       Les droits sont portés par le rôle, plus par l'employé. Les anciens
+       comptes (texte libre + permissions individuelles) sont convertis
+       automatiquement : un rôle est créé par intitulé distinct. */
     const permKeys = (window.MN_PERMS || []).map(p => p.key);
+    const cleanPerms = p => (Array.isArray(p) ? p : []).filter(x => permKeys.indexOf(x) !== -1);
+
+    const seenRo = [];
+    c.roles = (Array.isArray(c.roles) ? c.roles : []).map((r, i) => {
+      const id = uniqueId(r.id || r.name, seenRo); seenRo.push(id);
+      return {
+        id,
+        name: String(r.name || id),
+        color: String(r.color || (window.MN_ROLE_COLORS || ["#ff2bd1"])[i % 10]),
+        icon: r.icon || "i-badge",
+        perms: cleanPerms(r.perms)
+      };
+    });
+
+    const rawUsers = Array.isArray(c.users) ? c.users : [];
+
+    /* Reprise des anciens comptes : on fabrique les rôles manquants. */
+    rawUsers.forEach(u => {
+      if (u.roleId && c.roles.some(r => r.id === u.roleId)) return;
+      const label = String(u.role || "Mécano");
+      const wanted = slugify(label);
+      let role = c.roles.find(r => r.id === wanted || r.name === label);
+      if (!role) {
+        role = {
+          id: uniqueId(label, seenRo),
+          name: label,
+          color: (window.MN_ROLE_COLORS || ["#ff2bd1"])[c.roles.length % 10],
+          icon: "i-badge",
+          perms: cleanPerms(u.perms)
+        };
+        seenRo.push(role.id);
+        c.roles.push(role);
+      }
+      u.roleId = role.id;
+    });
+
+    if (!c.roles.length) {
+      c.roles = [{ id: "mecano", name: "Mécano", color: "#ff2bd1", perms: ["bt", "duty"] }];
+    }
+
+    /* --- employés --- */
+    const roleIds = c.roles.map(r => r.id);
     const seenU = [];
-    c.users = (Array.isArray(c.users) ? c.users : []).map(u => {
+    c.users = rawUsers.map(u => {
       const id = uniqueId(u.id || u.pseudo, seenU); seenU.push(id);
+      const roleId = roleIds.indexOf(u.roleId) !== -1 ? u.roleId : roleIds[0];
+      const createdAt = u.createdAt || new Date().toISOString();
+
+      /* Historique des grades : on garde le nom du rôle au moment de la
+         promotion, pour que la trace reste lisible même si le rôle est
+         renommé ou supprimé plus tard. */
+      let history = (Array.isArray(u.history) ? u.history : []).map(h => ({
+        roleId: String(h.roleId || ""),
+        roleName: String(h.roleName || ""),
+        at: h.at || createdAt,
+        by: h.by ? String(h.by) : "",
+        note: h.note ? String(h.note) : ""
+      })).filter(h => h.roleName || h.roleId);
+
+      if (!history.length) {
+        const r = c.roles.find(x => x.id === roleId);
+        history = [{ roleId, roleName: r ? r.name : roleId, at: createdAt, by: "", note: "Entrée dans l'entreprise" }];
+      }
+      history.sort((a, b) => new Date(a.at) - new Date(b.at));
+
       return {
         id,
         pseudo: String(u.pseudo || id),
-        role: String(u.role || "Mécano"),
-        perms: (Array.isArray(u.perms) ? u.perms : []).filter(p => permKeys.indexOf(p) !== -1),
+        roleId,
         pin: typeof u.pin === "string" && u.pin.length === 64 ? u.pin : null,
         active: u.active !== false,
-        createdAt: u.createdAt || new Date().toISOString()
+        /* Masqué du trombinoscope Équipe, mais compte pleinement fonctionnel :
+           la personne se connecte et travaille normalement. */
+        hidden: u.hidden === true,
+        createdAt,
+        /* Date d'embauche (AAAA-MM-JJ), séparée de la création du compte. */
+        hiredAt: /^\d{4}-\d{2}-\d{2}$/.test(u.hiredAt) ? u.hiredAt : createdAt.slice(0, 10),
+        trainings: (Array.isArray(u.trainings) ? u.trainings : [])
+          .map(t => String(t).trim()).filter(Boolean).slice(0, 30),
+        note: u.note ? String(u.note).slice(0, 400) : "",
+        history: history.slice(-40)
       };
     });
 
     return c;
+  }
+
+  /** Ajoute une ligne d'historique quand quelqu'un change de grade. */
+  function recordPromotion(user, newRoleId, roles, byPseudo, note) {
+    const r = (roles || []).find(x => x.id === newRoleId);
+    user.roleId = newRoleId;
+    user.history = (user.history || []).concat([{
+      roleId: newRoleId,
+      roleName: r ? r.name : newRoleId,
+      at: new Date().toISOString(),
+      by: byPseudo || "",
+      note: note || ""
+    }]).slice(-40);
+    return user;
   }
 
   /* ---- Chargement ------------------------------------------------------- */
@@ -199,6 +293,9 @@ window.MNStore = (function () {
   const settings = () => (_catalog ? _catalog.settings : normalize({}).settings);
   const brand = () => settings().brand;
 
+  const roleById = id => (_catalog.roles || []).find(r => r.id === id) || null;
+  const roleOf = user => (user && roleById(user.roleId)) ||
+    { id: "", name: "Sans rôle", color: "#6a6280", perms: [] };
   const itemById = id => (_catalog.items || []).find(i => i.id === id) || null;
   const resourceById = id => (_catalog.resources || []).find(r => r.id === id) || null;
   const categoryById = id => (_catalog.categories || []).find(c => c.id === id) || null;
@@ -252,10 +349,10 @@ window.MNStore = (function () {
   const clearBTs = () => localStorage.removeItem(K_BTS);
 
   return {
-    load, normalize, slugify, uniqueId, clone, onChange,
+    load, normalize, slugify, uniqueId, clone, onChange, recordPromotion,
     saveDraft, discardDraft, toJSON, download,
     catalog, published, hasDraft, origin, settings, brand,
-    itemById, resourceById, categoryById, totals,
+    roleById, roleOf, itemById, resourceById, categoryById, totals,
     getCart, setCart, getBTs, addBT, removeBT, clearBTs
   };
 })();

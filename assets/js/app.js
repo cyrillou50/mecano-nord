@@ -165,20 +165,27 @@
     }).join("");
   }
 
+  /** Plafond de cet objet ; 0 dans les données = illimité. */
+  const capOf = it => (it.max > 0 ? it.max : 999);
+
   function itemCard(it) {
     const qty = cart[it.id] || 0;
     const chips = costChips(it);
+    const cap = capOf(it);
+    const full = qty >= cap;
 
-    return '<article class="item' + (qty ? " is-picked" : "") + '" data-id="' + esc(it.id) + '"' +
-      ' title="Clic = +1 · clic droit = −1 · Maj = ±5">' +
+    return '<article class="item' + (qty ? " is-picked" : "") + (full ? " is-full" : "") +
+      '" data-id="' + esc(it.id) + '" title="Clic = +1 · clic droit = −1 · Maj = ±5">' +
       (qty ? '<span class="item__badge">' + qty + "</span>" : "") +
+      (it.max > 0 ? '<span class="item__cap" title="Maximum ' + it.max + ' par bon de travail">max ' + it.max + "</span>" : "") +
       '<div class="item__icon">' + mnIcon(it.icon) + "</div>" +
       '<h3 class="item__name">' + esc(it.name) + "</h3>" +
       (it.note ? '<p class="item__note">' + esc(it.note) + "</p>" : "") +
       '<div class="stepper">' +
         '<button data-act="dec" aria-label="Retirer"' + (qty ? "" : " disabled") + ">" + svg("minus") + "</button>" +
-        '<span class="stepper__val">' + qty + "</span>" +
-        '<button data-act="inc" aria-label="Ajouter">' + svg("plus") + "</button>" +
+        '<input class="stepper__val" type="text" inputmode="numeric" value="' + qty + '"' +
+          ' aria-label="Quantité de ' + esc(it.name) + '" data-qty>' +
+        '<button data-act="inc" aria-label="Ajouter"' + (full ? " disabled" : "") + ">" + svg("plus") + "</button>" +
       "</div>" +
       (showCosts && chips ? '<div class="item__cost">' + chips + "</div>" : "") +
     "</article>";
@@ -191,14 +198,60 @@
     if (!card) return;
     const id = card.dataset.id;
     const step = e.shiftKey ? 5 : 1;
-    const btn = e.target.closest(".stepper button[data-act]");
 
+    /* Le champ de saisie gère ses propres clics. */
+    if (e.target.closest("[data-qty]")) return;
+
+    const btn = e.target.closest(".stepper button[data-act]");
     if (btn) {
       if (btn.disabled) return;
       setQty(id, (cart[id] || 0) + (btn.dataset.act === "inc" ? step : -step));
       return;
     }
     setQty(id, (cart[id] || 0) + step);
+  });
+
+  /* ---- Saisie du nombre au clavier -------------------------------------------- */
+
+  /* Sélection du contenu au clic, pour taper directement par-dessus. */
+  document.addEventListener("focusin", e => {
+    if (e.target.matches("[data-qty]")) e.target.select();
+  });
+
+  document.addEventListener("input", e => {
+    const f = e.target;
+    if (!f.matches("[data-qty]")) return;
+    const clean = f.value.replace(/[^\d]/g, "").slice(0, 3);
+    if (f.value !== clean) f.value = clean;
+  });
+
+  document.addEventListener("keydown", e => {
+    const f = e.target;
+    if (!f.matches("[data-qty]")) return;
+    const card = f.closest(".item");
+    const id = card.dataset.id;
+
+    if (e.key === "Enter") { e.preventDefault(); f.blur(); return; }
+    if (e.key === "Escape") { e.preventDefault(); f.value = cart[id] || 0; f.blur(); return; }
+    if (e.key === "ArrowUp") { e.preventDefault(); setQty(id, (cart[id] || 0) + (e.shiftKey ? 5 : 1)); }
+    if (e.key === "ArrowDown") { e.preventDefault(); setQty(id, (cart[id] || 0) - (e.shiftKey ? 5 : 1)); }
+  });
+
+  document.addEventListener("focusout", e => {
+    const f = e.target;
+    if (!f.matches("[data-qty]")) return;
+    if (patching) return;              // focus perdu à cause d'un redessin, pas d'une action
+    const card = f.closest(".item");
+    if (!card) return;
+    const id = card.dataset.id;
+    const asked = Math.round(Number(f.value) || 0);
+    const it = MNStore.itemById(id);
+    const cap = it ? capOf(it) : 999;
+
+    if (it && it.max > 0 && asked > it.max) {
+      MNUI.toast(it.name + " : " + it.max + " maximum par bon de travail", "err");
+    }
+    setQty(id, Math.min(asked, cap));
   });
 
   /* Clic droit sur une carte = retirer un. */
@@ -210,7 +263,14 @@
   });
 
   function setQty(id, v) {
-    const q = Math.max(0, Math.min(999, Math.round(v)));
+    const it = MNStore.itemById(id);
+    const before = cart[id] || 0;
+    const q = Math.max(0, Math.min(it ? capOf(it) : 999, Math.round(v)));
+
+    /* On prévient quand la limite bloque réellement une hausse. */
+    if (it && it.max > 0 && q === it.max && v > it.max && before < it.max) {
+      MNUI.toast(it.name + " : limité à " + it.max + " par bon de travail", "info");
+    }
     if (q) cart[id] = q; else delete cart[id];
     cart = MNStore.setCart(cart);
     patchCard(id);
@@ -219,13 +279,30 @@
   }
 
   /** Redessine une seule carte plutôt que tout le catalogue. */
+  let patching = false;
   function patchCard(id) {
+    if (patching) return;              // rendre le focus déclenche un focusout : pas de ré-entrance
     const card = document.querySelector('.item[data-id="' + CSS.escape(id) + '"]');
     const it = MNStore.itemById(id);
-    if (!card || !it) return;
-    const tmp = document.createElement("div");
-    tmp.innerHTML = itemCard(it);
-    card.replaceWith(tmp.firstElementChild);
+    if (!card || !it || !card.isConnected) return;
+
+    /* Si la personne était en train de taper la quantité, on lui rend le champ. */
+    const wasTyping = document.activeElement && card.contains(document.activeElement) &&
+      document.activeElement.matches("[data-qty]");
+
+    patching = true;
+    try {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = itemCard(it);
+      const fresh = tmp.firstElementChild;
+      card.replaceWith(fresh);
+      if (wasTyping) {
+        const f = fresh.querySelector("[data-qty]");
+        if (f) { f.focus(); f.select(); }
+      }
+    } finally {
+      patching = false;
+    }
   }
 
   /* ---- Barre du bas -------------------------------------------------------- */
@@ -325,20 +402,8 @@
       "</div>";
 
     const form =
-      '<div class="form-grid" style="margin-bottom:14px">' +
-        '<div class="field"><label class="label" for="f-client">Client</label>' +
-          '<input class="input" id="f-client" placeholder="Nom du client" maxlength="60"></div>' +
-        '<div class="field"><label class="label" for="f-veh">Véhicule</label>' +
-          '<input class="input" id="f-veh" placeholder="Ex. Sultan RS" maxlength="60"></div>' +
-        '<div class="field"><label class="label" for="f-plate">Plaque</label>' +
-          '<input class="input" id="f-plate" placeholder="42ABC99" maxlength="16"></div>' +
-        '<div class="field"><label class="label" for="f-state">État</label>' +
-          '<select class="select" id="f-state">' +
-            '<option value="fait">Terminé</option>' +
-            '<option value="attente">En attente de ressources</option>' +
-            '<option value="cours">En cours</option>' +
-          "</select></div>" +
-      "</div>" +
+      '<div class="field" style="margin-bottom:14px"><label class="label" for="f-client">Client</label>' +
+        '<input class="input" id="f-client" placeholder="Nom du client" maxlength="60"></div>' +
       '<div class="field"><label class="label" for="f-note">Note</label>' +
         '<textarea class="textarea" id="f-note" placeholder="Remarques, pièces à commander…" maxlength="400"></textarea></div>';
 
@@ -360,9 +425,6 @@
         at: Date.now(),
         by: s ? s.pseudo : "?",
         client: g("#f-client"),
-        vehicle: g("#f-veh"),
-        plate: g("#f-plate").toUpperCase(),
-        state: g("#f-state"),
         note: g("#f-note"),
         lines: t.lines.map(l => ({ id: l.item.id, name: l.item.name, qty: l.qty })),
         resources: t.resources.map(r => ({ id: r.resource.id, name: r.resource.name, qty: r.qty })),
@@ -371,14 +433,21 @@
       MNStore.addBT(bt);
       cart = MNStore.setCart({});
       renderTabs(); renderCatalog(); renderDock();
+
       if (doCopy) MNUI.copy(btToText(bt), "Bon de travail copié — colle-le sur Discord");
       else MNUI.toast("Bon de travail " + bt.ref + " enregistré", "ok");
+
+      /* Envoi Discord si un webhook est configuré — sans bloquer l'interface. */
+      if (MNWebhook.has("bt")) {
+        MNWebhook.sendBT(bt, bt.lines, bt.resources).then(r => {
+          if (r.ok) MNUI.toast("BT envoyé sur Discord", "ok");
+          else if (!r.skipped) MNUI.toast("Discord : " + r.error, "err");
+        });
+      }
     }
   }
 
   /* ---- Texte prêt pour Discord ------------------------------------------------ */
-
-  const STATES = { fait: "Terminé", attente: "En attente de ressources", cours: "En cours" };
 
   function btToText(bt) {
     const b = MNStore.brand();
@@ -387,10 +456,6 @@
     L.push("`" + bt.ref + "`  ·  " + new Date(bt.at).toLocaleString("fr-FR"));
     L.push("Mécano : **" + bt.by + "**");
     if (bt.client) L.push("Client : **" + bt.client + "**");
-    if (bt.vehicle || bt.plate) {
-      L.push("Véhicule : " + [bt.vehicle, bt.plate ? "`" + bt.plate + "`" : ""].filter(Boolean).join(" · "));
-    }
-    if (bt.state && STATES[bt.state]) L.push("État : " + STATES[bt.state]);
     L.push("");
     L.push("__Prestations__");
     bt.lines.forEach(l => L.push("• " + l.name + " ×" + l.qty));
@@ -432,7 +497,7 @@
             '<div class="bt__main">' +
               "<b>" + esc(bt.client || "Client non renseigné") + "</b>" +
               "<span>" + esc(bt.ref) + " · " + new Date(bt.at).toLocaleString("fr-FR") +
-                " · " + esc(bt.by) + (bt.plate ? " · " + esc(bt.plate) : "") + "</span>" +
+                " · " + esc(bt.by) + "</span>" +
             "</div>" +
             '<span class="bt__amount">' + (bt.count || bt.lines.length) + " obj.</span>" +
             '<button class="btn btn--icon" data-h="view" title="Voir">' + svg("file") + "</button>" +

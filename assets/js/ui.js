@@ -263,13 +263,22 @@ window.MNUI = (function () {
       '<nav class="topnav">' +
         '<a class="navlink' + (active === "fact" ? " is-active" : "") + '" href="index.html">Facturation</a>' +
         (active === "fact" ? '<button class="navlink" id="nav-history">Historique</button>' : "") +
+        (MNAuth.canAny("duty", "duty_view")
+          ? '<a class="navlink' + (active === "service" ? " is-active" : "") + '" href="service.html">Service</a>'
+          : "") +
+        (MNAuth.canAny("staff", "promote", "users")
+          ? '<a class="navlink' + (active === "equipe" ? " is-active" : "") + '" href="equipe.html">Équipe</a>'
+          : "") +
         (canAdmin ? '<a class="navlink' + (active === "admin" ? " is-active" : "") + '" href="admin.html">Admin</a>' : "") +
       "</nav>" +
       '<div class="topbar__spacer"></div>' +
       (s
         ? '<div class="userchip">' +
-            '<div class="userchip__id"><b>' + esc(s.pseudo) + "</b><span>" + esc(s.role) + "</span></div>" +
-            '<div class="userchip__av">' + esc(initials(s.pseudo)) + "</div>" +
+            '<div class="userchip__id"><b>' + esc(s.pseudo) + "</b><span" +
+              (s.roleColor ? ' style="color:' + esc(s.roleColor) + '"' : "") + ">" + esc(s.role) + "</span></div>" +
+            '<div class="userchip__av"' +
+              (s.roleColor ? ' style="background:' + esc(s.roleColor) + '"' : "") + ">" +
+              esc(initials(s.pseudo)) + "</div>" +
             '<button class="btn btn--icon" id="btn-logout" title="Se déconnecter" aria-label="Se déconnecter">' +
               svg("logout") +
             "</button>" +

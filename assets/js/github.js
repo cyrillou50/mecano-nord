@@ -174,6 +174,38 @@ window.MNGitHub = (function () {
     return Array.isArray(r) ? r : [];
   }
 
+  /** Lit un fichier du dépôt. Renvoie { content (base64), sha }. */
+  async function getFile(path) {
+    const c = repoConfig();
+    const f = await api(`/repos/${c.owner}/${c.repo}/contents/${encodeURI(path)}?ref=${encodeURIComponent(c.branch)}`);
+    return { content: (f.content || "").replace(/\s/g, ""), sha: f.sha };
+  }
+
+  /** Supprime un fichier du dépôt. */
+  async function deleteFile(path, message) {
+    const c = repoConfig();
+    const sha = await currentSha(path);
+    if (!sha) throw err("not-found", "Fichier introuvable : " + path);
+    return api(`/repos/${c.owner}/${c.repo}/contents/${encodeURI(path)}`, {
+      method: "DELETE",
+      body: JSON.stringify({
+        message: message || ("Suppression de " + path),
+        sha,
+        branch: c.branch
+      })
+    });
+  }
+
+  /** Renomme un fichier : copie au nouveau nom puis supprime l'ancien. */
+  async function renameFile(from, to, message) {
+    if (from === to) return { ok: true, unchanged: true };
+    if (await currentSha(to)) throw err("exists", "Un fichier porte déjà ce nom : " + to);
+    const f = await getFile(from);
+    await putFile(to, f.content, message || ("Renommage : " + from + " → " + to));
+    await deleteFile(from, "Renommage : ancien fichier " + from);
+    return { ok: true };
+  }
+
   /** Dépose une image (donnée `data:image/...;base64,...`) dans le dépôt. */
   function uploadImage(path, dataUri, message) {
     const i = String(dataUri).indexOf(",");
@@ -211,6 +243,6 @@ window.MNGitHub = (function () {
     getToken, setToken, hasToken, forgetToken,
     detect, repoConfig, isConfigured,
     check, publish, lastPublish,
-    putFile, putText, listDir, uploadImage
+    putFile, putText, listDir, uploadImage, getFile, deleteFile, renameFile
   };
 })();

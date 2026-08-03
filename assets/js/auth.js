@@ -111,12 +111,14 @@ window.MNAuth = (function () {
     return users().find(u => norm(u.pseudo) === n) || null;
   }
 
-  /** Permissions réellement actives (« admin » implique tout). */
+  /** Permissions réellement actives : celles du rôle, « admin » impliquant tout. */
   function effectivePerms(user) {
     if (!user) return [];
-    const p = Array.isArray(user.perms) ? user.perms.slice() : [];
-    return p.includes("admin") ? allPerms() : p;
+    const p = (MNStore.roleOf(user).perms || []).slice();
+    return p.indexOf("admin") !== -1 ? allPerms() : p;
   }
+
+  const roleOf = user => MNStore.roleOf(user);
 
   /* ---- Session ----------------------------------------------------------- */
 
@@ -149,16 +151,22 @@ window.MNAuth = (function () {
 
     if (s.guest) {
       if (!authCfg().allowGuests) { localStorage.removeItem(K_SESSION); return null; }
-      _session = { uid: null, pseudo: s.pseudo, role: "Invité", guest: true, perms: authCfg().guestPerms || [] };
+      _session = {
+        uid: null, pseudo: s.pseudo, guest: true,
+        role: "Invité", roleColor: "#6a6280",
+        perms: authCfg().guestPerms || []
+      };
       return _session;
     }
 
     const u = users().find(x => x.id === s.uid);
     if (!u || u.active === false) { localStorage.removeItem(K_SESSION); return null; }
+    const r = MNStore.roleOf(u);
 
     _session = {
-      uid: u.id, pseudo: u.pseudo, role: u.role || "Mécano",
-      guest: false, perms: effectivePerms(u), user: u
+      uid: u.id, pseudo: u.pseudo, guest: false,
+      role: r.name, roleId: r.id, roleColor: r.color,
+      perms: effectivePerms(u), user: u
     };
     return _session;
   }
@@ -192,17 +200,16 @@ window.MNAuth = (function () {
     /* Premier démarrage : personne dans la liste → le premier arrivé est patron. */
     if (!list.length && authCfg().bootstrapFirstUser !== false) {
       const id = MNStore.slugify(clean);
-      const u = {
+      const cat = MNStore.clone(MNStore.catalog());
+      cat.roles = [{ id: "patron", name: "Patron", color: "#ff2bd1", perms: ["admin"] }];
+      cat.users = [{
         id,
         pseudo: clean,
-        role: "Patron",
-        perms: ["admin"],
+        roleId: "patron",
         pin: pin ? hashPin(id, pin) : null,
         active: true,
         createdAt: new Date().toISOString()
-      };
-      const cat = MNStore.clone(MNStore.catalog());
-      cat.users = [u];
+      }];
       MNStore.saveDraft(cat);
       _session = null;
       writeStored({ uid: id, pseudo: clean });
@@ -241,7 +248,7 @@ window.MNAuth = (function () {
   function refresh() { _session = null; return session(); }
 
   return {
-    sha256, hashPin, users, findByPseudo, effectivePerms, allPerms,
+    sha256, hashPin, users, findByPseudo, effectivePerms, roleOf, allPerms,
     session, isLogged, can, canAny, needsPin, login, logout, refresh
   };
 })();

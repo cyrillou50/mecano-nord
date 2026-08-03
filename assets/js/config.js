@@ -32,9 +32,20 @@ window.MN_CONFIG = {
    sont libres.
    ========================================================================== */
 window.MN_PERMS = [
-  { key: "bt",     name: "Faire des BT",       desc: "Utiliser la facturation et enregistrer des bons de travail." },
-  { key: "items",  name: "Gérer le catalogue", desc: "Créer / modifier objets, catégories, ressources et coûts." },
-  { key: "users",  name: "Gérer les employés", desc: "Ajouter des pseudos et changer leurs permissions." },
-  { key: "publish",name: "Publier en ligne",   desc: "Envoyer les modifications sur le site public." },
-  { key: "admin",  name: "Patron (tout)",      desc: "Accès complet : implique toutes les permissions." }
+  { key: "bt",        name: "Faire des BT",        desc: "Utiliser la facturation et enregistrer des bons de travail." },
+  { key: "duty",      name: "Pointer son service", desc: "Prendre et quitter son service depuis le site." },
+  { key: "duty_view", name: "Voir les services",   desc: "Voir qui est en service et l'historique de l'équipe." },
+  { key: "duty_manage", name: "Gérer les services", desc: "Pointer à la place de quelqu'un, clôturer un service oublié, corriger l'historique." },
+  { key: "staff",     name: "Voir les fiches",     desc: "Consulter les fiches employés : ancienneté, formations, carrière." },
+  { key: "promote",   name: "Gérer les carrières", desc: "Promouvoir, changer les formations et compléter les fiches." },
+  { key: "items",     name: "Gérer le catalogue",  desc: "Créer / modifier objets, catégories, ressources et coûts." },
+  { key: "users",     name: "Gérer l'équipe",      desc: "Ajouter des employés, créer des rôles et régler leurs droits." },
+  { key: "publish",   name: "Publier en ligne",    desc: "Envoyer les modifications sur le site public." },
+  { key: "admin",     name: "Patron (tout)",       desc: "Accès complet : implique toutes les permissions." }
+];
+
+/* Couleurs proposées pour les rôles. */
+window.MN_ROLE_COLORS = [
+  "#ff2bd1", "#ff7ae0", "#c2551f", "#ffa92e", "#a8ff52",
+  "#4fd8c0", "#7fd7e8", "#8b8bff", "#b8c4d4", "#ff3b5c"
 ];

@@ -28,6 +28,14 @@ window.MN_ICONS = {
   "i-wrench": '<path d="M15.5 3.5a5.5 5.5 0 0 0-5 7.7L3.8 17.9a2 2 0 0 0 2.8 2.8l6.7-6.7A5.5 5.5 0 1 0 15.5 3.5z"/><path d="m15 3.8 3.2 3.2-2.4 2.4-3.2-3.2z"/>',
   "i-box": '<path d="m12 3 8 4.2v9.6L12 21l-8-4.2V7.2z"/><path d="M4 7.2 12 11.5l8-4.3M12 11.5V21"/>',
 
+  /* ---- Grades ---------------------------------------------------------- */
+  "i-crown": '<path d="m3 17 1.4-9.4 4.3 3.6L12 5.2l3.3 6 4.3-3.6L21 17z"/><path d="M3.6 20h16.8"/>',
+  "i-star": '<path d="m12 3.6 2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9L3.5 9.8l5.9-.8z"/>',
+  "i-badge": '<path d="M12 2.6 5.5 5v6.4c0 4 2.7 6.9 6.5 8.4 3.8-1.5 6.5-4.4 6.5-8.4V5z"/><path d="m9.4 11.4 1.9 1.9 3.4-3.6"/>',
+  "i-helmet": '<path d="M3.6 15.5a8.4 8.4 0 0 1 16.8 0z"/><path d="M9.5 15.5V6.4a1.6 1.6 0 0 1 1.6-1.6h1.8a1.6 1.6 0 0 1 1.6 1.6v9.1"/><path d="M2.6 18.4h18.8"/>',
+  "i-stripes": '<path d="m5 8 7 3.4L19 8"/><path d="m5 12.5 7 3.4 7-3.4"/><path d="m5 17 7 3.4 7-3.4"/>',
+  "i-clipboard": '<rect x="5" y="4.5" width="14" height="16" rx="2"/><path d="M9 4.5V3.4a1.4 1.4 0 0 1 1.4-1.4h3.2A1.4 1.4 0 0 1 15 3.4v1.1z"/><path d="M8.8 11h6.4M8.8 15h4.4"/>',
+
   /* ---- Ressources ------------------------------------------------------ */
   "r-plastic": '<rect x="4" y="4.5" width="16" height="15" rx="2"/><path d="m7 9 4 4M13 9l4 4M7 16l3-3"/>',
   "r-coal": '<path d="m4 14.5 3.2-7.4L12.5 5l6 4 2 5.8-4 4.2H8z"/><path d="m9.5 9 3 4.2-2 5"/>',
@@ -45,6 +53,10 @@ window.MN_ICONS = {
 
 /* Regroupement pour le sélecteur d'icônes du panneau admin. */
 window.MN_ICON_GROUPS = {
+  "Grades": [
+    "i-crown", "i-star", "i-badge", "i-helmet", "i-stripes",
+    "i-clipboard", "i-key", "i-wrench", "i-armor"
+  ],
   "Pièces & prestations": [
     "i-headlight", "i-seat", "i-bumper", "i-spray", "i-tire-smoke", "i-tire-offroad",
     "i-wheels-moto", "i-wheels-car", "i-wheels-truck", "i-engine", "i-turbo",

@@ -49,25 +49,71 @@ La toute première personne qui se connecte devient automatiquement **patron**
 
 | Onglet | À quoi ça sert |
 |---|---|
-| **Objets** | Créer / modifier les prestations et leur coût en ressources |
+| **Objets** | Prestations, coût en ressources, **quantité maximum par BT** |
 | **Catégories** | Les onglets affichés sur la page de facturation |
-| **Ressources** | Plastique, métal, charbon… avec icône et couleur |
-| **Employés** | Qui peut se connecter, avec quelles permissions |
+| **Ressources** | Plastique, ferraille, charbon… avec icône et couleur |
+| **Employés** | Qui peut se connecter, et avec quel rôle |
+| **Rôles** | Les droits, par rôle : nom, couleur, permissions |
+| **Discord** | Adresses des webhooks (bons de travail, services) |
 | **Le site** | Nom de l'entreprise, slogan, **logo**, réglages de connexion |
 | **Publier** | Envoyer les modifications en ligne |
 
-### Permissions disponibles
+### Rôles et permissions
+
+Les droits sont portés par le **rôle**, pas par la personne : tu crées
+« Mécano », « Chef d'atelier », « Patron »… avec une couleur et des
+permissions, puis tu attribues un rôle à chaque employé. Changer les droits
+d'un rôle les change pour tout le monde d'un coup.
 
 | Clé | Ce que ça autorise |
 |---|---|
 | `bt` | Utiliser la facturation et enregistrer des bons de travail |
+| `duty` | Prendre et quitter son service |
+| `duty_view` | Voir qui est en service et l'historique de l'équipe |
 | `items` | Gérer objets, catégories, ressources et leurs coûts |
-| `users` | Ajouter des employés et changer leurs permissions |
+| `users` | Gérer les employés et les rôles |
 | `publish` | Envoyer les modifications sur le site public |
 | `admin` | Patron — implique automatiquement tout le reste |
 
 Un employé peut avoir un **code d'accès** (facultatif). Recommandé pour les
 comptes qui gèrent le catalogue ou l'équipe.
+
+Deux garde-fous : tu ne peux pas te désactiver toi-même, ni prendre (ou
+modifier) un rôle qui te retirerait la gestion de l'équipe.
+
+---
+
+## 3 bis. Service et Discord
+
+### Prise de service
+
+La page **Service** permet de pointer en arrivant et en partant. Les personnes
+ayant `duty_view` voient le tableau des présents, le temps cumulé sur 7 jours
+et les derniers pointages, et peuvent clôturer le service de quelqu'un qui a
+oublié.
+
+Le tableau partagé vit dans `data/duty.json`. Il n'est mis à jour pour toute
+l'équipe que par les personnes ayant un **jeton GitHub** sur leur appareil ;
+pour les autres, le pointage part sur Discord et le site le signale.
+
+### Webhooks Discord
+
+Dans **Admin → Discord**, deux adresses : une pour les bons de travail, une
+pour les services. Un bouton **Envoyer un test** valide la configuration.
+
+⚠️ **L'adresse du webhook est enregistrée dans le fichier de données, qui est
+public.** Quelqu'un qui sait chercher peut donc écrire dans le salon. Utilise
+un salon dédié sans enjeu, et régénère le webhook depuis Discord si besoin.
+
+### Limiter les quantités
+
+Dans la fiche d'un objet, **Quantité maximum par BT** : `0` = illimité, `2`
+empêche d'en mettre plus de deux sur un même bon de travail. La carte affiche
+un repère « max 2 » et le bouton **+** se désactive une fois la limite atteinte.
+
+Sur la page de facturation, la quantité est un **champ de saisie** : clique
+dessus et tape le nombre directement (les flèches ↑ ↓ marchent aussi, Maj
+pour aller de 5 en 5).
 
 ---
 

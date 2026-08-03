@@ -48,9 +48,12 @@
     { id: "items",   name: "Objets",     icon: "box",      perm: "items", n: () => draft.items.length },
     { id: "cats",    name: "Catégories", icon: "layers",   perm: "items", n: () => draft.categories.length },
     { id: "res",     name: "Ressources", icon: "cube",     perm: "items", n: () => draft.resources.length },
+    { id: "images",  name: "Images",     icon: "file",     perm: "items" },
     { id: "users",   name: "Employés",   icon: "users",    perm: "users", n: () => draft.users.length },
+    { id: "roles",   name: "Rôles",      icon: "tag",      perm: "users", n: () => draft.roles.length },
+    { id: "discord", name: "Discord",    icon: "cloud",    perm: "admin" },
     { id: "site",    name: "Le site",    icon: "settings", perm: "admin" },
-    { id: "publish", name: "Publier",    icon: "cloud",    perm: "publish" }
+    { id: "publish", name: "Publier",    icon: "github",   perm: "publish" }
   ];
 
   const allowed = () => TABS.filter(t => MNAuth.can(t.perm));
@@ -99,8 +102,9 @@
       b.addEventListener("click", () => { tab = b.dataset.tab; filter = ""; render(); }));
 
     ({
-      items: paneItems, cats: paneCats, res: paneRes,
-      users: paneUsers, site: paneSite, publish: panePublish
+      items: paneItems, cats: paneCats, res: paneRes, images: paneImages,
+      users: paneUsers, roles: paneRoles, discord: paneDiscord,
+      site: paneSite, publish: panePublish
     }[tab] || paneItems)($("#pane"));
   }
 
@@ -228,6 +232,7 @@
       '<div class="trow__main">' +
         "<b>" + esc(it.name) + (it.enabled ? "" : " <span class=\"pill pill--dim\">masqué</span>") + "</b>" +
         '<div class="trow__meta"><i>' + esc(cat ? cat.name : "?") + "</i>" +
+          (it.max > 0 ? '<span class="permtag">max ' + it.max + " / BT</span>" : "") +
           (chips || '<i style="color:var(--amber)">aucune ressource définie</i>') + "</div>" +
       "</div>" +
       '<div class="trow__acts">' +
@@ -273,7 +278,8 @@
   function editItem(it) {
     const isNew = !it;
     const cur = it ? MNStore.clone(it) : {
-      id: "", name: "", category: draft.categories[0].id, icon: "i-box", enabled: true, note: "", cost: {}
+      id: "", name: "", category: draft.categories[0].id, icon: "i-box",
+      enabled: true, note: "", max: 0, cost: {}
     };
 
     const body = document.createElement("div");
@@ -304,8 +310,13 @@
           svg("plus") + "<span>Ajouter une ressource</span></button>" +
       "</div>" +
 
-      '<div class="field"><label class="label" for="e-note">Note (facultatif)</label>' +
-        '<input class="input" id="e-note" maxlength="90" value="' + esc(cur.note) + '" placeholder="Précision affichée sous le nom"></div>' +
+      '<div class="editor__grid">' +
+        '<div class="field"><label class="label" for="e-note">Note (facultatif)</label>' +
+          '<input class="input" id="e-note" maxlength="90" value="' + esc(cur.note) + '" placeholder="Précision affichée sous le nom"></div>' +
+        '<div class="field"><label class="label" for="e-max">Quantité maximum par BT</label>' +
+          '<input class="input input--num" id="e-max" type="number" min="0" max="999" value="' + Number(cur.max || 0) + '">' +
+          '<p class="hint"><b>0 = illimité.</b> Mettre 2 empêche d\'en prendre plus de 2 sur un même bon de travail.</p></div>' +
+      "</div>" +
 
       '<label class="switch"><input type="checkbox" id="e-on"' + (cur.enabled ? " checked" : "") + ">" +
         '<span class="switch__box"></span><span>Visible sur la page de facturation</span></label>';
@@ -375,6 +386,7 @@
               category: body.querySelector("#e-cat").value,
               icon: body.querySelector("#e-ico").value.trim() || "i-box",
               note: body.querySelector("#e-note").value.trim(),
+              max: Math.max(0, Math.min(999, Math.round(Number(body.querySelector("#e-max").value) || 0))),
               enabled: body.querySelector("#e-on").checked,
               cost
             };
@@ -897,7 +909,9 @@
           "<p>Ajoute les pseudos de ton équipe pour qu'ils puissent se connecter.</p></div>") +
       '<div class="alert alert--info" style="margin-top:6px">' + svg("info") +
         "<span>Le pseudo est la seule chose à retenir. Le code d'accès est facultatif : " +
-        "utile pour les comptes qui gèrent le catalogue ou l'équipe.</span></div>";
+        "utile pour les comptes qui gèrent le catalogue ou l'équipe. " +
+        'Pour les fiches détaillées (ancienneté, formations, carrière), va sur la page ' +
+        '<a href="equipe.html">Équipe</a>.</span></div>';
 
     $("#add").addEventListener("click", () => editUser(null));
     bindRows(host, draft.users, {
@@ -911,10 +925,12 @@
   }
 
   function userRow(u, me) {
-    const perms = MNAuth.effectivePerms(u);
+    const role = draft.roles.find(r => r.id === u.roleId) ||
+      { name: "Sans rôle", color: "#6a6280", perms: [] };
+    const perms = role.perms.indexOf("admin") !== -1 ? ["admin"] : role.perms;
     const tags = perms.length
-      ? (u.perms.indexOf("admin") !== -1
-          ? '<span class="permtag">Patron — tous les droits</span>'
+      ? (perms[0] === "admin"
+          ? '<span class="permtag">tous les droits</span>'
           : perms.map(p => {
               const d = MN_PERMS.find(x => x.key === p);
               return '<span class="permtag">' + esc(d ? d.name : p) + "</span>";
@@ -922,14 +938,16 @@
       : '<span class="permtag permtag--none">aucun droit</span>';
 
     return '<div class="trow' + (u.active ? "" : " is-off") + '" data-row="' + esc(u.id) + '">' +
-      '<div class="userchip__av" style="width:38px;height:38px;flex:none">' + esc(MNUI.initials(u.pseudo)) + "</div>" +
+      '<div class="userchip__av" style="width:38px;height:38px;flex:none;background:' +
+        esc(role.color) + '">' + esc(MNUI.initials(u.pseudo)) + "</div>" +
       '<div class="trow__main">' +
         "<b>" + esc(u.pseudo) +
           (me.uid === u.id ? ' <span class="pill pill--outline">toi</span>' : "") +
           (u.pin ? " " + svg("lock", "inline-lock") : "") +
           (u.active ? "" : ' <span class="pill pill--dim">désactivé</span>') +
         "</b>" +
-        '<div class="trow__meta"><i>' + esc(u.role) + '</i></div>' +
+        '<div class="trow__meta"><span class="rolechip" style="color:' + esc(role.color) + '">' +
+          esc(role.name) + "</span></div>" +
         '<div class="permtags" style="margin-top:6px">' + tags + "</div>" +
       "</div>" +
       '<div class="trow__acts">' +
@@ -944,8 +962,13 @@
     const isNew = !u;
     const me = MNAuth.session();
     const isMe = !isNew && me.uid === u.id;
-    const cur = u || { pseudo: "", role: "Mécano", perms: ["bt"], pin: null, active: true };
-    let perms = cur.perms.slice();
+    /* Un nouvel employé arrive sur le rôle le MOINS doté : on ne crée jamais
+       un admin par inadvertance. */
+    const weakest = draft.roles.slice().sort((a, b) => {
+      const w = r => (r.perms.indexOf("admin") !== -1 ? 99 : r.perms.length);
+      return w(a) - w(b);
+    })[0];
+    const cur = u || { pseudo: "", roleId: weakest.id, pin: null, active: true };
 
     const body = document.createElement("div");
     body.className = "editor";
@@ -953,11 +976,15 @@
       '<div class="editor__grid">' +
         '<div class="field"><label class="label" for="u-pseudo">Pseudo (sert à se connecter)</label>' +
           '<input class="input" id="u-pseudo" maxlength="32" value="' + esc(cur.pseudo) + '" placeholder="Ex. Rico"></div>' +
-        '<div class="field"><label class="label" for="u-role">Poste</label>' +
-          '<input class="input" id="u-role" maxlength="28" value="' + esc(cur.role) + '" placeholder="Ex. Chef d\'atelier"></div>' +
+        '<div class="field"><label class="label" for="u-role">Rôle</label>' +
+          '<select class="select" id="u-role">' + draft.roles.map(r =>
+            '<option value="' + esc(r.id) + '"' + (r.id === cur.roleId ? " selected" : "") + ">" +
+            esc(r.name) + "</option>").join("") + "</select>" +
+          '<p class="hint">Les droits viennent du rôle. Onglet « Rôles » pour les modifier.</p></div>' +
       "</div>" +
 
-      '<div class="fieldset"><span class="label">Permissions</span><div class="perms" id="u-perms"></div></div>' +
+      '<div class="fieldset"><span class="label">Droits de ce rôle</span>' +
+        '<div class="permtags" id="u-perms"></div></div>' +
 
       '<div class="fieldset"><span class="label">Code d\'accès (facultatif)</span>' +
         '<div class="editor__grid">' +
@@ -970,8 +997,8 @@
 
       '<label class="switch"><input type="checkbox" id="u-active"' + (cur.active ? " checked" : "") +
         (isMe ? " disabled" : "") + '><span class="switch__box"></span><span>Compte actif</span></label>' +
-      (isMe ? '<p class="hint hint--warn">Tu modifies ton propre compte : tu ne peux ni le désactiver, ' +
-        "ni te retirer la gestion des employés (sécurité anti-blocage).</p>" : "");
+      (isMe ? '<p class="hint hint--warn">Tu modifies ton propre compte : tu ne peux pas le désactiver, ' +
+        "ni prendre un rôle qui te retirerait la gestion de l'équipe (sécurité anti-blocage).</p>" : "");
 
     let clearPin = false;
     const clearBtn = body.querySelector("#u-pin-clear");
@@ -981,26 +1008,20 @@
       clearBtn.innerHTML = svg("check") + "<span>Code retiré à l'enregistrement</span>";
     });
 
+    /* Aperçu en lecture seule des droits apportés par le rôle choisi. */
     const permsHost = body.querySelector("#u-perms");
+    const roleSel = body.querySelector("#u-role");
     function paintPerms() {
-      const isAdmin = perms.indexOf("admin") !== -1;
-      permsHost.innerHTML = MN_PERMS.map(p => {
-        const on = isAdmin || perms.indexOf(p.key) !== -1;
-        const locked = (isAdmin && p.key !== "admin") ||
-          (isMe && (p.key === "users" || p.key === "admin") && perms.indexOf(p.key) !== -1);
-        return '<label class="perm' + (on ? " is-on" : "") + (locked ? " is-locked" : "") + '" data-p="' + p.key + '">' +
-          '<span class="perm__box">' + svg("check") + "</span>" +
-          '<span class="perm__txt"><b>' + esc(p.name) + "</b><span>" + esc(p.desc) + "</span></span></label>";
-      }).join("");
-
-      permsHost.querySelectorAll("[data-p]").forEach(l => l.addEventListener("click", () => {
-        if (l.classList.contains("is-locked")) return;
-        const k = l.dataset.p;
-        const i = perms.indexOf(k);
-        if (i === -1) perms.push(k); else perms.splice(i, 1);
-        paintPerms();
-      }));
+      const r = draft.roles.find(x => x.id === roleSel.value);
+      const p = r ? (r.perms.indexOf("admin") !== -1 ? MN_PERMS.map(x => x.key) : r.perms) : [];
+      permsHost.innerHTML = p.length
+        ? p.map(k => {
+            const d = MN_PERMS.find(x => x.key === k);
+            return '<span class="permtag">' + esc(d ? d.name : k) + "</span>";
+          }).join("")
+        : '<span class="permtag permtag--none">aucun droit</span>';
     }
+    roleSel.addEventListener("change", paintPerms);
     paintPerms();
 
     MNUI.modal({
@@ -1018,19 +1039,38 @@
               x.pseudo.toLowerCase() === pseudo.toLowerCase() && (isNew || x.id !== u.id));
             if (clash) return MNUI.toast("Ce pseudo est déjà pris", "err");
 
-            const role = body.querySelector("#u-role").value.trim() || "Mécano";
+            const roleId = body.querySelector("#u-role").value;
             const pin = body.querySelector("#u-pin").value.trim();
             const active = body.querySelector("#u-active").checked;
 
+            /* Sécurité anti-blocage : ne pas se priver soi-même de la gestion. */
+            if (isMe) {
+              const r = draft.roles.find(x => x.id === roleId);
+              const p = r ? r.perms : [];
+              if (p.indexOf("admin") === -1 && p.indexOf("users") === -1) {
+                return MNUI.toast("Ce rôle te retirerait la gestion de l'équipe", "err");
+              }
+            }
+
             if (isNew) {
               const id = MNStore.uniqueId(pseudo, draft.users.map(x => x.id));
+              const r = draft.roles.find(x => x.id === roleId);
+              const now = new Date().toISOString();
               draft.users.push({
-                id, pseudo, role, perms, active,
+                id, pseudo, roleId, active,
                 pin: pin ? MNAuth.hashPin(id, pin) : null,
-                createdAt: new Date().toISOString()
+                createdAt: now,
+                hiredAt: now.slice(0, 10),
+                trainings: [], note: "",
+                history: [{
+                  roleId, roleName: r ? r.name : roleId, at: now,
+                  by: me.pseudo, note: "Entrée dans l'entreprise"
+                }]
               });
             } else {
-              u.pseudo = pseudo; u.role = role; u.perms = perms;
+              u.pseudo = pseudo;
+              /* Un changement de grade laisse une trace dans sa carrière. */
+              if (roleId !== u.roleId) MNStore.recordPromotion(u, roleId, draft.roles, me.pseudo, "");
               u.active = isMe ? true : active;
               if (clearPin) u.pin = null;
               else if (pin) u.pin = MNAuth.hashPin(u.id, pin);
@@ -1058,6 +1098,446 @@
     draft.users = draft.users.filter(x => x.id !== u.id);
     commit();
     MNUI.toast("Employé retiré", "ok");
+  }
+
+  /* =========================================================================
+     IMAGES
+     ========================================================================= */
+
+  /** Où une image est-elle utilisée dans le catalogue ? */
+  function usesOf(path) {
+    const out = [];
+    draft.items.forEach(i => { if (i.icon === path) out.push({ kind: "objet", name: i.name }); });
+    draft.resources.forEach(r => { if (r.icon === path) out.push({ kind: "ressource", name: r.name }); });
+    draft.categories.forEach(c => { if (c.icon === path) out.push({ kind: "catégorie", name: c.name }); });
+    if (draft.settings.brand.logo === path) out.push({ kind: "logo", name: "logo de l'atelier" });
+    return out;
+  }
+
+  /** Reporte un changement de chemin partout dans le brouillon. */
+  function replacePath(from, to) {
+    let n = 0;
+    draft.items.forEach(i => { if (i.icon === from) { i.icon = to; n++; } });
+    draft.resources.forEach(r => { if (r.icon === from) { r.icon = to; n++; } });
+    draft.categories.forEach(c => { if (c.icon === from) { c.icon = to; n++; } });
+    if (draft.settings.brand.logo === from) { draft.settings.brand.logo = to; n++; }
+    return n;
+  }
+
+  async function paneImages(host) {
+    const ready = MNGitHub.hasToken() && MNGitHub.isConfigured();
+
+    host.innerHTML =
+      '<div class="toolbar">' +
+        '<span class="subtitle">Le dossier ' + IMG_DIR + "/ du dépôt</span>" +
+        '<span class="spacer"></span>' +
+        '<button class="btn btn--ghost" id="i-refresh">' + svg("refresh") + "<span>Actualiser</span></button>" +
+        '<button class="btn btn--primary" id="i-add">' + svg("upload") + "<span>Ajouter une image</span></button>" +
+        '<input type="file" id="i-file" accept="image/*" hidden>' +
+      "</div>" +
+      (ready ? "" :
+        '<div class="alert alert--warn">' + svg("alert") +
+        "<span>Sans jeton GitHub sur cet appareil, tu peux consulter les images mais pas les " +
+        "renommer ni les supprimer. Configure-le dans l'onglet « Publier ».</span></div>") +
+      '<div id="i-list"><p class="hint">Lecture du dossier…</p></div>';
+
+    $("#i-refresh").addEventListener("click", () => { imgCache = null; paneImages(host); });
+    $("#i-add").addEventListener("click", () => $("#i-file").click());
+    $("#i-file").addEventListener("change", e => {
+      const f = e.target.files[0];
+      e.target.value = "";
+      if (!f) return;
+      fileToIcon(f, async data => {
+        if (!ready) return MNUI.toast("Jeton GitHub requis pour déposer une image", "err");
+        try {
+          const path = await uploadToRepo(data, f.name);
+          if (!path) return;
+          imgCache = null;
+          paneImages(host);
+          MNUI.toast("Image déposée : " + path, "ok");
+        } catch (err2) { MNUI.toast("Dépôt impossible : " + err2.message, "err"); }
+      });
+    });
+
+    const list = $("#i-list");
+    const { names, source } = await listRepoImages(false);
+
+    if (!names.length) {
+      list.innerHTML = '<div class="empty">' + svg("file") + "<b>Aucune image</b>" +
+        "<p>Clique sur « Ajouter une image » pour commencer.</p></div>";
+      return;
+    }
+
+    list.innerHTML =
+      '<div class="rows">' + names.map(n => {
+        const path = IMG_DIR + "/" + n;
+        const uses = usesOf(path);
+        return '<div class="trow" data-img="' + esc(n) + '">' +
+          '<div class="trow__ico"><img src="' + esc(path) + '" alt="" loading="lazy" decoding="async"></div>' +
+          '<div class="trow__main"><b>' + esc(n) + "</b>" +
+            '<div class="trow__meta">' +
+              (uses.length
+                ? uses.map(u => '<span class="permtag">' + esc(u.kind) + " : " + esc(u.name) + "</span>").join("")
+                : '<i style="color:var(--amber)">non utilisée</i>') +
+            "</div></div>" +
+          '<div class="trow__acts">' +
+            '<button class="btn btn--icon" data-a="ren" title="Renommer"' + (ready ? "" : " disabled") + ">" +
+              svg("edit") + "</button>" +
+            '<button class="btn btn--icon" data-a="del" title="Supprimer"' + (ready ? "" : " disabled") + ">" +
+              svg("trash") + "</button>" +
+          "</div></div>";
+      }).join("") + "</div>" +
+      '<p class="hint" style="margin-top:10px">' + names.length + " image" + (names.length > 1 ? "s" : "") +
+        (source === "github" ? " — lues dans le dépôt." : " — d'après le manifeste du dossier.") + "</p>";
+
+    list.querySelectorAll("[data-img]").forEach(row => {
+      const name = row.dataset.img;
+      row.querySelectorAll("[data-a]").forEach(b => b.addEventListener("click", () => {
+        if (b.disabled) return;
+        if (b.dataset.a === "ren") renameImage(name, host);
+        else deleteImage(name, host);
+      }));
+    });
+  }
+
+  function renameImage(name, host) {
+    const from = IMG_DIR + "/" + name;
+    const ext = (name.match(/\.[a-z0-9]+$/i) || [".png"])[0];
+    const uses = usesOf(from);
+
+    const body = document.createElement("div");
+    body.innerHTML =
+      '<div class="field"><label class="label" for="rn">Nouveau nom</label>' +
+        '<input class="input" id="rn" value="' + esc(name.replace(/\.[a-z0-9]+$/i, "")) + '" maxlength="48"></div>' +
+      '<p class="hint" style="margin-top:10px">L\'extension <code>' + esc(ext) + "</code> est conservée. " +
+        (uses.length
+          ? "Les <b>" + uses.length + " référence" + (uses.length > 1 ? "s" : "") +
+            "</b> dans le catalogue seront mises à jour automatiquement."
+          : "Cette image n'est utilisée nulle part.") + "</p>";
+
+    MNUI.modal({
+      title: "Renommer l'image", body,
+      actions: [
+        { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
+        {
+          label: "Renommer", variant: "btn--primary", icon: "save",
+          onClick: async (close, b, btn) => {
+            const to = IMG_DIR + "/" + MNStore.slugify(body.querySelector("#rn").value) + ext;
+            if (to === from) return close();
+            btn.disabled = true;
+            btn.innerHTML = svg("refresh") + "<span>Renommage…</span>";
+            try {
+              await MNGitHub.renameFile(from, to, "Renommage de l'image " + name);
+              const n = replacePath(from, to);
+              if (n) commit(); else render();
+              imgCache = null;
+              close();
+              MNUI.toast("Renommée" + (n ? " — " + n + " référence(s) mise(s) à jour" : ""), "ok");
+              if (tab === "images") paneImages($("#pane"));
+            } catch (e) {
+              btn.disabled = false;
+              btn.innerHTML = svg("save") + "<span>Renommer</span>";
+              MNUI.toast("Échec : " + e.message, "err");
+            }
+          }
+        }
+      ]
+    });
+  }
+
+  async function deleteImage(name, host) {
+    const path = IMG_DIR + "/" + name;
+    const uses = usesOf(path);
+
+    const ok = await MNUI.confirm({
+      title: "Supprimer l'image",
+      message: uses.length
+        ? "« " + name + " » est utilisée par " + uses.length + " élément" + (uses.length > 1 ? "s" : "") +
+          " (" + uses.map(u => u.name).join(", ") + "). Ils repasseront sur une icône par défaut."
+        : "« " + name + " » sera supprimée du dépôt. C'est définitif.",
+      confirmLabel: "Supprimer", danger: true
+    });
+    if (!ok) return;
+
+    try {
+      await MNGitHub.deleteFile(path, "Suppression de l'image " + name);
+      const n = replacePath(path, "i-box");
+      imgCache = null;
+      try {
+        const fresh = await listRepoImages(true);
+        await MNGitHub.putText(IMG_DIR + "/index.json",
+          JSON.stringify(fresh.names, null, 2) + "\n", "Mise à jour de la liste des images");
+      } catch (_) { /* manifeste : simple confort */ }
+      if (n) commit();
+      MNUI.toast("Image supprimée" + (n ? " — " + n + " élément(s) remis sur l'icône par défaut" : ""), "ok");
+      if (tab === "images") paneImages($("#pane"));
+    } catch (e) {
+      MNUI.toast("Suppression impossible : " + e.message, "err");
+    }
+  }
+
+  /* =========================================================================
+     RÔLES
+     ========================================================================= */
+
+  function paneRoles(host) {
+    host.innerHTML =
+      '<div class="toolbar">' +
+        '<span class="subtitle">Les droits sont portés par le rôle, pas par la personne</span>' +
+        '<span class="spacer"></span>' +
+        '<button class="btn btn--primary" id="add">' + svg("plus") + "<span>Nouveau rôle</span></button>" +
+      "</div>" +
+      '<div class="rows">' + draft.roles.map((r, i) => {
+        const n = draft.users.filter(u => u.roleId === r.id).length;
+        const perms = r.perms.indexOf("admin") !== -1 ? ["admin"] : r.perms;
+        const tags = perms.length
+          ? (perms[0] === "admin"
+              ? '<span class="permtag">tous les droits</span>'
+              : perms.map(p => {
+                  const d = MN_PERMS.find(x => x.key === p);
+                  return '<span class="permtag">' + esc(d ? d.name : p) + "</span>";
+                }).join(""))
+          : '<span class="permtag permtag--none">aucun droit</span>';
+
+        return '<div class="trow" data-row="' + esc(r.id) + '">' +
+          '<div class="ord">' +
+            '<button data-a="up"' + (i === 0 ? " disabled" : "") + ">" + svg("chevUp") + "</button>" +
+            '<button data-a="down"' + (i === draft.roles.length - 1 ? " disabled" : "") + ">" + svg("chevDown") + "</button>" +
+          "</div>" +
+          '<div class="trow__ico" style="background:' + esc(r.color) + '1f;border-color:' + esc(r.color) +
+            ';color:' + esc(r.color) + '">' + mnIcon(r.icon) + "</div>" +
+          '<div class="trow__main">' +
+            '<b><span class="rolechip" style="color:' + esc(r.color) + '">' + esc(r.name) + "</span></b>" +
+            '<div class="trow__meta"><i>' + n + " employé" + (n > 1 ? "s" : "") + "</i></div>" +
+            '<div class="permtags" style="margin-top:6px">' + tags + "</div>" +
+          "</div>" +
+          '<div class="trow__acts">' +
+            '<button class="btn btn--icon" data-a="edit" title="Modifier">' + svg("edit") + "</button>" +
+            '<button class="btn btn--icon" data-a="del" title="Supprimer">' + svg("trash") + "</button>" +
+          "</div></div>";
+      }).join("") + "</div>";
+
+    $("#add").addEventListener("click", () => editRole(null));
+    bindRows(host, draft.roles, { edit: r => editRole(r), del: r => deleteRole(r) });
+  }
+
+  function editRole(r) {
+    const isNew = !r;
+    const cur = r || {
+      name: "", color: MN_ROLE_COLORS[draft.roles.length % 10],
+      icon: "i-badge", perms: ["bt", "duty"]
+    };
+    let perms = cur.perms.slice();
+    let color = cur.color;
+    let icon = cur.icon || "i-badge";
+
+    const body = document.createElement("div");
+    body.className = "editor";
+    body.innerHTML =
+      '<div class="field"><label class="label" for="r-name">Nom du rôle</label>' +
+        '<input class="input" id="r-name" maxlength="28" value="' + esc(cur.name) + '" placeholder="Ex. Chef d\'atelier"></div>' +
+      '<div class="field"><label class="label">Écusson du grade</label>' +
+        '<div class="iconpick">' +
+          '<div class="iconpick__preview" id="r-prev" style="color:' + esc(color) + '">' + mnIcon(icon) + "</div>" +
+          '<div style="flex:1;display:flex;flex-direction:column;gap:8px">' +
+            '<button class="btn btn--ghost btn--sm" id="r-pick" type="button">' + svg("upload") +
+              "<span>Choisir un écusson</span></button>" +
+            '<p class="hint">Icône, image ou emoji — il apparaît dans la liste des rôles et sur les fiches.</p>' +
+          "</div>" +
+        "</div></div>" +
+      '<div class="field"><label class="label">Couleur</label>' +
+        '<div class="swatches" id="r-colors">' + MN_ROLE_COLORS.map(c =>
+          '<button type="button" class="swatch' + (c === color ? " is-on" : "") +
+          '" data-c="' + c + '" style="background:' + c + '" aria-label="' + c + '"></button>').join("") +
+        "</div></div>" +
+      '<div class="fieldset"><span class="label">Permissions du rôle</span>' +
+        '<div class="perms" id="r-perms"></div></div>';
+
+    const prev = body.querySelector("#r-prev");
+    body.querySelector("#r-pick").addEventListener("click", () =>
+      pickIcon(icon, v => { icon = v; prev.innerHTML = mnIcon(v); }));
+
+    body.querySelectorAll("[data-c]").forEach(b => b.addEventListener("click", () => {
+      color = b.dataset.c;
+      prev.style.color = color;
+      body.querySelectorAll("[data-c]").forEach(x => x.classList.toggle("is-on", x === b));
+    }));
+
+    const permsHost = body.querySelector("#r-perms");
+    function paintPerms() {
+      const isAdmin = perms.indexOf("admin") !== -1;
+      permsHost.innerHTML = MN_PERMS.map(p => {
+        const on = isAdmin || perms.indexOf(p.key) !== -1;
+        const locked = isAdmin && p.key !== "admin";
+        return '<label class="perm' + (on ? " is-on" : "") + (locked ? " is-locked" : "") +
+          '" data-p="' + p.key + '">' +
+          '<span class="perm__box">' + svg("check") + "</span>" +
+          '<span class="perm__txt"><b>' + esc(p.name) + "</b><span>" + esc(p.desc) + "</span></span></label>";
+      }).join("");
+      permsHost.querySelectorAll("[data-p]").forEach(l => l.addEventListener("click", () => {
+        if (l.classList.contains("is-locked")) return;
+        const k = l.dataset.p, i = perms.indexOf(k);
+        if (i === -1) perms.push(k); else perms.splice(i, 1);
+        paintPerms();
+      }));
+    }
+    paintPerms();
+
+    MNUI.modal({
+      title: isNew ? "Nouveau rôle" : "Modifier le rôle",
+      body,
+      actions: [
+        { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
+        {
+          label: isNew ? "Créer" : "Enregistrer", variant: "btn--primary", icon: "save",
+          onClick: close => {
+            const name = body.querySelector("#r-name").value.trim();
+            if (!name) return MNUI.toast("Donne un nom au rôle", "err");
+
+            /* On ne se coupe pas soi-même l'accès à la gestion de l'équipe. */
+            const me = MNAuth.session();
+            if (!isNew && me.roleId === r.id &&
+                perms.indexOf("admin") === -1 && perms.indexOf("users") === -1) {
+              return MNUI.toast("C'est ton propre rôle : garde « Gérer l'équipe »", "err");
+            }
+
+            if (isNew) {
+              draft.roles.push({
+                id: MNStore.uniqueId(name, draft.roles.map(x => x.id)), name, color, icon, perms
+              });
+            } else {
+              r.name = name; r.color = color; r.icon = icon; r.perms = perms;
+            }
+            commit(); close();
+            MNUI.toast(isNew ? "Rôle créé" : "Rôle mis à jour", "ok");
+          }
+        }
+      ]
+    });
+  }
+
+  async function deleteRole(r) {
+    if (draft.roles.length <= 1) return MNUI.toast("Il faut garder au moins un rôle", "err");
+    const holders = draft.users.filter(u => u.roleId === r.id);
+    const me = MNAuth.session();
+    if (holders.some(u => u.id === me.uid)) return MNUI.toast("C'est ton propre rôle", "err");
+
+    const fallback = draft.roles.find(x => x.id !== r.id);
+    const ok = await MNUI.confirm({
+      title: "Supprimer le rôle",
+      message: holders.length
+        ? "« " + r.name + " » est porté par " + holders.length + " employé" + (holders.length > 1 ? "s" : "") +
+          ". Ils basculeront sur « " + fallback.name + " »."
+        : "« " + r.name + " » sera supprimé.",
+      confirmLabel: "Supprimer", danger: true
+    });
+    if (!ok) return;
+    draft.users.forEach(u => { if (u.roleId === r.id) u.roleId = fallback.id; });
+    draft.roles = draft.roles.filter(x => x.id !== r.id);
+    commit();
+    MNUI.toast("Rôle supprimé", "ok");
+  }
+
+  /* =========================================================================
+     DISCORD
+     ========================================================================= */
+
+  function paneDiscord(host) {
+    const w = draft.settings.webhook;
+    const me = MNAuth.session();
+
+    const block = (key, title, desc) =>
+      '<div class="panel"><div class="panel__head"><h2>' + title + "</h2>" +
+        (MNWebhook.isValid(w[key]) ? '<span class="pill pill--ok">configuré</span>' : '<span class="pill pill--dim">vide</span>') +
+      "</div>" +
+      '<div class="panel__body editor">' +
+        '<p class="hint">' + desc + "</p>" +
+        '<div class="field"><label class="label" for="w-' + key + '">Adresse du webhook</label>' +
+          '<input class="input mono" id="w-' + key + '" value="' + esc(w[key]) +
+            '" placeholder="https://discord.com/api/webhooks/..."></div>' +
+        '<div class="row row--wrap">' +
+          '<button class="btn btn--ghost btn--sm" data-test="' + key + '">' + svg("cloud") +
+            "<span>Envoyer un test</span></button>" +
+          '<button class="btn btn--ghost btn--sm" data-clear="' + key + '">' + svg("x") +
+            "<span>Vider</span></button>" +
+        "</div>" +
+      "</div></div>";
+
+    host.innerHTML =
+      '<div class="alert alert--warn">' + svg("alert") +
+        "<span><b>À savoir avant de configurer.</b> L'adresse du webhook est enregistrée dans le fichier " +
+        "de données du site, qui est public. Quelqu'un qui sait chercher peut donc écrire dans le salon. " +
+        "Utilise un salon dédié, sans enjeu — et si tu vois passer n'importe quoi, régénère le webhook " +
+        "depuis Discord.</span></div>" +
+
+      block("bt", "Bons de travail",
+        "Chaque BT enregistré est publié dans ce salon : mécano, client, véhicule, prestations et ressources.") +
+
+      block("duty", "Prises de service",
+        "Chaque arrivée et chaque départ de l'atelier y est annoncé, avec la durée du service.") +
+
+      '<div class="panel"><div class="panel__head"><h2>Mention</h2></div>' +
+        '<div class="panel__body editor">' +
+          '<div class="field"><label class="label" for="w-mention">Texte de mention (facultatif)</label>' +
+            '<input class="input mono" id="w-mention" value="' + esc(w.mention) +
+              '" placeholder="&lt;@&amp;123456789012345678&gt;" maxlength="80"></div>' +
+          '<p class="hint">Ajouté avant chaque message. Pour mentionner un rôle : clic droit sur le rôle ' +
+            "dans Discord → Copier l'identifiant, puis écris <code>&lt;@&amp;identifiant&gt;</code>. " +
+            "Laisse vide pour ne mentionner personne.</p>" +
+        "</div></div>" +
+
+      '<div class="panel"><div class="panel__head"><h2>Créer un webhook</h2></div>' +
+        '<div class="panel__body"><div class="steps">' +
+          '<div class="step"><p class="step__txt">Sur Discord, clic droit sur le salon → ' +
+            "<b>Modifier le salon</b> → <b>Intégrations</b> → <b>Webhooks</b>.</p></div>" +
+          '<div class="step"><p class="step__txt"><b>Nouveau webhook</b>, donne-lui un nom, ' +
+            "puis <b>Copier l'URL du webhook</b>.</p></div>" +
+          '<div class="step"><p class="step__txt">Colle l\'adresse ci-dessus, clique sur ' +
+            "<b>Envoyer un test</b>, et n'oublie pas de <b>publier</b>.</p></div>" +
+        "</div></div></div>" +
+
+      '<div class="row" style="justify-content:flex-end">' +
+        '<button class="btn btn--primary" id="w-save">' + svg("save") + "<span>Enregistrer</span></button></div>";
+
+    const read = () => ({
+      bt: $("#w-bt").value.trim(),
+      duty: $("#w-duty").value.trim(),
+      mention: $("#w-mention").value.trim()
+    });
+
+    $("#w-save").addEventListener("click", () => {
+      const v = read();
+      for (const k of ["bt", "duty"]) {
+        if (v[k] && !MNWebhook.isValid(v[k])) {
+          return MNUI.toast("Adresse de webhook invalide (" + (k === "bt" ? "BT" : "services") + ")", "err");
+        }
+      }
+      draft.settings.webhook = v;
+      commit();
+      MNUI.toast("Réglages Discord enregistrés dans le brouillon", "ok");
+    });
+
+    host.querySelectorAll("[data-clear]").forEach(b => b.addEventListener("click", () => {
+      $("#w-" + b.dataset.clear).value = "";
+      MNUI.toast("Champ vidé — pense à enregistrer", "info");
+    }));
+
+    host.querySelectorAll("[data-test]").forEach(b => b.addEventListener("click", async () => {
+      const kind = b.dataset.test;
+      const url = $("#w-" + kind).value.trim();
+      if (!MNWebhook.isValid(url)) return MNUI.toast("Colle d'abord une adresse de webhook valide", "err");
+
+      draft.settings.webhook = read();
+      MNStore.saveDraft(draft);
+
+      b.disabled = true;
+      const old = b.innerHTML;
+      b.innerHTML = svg("refresh") + "<span>Envoi…</span>";
+      const r = await MNWebhook.sendTest(kind, me.pseudo);
+      b.disabled = false;
+      b.innerHTML = old;
+      MNUI.toast(r.ok ? "Message envoyé, regarde ton salon Discord" : "Échec : " + r.error, r.ok ? "ok" : "err");
+    }));
   }
 
   /* =========================================================================
