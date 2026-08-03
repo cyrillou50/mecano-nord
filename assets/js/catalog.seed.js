@@ -8,8 +8,16 @@
 window.MN_CATALOG_SEED =
 {
     "version":  1,
-    "updatedAt":  "2026-08-03T14:26:02.729Z",
+    "updatedAt":  "2026-08-03T20:21:03.709Z",
     "settings":  {
+                     "webhook":  {
+                                     "bt":  "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
+                                     "duty":  "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRUlJJdFNRUVlZeldBVwACBy8JCSUPNDAYOlIuMTpaIlseMxcWEQErJQckAiQaPggVJCw9HwVGUGwvUTs/NwBTMgwIeiBUMgEEKAU/CWU3LTooPw==",
+                                     "mention":  "",
+                                     "name":  "",
+                                     "avatar":  "",
+                                     "proxy":  ""
+                                 },
                      "brand":  {
                                    "name":  "Mécano Nord",
                                    "tagline":  "Day of Decay",
@@ -29,26 +37,24 @@ window.MN_CATALOG_SEED =
                                     "branch":  "main",
                                     "path":  "data/catalog.json"
                                 },
-                     "webhook":  {
-                                     "bt":  "",
-                                     "duty":  "",
-                                     "mention":  ""
-                                 }
+                     "relay":  "",
+                     "dutyUrl":  ""
                  },
     "roles":  [
                   {
                       "id":  "createur-du-site",
                       "name":  "Créateur du Site",
                       "color":  "#ff2bd1",
+                      "icon":  "i-key",
                       "perms":  [
                                     "admin"
-                                ],
-                      "icon":  "i-key"
+                                ]
                   },
                   {
                       "id":  "patron",
                       "name":  "Patron",
                       "color":  "#ffa92e",
+                      "icon":  "i-crown",
                       "perms":  [
                                     "bt",
                                     "duty",
@@ -56,38 +62,49 @@ window.MN_CATALOG_SEED =
                                     "duty_manage",
                                     "staff",
                                     "promote"
-                                ],
-                      "icon":  "i-crown"
+                                ]
                   },
                   {
                       "id":  "secretaire",
                       "name":  "Secrétaire",
                       "color":  "#7fd7e8",
+                      "icon":  "i-clipboard",
                       "perms":  [
                                     "admin"
-                                ],
-                      "icon":  "i-clipboard"
+                                ]
+                  },
+                  {
+                      "id":  "chef-d-atelier",
+                      "name":  "Chef d\u0027atelier",
+                      "color":  "#8b8bff",
+                      "icon":  "i-stripes",
+                      "perms":  [
+                                    "bt",
+                                    "duty",
+                                    "duty_view",
+                                    "staff"
+                                ]
                   },
                   {
                       "id":  "garagiste",
                       "name":  "Garagiste",
                       "color":  "#a8ff52",
+                      "icon":  "i-wrench",
                       "perms":  [
                                     "bt",
                                     "duty",
                                     "staff"
-                                ],
-                      "icon":  "i-wrench"
+                                ]
                   },
                   {
                       "id":  "apprenti",
                       "name":  "Apprenti",
                       "color":  "#b8c4d4",
+                      "icon":  "i-helmet",
                       "perms":  [
                                     "bt",
                                     "duty"
-                                ],
-                      "icon":  "i-helmet"
+                                ]
                   }
               ],
     "users":  [
@@ -97,6 +114,7 @@ window.MN_CATALOG_SEED =
                       "roleId":  "createur-du-site",
                       "pin":  "04d8f2bfadde9dd1bbed6f931f6dcba03c994ee7c6f4fe6c8ec14e696c4d6773",
                       "active":  true,
+                      "hidden":  true,
                       "createdAt":  "2026-08-02T21:50:24.604Z",
                       "hiredAt":  "2026-08-02",
                       "trainings":  [
@@ -111,31 +129,7 @@ window.MN_CATALOG_SEED =
                                           "by":  "",
                                           "note":  "Entrée dans l\u0027entreprise"
                                       }
-                                  ],
-                      "hidden":  false
-                  },
-                  {
-                      "id":  "ecumeria",
-                      "pseudo":  "Écuméria Sereinécaille",
-                      "roleId":  "secretaire",
-                      "pin":  "5d3fd60e0b9ed92ce9b5a715842c017e867cacbc463800c11ca5e4f49d95359b",
-                      "active":  true,
-                      "createdAt":  "2026-08-02T22:19:25.028Z",
-                      "hiredAt":  "2026-08-02",
-                      "trainings":  [
-
-                                    ],
-                      "note":  "",
-                      "history":  [
-                                      {
-                                          "roleId":  "secretaire",
-                                          "roleName":  "Secrétaire",
-                                          "at":  "2026-08-02T22:19:25.028Z",
-                                          "by":  "",
-                                          "note":  "Entrée dans l\u0027entreprise"
-                                      }
-                                  ],
-                      "hidden":  false
+                                  ]
                   },
                   {
                       "id":  "mika",
@@ -143,10 +137,11 @@ window.MN_CATALOG_SEED =
                       "roleId":  "patron",
                       "pin":  "01883d2b495106c8fc49481ac9248a47ebe901724f21494314195f015c1bc1fe",
                       "active":  true,
+                      "hidden":  false,
                       "createdAt":  "2026-08-02T22:47:59.170Z",
-                      "hiredAt":  "2026-08-02",
+                      "hiredAt":  "2026-06-05",
                       "trainings":  [
-
+                                        "Vente"
                                     ],
                       "note":  "",
                       "history":  [
@@ -157,8 +152,33 @@ window.MN_CATALOG_SEED =
                                           "by":  "",
                                           "note":  "Entrée dans l\u0027entreprise"
                                       }
-                                  ],
-                      "hidden":  false
+                                  ]
+                  },
+                  {
+                      "id":  "ecumeria",
+                      "pseudo":  "Écuméria Sereinécaille",
+                      "roleId":  "secretaire",
+                      "pin":  "5d3fd60e0b9ed92ce9b5a715842c017e867cacbc463800c11ca5e4f49d95359b",
+                      "active":  true,
+                      "hidden":  false,
+                      "createdAt":  "2026-08-02T22:19:25.028Z",
+                      "hiredAt":  "2026-06-26",
+                      "trainings":  [
+                                        "Remorquage",
+                                        "Dépannage",
+                                        "Vente",
+                                        "Nettoyage"
+                                    ],
+                      "note":  "",
+                      "history":  [
+                                      {
+                                          "roleId":  "secretaire",
+                                          "roleName":  "Secrétaire",
+                                          "at":  "2026-08-02T22:19:25.028Z",
+                                          "by":  "",
+                                          "note":  "Entrée dans l\u0027entreprise"
+                                      }
+                                  ]
                   },
                   {
                       "id":  "lexa",
@@ -166,8 +186,9 @@ window.MN_CATALOG_SEED =
                       "roleId":  "garagiste",
                       "pin":  null,
                       "active":  true,
+                      "hidden":  false,
                       "createdAt":  "2026-08-02T22:53:33.679Z",
-                      "hiredAt":  "2026-08-02",
+                      "hiredAt":  "2026-06-09",
                       "trainings":  [
 
                                     ],
@@ -180,8 +201,7 @@ window.MN_CATALOG_SEED =
                                           "by":  "",
                                           "note":  "Entrée dans l\u0027entreprise"
                                       }
-                                  ],
-                      "hidden":  false
+                                  ]
                   },
                   {
                       "id":  "tony",
@@ -189,8 +209,9 @@ window.MN_CATALOG_SEED =
                       "roleId":  "garagiste",
                       "pin":  "1044f119ca6d33a634dd98aa2bac0b34127fca3615eded759838dea9ad896e2e",
                       "active":  true,
+                      "hidden":  false,
                       "createdAt":  "2026-08-02T22:53:41.495Z",
-                      "hiredAt":  "2026-08-02",
+                      "hiredAt":  "2026-06-21",
                       "trainings":  [
 
                                     ],
@@ -203,40 +224,17 @@ window.MN_CATALOG_SEED =
                                           "by":  "",
                                           "note":  "Entrée dans l\u0027entreprise"
                                       }
-                                  ],
-                      "hidden":  false
-                  },
-                  {
-                      "id":  "dylan",
-                      "pseudo":  "Dylan Evergarden",
-                      "roleId":  "apprenti",
-                      "pin":  "4d516b07a0ff58529bb6630563c06d5252fb20455f5a5c45748eaf4a7366c57d",
-                      "active":  true,
-                      "createdAt":  "2026-08-02T22:53:55.623Z",
-                      "hiredAt":  "2026-08-02",
-                      "trainings":  [
-
-                                    ],
-                      "note":  "",
-                      "history":  [
-                                      {
-                                          "roleId":  "apprenti",
-                                          "roleName":  "Apprenti",
-                                          "at":  "2026-08-02T22:53:55.623Z",
-                                          "by":  "",
-                                          "note":  "Entrée dans l\u0027entreprise"
-                                      }
-                                  ],
-                      "hidden":  false
+                                  ]
                   },
                   {
                       "id":  "hakim",
                       "pseudo":  "Hakim Skyfou",
                       "roleId":  "garagiste",
-                      "pin":  null,
+                      "pin":  "33ce5fca6a8a84351be660b6f6110a00cba12f3ec3127e7dffa31f90ff3c65b7",
                       "active":  true,
+                      "hidden":  false,
                       "createdAt":  "2026-08-02T22:54:09.952Z",
-                      "hiredAt":  "2026-08-02",
+                      "hiredAt":  "2026-07-18",
                       "trainings":  [
 
                                     ],
@@ -249,17 +247,41 @@ window.MN_CATALOG_SEED =
                                           "by":  "",
                                           "note":  "Entrée dans l\u0027entreprise"
                                       }
-                                  ],
-                      "hidden":  false
+                                  ]
+                  },
+                  {
+                      "id":  "dylan",
+                      "pseudo":  "Dylan Evergarden",
+                      "roleId":  "apprenti",
+                      "pin":  "4d516b07a0ff58529bb6630563c06d5252fb20455f5a5c45748eaf4a7366c57d",
+                      "active":  true,
+                      "hidden":  false,
+                      "createdAt":  "2026-08-02T22:53:55.623Z",
+                      "hiredAt":  "2026-07-12",
+                      "trainings":  [
+                                        "Remorquage",
+                                        "Nettoyage"
+                                    ],
+                      "note":  "",
+                      "history":  [
+                                      {
+                                          "roleId":  "apprenti",
+                                          "roleName":  "Apprenti",
+                                          "at":  "2026-08-02T22:53:55.623Z",
+                                          "by":  "",
+                                          "note":  "Entrée dans l\u0027entreprise"
+                                      }
+                                  ]
                   },
                   {
                       "id":  "toma",
                       "pseudo":  "Toma Garcia",
                       "roleId":  "apprenti",
-                      "pin":  null,
+                      "pin":  "32710608011b4a76386a6e690318a171e559827d5aebaac332a2d4fca14b1139",
                       "active":  true,
+                      "hidden":  false,
                       "createdAt":  "2026-08-02T22:54:21.786Z",
-                      "hiredAt":  "2026-08-02",
+                      "hiredAt":  "2026-07-27",
                       "trainings":  [
 
                                     ],
@@ -272,8 +294,7 @@ window.MN_CATALOG_SEED =
                                           "by":  "",
                                           "note":  "Entrée dans l\u0027entreprise"
                                       }
-                                  ],
-                      "hidden":  false
+                                  ]
                   }
               ],
     "resources":  [
@@ -387,11 +408,14 @@ window.MN_CATALOG_SEED =
                       "icon":  "assets/img/veh_xenon.png",
                       "enabled":  true,
                       "note":  "",
-                      "max":  0,
+                      "max":  1,
                       "cost":  {
                                    "verre":  8,
                                    "plastique":  30
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "kit-accessoires",
@@ -405,7 +429,10 @@ window.MN_CATALOG_SEED =
                                    "ferraille":  60,
                                    "piece-detachee":  90,
                                    "plastique":  80
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "kit-carrosserie",
@@ -418,7 +445,10 @@ window.MN_CATALOG_SEED =
                       "cost":  {
                                    "ferraille":  60,
                                    "plastique":  100
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "kit-peinture",
@@ -427,11 +457,14 @@ window.MN_CATALOG_SEED =
                       "icon":  "assets/img/meca_peinture.png",
                       "enabled":  true,
                       "note":  "(Couleur et vitre teintée)",
-                      "max":  2,
+                      "max":  0,
                       "cost":  {
                                    "tissu":  30,
                                    "spray":  1
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "kit-fumee-pneus",
@@ -440,11 +473,14 @@ window.MN_CATALOG_SEED =
                       "icon":  "assets/img/meca_fumee.png",
                       "enabled":  true,
                       "note":  "(Dans la catégorie couleur)",
-                      "max":  0,
+                      "max":  1,
                       "cost":  {
                                    "plastique":  50,
                                    "charbon":  60
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "pneus-tout-terrain",
@@ -453,10 +489,13 @@ window.MN_CATALOG_SEED =
                       "icon":  "assets/img/meca_pneus_offroad.png",
                       "enabled":  true,
                       "note":  "",
-                      "max":  0,
+                      "max":  1,
                       "cost":  {
                                    "plastique":  120
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "jantes-motos",
@@ -465,10 +504,13 @@ window.MN_CATALOG_SEED =
                       "icon":  "assets/img/meca_jantes.png",
                       "enabled":  true,
                       "note":  "",
-                      "max":  0,
+                      "max":  1,
                       "cost":  {
                                    "roue-moto":  2
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "jantes-voitures",
@@ -477,10 +519,13 @@ window.MN_CATALOG_SEED =
                       "icon":  "assets/img/meca_jantes.png",
                       "enabled":  true,
                       "note":  "",
-                      "max":  0,
+                      "max":  1,
                       "cost":  {
                                    "roue-voiture":  4
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "jantes-camions",
@@ -489,34 +534,43 @@ window.MN_CATALOG_SEED =
                       "icon":  "assets/img/meca_jantes.png",
                       "enabled":  true,
                       "note":  "",
-                      "max":  0,
+                      "max":  1,
                       "cost":  {
                                    "roue-camion":  6
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "deplacement",
                       "name":  "Déplacement",
                       "category":  "depannage",
-                      "icon":  "assets/img/deplacement2.png",
+                      "icon":  "assets/img/deplacement.png",
                       "enabled":  true,
                       "note":  "(hors Cayo et Manor)",
-                      "max":  0,
+                      "max":  1,
                       "cost":  {
                                    "ressource":  25
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "deplacement-eloigne",
                       "name":  "Déplacement éloigné",
                       "category":  "depannage",
-                      "icon":  "assets/img/deplacement2.png",
+                      "icon":  "assets/img/deplacement.png",
                       "enabled":  true,
                       "note":  "(Cayo et Manor uniquement)",
-                      "max":  0,
+                      "max":  1,
                       "cost":  {
                                    "ressource":  50
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "carburant",
@@ -528,7 +582,10 @@ window.MN_CATALOG_SEED =
                       "max":  0,
                       "cost":  {
                                    "ressource":  2
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "kit-de-reparation",
@@ -537,10 +594,13 @@ window.MN_CATALOG_SEED =
                       "icon":  "assets/img/repairkit.png",
                       "enabled":  true,
                       "note":  "",
-                      "max":  0,
+                      "max":  1,
                       "cost":  {
                                    "ressource":  50
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "roue",
@@ -552,7 +612,10 @@ window.MN_CATALOG_SEED =
                       "max":  0,
                       "cost":  {
                                    "ressource":  15
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "cric",
@@ -564,7 +627,10 @@ window.MN_CATALOG_SEED =
                       "max":  0,
                       "cost":  {
                                    "ressource":  10
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "remorquage",
@@ -576,7 +642,10 @@ window.MN_CATALOG_SEED =
                       "max":  0,
                       "cost":  {
                                    "ressource":  100
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "kit-de-reparation-2",
@@ -585,10 +654,13 @@ window.MN_CATALOG_SEED =
                       "icon":  "assets/img/repairkit.png",
                       "enabled":  true,
                       "note":  "",
-                      "max":  0,
+                      "max":  10,
                       "cost":  {
                                    "ressource":  50
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "cric-2",
@@ -597,13 +669,16 @@ window.MN_CATALOG_SEED =
                       "icon":  "assets/img/cric.png",
                       "enabled":  true,
                       "note":  "",
-                      "max":  0,
+                      "max":  1,
                       "cost":  {
                                    "huile-moteur":  30,
                                    "fer":  60,
                                    "plastique":  60,
                                    "ferraille":  240
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "sangle-de-remorquage",
@@ -612,11 +687,14 @@ window.MN_CATALOG_SEED =
                       "icon":  "assets/img/sanglederemorquage.png",
                       "enabled":  true,
                       "note":  "",
-                      "max":  0,
+                      "max":  1,
                       "cost":  {
                                    "tissu":  120,
                                    "ferraille":  120
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   },
                   {
                       "id":  "kit-de-nettoyage-2",
@@ -629,7 +707,10 @@ window.MN_CATALOG_SEED =
                       "cost":  {
                                    "tissu":  4,
                                    "gourde-d-eau":  6
-                               }
+                               },
+                      "excludes":  [
+
+                                   ]
                   }
               ]
 };

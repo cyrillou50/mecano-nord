@@ -17,6 +17,7 @@
   let canSeeNotes = false;
   let showHidden = false;
   let reorder = false;
+  let ticker = null;
 
   MNUI.start({ page: "equipe", title: "Équipe", onReady: init });
 
@@ -32,6 +33,23 @@
 
     await MNDuty.load(false).catch(() => {});
     render();
+
+    /* Les compteurs de service de la personne en cours avancent à la seconde. */
+    clearInterval(ticker);
+    ticker = setInterval(tick, 1000);
+  }
+
+  function tick() {
+    const u = draft && draft.users.find(x => x.id === sel);
+    if (!u || !MNDuty.isOn(u.id)) return;
+
+    const w = document.querySelector('[data-live="week"]');
+    const t = document.querySelector('[data-live="total"]');
+    if (w) w.textContent = MNDuty.dur(MNDuty.secondsFor(u.id, MNDuty.weekStart()));
+    if (t) t.textContent = MNDuty.dur(MNDuty.secondsFor(u.id));
+
+    const live = document.querySelector("[data-since-live]");
+    if (live) live.textContent = MNDuty.sinceDur(live.dataset.sinceLive);
   }
 
   /* ---- Enregistrement --------------------------------------------------------- */
@@ -216,6 +234,12 @@
     const on = MNDuty.isOn(u.id);
     const hist = (u.history || []).slice().reverse();
 
+    /* « Actuel » se pose sur la ligne du grade réellement porté, pas
+       forcément la plus récente : une promotion peut être enregistrée
+       après coup avec une date antérieure. */
+    let nowIdx = hist.findIndex(h => h.roleId === u.roleId);
+    if (nowIdx === -1) nowIdx = 0;
+
     pane.innerHTML =
       '<div class="panel">' +
         '<div class="staffhead" style="--role:' + esc(r.color) + '">' +
@@ -241,8 +265,8 @@
         '<div class="panel__body">' +
           '<div class="statgrid">' +
             stat("Ancienneté", seniority(u.hiredAt)) +
-            stat("Service cette semaine", MNDuty.human(MNDuty.minutesFor(u.id, MNDuty.weekStart())), on) +
-            stat("Service au total", MNDuty.human(MNDuty.minutesFor(u.id)), on) +
+            stat("Service cette semaine", MNDuty.dur(MNDuty.secondsFor(u.id, MNDuty.weekStart())), on, "week") +
+            stat("Service au total", MNDuty.dur(MNDuty.secondsFor(u.id)), on, "total") +
             stat("Formations", String((u.trainings || []).length)) +
           "</div>" +
 
@@ -251,11 +275,11 @@
           '<ol class="timeline">' + hist.map((h, i) => {
             const hr = draft.roles.find(x => x.id === h.roleId);
             const color = hr ? hr.color : "#6a6280";
-            return '<li class="tl' + (i === 0 ? " is-now" : "") + '" style="--role:' + esc(color) + '">' +
+            return '<li class="tl' + (i === nowIdx ? " is-now" : "") + '" style="--role:' + esc(color) + '">' +
               '<div class="tl__dot"></div>' +
               '<div class="tl__body">' +
                 "<b>" + esc(h.roleName || h.roleId) + "</b>" +
-                (i === 0 ? ' <span class="pill pill--outline">actuel</span>' : "") +
+                (i === nowIdx ? ' <span class="pill pill--outline">actuel</span>' : "") +
                 '<div class="tl__meta">' + fdatetime(h.at) +
                   (h.by ? " · par " + esc(h.by) : "") +
                   (h.note ? " · " + esc(h.note) : "") + "</div>" +
@@ -296,7 +320,8 @@
       (on
         ? '<div class="alert alert--ok" style="margin-bottom:12px">' + svg("check") +
           "<span><b>En service actuellement</b> depuis " + hhmm(MNDuty.entryOf(u.id).since) +
-          " — " + MNDuty.sinceHuman(MNDuty.entryOf(u.id).since) + ".</span></div>"
+          ' — <b class="tnum" data-since-live="' + esc(MNDuty.entryOf(u.id).since) + '">' +
+          MNDuty.sinceDur(MNDuty.entryOf(u.id).since) + "</b>.</span></div>"
         : "");
 
     if (!log.length) {
@@ -318,21 +343,21 @@
 
       let wk = weeks.find(x => x.key === wKey);
       if (!wk) {
-        wk = { key: wKey, minutes: 0, sessions: 0, days: [], label: weekLabel(mon) };
+        wk = { key: wKey, seconds: 0, sessions: 0, days: [], label: weekLabel(mon) };
         weeks.push(wk);
       }
-      wk.minutes += e.minutes;
+      wk.seconds += e.seconds;
       wk.sessions++;
 
       let day = wk.days.find(x => x.key === dKey);
       if (!day) {
         day = {
-          key: dKey, minutes: 0, slots: [], forced: false,
+          key: dKey, seconds: 0, slots: [], forced: false,
           label: d.toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "2-digit" })
         };
         wk.days.push(day);
       }
-      day.minutes += e.minutes;
+      day.seconds += e.seconds;
       day.slots.push(hhmm(e.in) + "–" + hhmm(e.out));
       if (e.forced) day.forced = true;
     });
@@ -346,7 +371,7 @@
             (wk.key === thisWeek ? ' <span class="pill pill--ok">en cours</span>' : "") + "</span>" +
           '<span class="svcweek__meta">' + wk.days.length + " j · " + wk.sessions + " service" +
             (wk.sessions > 1 ? "s" : "") + "</span>" +
-          '<b class="svcweek__tot tnum">' + MNDuty.human(wk.minutes) + "</b>" +
+          '<b class="svcweek__tot tnum">' + MNDuty.dur(wk.seconds, true) + "</b>" +
         "</summary>" +
         '<div class="svcweek__body">' +
           wk.days.map(d =>
@@ -356,12 +381,12 @@
                 '<span class="svc__slot tnum">' + esc(s) + "</span>").join("") +
                 (d.forced ? '<span class="permtag">clôturé par un gérant</span>' : "") +
               "</span>" +
-              '<span class="svc__tot tnum">' + MNDuty.human(d.minutes) + "</span>" +
+              '<span class="svc__tot tnum">' + MNDuty.dur(d.seconds) + "</span>" +
             "</div>"
           ).join("") +
           '<div class="svcweek__recap">' +
             "<span>Moyenne par jour travaillé</span>" +
-            '<b class="tnum">' + MNDuty.human(Math.round(wk.minutes / wk.days.length)) + "</b>" +
+            '<b class="tnum">' + MNDuty.dur(Math.round(wk.seconds / wk.days.length)) + "</b>" +
           "</div>" +
         "</div>" +
       "</details>"
@@ -381,10 +406,10 @@
     return "Semaine du " + a + " au " + b;
   }
 
-  const stat = (label, value, live) =>
+  const stat = (label, value, live, key) =>
     '<div class="stat' + (live ? " stat--live" : "") + '">' +
       '<span class="stat__l">' + esc(label) + "</span>" +
-      '<b class="stat__v">' + esc(value) + "</b>" +
+      '<b class="stat__v tnum"' + (key ? ' data-live="' + key + '"' : "") + ">" + esc(value) + "</b>" +
     "</div>";
 
   const fdatetime = d => {
@@ -392,17 +417,40 @@
     return isNaN(x) ? "—" : x.toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   };
 
+  /**
+   * Ancienneté exacte en années / mois / jours, en tenant compte de la
+   * longueur réelle de chaque mois (pas d'approximation à 30,44 jours).
+   */
   function seniority(hiredAt) {
     if (!hiredAt) return "—";
-    const days = Math.floor((Date.now() - new Date(hiredAt + "T12:00:00")) / 86400000);
-    if (isNaN(days) || days < 0) return "—";
-    if (days < 1) return "aujourd'hui";
-    if (days < 31) return days + " jour" + (days > 1 ? "s" : "");
-    const months = Math.floor(days / 30.44);
-    if (months < 12) return months + " mois";
-    const years = Math.floor(months / 12);
-    const rest = months % 12;
-    return years + " an" + (years > 1 ? "s" : "") + (rest ? " " + rest + " mois" : "");
+    const d = new Date(hiredAt + "T00:00:00");
+    if (isNaN(d)) return "—";
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    if (d > now) return "à venir";
+
+    let years = now.getFullYear() - d.getFullYear();
+    let months = now.getMonth() - d.getMonth();
+    let days = now.getDate() - d.getDate();
+
+    if (days < 0) {
+      months--;
+      /* nombre de jours du mois précédent celui d'aujourd'hui */
+      days += new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+    }
+    if (months < 0) { years--; months += 12; }
+
+    const total = Math.round((now - d) / 86400000);
+    if (total === 0) return "aujourd'hui";
+
+    const p = [];
+    if (years) p.push(years + " an" + (years > 1 ? "s" : ""));
+    if (months) p.push(months + " mois");
+    if (days || !p.length) p.push(days + " jour" + (days > 1 ? "s" : ""));
+
+    /* Le total en jours lève toute ambiguïté. */
+    return p.join(" ") + " (" + total + " j)";
   }
 
   /* ---- Montée de grade --------------------------------------------------------- */
@@ -418,9 +466,18 @@
         '<select class="select" id="p-role">' + draft.roles.map(r =>
           '<option value="' + esc(r.id) + '"' + (r.id === u.roleId ? " selected" : "") + ">" +
           esc(r.name) + "</option>").join("") + "</select></div>" +
+      '<div class="editor__grid">' +
+        '<div class="field"><label class="label" for="p-date">Date de la montée</label>' +
+          '<input class="input" id="p-date" type="date" value="' + new Date().toISOString().slice(0, 10) +
+            '" max="' + new Date().toISOString().slice(0, 10) + '"></div>' +
+        '<div class="field"><label class="label" for="p-time">Heure</label>' +
+          '<input class="input" id="p-time" type="time" value="' +
+            new Date().toTimeString().slice(0, 5) + '"></div>' +
+      "</div>" +
       '<div class="field"><label class="label" for="p-note">Motif (facultatif)</label>' +
         '<input class="input" id="p-note" maxlength="80" placeholder="Ex. promotion après formation remorquage"></div>' +
-      '<p class="hint">La date est enregistrée automatiquement, et l\'ancien grade reste dans la carrière.</p>';
+      '<p class="hint">La date est pré-remplie à aujourd\'hui, mais tu peux la reculer si la promotion ' +
+        "a eu lieu avant d'être enregistrée ici. L'ancien grade reste dans la carrière.</p>";
 
     MNUI.modal({
       title: "Changer le grade de " + u.pseudo, body,
@@ -439,11 +496,22 @@
                 return MNUI.toast("Ce grade te retirerait la gestion de l'équipe", "err");
               }
             }
+            /* Date choisie : on la borne à maintenant, une promotion
+               ne peut pas être datée dans le futur. */
+            const jour = body.querySelector("#p-date").value;
+            const heure = body.querySelector("#p-time").value || "12:00";
+            let quand = jour ? new Date(jour + "T" + heure + ":00") : new Date();
+            if (isNaN(quand) || quand > new Date()) quand = new Date();
+
             const to = draft.roles.find(x => x.id === roleId);
-            MNStore.recordPromotion(u, roleId, draft.roles, me.pseudo, body.querySelector("#p-note").value.trim());
+            MNStore.recordPromotion(
+              u, roleId, draft.roles, me.pseudo,
+              body.querySelector("#p-note").value.trim(), quand.toISOString()
+            );
             commit();
             close();
-            MNUI.toast(u.pseudo + " passe " + (to ? to.name : roleId), "ok");
+            MNUI.toast(u.pseudo + " passe " + (to ? to.name : roleId) +
+              " (au " + quand.toLocaleDateString("fr-FR") + ")", "ok");
           }
         }
       ]

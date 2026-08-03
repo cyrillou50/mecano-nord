@@ -116,12 +116,65 @@ peut la retrouver. Même chose pour l'inspecteur du navigateur : il est
 impossible de le bloquer, et tout le code d'un site statique est public par
 construction.
 
-**La seule vraie parade** est le relais : un petit service qui garde les
-adresses de son côté. Le fichier `relais-webhook.js` à la racine est prêt à
-déployer sur Cloudflare Workers (gratuit, ~10 minutes, sans carte bancaire) —
-les instructions sont en tête du fichier. Une fois en place, tu colles
-l'adresse du relais dans **Admin → Discord** et tu vides les champs Discord :
-les webhooks ne sont alors plus du tout dans le dépôt.
+### Pointage automatique pour toute l'équipe
+
+Par défaut, seuls les employés ayant un jeton GitHub apparaissent dans le
+tableau de service. Pour que ce soit automatique **sans que personne
+n'installe quoi que ce soit**, deux options, à régler dans
+**Admin → Publier → Pointage de l'équipe** :
+
+**Option 1 — Base partagée (le plus simple, ~5 min, aucun code à déployer)**
+
+1. `console.firebase.google.com` → **Créer un projet** (refuse Analytics)
+2. **Créer** → **Realtime Database** → région **Europe** → mode verrouillé
+3. Onglet **Règles**, coller ceci puis **Publier** :
+   ```json
+   {
+     "rules": {
+       "duty": { ".read": true, ".write": true },
+       "$autre": { ".read": false, ".write": false }
+     }
+   }
+   ```
+4. Copier l'adresse de la base, **ajouter `/duty` à la fin**, coller dans le
+   champ prévu, **Tester**, enregistrer, publier.
+
+Ces règles n'ouvrent que la clé `duty` : le catalogue, les employés et le
+dépôt restent hors d'atteinte. Au pire, quelqu'un de motivé pourrait salir le
+tableau de pointage.
+
+**Option 2 — Ton VPS (le mieux si tu en as un)**
+
+Un petit serveur Node sans aucune dépendance, à copier sur ton VPS. Il gère le
+pointage *et* les webhooks, garde tes données chez toi avec sauvegardes
+automatiques, et ne laisse plus rien de sensible dans le dépôt.
+
+Le guide pas à pas est dans **`serveur/README.md`** (Node, systemd, Caddy pour
+le HTTPS, réglages du site). Compte 20 minutes.
+
+**Option 3 — Relais Cloudflare**, si tu n'as ni VPS ni envie de Firebase.
+
+⚠️ Ne partage jamais un jeton GitHub « d'équipe » pour contourner ça : il
+donne le droit d'écrire sur **tout** le dépôt.
+
+---
+
+**Pour les webhooks, la vraie parade est le relais**, et il règle deux
+problèmes d'un coup.
+
+Le fichier `relais.js` à la racine est prêt à déployer sur Cloudflare Workers
+(gratuit, ~10 minutes, sans carte bancaire) — les instructions sont en tête du
+fichier. Une fois en place, tu colles son adresse dans **Admin → Discord** :
+
+1. **Les webhooks Discord** ne sont plus dans le dépôt : c'est le relais qui
+   les connaît.
+2. **Le pointage devient automatique pour toute l'équipe.** Sans relais, seuls
+   les employés ayant un jeton GitHub apparaissent dans le tableau de service.
+   Avec lui, c'est le relais qui écrit, et **personne n'a rien à installer**.
+
+⚠️ Ne partage jamais un jeton GitHub « d'équipe » pour contourner ça : il donne
+le droit d'écrire sur **tout** le dépôt. Le relais, lui, ne peut toucher qu'au
+fichier de pointage.
 
 En attendant, utilise un salon dédié sans enjeu, et régénère le webhook depuis
 Discord au moindre doute.

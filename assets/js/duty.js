@@ -20,6 +20,9 @@ window.MNDuty = (function () {
 
   const empty = () => ({ updatedAt: new Date(0).toISOString(), onDuty: [], log: [] });
 
+  /** Écart exact en secondes entre deux horodatages. */
+  const secBetween = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000));
+
   function normalize(raw) {
     const b = (raw && typeof raw === "object") ? raw : {};
     return {
@@ -30,16 +33,24 @@ window.MNDuty = (function () {
         roleId: String(e.roleId || ""),
         since: e.since || new Date().toISOString()
       })).filter(e => e.id),
-      log: (Array.isArray(b.log) ? b.log : []).slice(0, MAX_LOG).map(e => ({
-        id: String(e.id || ""),
-        pseudo: String(e.pseudo || "?"),
-        roleId: String(e.roleId || ""),
-        in: e.in || null,
-        out: e.out || null,
-        minutes: Math.max(0, Math.round(Number(e.minutes) || 0)),
-        /* conservé : c'est ce qui distingue un oubli clôturé par un gérant */
-        forced: e.forced === true
-      }))
+      log: (Array.isArray(b.log) ? b.log : []).slice(0, MAX_LOG).map(e => {
+        /* La durée exacte se recalcule depuis les horodatages ; le champ
+           `minutes` des anciens enregistrements sert de repli. */
+        const exact = (e.in && e.out) ? secBetween(e.in, e.out) : null;
+        const sec = exact !== null ? exact
+          : Math.max(0, Math.round(Number(e.seconds) || Number(e.minutes) * 60 || 0));
+        return {
+          id: String(e.id || ""),
+          pseudo: String(e.pseudo || "?"),
+          roleId: String(e.roleId || ""),
+          in: e.in || null,
+          out: e.out || null,
+          seconds: sec,
+          minutes: Math.round(sec / 60),
+          /* conservé : c'est ce qui distingue un oubli clôturé par un gérant */
+          forced: e.forced === true
+        };
+      })
     };
   }
 
@@ -49,10 +60,26 @@ window.MNDuty = (function () {
     if (_board && !force) return _board;
 
     let remote = null;
-    try {
-      const r = await fetch(FILE + "?v=" + Date.now(), { cache: "no-store" });
-      if (r.ok) remote = normalize(await r.json());
-    } catch (_) { /* fichier absent ou file:// */ }
+    const base = baseUrl();
+
+    /* La base partagée fait autorité quand elle est configurée. */
+    if (base) {
+      try {
+        const r = await fetch(base + "?t=" + Date.now(), { cache: "no-store" });
+        if (r.ok) {
+          const j = await r.json();
+          if (j) remote = normalize(j);
+          else remote = empty();      // base encore vide : ce n'est pas une erreur
+        }
+      } catch (_) { /* hors ligne : on retombe sur le local */ }
+    }
+
+    if (!remote) {
+      try {
+        const r = await fetch(FILE + "?v=" + Date.now(), { cache: "no-store" });
+        if (r.ok) remote = normalize(await r.json());
+      } catch (_) { /* fichier absent ou file:// */ }
+    }
 
     let local = null;
     try {
@@ -74,11 +101,36 @@ window.MNDuty = (function () {
   const entryOf = uid => board().onDuty.find(e => e.id === uid) || null;
   const isOn = uid => !!entryOf(uid);
 
-  /** Peut-on écrire le tableau partagé depuis cet appareil ? */
+  const relayUrl = () => {
+    try { return String(MNStore.settings().relay || "").trim(); }
+    catch (_) { return ""; }
+  };
+
+  /**
+   * Base partagée directe (Firebase Realtime Database).
+   * On tolère l'URL avec ou sans le « .json » final attendu par son API REST.
+   */
+  function baseUrl() {
+    let u = "";
+    try { u = String(MNStore.settings().dutyUrl || "").trim(); } catch (_) { return ""; }
+    if (!u) return "";
+    u = u.replace(/\/+$/, "");
+    return /\.json$/i.test(u) ? u : u + ".json";
+  }
+
+  /**
+   * Le pointage peut-il rejoindre le tableau commun ?
+   * Avec un relais, c'est automatique pour tout le monde : personne n'a
+   * de jeton à installer. Sinon, il faut un jeton sur cet appareil.
+   */
   const canShare = () => {
+    if (baseUrl() || relayUrl()) return true;
     try { return MNGitHub.hasToken() && MNGitHub.isConfigured(); }
     catch (_) { return false; }
   };
+
+  /** Le partage se fait-il sans que l'employé n'ait rien à installer ? */
+  const isAuto = () => !!(baseUrl() || relayUrl());
 
   /* ---- Écriture ------------------------------------------------------------ */
 
@@ -88,6 +140,41 @@ window.MNDuty = (function () {
   }
 
   async function push(b, message) {
+    /* Base partagée : un simple PUT, rien à installer pour personne. */
+    const base = baseUrl();
+    if (base) {
+      try {
+        const r = await fetch(base, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(b)
+        });
+        if (r.ok) return { ok: true };
+        return { ok: false, error: "Base de service : erreur " + r.status };
+      } catch (_) {
+        return { ok: false, error: "Base de service injoignable." };
+      }
+    }
+
+    const relay = relayUrl();
+
+    /* Le relais écrit à notre place : aucun jeton nécessaire côté employé. */
+    if (relay) {
+      try {
+        const r = await fetch(relay, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "duty", board: b, message })
+        });
+        if (r.ok) return { ok: true };
+        let why = "relais : erreur " + r.status;
+        try { const j = await r.json(); if (j && j.error) why = j.error; } catch (_) { /* rien */ }
+        return { ok: false, error: why };
+      } catch (_) {
+        return { ok: false, error: "Relais injoignable." };
+      }
+    }
+
     if (!canShare()) return { ok: false, skipped: true };
     try {
       await MNGitHub.putText(FILE, JSON.stringify(b, null, 2) + "\n", message);
@@ -97,7 +184,7 @@ window.MNDuty = (function () {
     }
   }
 
-  const minutesBetween = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 60000));
+  const minutesBetween = (a, b) => Math.round(secBetween(a, b) / 60);
 
   /**
    * Prise de service.
@@ -131,16 +218,19 @@ window.MNDuty = (function () {
 
     const e = b.onDuty.splice(i, 1)[0];
     const out = new Date().toISOString();
-    const minutes = minutesBetween(e.since, out);
+    const seconds = secBetween(e.since, out);
 
-    b.log.unshift({ id: e.id, pseudo: e.pseudo, roleId: e.roleId, in: e.since, out, minutes });
+    b.log.unshift({
+      id: e.id, pseudo: e.pseudo, roleId: e.roleId,
+      in: e.since, out, seconds, minutes: Math.round(seconds / 60)
+    });
     b.log = b.log.slice(0, MAX_LOG);
     b.updatedAt = out;
     saveLocal(b);
 
     const shared = await push(b, "Fin de service de " + session.pseudo);
-    const discord = await MNWebhook.sendDuty(session.pseudo, session.role, "out", minutes);
-    return { shared: shared.ok, shareError: shared.error, discord, minutes };
+    const discord = await MNWebhook.sendDuty(session.pseudo, session.role, "out", seconds);
+    return { shared: shared.ok, shareError: shared.error, discord, seconds };
   }
 
   /** Sortir quelqu'un de force (gérant). */
@@ -152,15 +242,18 @@ window.MNDuty = (function () {
 
     const e = b.onDuty.splice(i, 1)[0];
     const out = new Date().toISOString();
-    const minutes = minutesBetween(e.since, out);
-    b.log.unshift({ id: e.id, pseudo: e.pseudo, roleId: e.roleId, in: e.since, out, minutes, forced: true });
+    const seconds = secBetween(e.since, out);
+    b.log.unshift({
+      id: e.id, pseudo: e.pseudo, roleId: e.roleId,
+      in: e.since, out, seconds, minutes: Math.round(seconds / 60), forced: true
+    });
     b.log = b.log.slice(0, MAX_LOG);
     b.updatedAt = out;
     saveLocal(b);
 
     const shared = await push(b, "Fin de service de " + e.pseudo + " (par " + byPseudo + ")");
-    await MNWebhook.sendDuty(e.pseudo + " (sorti par " + byPseudo + ")", "", "out", minutes);
-    return { shared: shared.ok, shareError: shared.error, minutes, pseudo: e.pseudo };
+    await MNWebhook.sendDuty(e.pseudo + " (sorti par " + byPseudo + ")", "", "out", seconds);
+    return { shared: shared.ok, shareError: shared.error, seconds, pseudo: e.pseudo };
   }
 
   /** Mettre quelqu'un en service à sa place (gérant). */
@@ -224,10 +317,10 @@ window.MNDuty = (function () {
   }
 
   /**
-   * Minutes de service d'une personne depuis `sinceTs` (tout si omis).
-   * Le service en cours est compté au prorata.
+   * Secondes de service d'une personne depuis `sinceTs` (tout si omis).
+   * Le service en cours est compté au prorata, à la seconde.
    */
-  function minutesFor(uid, sinceTs) {
+  function secondsFor(uid, sinceTs) {
     const from = sinceTs || 0;
     let total = 0;
 
@@ -237,43 +330,60 @@ window.MNDuty = (function () {
       if (end < from) return;
       const start = new Date(e.in).getTime();
       /* Un service à cheval sur la limite n'est compté qu'à partir d'elle. */
-      total += Math.max(0, Math.round((end - Math.max(start, from)) / 60000));
+      total += Math.max(0, Math.round((end - Math.max(start, from)) / 1000));
     });
 
     const cur = entryOf(uid);
     if (cur) {
       const start = new Date(cur.since).getTime();
-      total += Math.max(0, Math.round((Date.now() - Math.max(start, from)) / 60000));
+      total += Math.max(0, Math.round((Date.now() - Math.max(start, from)) / 1000));
     }
     return total;
   }
 
-  /** Minutes cumulées par employé sur les N derniers jours. */
+  /** Secondes cumulées par employé sur les N derniers jours. */
   function totals(days) {
     const since = Date.now() - (days || 7) * 86400000;
     const by = {};
     board().log.forEach(e => {
       if (!e.out || new Date(e.out).getTime() < since) return;
-      if (!by[e.id]) by[e.id] = { id: e.id, pseudo: e.pseudo, roleId: e.roleId, minutes: 0, sessions: 0 };
-      by[e.id].minutes += e.minutes;
+      if (!by[e.id]) by[e.id] = { id: e.id, pseudo: e.pseudo, roleId: e.roleId, seconds: 0, sessions: 0 };
+      by[e.id].seconds += e.seconds;
       by[e.id].sessions++;
     });
-    return Object.keys(by).map(k => by[k]).sort((a, b2) => b2.minutes - a.minutes);
+    return Object.keys(by).map(k => by[k]).sort((a, b2) => b2.seconds - a.seconds);
   }
 
-  /** « 2 h 15 » à partir d'un nombre de minutes. */
-  function human(min) {
-    const m = Math.max(0, Math.round(min));
-    const h = Math.floor(m / 60);
-    return h ? h + " h " + String(m % 60).padStart(2, "0") : m + " min";
+  /**
+   * Durée lisible à partir de secondes.
+   * `dur(8130)` → « 2 h 15 min 30 s » · `dur(8130, true)` → « 2 h 15 »
+   */
+  function dur(sec, compact) {
+    const t = Math.max(0, Math.round(sec));
+    const j = Math.floor(t / 86400);
+    const h = Math.floor((t % 86400) / 3600);
+    const m = Math.floor((t % 3600) / 60);
+    const s = t % 60;
+
+    if (compact) {
+      if (j) return j + " j " + String(h).padStart(2, "0") + " h";
+      if (h) return h + " h " + String(m).padStart(2, "0");
+      return m + " min";
+    }
+    const p = [];
+    if (j) p.push(j + " j");
+    if (h || j) p.push(h + " h");
+    if (m || h || j) p.push(m + " min");
+    p.push(s + " s");
+    return p.join(" ");
   }
 
-  const sinceHuman = iso => human(minutesBetween(iso, new Date().toISOString()));
+  const sinceDur = (iso, compact) => dur(secBetween(iso, new Date().toISOString()), compact);
 
   return {
-    load, board, isOn, entryOf, canShare,
+    load, board, isOn, entryOf, canShare, isAuto, relayUrl, baseUrl,
     clockIn, clockOut, forceOut, forceIn, clearLog, removeLog,
-    logOf, minutesFor, weekStart,
-    totals, human, sinceHuman, minutesBetween
+    logOf, secondsFor, weekStart,
+    totals, dur, sinceDur, secBetween, minutesBetween
   };
 })();

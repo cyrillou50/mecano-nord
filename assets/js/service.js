@@ -22,9 +22,9 @@
     await MNDuty.load(true);
     render();
 
-    /* Les durées affichées avancent toutes les 30 s. */
+    /* Les compteurs avancent à la seconde. */
     clearInterval(ticker);
-    ticker = setInterval(refreshDurations, 30000);
+    ticker = setInterval(refreshDurations, 1000);
   }
 
   function denied() {
@@ -61,6 +61,9 @@
     document.querySelectorAll("[data-out]").forEach(b =>
       b.addEventListener("click", () => kick(b.dataset.out, b.dataset.pseudo)));
 
+    const tk = $("#d-token");
+    if (tk) tk.addEventListener("click", askToken);
+
     const pin = $("#d-punch");
     if (pin) pin.addEventListener("click", punchSomeone);
 
@@ -79,7 +82,7 @@
         "<b>" + (on ? "Tu es en service" : "Tu n'es pas en service") + "</b>" +
         "<span>" + (on
           ? "Depuis " + new Date(mine.since).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) +
-            ' — <b class="tnum" id="d-elapsed">' + MNDuty.sinceHuman(mine.since) + "</b>"
+            ' — <b class="tnum" id="d-elapsed">' + MNDuty.sinceDur(mine.since) + "</b>"
           : "Pointe en arrivant à l'atelier, l'équipe est prévenue sur Discord.") + "</span>" +
       "</div>" +
       '<button class="btn ' + (on ? "btn--danger" : "btn--solid") + '" id="d-toggle">' +
@@ -87,11 +90,70 @@
     "</div>";
   }
 
+  /**
+   * Affiché seulement quand rien n'est en place. Le message vise le
+   * responsable : un employé n'a jamais à installer quoi que ce soit.
+   */
   function shareWarning() {
-    return '<div class="alert alert--warn" style="margin-bottom:18px">' + svg("alert") +
-      "<span><b>Ton pointage n'est pas partagé sur le site.</b> Il part bien sur Discord, mais pour " +
-      "qu'il apparaisse dans le tableau des gérants, il faut un jeton GitHub enregistré sur cet " +
-      "appareil (panneau admin → onglet Publier).</span></div>";
+    const chef = MNAuth.canAny("admin", "publish");
+    return '<div class="alert alert--warn" style="margin-bottom:18px;align-items:center">' + svg("alert") +
+      "<span><b>Les pointages ne sont pas encore partagés.</b> Ils partent sur Discord, mais " +
+      "n'apparaissent pas dans le tableau commun. " +
+      (chef
+        ? "Mets en place le <b>relais</b> (panneau admin → Discord) : une fois fait, tout le monde " +
+          "pointe sans rien avoir à installer."
+        : "Préviens un responsable : il doit mettre en place le relais du site.") + "</span>" +
+      (chef
+        ? '<button class="btn btn--ghost btn--sm" id="d-token" style="flex:none" ' +
+          'title="Solution de dépannage : utiliser un jeton sur cet appareil">' + svg("key") +
+          "<span>Jeton</span></button>"
+        : "");
+  }
+
+  /** Enregistre le jeton d'équipe sur cet appareil. */
+  function askToken() {
+    const body = document.createElement("div");
+    body.innerHTML =
+      '<div class="field"><label class="label" for="tk">Jeton d\'équipe</label>' +
+        '<input class="input mono" id="tk" type="password" placeholder="github_pat_…" autocomplete="off"></div>' +
+      '<div id="tk-msg" style="margin-top:12px"></div>' +
+      '<p class="hint" style="margin-top:12px">Colle ici le jeton que ton responsable t\'a envoyé. ' +
+        "Il reste sur <b>cet appareil</b> et sert uniquement à inscrire tes prises de service dans le " +
+        "tableau commun. Tu n'auras plus à le refaire.</p>";
+
+    MNUI.modal({
+      title: "Jeton d'équipe", body,
+      actions: [
+        { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
+        {
+          label: "Enregistrer", variant: "btn--primary", icon: "save",
+          onClick: async (close, b, btn) => {
+            const v = body.querySelector("#tk").value.trim();
+            const msg = body.querySelector("#tk-msg");
+            if (!v) return MNUI.toast("Colle d'abord le jeton", "err");
+
+            btn.disabled = true;
+            btn.innerHTML = svg("refresh") + "<span>Vérification…</span>";
+            const avant = MNGitHub.getToken();
+            MNGitHub.setToken(v);
+            try {
+              const r = await MNGitHub.check();
+              if (!r.canWrite) throw new Error("Ce jeton n'a pas le droit d'écrire sur le dépôt.");
+              close();
+              MNUI.toast("Jeton enregistré — tes pointages sont maintenant partagés", "ok");
+              await MNDuty.load(true);
+              render();
+            } catch (e) {
+              if (avant) MNGitHub.setToken(avant); else MNGitHub.forgetToken();
+              btn.disabled = false;
+              btn.innerHTML = svg("save") + "<span>Enregistrer</span>";
+              msg.innerHTML = '<div class="alert alert--err">' + svg("alert") +
+                "<span>" + esc(e.message) + "</span></div>";
+            }
+          }
+        }
+      ]
+    });
   }
 
   function teamCount(onDuty) {
@@ -138,7 +200,7 @@
                   ';color:' + esc(role.color) + '">' + esc(role.name) + "</span>" : "") +
           "<i>depuis " + new Date(e.since).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) + "</i>" +
         "</div></div>" +
-      '<span class="trow__price tnum" data-since="' + esc(e.since) + '">' + MNDuty.sinceHuman(e.since) + "</span>" +
+      '<span class="trow__price tnum" data-since="' + esc(e.since) + '">' + MNDuty.sinceDur(e.since) + "</span>" +
       (canManage
         ? '<button class="btn btn--icon" data-out="' + esc(e.id) + '" data-pseudo="' + esc(e.pseudo) +
           '" title="Mettre fin à son service">' + svg("logout") + "</button>"
@@ -162,7 +224,7 @@
                   '<div class="trow__meta">' +
                     (role ? "<i>" + esc(role.name) + "</i>" : "") +
                     "<em>" + u.sessions + " service" + (u.sessions > 1 ? "s" : "") + "</em></div></div>" +
-                '<span class="trow__price tnum">' + MNDuty.human(u.minutes) + "</span></div>";
+                '<span class="trow__price tnum">' + MNDuty.dur(u.seconds) + "</span></div>";
             }).join("") + "</div>"
           : '<p class="hint">Aucun service terminé sur la période.</p>') +
       "</div></div>" +
@@ -183,7 +245,7 @@
                     " → " + new Date(e.out).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) +
                     "</i>" + (e.forced ? '<span class="permtag">sorti par un gérant</span>' : "") +
                   "</div></div>" +
-                  '<span class="trow__price tnum">' + MNDuty.human(e.minutes) + "</span>" +
+                  '<span class="trow__price tnum">' + MNDuty.dur(e.seconds) + "</span>" +
                   (canManage
                     ? '<button class="btn btn--icon" data-rmlog="' + i + '" data-pseudo="' + esc(e.pseudo) +
                       '" title="Retirer cette ligne">' + svg("trash") + "</button>"
@@ -198,9 +260,9 @@
   function refreshDurations() {
     const mine = MNDuty.entryOf(me.uid);
     const el = $("#d-elapsed");
-    if (el && mine) el.textContent = MNDuty.sinceHuman(mine.since);
+    if (el && mine) el.textContent = MNDuty.sinceDur(mine.since);
     document.querySelectorAll("[data-since]").forEach(n => {
-      n.textContent = MNDuty.sinceHuman(n.dataset.since);
+      n.textContent = MNDuty.sinceDur(n.dataset.since);
     });
   }
 
@@ -231,7 +293,7 @@
       if (r.already) { MNUI.toast("C'était déjà le cas", "info"); return; }
 
       const bits = [];
-      bits.push(on ? "Service terminé — " + MNDuty.human(r.minutes) : "Bon service !");
+      bits.push(on ? "Service terminé — " + MNDuty.dur(r.seconds) : "Bon service !");
       if (r.discord && r.discord.skipped) bits.push("webhook Discord non configuré");
       else if (r.discord && !r.discord.ok) bits.push("Discord : " + r.discord.error);
       if (!r.shared && MNDuty.canShare()) bits.push("partage : " + (r.shareError || "échec"));
@@ -316,6 +378,6 @@
     const r = await MNDuty.forceOut(uid, me.pseudo);
     render();
     MNUI.toast(r.already ? "Cette personne n'était plus en service"
-      : "Service de " + pseudo + " clôturé (" + MNDuty.human(r.minutes) + ")", "ok");
+      : "Service de " + pseudo + " clôturé (" + MNDuty.dur(r.seconds) + ")", "ok");
   }
 })();

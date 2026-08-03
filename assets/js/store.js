@@ -62,9 +62,15 @@ window.MNStore = (function () {
         /* Identité du bot Discord : vide = nom et logo de l'atelier */
         name: String(w.name || ""),
         avatar: String(w.avatar || ""),
-        /* Relais facultatif qui garde les adresses côté serveur */
-        proxy: String(w.proxy || "")
+        /* Ancien emplacement du relais, repris ci-dessous */
+        proxy: ""
       },
+      /* Relais : garde le jeton et les webhooks côté serveur. Une fois
+         renseigné, plus personne n'a besoin de jeton pour pointer. */
+      relay: String(s.relay || w.proxy || ""),
+      /* Base partagée pour le tableau de service (Firebase). Encore plus
+         simple que le relais : aucun code à déployer. */
+      dutyUrl: String(s.dutyUrl || ""),
       brand: {
         name: String(b.name || D().brand.name),
         tagline: String(b.tagline || D().brand.tagline),
@@ -120,8 +126,17 @@ window.MNStore = (function () {
         note: it.note ? String(it.note) : "",
         /* Quantité maximale par bon de travail. 0 = illimité. */
         max: Math.max(0, Math.min(999, Math.round(Number(it.max) || 0))),
+        /* Objets incompatibles : en choisir un bloque les autres. */
+        excludes: (Array.isArray(it.excludes) ? it.excludes : [])
+          .map(String).filter(x => x && x !== id),
         cost
       };
+    });
+
+    /* On ne garde que les incompatibilités qui pointent vers un objet réel. */
+    const itemIds = c.items.map(i => i.id);
+    c.items.forEach(i => {
+      i.excludes = i.excludes.filter((x, n) => itemIds.indexOf(x) !== -1 && i.excludes.indexOf(x) === n);
     });
 
     /* --- rôles ---
@@ -216,17 +231,23 @@ window.MNStore = (function () {
     return c;
   }
 
-  /** Ajoute une ligne d'historique quand quelqu'un change de grade. */
-  function recordPromotion(user, newRoleId, roles, byPseudo, note) {
+  /**
+   * Ajoute une ligne d'historique quand quelqu'un change de grade.
+   * `at` permet de dater la promotion au jour où elle a réellement eu lieu.
+   */
+  function recordPromotion(user, newRoleId, roles, byPseudo, note, at) {
     const r = (roles || []).find(x => x.id === newRoleId);
     user.roleId = newRoleId;
     user.history = (user.history || []).concat([{
       roleId: newRoleId,
       roleName: r ? r.name : newRoleId,
-      at: new Date().toISOString(),
+      at: at || new Date().toISOString(),
       by: byPseudo || "",
       note: note || ""
-    }]).slice(-40);
+    }]);
+    /* On garde l'ordre chronologique même si la date saisie est antérieure. */
+    user.history.sort((a, b) => new Date(a.at) - new Date(b.at));
+    user.history = user.history.slice(-40);
     return user;
   }
 

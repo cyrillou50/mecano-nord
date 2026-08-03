@@ -60,8 +60,17 @@ window.MNWebhook = (function () {
   /** L'adresse ressemble-t-elle à un webhook Discord ? (brouillée ou non) */
   const isValid = url => RE.test(unpack(url));
 
-  /** Un webhook est-il configuré pour ce type de message ? */
-  const has = kind => isValid(conf()[kind]);
+  /** Adresse du relais, s'il y en a un. */
+  function relayUrl() {
+    try { return String(MNStore.settings().relay || "").trim(); }
+    catch (_) { return ""; }
+  }
+
+  /**
+   * Un envoi est-il possible pour ce type de message ?
+   * Avec un relais, il connaît les adresses : rien à configurer côté site.
+   */
+  const has = kind => !!relayUrl() || isValid(conf()[kind]);
 
   /** Chemin relatif → adresse absolue, indispensable pour l'avatar Discord. */
   function absUrl(u) {
@@ -86,8 +95,10 @@ window.MNWebhook = (function () {
   async function send(kind, embed) {
     const c = conf();
     const stored = String(c[kind] || "").trim();
-    if (!stored) return { ok: false, skipped: true };
-    if (!isValid(stored)) return { ok: false, error: "Adresse de webhook invalide." };
+    if (!relayUrl()) {
+      if (!stored) return { ok: false, skipped: true };
+      if (!isValid(stored)) return { ok: false, error: "Adresse de webhook invalide." };
+    }
 
     const brand = MNStore.brand();
     const avatar = absUrl(c.avatar || brand.logo);
@@ -113,9 +124,9 @@ window.MNWebhook = (function () {
 
     /* Un relais garde l'adresse du webhook côté serveur : c'est la seule
        façon qu'elle ne soit pas dans le dépôt. Sans relais, envoi direct. */
-    const proxy = String(c.proxy || "").trim();
-    const target = proxy || unpack(stored);
-    const payload = proxy ? { kind, message: body } : body;
+    const relay = relayUrl();
+    const target = relay || unpack(stored);
+    const payload = relay ? { type: "webhook", kind, message: body } : body;
 
     try {
       const r = await fetch(target, {
@@ -163,14 +174,26 @@ window.MNWebhook = (function () {
     });
   }
 
-  /** Prise ou fin de service. */
-  function sendDuty(pseudo, role, action, minutes) {
+  /** Durée lisible, sans dépendre du module de pointage. */
+  function duree(sec) {
+    const t = Math.max(0, Math.round(sec));
+    const j = Math.floor(t / 86400);
+    const h = Math.floor((t % 86400) / 3600);
+    const m = Math.floor((t % 3600) / 60);
+    const p = [];
+    if (j) p.push(j + " j");
+    if (h || j) p.push(h + " h");
+    p.push(m + " min");
+    return p.join(" ");
+  }
+
+  /** Prise ou fin de service. `seconds` = durée exacte du service terminé. */
+  function sendDuty(pseudo, role, action, seconds) {
     const inService = action === "in";
     const f = [];
     if (role) f.push({ name: "Poste", value: role, inline: true });
-    if (!inService && minutes != null) {
-      const h = Math.floor(minutes / 60), m = minutes % 60;
-      f.push({ name: "Durée", value: (h ? h + " h " : "") + m + " min", inline: true });
+    if (!inService && seconds != null) {
+      f.push({ name: "Durée", value: duree(seconds), inline: true });
     }
     return send("duty", {
       title: (inService ? "🟢 Prise de service" : "🔴 Fin de service") + " — " + pseudo,
@@ -189,5 +212,5 @@ window.MNWebhook = (function () {
     });
   }
 
-  return { isValid, has, send, sendBT, sendDuty, sendTest, pack, unpack, absUrl };
+  return { isValid, has, send, sendBT, sendDuty, sendTest, pack, unpack, absUrl, relayUrl };
 })();

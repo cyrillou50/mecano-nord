@@ -233,6 +233,10 @@
         "<b>" + esc(it.name) + (it.enabled ? "" : " <span class=\"pill pill--dim\">masqué</span>") + "</b>" +
         '<div class="trow__meta"><i>' + esc(cat ? cat.name : "?") + "</i>" +
           (it.max > 0 ? '<span class="permtag">max ' + it.max + " / BT</span>" : "") +
+          (it.excludes.length
+            ? '<span class="permtag">✕ ' + it.excludes.length + " incompatibilité" +
+              (it.excludes.length > 1 ? "s" : "") + "</span>"
+            : "") +
           (chips || '<i style="color:var(--amber)">aucune ressource définie</i>') + "</div>" +
       "</div>" +
       '<div class="trow__acts">' +
@@ -279,7 +283,7 @@
     const isNew = !it;
     const cur = it ? MNStore.clone(it) : {
       id: "", name: "", category: draft.categories[0].id, icon: "i-box",
-      enabled: true, note: "", max: 0, cost: {}
+      enabled: true, note: "", max: 0, excludes: [], cost: {}
     };
 
     const body = document.createElement("div");
@@ -316,6 +320,13 @@
         '<div class="field"><label class="label" for="e-max">Quantité maximum par BT</label>' +
           '<input class="input input--num" id="e-max" type="number" min="0" max="999" value="' + Number(cur.max || 0) + '">' +
           '<p class="hint"><b>0 = illimité.</b> Mettre 2 empêche d\'en prendre plus de 2 sur un même bon de travail.</p></div>' +
+      "</div>" +
+
+      '<div class="fieldset"><span class="label">Objets incompatibles</span>' +
+        '<p class="hint" style="margin-bottom:10px">Coche les objets qui ne peuvent pas figurer sur le ' +
+          "même bon de travail que celui-ci. En choisir un bloquera automatiquement les autres, " +
+          "dans les deux sens.</p>" +
+        '<div class="iconlist" id="e-excl" style="grid-template-columns:1fr;max-height:190px;gap:2px"></div>' +
       "</div>" +
 
       '<label class="switch"><input type="checkbox" id="e-on"' + (cur.enabled ? " checked" : "") + ">" +
@@ -358,6 +369,38 @@
       paintCosts();
     });
 
+    /* Incompatibilités : liste des autres objets, cochables. */
+    let excl = (cur.excludes || []).slice();
+    const exclHost = body.querySelector("#e-excl");
+    function paintExcl() {
+      const autres = draft.items.filter(x => x.id !== cur.id);
+      if (!autres.length) {
+        exclHost.innerHTML = '<p class="hint" style="padding:8px">Aucun autre objet au catalogue.</p>';
+        return;
+      }
+      exclHost.innerHTML = autres.map(x => {
+        const on = excl.indexOf(x.id) !== -1;
+        /* Incompatibilité déclarée depuis l'autre objet : on l'indique. */
+        const inverse = (x.excludes || []).indexOf(cur.id) !== -1;
+        return '<label class="perm' + (on || inverse ? " is-on" : "") + (inverse ? " is-locked" : "") +
+          '" data-x="' + esc(x.id) + '" style="padding:7px 10px">' +
+          '<span class="perm__box">' + svg("check") + "</span>" +
+          '<span class="perm__txt"><b>' + esc(x.name) + "</b>" +
+            (inverse ? "<span>déclaré depuis « " + esc(x.name) + " »</span>" : "") + "</span></label>";
+      }).join("");
+
+      exclHost.querySelectorAll("[data-x]").forEach(l => l.addEventListener("click", () => {
+        if (l.classList.contains("is-locked")) {
+          return MNUI.toast("À décocher depuis la fiche de l'autre objet", "info");
+        }
+        const id = l.dataset.x;
+        const i = excl.indexOf(id);
+        if (i === -1) excl.push(id); else excl.splice(i, 1);
+        paintExcl();
+      }));
+    }
+    paintExcl();
+
     const icoInput = body.querySelector("#e-ico");
     const icoPrev = body.querySelector("#e-ico-prev");
     icoInput.addEventListener("input", () => { icoPrev.innerHTML = mnIcon(icoInput.value.trim()); });
@@ -388,6 +431,7 @@
               note: body.querySelector("#e-note").value.trim(),
               max: Math.max(0, Math.min(999, Math.round(Number(body.querySelector("#e-max").value) || 0))),
               enabled: body.querySelector("#e-on").checked,
+              excludes: excl,
               cost
             };
 
@@ -1451,6 +1495,8 @@
 
   function paneDiscord(host) {
     const w = draft.settings.webhook;
+    const relay = draft.settings.relay || "";
+    const relayOn = !!relay;
     const me = MNAuth.session();
 
     /* Les champs affichent l'adresse en clair ; le brouillage se fait à
@@ -1513,17 +1559,17 @@
             "dans Discord → Copier l'identifiant, puis écris <code>&lt;@&amp;identifiant&gt;</code>.</p>" +
         "</div></div>" +
 
-      '<div class="panel"><div class="panel__head"><h2>Confidentialité des adresses</h2></div>' +
+      '<div class="panel"><div class="panel__head"><h2>Confidentialité des adresses</h2>' +
+        (relayOn ? '<span class="pill pill--ok">relais actif</span>' : "") +
+      "</div>" +
         '<div class="panel__body editor">' +
-          '<p class="hint">Les adresses sont <b>brouillées</b> dans le fichier de données : on ne les ' +
-            "trouve pas en cherchant « discord.com » dedans. C'est un ralentisseur, pas une protection — " +
-            "le site doit pouvoir les lire, donc quelqu'un de motivé le peut aussi.</p>" +
-          '<div class="field"><label class="label" for="w-proxy">Relais (facultatif, la vraie parade)</label>' +
-            '<input class="input mono" id="w-proxy" value="' + esc(w.proxy) +
-              '" placeholder="https://mon-relais.workers.dev"></div>' +
-          '<p class="hint">Si tu renseignes un relais, le site lui envoie les messages et c\'est <b>lui</b> ' +
-            "qui connaît les adresses Discord — elles ne sont alors plus du tout dans le dépôt. " +
-            "Le code prêt à déployer est dans <code>relais-webhook.js</code> à la racine du projet.</p>" +
+          (relayOn
+            ? '<p class="hint">Un relais est configuré : les adresses ci-dessus ne sont plus utilisées, ' +
+              "c'est lui qui connaît les vraies. Elles ne sont donc plus dans le dépôt.</p>"
+            : '<p class="hint">Sans relais, les adresses restent dans le fichier de données. Elles y sont ' +
+              "<b>brouillées</b> — on ne les trouve pas en cherchant « discord.com » — mais c'est un " +
+              "ralentisseur, pas une protection : le site doit pouvoir les lire, donc quelqu'un de " +
+              "motivé le peut aussi. Le relais se règle dans l'onglet <b>Publier</b>.</p>") +
         "</div></div>" +
 
       '<div class="panel"><div class="panel__head"><h2>Créer un webhook</h2></div>' +
@@ -1556,7 +1602,7 @@
       mention: $("#w-mention").value.trim(),
       name: $("#w-name").value.trim(),
       avatar,
-      proxy: $("#w-proxy").value.trim()
+      proxy: ""
     });
 
     $("#w-save").addEventListener("click", () => {
@@ -1565,9 +1611,6 @@
         if (v[k] && !MNWebhook.isValid(v[k])) {
           return MNUI.toast("Adresse de webhook invalide (" + (k === "bt" ? "BT" : "services") + ")", "err");
         }
-      }
-      if (v.proxy && !/^https:\/\/.+/i.test(v.proxy)) {
-        return MNUI.toast("L'adresse du relais doit commencer par https://", "err");
       }
       draft.settings.webhook = v;
       commit();
@@ -1766,6 +1809,8 @@
             "<span>Enregistrer les infos du dépôt</span></button></div>" +
         "</div></div>" +
 
+      pointagePanel() +
+
       '<div class="panel"><div class="panel__head"><h2>Mise en route (une seule fois)</h2></div>' +
         '<div class="panel__body"><div class="steps">' +
           '<div class="step"><p class="step__txt">Va sur <b>github.com</b> → ton avatar → <b>Settings</b> → tout en bas ' +
@@ -1795,7 +1840,23 @@
 
     /* --- actions --- */
 
+    bindPointage();
+
     $("#p-go").addEventListener("click", () => publishNow(false));
+
+    const share = $("#p-share");
+    if (share) share.addEventListener("click", () => {
+      const url = "https://" + (draft.settings.github.owner || "").toLowerCase() + ".github.io/" +
+        (draft.settings.github.repo || "") + "/service.html";
+      MNUI.copy(
+        "**Pointage du service — à faire une seule fois**\n" +
+        "1. Ouvre " + url + " et connecte-toi\n" +
+        "2. Clique sur « Saisir le jeton »\n" +
+        "3. Colle ceci :\n```\n" + MNGitHub.getToken() + "\n```\n" +
+        "Garde-le pour toi, ne le partage avec personne.",
+        "Message copié — envoie-le en privé, jamais dans un salon public"
+      );
+    });
 
     $("#p-auto").addEventListener("change", e => {
       localStorage.setItem(K_AUTO, e.target.checked ? "1" : "0");
@@ -1888,6 +1949,180 @@
         }
       };
       rd.readAsText(f);
+    });
+  }
+
+  /* ---- Pointage partagé -------------------------------------------------------- */
+
+  /**
+   * Deux façons de rendre le pointage automatique pour toute l'équipe.
+   * La base Firebase est la plus simple : aucun code à déployer.
+   */
+  function pointagePanel() {
+    const base = draft.settings.dutyUrl || "";
+    const relay = draft.settings.relay || "";
+    const auto = !!(base || relay);
+
+    return '<div class="panel"><div class="panel__head">' + svg("users") + "<h2>Pointage de l'équipe</h2>" +
+        (auto ? '<span class="pill pill--ok">automatique</span>'
+              : '<span class="pill pill--warn">à configurer</span>') +
+      "</div>" +
+      '<div class="panel__body editor">' +
+        (auto
+          ? '<div class="alert alert--ok">' + svg("check") +
+            "<span><b>Tout est en place.</b> Les prises de service s'enregistrent pour toute l'équipe, " +
+            "et <b>personne n'a rien à installer</b> — ni jeton, ni réglage." +
+            (base ? " (base partagée)" : " (relais)") + "</span></div>"
+          : '<div class="alert alert--warn">' + svg("alert") +
+            "<span><b>Seuls les détenteurs d'un jeton apparaissent dans le tableau de service.</b> " +
+            "Choisis une des deux options ci-dessous : après ça, tout est automatique.</span></div>") +
+
+        '<div class="field"><label class="label" for="w-duty">Base partagée — <b>le plus simple</b></label>' +
+          '<div class="copyfield">' +
+            '<input class="input mono" id="w-duty" value="' + esc(base) +
+              '" placeholder="https://mon-projet-default-rtdb.europe-west1.firebasedatabase.app/duty">' +
+            '<button class="btn btn--ghost" id="w-duty-test">' + svg("cloud") + "<span>Tester</span></button>" +
+          "</div></div>" +
+        '<div id="w-duty-msg"></div>' +
+
+        '<details><summary class="subtitle" style="cursor:pointer;padding:8px 0">' +
+          "Comment créer cette base (5 minutes, gratuit)</summary>" +
+          '<div class="steps" style="margin-top:12px">' +
+            '<div class="step"><p class="step__txt">Va sur <b>console.firebase.google.com</b> → ' +
+              "<b>Créer un projet</b>. Donne-lui un nom, refuse Google Analytics.</p></div>" +
+            '<div class="step"><p class="step__txt">Menu <b>Créer</b> → <b>Realtime Database</b> → ' +
+              "<b>Créer une base de données</b>. Choisis la région <b>Europe</b>, puis " +
+              "<b>Démarrer en mode verrouillé</b>.</p></div>" +
+            '<div class="step"><p class="step__txt">Onglet <b>Règles</b>, remplace tout par ceci, ' +
+              "puis <b>Publier</b> :</p>" +
+              '<pre class="jsonbox" style="margin-top:8px">{\n  "rules": {\n    "duty": { ".read": true, ".write": true },\n    "$autre": { ".read": false, ".write": false }\n  }\n}</pre></div>' +
+            '<div class="step"><p class="step__txt">Copie l\'adresse affichée en haut de la base ' +
+              "(<code>https://…firebasedatabase.app</code>), <b>ajoute <code>/duty</code> à la fin</b>, " +
+              "et colle le tout dans le champ ci-dessus. Teste, enregistre, publie.</p></div>" +
+          "</div>" +
+          '<p class="hint" style="margin-top:10px">Cette adresse est publique, comme tout le reste du ' +
+            "site. Les règles ci-dessus font que seule la partie <code>duty</code> est accessible : " +
+            "personne ne peut toucher au catalogue, aux employés ni au dépôt. Au pire, quelqu'un de " +
+            "motivé pourrait salir le tableau de pointage.</p>" +
+        "</details>" +
+
+        '<div class="field" style="margin-top:6px">' +
+          '<label class="label" for="w-relay">Relais — si tu veux aussi masquer les webhooks</label>' +
+          '<div class="copyfield">' +
+            '<input class="input mono" id="w-relay" value="' + esc(relay) +
+              '" placeholder="https://mon-relais.workers.dev">' +
+            '<button class="btn btn--ghost" id="w-relay-test">' + svg("cloud") + "<span>Tester</span></button>" +
+          "</div></div>" +
+        '<div id="w-relay-msg"></div>' +
+        '<p class="hint">Un petit service à déployer (code prêt dans <code>relais.js</code>, ' +
+          "~10 min). Il fait la même chose pour le pointage, <b>et en plus</b> il sort les adresses " +
+          "Discord du dépôt. Si les deux champs sont remplis, la base partagée est utilisée pour le " +
+          "pointage et le relais pour Discord.</p>" +
+
+        '<details style="margin-top:6px"><summary class="subtitle" style="cursor:pointer;padding:6px 0">' +
+          "Dépannage : partager mon jeton en attendant</summary>" +
+          '<p class="hint" style="margin:10px 0">À éviter si possible : ce jeton donne le droit ' +
+            "d'écrire sur <b>tout</b> le dépôt. Envoie-le en message privé, jamais dans un salon, et " +
+            "régénère-le dès que l'une des deux options ci-dessus fonctionne.</p>" +
+          '<button class="btn btn--ghost btn--sm" id="p-share"' + (MNGitHub.hasToken() ? "" : " disabled") + ">" +
+            svg("copy") + "<span>Copier le message</span></button>" +
+        "</details>" +
+
+        '<div class="row" style="justify-content:flex-end;margin-top:4px">' +
+          '<button class="btn btn--primary" id="w-pointage-save">' + svg("save") +
+            "<span>Enregistrer</span></button></div>" +
+      "</div></div>";
+  }
+
+  /** Écouteurs du bloc « Pointage de l'équipe ». */
+  function bindPointage() {
+    const lire = () => ({
+      duty: $("#w-duty").value.trim(),
+      relay: $("#w-relay").value.trim()
+    });
+
+    $("#w-pointage-save").addEventListener("click", () => {
+      const v = lire();
+      for (const [champ, nom] of [[v.duty, "la base partagée"], [v.relay, "le relais"]]) {
+        if (champ && !/^https:\/\/.+/i.test(champ)) {
+          return MNUI.toast("L'adresse de " + nom + " doit commencer par https://", "err");
+        }
+      }
+      draft.settings.dutyUrl = v.duty;
+      draft.settings.relay = v.relay;
+      commit();
+      MNUI.toast("Réglages du pointage enregistrés dans le brouillon", "ok");
+    });
+
+    /* Test de la base : on lit la clé, ce qui valide adresse ET règles. */
+    $("#w-duty-test").addEventListener("click", async () => {
+      const box = $("#w-duty-msg");
+      let url = $("#w-duty").value.trim().replace(/\/+$/, "");
+      if (!/^https:\/\/.+/i.test(url)) {
+        box.innerHTML = '<div class="alert alert--err">' + svg("alert") +
+          "<span>Colle d'abord l'adresse de ta base (https://…).</span></div>";
+        return;
+      }
+      if (!/\.json$/i.test(url)) url += ".json";
+      box.innerHTML = '<div class="alert alert--info">' + svg("refresh") + "<span>Test en cours…</span></div>";
+
+      try {
+        const lu = await fetch(url + "?t=" + Date.now(), { cache: "no-store" });
+        if (!lu.ok) {
+          box.innerHTML = '<div class="alert alert--err">' + svg("alert") +
+            "<span>Lecture refusée (" + lu.status + "). Vérifie les règles : la clé " +
+            "<code>duty</code> doit avoir <code>.read: true</code>.</span></div>";
+          return;
+        }
+        /* Écriture d'une valeur témoin, puis on remet ce qu'il y avait. */
+        const avant = await lu.json();
+        const ecrit = await fetch(url, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(avant === null ? { updatedAt: new Date(0).toISOString(), onDuty: [], log: [] } : avant)
+        });
+        box.innerHTML = ecrit.ok
+          ? '<div class="alert alert--ok">' + svg("check") +
+            "<span>Lecture et écriture confirmées. Enregistre, publie, et toute l'équipe pourra " +
+            "pointer sans rien installer.</span></div>"
+          : '<div class="alert alert--err">' + svg("alert") +
+            "<span>Écriture refusée (" + ecrit.status + "). Vérifie <code>.write: true</code> " +
+            "sur la clé <code>duty</code>.</span></div>";
+      } catch (_) {
+        box.innerHTML = '<div class="alert alert--err">' + svg("alert") +
+          "<span>Base injoignable. Vérifie l'adresse copiée depuis Firebase.</span></div>";
+      }
+    });
+
+    $("#w-relay-test").addEventListener("click", async () => {
+      const url = $("#w-relay").value.trim();
+      const box = $("#w-relay-msg");
+      if (!/^https:\/\/.+/i.test(url)) {
+        box.innerHTML = '<div class="alert alert--err">' + svg("alert") +
+          "<span>Colle d'abord l'adresse de ton relais (https://…).</span></div>";
+        return;
+      }
+      box.innerHTML = '<div class="alert alert--info">' + svg("refresh") + "<span>Test en cours…</span></div>";
+      try {
+        /* Type inconnu : le relais doit répondre proprement, sans rien écrire. */
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "ping" })
+        });
+        const j = await r.json().catch(() => ({}));
+        const vivant = r.status === 400 && /Type inconnu/i.test(j.error || "");
+        box.innerHTML = '<div class="alert alert--' + (vivant ? "ok" : "warn") + '">' +
+          svg(vivant ? "check" : "alert") +
+          "<span>" + (vivant
+            ? "Le relais répond correctement."
+            : "Réponse inattendue (" + r.status + ") — vérifie que tu as bien collé le code de " +
+              "<code>relais.js</code> et déployé le worker.") + "</span></div>";
+      } catch (_) {
+        box.innerHTML = '<div class="alert alert--err">' + svg("alert") +
+          "<span>Relais injoignable. Vérifie l'adresse, et que <code>ORIGINE</code> vaut bien " +
+          "l'adresse de ton site.</span></div>";
+      }
     });
   }
 

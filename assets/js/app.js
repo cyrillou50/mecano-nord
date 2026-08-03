@@ -168,24 +168,48 @@
   /** Plafond de cet objet ; 0 dans les données = illimité. */
   const capOf = it => (it.max > 0 ? it.max : 999);
 
+  /**
+   * Objet déjà au panier qui rend celui-ci indisponible.
+   * L'incompatibilité vaut dans les deux sens : la déclarer d'un côté suffit.
+   */
+  function blockerOf(it) {
+    const ids = Object.keys(cart).filter(id => cart[id] > 0 && id !== it.id);
+    for (let i = 0; i < ids.length; i++) {
+      const other = MNStore.itemById(ids[i]);
+      if (!other) continue;
+      if ((it.excludes || []).indexOf(other.id) !== -1 ||
+          (other.excludes || []).indexOf(it.id) !== -1) return other;
+    }
+    return null;
+  }
+
   function itemCard(it) {
     const qty = cart[it.id] || 0;
     const chips = costChips(it);
     const cap = capOf(it);
     const full = qty >= cap;
+    const blocker = qty ? null : blockerOf(it);
 
     return '<article class="item' + (qty ? " is-picked" : "") + (full ? " is-full" : "") +
-      '" data-id="' + esc(it.id) + '" title="Clic = +1 · clic droit = −1 · Maj = ±5">' +
+      (blocker ? " is-blocked" : "") +
+      '" data-id="' + esc(it.id) + '" title="' +
+      (blocker ? esc("Incompatible avec « " + blocker.name + " »") : "Clic = +1 · clic droit = −1 · Maj = ±5") + '">' +
       (qty ? '<span class="item__badge">' + qty + "</span>" : "") +
-      (it.max > 0 ? '<span class="item__cap" title="Maximum ' + it.max + ' par bon de travail">max ' + it.max + "</span>" : "") +
+      (it.max > 0 && !blocker
+        ? '<span class="item__cap" title="Maximum ' + it.max + ' par bon de travail">max ' + it.max + "</span>"
+        : "") +
+      (blocker ? '<span class="item__lock">' + svg("lock") + "</span>" : "") +
       '<div class="item__icon">' + mnIcon(it.icon) + "</div>" +
       '<h3 class="item__name">' + esc(it.name) + "</h3>" +
-      (it.note ? '<p class="item__note">' + esc(it.note) + "</p>" : "") +
+      (blocker
+        ? '<p class="item__note item__note--block">Incompatible avec ' + esc(blocker.name) + "</p>"
+        : it.note ? '<p class="item__note">' + esc(it.note) + "</p>" : "") +
       '<div class="stepper">' +
         '<button data-act="dec" aria-label="Retirer"' + (qty ? "" : " disabled") + ">" + svg("minus") + "</button>" +
         '<input class="stepper__val" type="text" inputmode="numeric" value="' + qty + '"' +
-          ' aria-label="Quantité de ' + esc(it.name) + '" data-qty>' +
-        '<button data-act="inc" aria-label="Ajouter"' + (full ? " disabled" : "") + ">" + svg("plus") + "</button>" +
+          ' aria-label="Quantité de ' + esc(it.name) + '"' + (blocker ? " disabled" : "") + " data-qty>" +
+        '<button data-act="inc" aria-label="Ajouter"' + (full || blocker ? " disabled" : "") + ">" +
+          svg("plus") + "</button>" +
       "</div>" +
       (showCosts && chips ? '<div class="item__cost">' + chips + "</div>" : "") +
     "</article>";
@@ -265,6 +289,16 @@
   function setQty(id, v) {
     const it = MNStore.itemById(id);
     const before = cart[id] || 0;
+
+    /* On ne peut pas ajouter un objet incompatible avec le panier en cours. */
+    if (it && v > before) {
+      const blocker = blockerOf(it);
+      if (blocker) {
+        MNUI.toast(it.name + " est incompatible avec « " + blocker.name + " » déjà au panier", "err");
+        return;
+      }
+    }
+
     const q = Math.max(0, Math.min(it ? capOf(it) : 999, Math.round(v)));
 
     /* On prévient quand la limite bloque réellement une hausse. */
@@ -273,9 +307,22 @@
     }
     if (q) cart[id] = q; else delete cart[id];
     cart = MNStore.setCart(cart);
-    patchCard(id);
+
+    /* Entrer ou sortir du panier change ce qui est bloqué ailleurs :
+       dans ce cas seulement, on redessine tout le catalogue. */
+    const entreOuSort = (before === 0) !== (q === 0);
+    if (entreOuSort && hasExclusions(id)) renderCatalog();
+    else patchCard(id);
+
     updateTabBadges();
     renderDock();
+  }
+
+  /** Cet objet est-il impliqué dans une incompatibilité ? */
+  function hasExclusions(id) {
+    const it = MNStore.itemById(id);
+    if (it && (it.excludes || []).length) return true;
+    return MNStore.catalog().items.some(x => (x.excludes || []).indexOf(id) !== -1);
   }
 
   /** Redessine une seule carte plutôt que tout le catalogue. */
