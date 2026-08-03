@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-03T15:28:45.051Z",
+  "updatedAt": "2026-08-03T15:39:37.864Z",
   "settings": {
     "webhook": {
       "bt": "https://discord.com/api/webhooks/1533845560908316924/qbc5rNdjgsrpChsNptayDj65kTvAbhBFXllsBaiA5eWl6LpT4fG03VzF2fQOYnLUbHwe",
@@ -128,7 +128,9 @@
       "hidden": false,
       "createdAt": "2026-08-02T22:47:59.170Z",
       "hiredAt": "2026-06-05",
-      "trainings": [],
+      "trainings": [
+        "Vente"
+      ],
       "note": "",
       "history": [
         {
@@ -149,7 +151,12 @@
       "hidden": false,
       "createdAt": "2026-08-02T22:19:25.028Z",
       "hiredAt": "2026-06-26",
-      "trainings": [],
+      "trainings": [
+        "Remorquage",
+        "Dépannage",
+        "Vente",
+        "Nettoyage"
+      ],
       "note": "",
       "history": [
         {
@@ -169,7 +176,7 @@
       "active": true,
       "hidden": false,
       "createdAt": "2026-08-02T22:53:33.679Z",
-      "hiredAt": "2026-08-02",
+      "hiredAt": "2026-06-09",
       "trainings": [],
       "note": "",
       "history": [
@@ -190,7 +197,7 @@
       "active": true,
       "hidden": false,
       "createdAt": "2026-08-02T22:53:41.495Z",
-      "hiredAt": "2026-08-02",
+      "hiredAt": "2026-06-21",
       "trainings": [],
       "note": "",
       "history": [
@@ -211,7 +218,7 @@
       "active": true,
       "hidden": false,
       "createdAt": "2026-08-02T22:54:09.952Z",
-      "hiredAt": "2026-08-02",
+      "hiredAt": "2026-07-18",
       "trainings": [],
       "note": "",
       "history": [
@@ -232,8 +239,11 @@
       "active": true,
       "hidden": false,
       "createdAt": "2026-08-02T22:53:55.623Z",
-      "hiredAt": "2026-08-02",
-      "trainings": [],
+      "hiredAt": "2026-07-12",
+      "trainings": [
+        "Remorquage",
+        "Nettoyage"
+      ],
       "note": "",
       "history": [
         {
@@ -253,7 +263,7 @@
       "active": true,
       "hidden": false,
       "createdAt": "2026-08-02T22:54:21.786Z",
-      "hiredAt": "2026-08-02",
+      "hiredAt": "2026-07-27",
       "trainings": [],
       "note": "",
       "history": [
