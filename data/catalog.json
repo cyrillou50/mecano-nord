@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-03T08:27:12.736Z",
+  "updatedAt": "2026-08-03T13:33:29.996Z",
   "settings": {
     "brand": {
       "name": "Mécano Nord",
@@ -53,7 +53,7 @@
       "perms": [
         "bt"
       ],
-      "pin": null,
+      "pin": "01883d2b495106c8fc49481ac9248a47ebe901724f21494314195f015c1bc1fe",
       "active": true,
       "createdAt": "2026-08-02T22:47:59.170Z"
     },
