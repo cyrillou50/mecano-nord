@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-03T21:47:26.993Z",
+  "updatedAt": "2026-08-03T23:19:31.444Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -515,7 +515,9 @@
       "enabled": true,
       "note": "(hors Cayo et Manor)",
       "max": 1,
-      "excludes": [],
+      "excludes": [
+        "deplacement-eloigne"
+      ],
       "cost": {
         "ressource": 25
       }
@@ -653,6 +655,45 @@
       "cost": {
         "tissu": 4,
         "gourde-d-eau": 6
+      }
+    },
+    {
+      "id": "roue-de-voiture",
+      "name": "Roue de voiture",
+      "category": "vente-soon",
+      "icon": "assets/img/car_tire.png",
+      "enabled": true,
+      "note": "",
+      "max": 10,
+      "excludes": [],
+      "cost": {
+        "ressource": 20
+      }
+    },
+    {
+      "id": "roue-de-moto",
+      "name": "Roue de moto",
+      "category": "vente-soon",
+      "icon": "assets/img/bike_tire.png",
+      "enabled": true,
+      "note": "",
+      "max": 10,
+      "excludes": [],
+      "cost": {
+        "ressource": 20
+      }
+    },
+    {
+      "id": "roue-de-camion",
+      "name": "Roue de camion",
+      "category": "vente-soon",
+      "icon": "assets/img/truck_tire.png",
+      "enabled": true,
+      "note": "",
+      "max": 10,
+      "excludes": [],
+      "cost": {
+        "ressource": 20
       }
     }
   ]
