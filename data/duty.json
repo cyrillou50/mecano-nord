@@ -1,12 +1,14 @@
 {
-  "updatedAt": "2026-08-03T14:36:53.915Z",
-  "onDuty": [
+  "updatedAt": "2026-08-03T17:18:29.121Z",
+  "onDuty": [],
+  "log": [
     {
       "id": "ecumeria",
       "pseudo": "Écuméria Sereinécaille",
       "roleId": "secretaire",
-      "since": "2026-08-03T14:36:53.915Z"
+      "in": "2026-08-03T14:36:53.915Z",
+      "out": "2026-08-03T17:18:29.121Z",
+      "minutes": 162
     }
-  ],
-  "log": []
+  ]
 }
