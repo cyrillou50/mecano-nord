@@ -502,6 +502,11 @@ window.MNDuty = (function () {
     };
 
     let etat = await envoyerOp(Object.assign({ op: "leave-set", remplace: remplace || "" }, entree));
+
+    /* Même prudence qu'à l'annulation : un serveur qui ne gère qu'une période
+       par personne aurait écrasé la mauvaise, ou rien enregistré du tout. */
+    if (etat && !congeById(entree.cid)) etat = null;
+
     if (!etat) {
       await load(true);
       const b = board();
@@ -522,7 +527,15 @@ window.MNDuty = (function () {
     const avant = congeById(cid);
     if (!avant) return { already: true };
 
-    let etat = await envoyerOp({ op: "leave-clear", cid });
+    /* `id` accompagne `cid` : un serveur antérieur aux périodes multiples ne
+       connaît que lui, et répondrait « déjà fait » sans rien retirer. */
+    let etat = await envoyerOp({ op: "leave-clear", cid, id: avant.id });
+
+    /* On vérifie plutôt que de croire sur parole : si la période est toujours
+       là, c'est que le serveur n'a pas compris. On reprend alors le chemin
+       complet, au lieu de laisser l'utilisateur devant un bouton sans effet. */
+    if (etat && congeById(cid)) etat = null;
+
     if (!etat) {
       await load(true);
       const b = board();

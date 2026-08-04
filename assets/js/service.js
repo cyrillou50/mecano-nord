@@ -8,9 +8,12 @@
   const $ = s => document.querySelector(s);
   const svg = MNUI.svg, esc = MNUI.esc;
 
+  const RAFRAICHIR = 5 * 60 * 1000;
+
   let me = null;
   let busy = false;
   let ticker = null;
+  let stopRefresh = null;
 
   MNUI.start({ page: "service", title: "Service", onReady: init });
 
@@ -43,6 +46,22 @@
     /* Les compteurs avancent à la seconde. */
     clearInterval(ticker);
     ticker = setInterval(refreshDurations, 1000);
+
+    /* Le tableau, lui, est relu toutes les 5 minutes : c'est ce qui fait
+       apparaître les pointages et les congés posés depuis un autre poste. */
+    if (stopRefresh) stopRefresh();
+    stopRefresh = MNUI.autoRefresh(rafraichir, RAFRAICHIR);
+  }
+
+  /**
+   * Relit le tableau partagé et redessine. On s'abstient pendant une action ou
+   * une fenêtre ouverte : redessiner sous les doigts de quelqu'un est pire que
+   * d'attendre le cycle suivant.
+   */
+  async function rafraichir() {
+    if (busy || document.querySelector(".modal-back")) return;
+    await MNDuty.load(true);
+    render();
   }
 
   function denied() {

@@ -421,8 +421,43 @@ window.MNUI = (function () {
     });
   }
 
+  /* ---- Rafraîchissement de fond --------------------------------------------- */
+
+  /**
+   * Rappelle `fn` à intervalle régulier pour garder la page à jour.
+   *
+   * Deux précautions : rien ne tourne quand l'onglet est en arrière-plan
+   * (personne ne regarde, et ça évite d'interroger le serveur pour rien), et
+   * au retour sur l'onglet on rattrape immédiatement si le délai est passé —
+   * sinon on retrouverait un écran vieux de plusieurs heures.
+   *
+   * @returns {function} à appeler pour tout arrêter
+   */
+  function autoRefresh(fn, ms) {
+    let dernier = Date.now();
+    let timer = null;
+
+    async function tick() {
+      if (document.hidden) return;
+      dernier = Date.now();
+      /* Un échec réseau ne doit ni casser la page ni interrompre le rythme. */
+      try { await fn(); } catch (e) { console.error(e); }
+    }
+
+    const relancer = () => { clearInterval(timer); timer = setInterval(tick, ms); };
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden || Date.now() - dernier < ms) return;
+      tick();
+      relancer();                       // on repart du retour, pas de l'ancien cycle
+    });
+
+    relancer();
+    return () => clearInterval(timer);
+  }
+
   return {
     svg, esc, num, ago, initials, brandMark, syncFavicon,
-    toast, modal, confirm, copy, mountTopbar, showGate, start
+    toast, modal, confirm, copy, mountTopbar, showGate, start, autoRefresh
   };
 })();

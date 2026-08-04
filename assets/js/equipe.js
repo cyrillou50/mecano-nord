@@ -19,6 +19,8 @@
   let reorder = false;
   let ticker = null;
 
+  const RAFRAICHIR = 5 * 60 * 1000;
+
   MNUI.start({ page: "equipe", title: "Équipe", onReady: init });
 
   /* La page est ouverte à toute l'équipe : chacun peut consulter les fiches.
@@ -37,6 +39,16 @@
     /* Les compteurs de service de la personne en cours avancent à la seconde. */
     clearInterval(ticker);
     ticker = setInterval(tick, 1000);
+
+    /* Et toutes les 5 minutes, on relit le tableau partagé : les heures de
+       service affichées ici viennent de là. */
+    MNUI.autoRefresh(async () => {
+      /* Jamais en pleine réorganisation ou fenêtre ouverte : on écraserait
+         un travail en cours. */
+      if (reorder || document.querySelector(".modal-back")) return;
+      await MNDuty.load(true);
+      render();
+    }, RAFRAICHIR);
   }
 
   function tick() {
