@@ -42,6 +42,9 @@ window.MNDuty = (function () {
     return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s)) ? s : "";
   }
 
+  /** Clé d'un bloc de congés : une personne, une date de départ. */
+  const cidDe = (uid, from) => uid + "|" + from;
+
   /** Nombre de jours couverts, bornes comprises. */
   function nbJours(from, to) {
     const a = new Date(from + "T12:00:00"), b = new Date(to + "T12:00:00");
@@ -91,16 +94,23 @@ window.MNDuty = (function () {
           forced: e.forced === true
         };
       }),
-      conges: (Array.isArray(b.conges) ? b.conges : []).map(e => ({
-        id: String(e.id || ""),
-        pseudo: String(e.pseudo || "?"),
-        roleId: String(e.roleId || ""),
-        from: jour(e.from),
-        to: jour(e.to),
-        note: String(e.note || "").slice(0, 300),
-        by: String(e.by || ""),          // vide = la personne les a posés elle-même
-        at: e.at || null
-      })).filter(e => e.id && e.from && e.to && e.from <= e.to)
+      conges: (Array.isArray(b.conges) ? b.conges : []).map(e => {
+        const id = String(e.id || ""), from = jour(e.from);
+        return {
+          id,
+          /* Une personne peut poser plusieurs périodes : chacune a sa clé.
+             Elle se déduit du départ, ce qui donne aux blocs déjà en base une
+             clé stable sans migration. */
+          cid: String(e.cid || cidDe(id, from)),
+          pseudo: String(e.pseudo || "?"),
+          roleId: String(e.roleId || ""),
+          from,
+          to: jour(e.to),
+          note: String(e.note || "").slice(0, 300),
+          by: String(e.by || ""),        // vide = la personne les a posés elle-même
+          at: e.at || null
+        };
+      }).filter(e => e.id && e.from && e.to && e.from <= e.to)
     };
   }
 
@@ -157,16 +167,6 @@ window.MNDuty = (function () {
   const entryOf = uid => board().onDuty.find(e => e.id === uid) || null;
   const isOn = uid => !!entryOf(uid);
 
-  /** Les congés en cours ou à venir d'une personne (un seul bloc à la fois). */
-  const congeOf = uid => board().conges.find(e => e.id === uid) || null;
-
-  /** Cette personne est-elle en congés aujourd'hui ? */
-  function enConge(uid, le) {
-    const c = congeOf(uid);
-    const j = le || jourLocal();
-    return !!(c && c.from <= j && j <= c.to);
-  }
-
   /** Tous les congés, du plus proche au plus lointain. Les passés sont écartés. */
   function conges(tout) {
     const j = jourLocal();
@@ -175,6 +175,29 @@ window.MNDuty = (function () {
       .slice()
       .sort((a, b) => a.from.localeCompare(b.from));
   }
+
+  /** Les périodes d'une personne, dans l'ordre. */
+  const congesOf = (uid, tout) => conges(tout).filter(c => c.id === uid);
+
+  /** Un bloc précis, par sa clé. */
+  const congeById = cid => board().conges.find(c => c.cid === cid) || null;
+
+  /** La période en cours, sinon la prochaine. Sert aux résumés d'une ligne. */
+  function congeOf(uid) {
+    const j = jourLocal();
+    const l = congesOf(uid);
+    return l.find(c => c.from <= j && j <= c.to) || l[0] || null;
+  }
+
+  /** Cette personne est-elle en congés ce jour-là ? */
+  function enConge(uid, le) {
+    const j = le || jourLocal();
+    return congesOf(uid, true).some(c => c.from <= j && j <= c.to);
+  }
+
+  /** La période qui empiéterait sur [from, to], en ignorant celle qu'on modifie. */
+  const chevauche = (uid, from, to, sauf) =>
+    board().conges.find(c => c.id === uid && c.cid !== sauf && c.from <= to && from <= c.to) || null;
 
   const relayUrl = () => {
     try { return MNStore.api("relais"); }
@@ -439,9 +462,9 @@ window.MNDuty = (function () {
   }
 
   /* ---- Congés ------------------------------------------------------------------
-     Une personne n'a qu'un bloc de congés à la fois : en reposer remplace le
-     précédent. C'est suffisant à l'échelle de l'atelier et ça évite d'avoir à
-     gérer des chevauchements. */
+     Une personne peut poser autant de périodes qu'elle veut, du moment
+     qu'elles ne se chevauchent pas : deux absences qui se recouvrent ne
+     veulent rien dire, et les refuser garde le tableau lisible. */
 
   const nomRole = id => {
     try { const r = MNStore.roleById(id); return r ? r.name : ""; }
@@ -457,45 +480,53 @@ window.MNDuty = (function () {
   });
 
   /**
-   * Pose ou remplace les congés de quelqu'un.
-   * @param {string} by  qui les pose, si ce n'est pas la personne elle-même
+   * Ajoute une période de congés, ou en remplace une existante.
+   * @param {string} by        qui les pose, si ce n'est pas la personne elle-même
+   * @param {string} remplace  clé de la période modifiée ; vide pour en ajouter une
    */
-  async function setConge(user, from, to, note, by) {
+  async function setConge(user, from, to, note, by, remplace) {
     const a = jour(from), b2 = jour(to);
     if (!a || !b2) return { error: "Dates invalides." };
     if (a > b2) return { error: "La date de retour précède le départ." };
 
+    const gene = chevauche(user.id, a, b2, remplace || "");
+    if (gene) {
+      return { error: "Chevauche une période déjà posée (du " + gene.from + " au " + gene.to + ")." };
+    }
+
     const entree = {
-      id: user.id, pseudo: user.pseudo, roleId: user.roleId || "",
+      id: user.id, cid: cidDe(user.id, a),
+      pseudo: user.pseudo, roleId: user.roleId || "",
       from: a, to: b2, note: String(note || "").slice(0, 300),
       by: by || "", at: new Date().toISOString()
     };
 
-    let etat = await envoyerOp(Object.assign({ op: "leave-set" }, entree));
+    let etat = await envoyerOp(Object.assign({ op: "leave-set", remplace: remplace || "" }, entree));
     if (!etat) {
       await load(true);
       const b = board();
-      const i = b.conges.findIndex(e => e.id === user.id);
+      const i = remplace ? b.conges.findIndex(e => e.cid === remplace) : -1;
       if (i === -1) b.conges.push(entree); else b.conges[i] = entree;
       b.updatedAt = entree.at;
       saveLocal(b);
       etat = await push(b, "Congés de " + user.pseudo);
     }
 
-    const discord = await MNWebhook.sendConge(infosConge(entree, "pose", by));
+    const discord = await MNWebhook.sendConge(
+      infosConge(entree, remplace ? "modifie" : "pose", by));
     return { shared: etat.ok, shareError: etat.error, discord, conge: entree };
   }
 
-  /** Annule les congés de quelqu'un. */
-  async function clearConge(uid, by) {
-    const avant = congeOf(uid);
+  /** Annule une période, désignée par sa clé. */
+  async function clearConge(cid, by) {
+    const avant = congeById(cid);
     if (!avant) return { already: true };
 
-    let etat = await envoyerOp({ op: "leave-clear", id: uid });
+    let etat = await envoyerOp({ op: "leave-clear", cid });
     if (!etat) {
       await load(true);
       const b = board();
-      const i = b.conges.findIndex(e => e.id === uid);
+      const i = b.conges.findIndex(e => e.cid === cid);
       if (i === -1) return { already: true };
       b.conges.splice(i, 1);
       b.updatedAt = new Date().toISOString();
@@ -627,7 +658,8 @@ window.MNDuty = (function () {
     load, board, isOn, entryOf, canShare, isAuto, relayUrl, baseUrl,
     souci: () => _souci,
     clockIn, clockOut, forceOut, forceIn, clearLog, removeLog,
-    conges, congeOf, enConge, setConge, clearConge, jourLocal, nbJours,
+    conges, congesOf, congeOf, congeById, enConge, chevauche,
+    setConge, clearConge, jourLocal, nbJours,
     logOf, secondsFor, weekStart,
     totals, dur, sinceDur, secBetween, minutesBetween
   };

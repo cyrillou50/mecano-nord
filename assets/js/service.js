@@ -80,12 +80,15 @@
     if (canPoint) $("#d-toggle").addEventListener("click", toggle);
 
     const cg = $("#d-conge");
-    if (cg) cg.addEventListener("click", () => askLeave(me.uid, me.pseudo, me.roleId));
-    const cgx = $("#d-conge-off");
-    if (cgx) cgx.addEventListener("click", () => dropLeave(me.uid, me.pseudo));
+    if (cg) cg.addEventListener("click", () => askLeave(me.uid, me.pseudo, me.roleId, ""));
     const cgp = $("#d-conge-other");
     if (cgp) cgp.addEventListener("click", leaveForSomeone);
 
+    document.querySelectorAll("[data-editconge]").forEach(b =>
+      b.addEventListener("click", () => {
+        const c = MNDuty.congeById(b.dataset.editconge);
+        if (c) askLeave(c.id, c.pseudo, c.roleId, c.cid);
+      }));
     document.querySelectorAll("[data-rmconge]").forEach(b =>
       b.addEventListener("click", () => dropLeave(b.dataset.rmconge, b.dataset.pseudo)));
     $("#d-reload").addEventListener("click", async () => {
@@ -141,25 +144,45 @@
       " · " + MNDuty.nbJours(c.from, c.to) + " jour" + (MNDuty.nbJours(c.from, c.to) > 1 ? "s" : "");
   }
 
+  /**
+   * Mes périodes. Elles sont listées ici et pas seulement dans le panneau
+   * d'équipe : un employé sans droit de regard sur l'équipe doit quand même
+   * pouvoir gérer les siennes.
+   */
   function myLeaveCard() {
-    const c = MNDuty.congeOf(me.uid);
-    const now = c && MNDuty.enConge(me.uid);
-    return '<div class="pubstate pubstate--' + (c ? "ok" : "off") + '" style="margin-bottom:18px">' +
-      '<div class="pubstate__ico">' + svg(c ? "calendar" : "calendar") + "</div>" +
-      '<div class="pubstate__txt">' +
-        "<b>" + (c
-          ? (now ? "Tu es en congés" : "Congés prévus")
-          : "Aucun congé prévu") + "</b>" +
-        "<span>" + (c
-          ? esc(periode(c)) + (c.note ? " — " + esc(c.note) : "") +
-            (c.by ? ' <span class="permtag">posés par ' + esc(c.by) + "</span>" : "")
-          : "Préviens l'équipe de ton absence, les dates partent sur Discord.") + "</span>" +
+    const list = MNDuty.congesOf(me.uid);
+    const now = MNDuty.enConge(me.uid);
+
+    return '<div class="panel" style="margin-bottom:18px">' +
+      '<div class="panel__head"><h2>Mes congés</h2>' +
+        (now ? '<span class="permtag permtag--on">en congés</span>' : "") +
+        (list.length ? '<span class="pill pill--ok">' + list.length + "</span>" : "") +
+        '<span class="spacer"></span>' +
+        '<button class="btn btn--solid btn--sm" id="d-conge">' + svg("calendar") +
+          "<span>" + (list.length ? "Ajouter une période" : "Poser des congés") + "</span></button>" +
       "</div>" +
-      (c
-        ? '<button class="btn btn--ghost" id="d-conge-off">' + svg("x") + "<span>Annuler</span></button>"
-        : "") +
-      '<button class="btn ' + (c ? "btn--ghost" : "btn--solid") + '" id="d-conge">' +
-        svg(c ? "edit" : "calendar") + "<span>" + (c ? "Modifier" : "Poser des congés") + "</span></button>" +
+      '<div class="panel__body">' +
+        (list.length
+          ? '<div class="rows">' + list.map(myLeaveRow).join("") + "</div>"
+          : '<p class="hint">Aucune absence prévue. Préviens l\'équipe de tes dates, ' +
+            "elles partent sur Discord.</p>") +
+      "</div></div>";
+  }
+
+  function myLeaveRow(c) {
+    const now = MNDuty.enConge(me.uid, MNDuty.jourLocal()) &&
+      c.from <= MNDuty.jourLocal() && MNDuty.jourLocal() <= c.to;
+    return '<div class="trow">' +
+      '<div class="trow__main"><b>' + esc(periode(c)) + "</b>" +
+        '<div class="trow__meta">' +
+          (now ? '<span class="permtag permtag--on">en cours</span>' : "<em>à venir</em>") +
+          (c.note ? "<i>" + esc(c.note) + "</i>" : "") +
+          (c.by ? "<i>posés par " + esc(c.by) + "</i>" : "") +
+        "</div></div>" +
+      '<button class="btn btn--icon" data-editconge="' + esc(c.cid) + '" title="Modifier ces dates">' +
+        svg("edit") + "</button>" +
+      '<button class="btn btn--icon" data-rmconge="' + esc(c.cid) + '" data-pseudo="' + esc(c.pseudo) +
+        '" title="Annuler cette période">' + svg("x") + "</button>" +
     "</div>";
   }
 
@@ -198,8 +221,10 @@
         "</div></div>" +
       '<span class="trow__price">' + esc(periode(c)) + "</span>" +
       (canManage || c.id === me.uid
-        ? '<button class="btn btn--icon" data-rmconge="' + esc(c.id) + '" data-pseudo="' + esc(c.pseudo) +
-          '" title="Annuler ces congés">' + svg("x") + "</button>"
+        ? '<button class="btn btn--icon" data-editconge="' + esc(c.cid) + '" title="Modifier ces dates">' +
+            svg("edit") + "</button>" +
+          '<button class="btn btn--icon" data-rmconge="' + esc(c.cid) + '" data-pseudo="' + esc(c.pseudo) +
+            '" title="Annuler cette période">' + svg("x") + "</button>"
         : "") +
     "</div>";
   }
@@ -424,12 +449,18 @@
 
   /**
    * Saisie des dates. `uid` peut être quelqu'un d'autre : dans ce cas Discord
-   * précise qui les a posés.
+   * précise qui les a posés. `cid` vide = nouvelle période.
    */
-  function askLeave(uid, pseudo, roleId) {
-    const dejaLa = MNDuty.congeOf(uid);
+  function askLeave(uid, pseudo, roleId, cid) {
+    const dejaLa = cid ? MNDuty.congeById(cid) : null;
     const pourMoi = uid === me.uid;
-    const demain = new Date(Date.now() + 86400000);
+    /* Une nouvelle période démarre au lendemain de la dernière posée : c'est
+       presque toujours ce qu'on veut quand on en enchaîne plusieurs. */
+    const derniere = MNDuty.congesOf(uid).slice(-1)[0];
+    const depart = (!dejaLa && derniere)
+      ? new Date(new Date(derniere.to + "T12:00:00").getTime() + 86400000)
+      : new Date(Date.now() + 86400000);
+    const demain = depart;
 
     const body = document.createElement("div");
     body.innerHTML =
@@ -469,8 +500,8 @@
     paint();
 
     MNUI.modal({
-      title: pourMoi ? (dejaLa ? "Modifier mes congés" : "Poser des congés")
-                     : "Congés de " + pseudo,
+      title: pourMoi ? (dejaLa ? "Modifier une période" : "Poser des congés")
+                     : (dejaLa ? "Modifier les congés de " : "Congés de ") + pseudo,
       body,
       actions: [
         { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
@@ -485,7 +516,7 @@
             const r = await MNDuty.setConge(
               { id: uid, pseudo, roleId: roleId || "" },
               from.value, to.value, body.querySelector("#cg-note").value.trim(),
-              pourMoi ? "" : me.pseudo
+              pourMoi ? "" : me.pseudo, cid || ""
             );
             if (r.error) {
               btn.disabled = false;
@@ -493,7 +524,8 @@
               return MNUI.toast(r.error, "err");
             }
             close(); render();
-            MNUI.toast(leaveToast("Congés enregistrés", r), r.discord && r.discord.ok !== false ? "ok" : "info");
+            MNUI.toast(leaveToast(dejaLa ? "Congés modifiés" : "Congés enregistrés", r),
+              r.discord && r.discord.ok !== false ? "ok" : "info");
           }
         }
       ]
@@ -509,19 +541,22 @@
     return bits.join(" · ");
   }
 
-  async function dropLeave(uid, pseudo) {
+  async function dropLeave(cid, pseudo) {
+    const c = MNDuty.congeById(cid);
+    if (!c) return MNUI.toast("Cette période n'existe plus", "info");
+    const pourMoi = c.id === me.uid;
+
     const ok = await MNUI.confirm({
-      title: "Annuler les congés",
-      message: uid === me.uid
-        ? "Tes congés seront retirés du tableau et l'équipe prévenue sur Discord."
-        : "Les congés de « " + pseudo + " » seront retirés et l'équipe prévenue sur Discord.",
-      confirmLabel: "Annuler les congés", danger: true
+      title: "Annuler cette période",
+      message: (pourMoi ? "Tes congés " : "Les congés de « " + pseudo + " » ") +
+        esc(periode(c)) + " seront retirés du tableau et l'équipe prévenue sur Discord.",
+      confirmLabel: "Annuler la période", danger: true
     });
     if (!ok) return;
 
-    const r = await MNDuty.clearConge(uid, uid === me.uid ? "" : me.pseudo);
+    const r = await MNDuty.clearConge(cid, pourMoi ? "" : me.pseudo);
     render();
-    MNUI.toast(r.already ? "Il n'y avait plus de congés" : leaveToast("Congés annulés", r),
+    MNUI.toast(r.already ? "Cette période n'existait plus" : leaveToast("Congés annulés", r),
       r.already ? "info" : "ok");
   }
 
@@ -533,10 +568,13 @@
     const body = document.createElement("div");
     body.innerHTML =
       '<div class="field"><label class="label" for="cgk">Employé</label>' +
-        '<select class="select" id="cgk">' + gens.map(u =>
-          '<option value="' + esc(u.id) + '">' + esc(u.pseudo) + " — " +
-          esc(MNStore.roleOf(u).name) +
-          (MNDuty.congeOf(u.id) ? " (congés déjà posés)" : "") + "</option>").join("") + "</select></div>";
+        '<select class="select" id="cgk">' + gens.map(u => {
+          const n = MNDuty.congesOf(u.id).length;
+          return '<option value="' + esc(u.id) + '">' + esc(u.pseudo) + " — " +
+            esc(MNStore.roleOf(u).name) +
+            (n ? " (" + n + " période" + (n > 1 ? "s" : "") + " déjà posée" + (n > 1 ? "s" : "") + ")" : "") +
+            "</option>";
+        }).join("") + "</select></div>";
 
     MNUI.modal({
       title: "Poser des congés", body,
@@ -547,7 +585,7 @@
           onClick: (close) => {
             const u = gens.find(x => x.id === body.querySelector("#cgk").value);
             close();
-            if (u) askLeave(u.id, u.pseudo, u.roleId);
+            if (u) askLeave(u.id, u.pseudo, u.roleId, "");
           }
         }
       ]

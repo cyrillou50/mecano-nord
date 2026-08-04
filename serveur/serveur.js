@@ -80,6 +80,9 @@ const jour = v => {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s)) ? s : null;
 };
 
+/** Clé d'une période : une personne, une date de départ. */
+const cidDe = (id, from) => id + "|" + from;
+
 function nettoyerConge(e) {
   const from = jour(e && e.from), to = jour(e && e.to);
   if (!from || !to || from > to) return null;
@@ -87,6 +90,7 @@ function nettoyerConge(e) {
   if (!id) return null;
   return {
     id,
+    cid: texte(e.cid, 130) || cidDe(id, from),
     pseudo: texte(e.pseudo, 60) || "?",
     roleId: texte(e.roleId, 60),
     from, to,
@@ -191,17 +195,26 @@ function appliquer(board, op) {
       return { board: b };
     }
 
-    /* Un seul bloc de congés par personne : reposer remplace le précédent. */
+    /* Plusieurs périodes par personne, à condition qu'elles ne se recouvrent
+       pas. `remplace` désigne celle qu'on modifie, sinon on en ajoute une. */
     case "leave-set": {
       const c = nettoyerConge(op);
       if (!c) return { erreur: "congés invalides" };
-      const j = b.conges.findIndex(e => e.id === c.id);
+
+      const remplace = texte(op.remplace, 130);
+      if (b.conges.some(e =>
+        e.id === c.id && e.cid !== remplace && e.from <= c.to && c.from <= e.to)) {
+        return { erreur: "chevauche une période déjà posée" };
+      }
+
+      const j = remplace ? b.conges.findIndex(e => e.cid === remplace) : -1;
       if (j === -1) b.conges.push(c); else b.conges[j] = c;
       return { board: b };
     }
 
     case "leave-clear": {
-      const j = b.conges.findIndex(e => e.id === id);
+      const cid = texte(op.cid, 130);
+      const j = b.conges.findIndex(e => e.cid === cid);
       if (j === -1) return { board: b, deja: true };
       b.conges.splice(j, 1);
       return { board: b };

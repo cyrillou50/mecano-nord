@@ -150,11 +150,29 @@ window.MNWebhook = (function () {
         body: JSON.stringify(payload)
       });
       if (r.ok || r.status === 204) return { ok: true };
+
+      /* Le relais renvoie la raison en clair : plus utile qu'un code seul. */
+      let raison = "";
+      if (relay) {
+        const d = await r.json().catch(() => ({}));
+        raison = String(d.error || "");
+      }
+
+      if (relay && r.status === 400 && /webhook non configuré/i.test(raison)) {
+        /* Un relais plus ancien ne connaît pas les types récents : plutôt que
+           d'échouer, on réessaie dans le salon de repli. */
+        if (REPLI[kind]) return send(REPLI[kind], embed);
+        /* Plus de repli : c'est que le relais n'a pas l'adresse. On le dit
+           franchement, avec le nom exact de la variable à renseigner. */
+        return { ok: false, error: "Ton relais n'a pas d'adresse pour « " + kind +
+          " ». Ajoute WEBHOOK_" + kind.toUpperCase() + " dans son service, puis redémarre-le." };
+      }
+
       if (r.status === 401 || r.status === 404) {
         return { ok: false, error: "Webhook introuvable — l'adresse a peut-être été révoquée." };
       }
       if (r.status === 429) return { ok: false, error: "Discord limite les envois, réessaie dans un instant." };
-      return { ok: false, error: "Discord a répondu " + r.status + "." };
+      return { ok: false, error: raison || (relay ? "Le relais a répondu " : "Discord a répondu ") + r.status + "." };
     } catch (_) {
       return { ok: false, error: "Envoi impossible (réseau ou webhook bloqué)." };
     }
@@ -232,10 +250,16 @@ window.MNWebhook = (function () {
       { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   }
 
+  const TITRES = {
+    pose: "🏖️ Congés posés",
+    modifie: "✏️ Congés modifiés",
+    annule: "↩️ Congés annulés"
+  };
+
   /**
-   * Congés posés ou annulés.
-   * @param {object} i  action ("pose"|"annule"), pseudo, role, from, to,
-   *                    days, note, by (qui a agi, si ce n'est pas la personne)
+   * Congés posés, modifiés ou annulés.
+   * @param {object} i  action ("pose"|"modifie"|"annule"), pseudo, role, from,
+   *                    to, days, note, by (qui a agi, si ce n'est pas la personne)
    */
   function sendConge(i) {
     const pose = i.action !== "annule";
@@ -250,12 +274,15 @@ window.MNWebhook = (function () {
       inline: true
     });
     if (i.by) {
-      f.push({ name: pose ? "Posés par" : "Annulés par", value: i.by, inline: true });
+      f.push({
+        name: i.action === "annule" ? "Annulés par" : i.action === "modifie" ? "Modifiés par" : "Posés par",
+        value: i.by, inline: true
+      });
     }
     if (i.note) f.push({ name: "Motif", value: String(i.note).slice(0, 1024) });
 
     return send("conges", {
-      title: (pose ? "🏖️ Congés posés" : "↩️ Congés annulés") + " — " + i.pseudo,
+      title: (TITRES[i.action] || TITRES.pose) + " — " + i.pseudo,
       color: pose ? COLORS.leaveOn : COLORS.leaveOff,
       fields: f
     });
