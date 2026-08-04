@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-04T13:19:02.856Z",
+  "updatedAt": "2026-08-04T13:19:22.739Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -433,7 +433,7 @@
       "category": "kits",
       "icon": "assets/img/meca_peinture.png",
       "enabled": true,
-      "note": "(Couleur et vitre teintée ‎ ‎ ‎ ‎ HORS fumée de pneus ‎ ‎ ‎ ‎ ‎ ‎ (Wheel smoke))",
+      "note": "(Couleur et vitre teintée ‎ ‎ ‎ ‎ HORS fumée de pneus ‎ ‎ ‎ ‎ ‎(Wheel smoke))",
       "max": 7,
       "excludes": [],
       "cost": {
