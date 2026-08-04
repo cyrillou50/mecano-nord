@@ -424,36 +424,68 @@ window.MNUI = (function () {
   /* ---- Rafraîchissement de fond --------------------------------------------- */
 
   /**
-   * Rappelle `fn` à intervalle régulier pour garder la page à jour.
+   * Rappelle `fn` régulièrement pour garder la page à jour.
    *
-   * Deux précautions : rien ne tourne quand l'onglet est en arrière-plan
-   * (personne ne regarde, et ça évite d'interroger le serveur pour rien), et
-   * au retour sur l'onglet on rattrape immédiatement si le délai est passé —
-   * sinon on retrouverait un écran vieux de plusieurs heures.
+   * Le rythme s'adapte à ce que fait la personne : soutenu tant qu'elle se
+   * sert de la page, ralenti quand elle la laisse ouverte sans y toucher,
+   * suspendu quand l'onglet passe en arrière-plan. Au retour sur l'onglet, on
+   * rattrape aussitôt — sinon on retrouverait un écran vieux de plusieurs
+   * heures.
    *
+   * Le prochain passage n'est programmé qu'une fois le précédent terminé :
+   * un serveur lent ralentit le rythme au lieu de faire s'empiler les
+   * requêtes.
+   *
+   * @param {function} fn
+   * @param {{vif:number, calme:number, apres:number}} rythme  en millisecondes
    * @returns {function} à appeler pour tout arrêter
    */
-  function autoRefresh(fn, ms) {
-    let dernier = Date.now();
-    let timer = null;
+  function autoRefresh(fn, rythme) {
+    const r = rythme || {};
+    const vif = r.vif || 10000;        // la page est utilisée
+    const calme = r.calme || 60000;    // ouverte, mais délaissée
+    const apres = r.apres || 120000;   // au-delà, on considère qu'elle l'est
 
-    async function tick() {
-      if (document.hidden) return;
-      dernier = Date.now();
-      /* Un échec réseau ne doit ni casser la page ni interrompre le rythme. */
-      try { await fn(); } catch (e) { console.error(e); }
+    let timer = null, arrete = false;
+    let dernier = Date.now();          // dernier passage effectif
+    let actif = Date.now();            // dernier signe de vie de la personne
+
+    const delai = () => (Date.now() - actif < apres ? vif : calme);
+
+    function planifier() {
+      clearTimeout(timer);
+      if (!arrete) timer = setTimeout(tick, delai());
     }
 
-    const relancer = () => { clearInterval(timer); timer = setInterval(tick, ms); };
+    async function tick() {
+      if (arrete) return;
+      if (!document.hidden) {
+        dernier = Date.now();
+        /* Un échec réseau ne doit ni casser la page ni interrompre le rythme. */
+        try { await fn(); } catch (e) { console.error(e); }
+      }
+      planifier();
+    }
+
+    function bouge() {
+      const dormait = Date.now() - actif >= apres;
+      actif = Date.now();
+      /* On sortait de la veille : le passage lent déjà programmé ferait
+         attendre une minute devant un écran périmé. On reprend la main. */
+      if (!dormait) return;
+      if (Date.now() - dernier >= vif) tick(); else planifier();
+    }
+    ["pointerdown", "keydown", "wheel"].forEach(e =>
+      window.addEventListener(e, bouge, { passive: true }));
 
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden || Date.now() - dernier < ms) return;
-      tick();
-      relancer();                       // on repart du retour, pas de l'ancien cycle
+      if (document.hidden) return;
+      actif = Date.now();
+      if (Date.now() - dernier >= vif) tick(); else planifier();
     });
 
-    relancer();
-    return () => clearInterval(timer);
+    planifier();
+    return () => { arrete = true; clearTimeout(timer); };
   }
 
   return {

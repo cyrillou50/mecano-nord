@@ -8,7 +8,10 @@
   const $ = s => document.querySelector(s);
   const svg = MNUI.svg, esc = MNUI.esc;
 
-  const RAFRAICHIR = 5 * 60 * 1000;
+  /* Le tableau bouge quand quelqu'un pointe : 10 s donne l'impression du
+     direct sans matraquer le serveur. Une page laissée ouverte retombe à la
+     minute. */
+  const RYTHME = { vif: 10000, calme: 60000 };
 
   let me = null;
   let busy = false;
@@ -47,21 +50,27 @@
     clearInterval(ticker);
     ticker = setInterval(refreshDurations, 1000);
 
-    /* Le tableau, lui, est relu toutes les 5 minutes : c'est ce qui fait
-       apparaître les pointages et les congés posés depuis un autre poste. */
+    /* Le tableau est relu en continu : c'est ce qui fait apparaître les
+       pointages et les congés posés depuis un autre poste. */
     if (stopRefresh) stopRefresh();
-    stopRefresh = MNUI.autoRefresh(rafraichir, RAFRAICHIR);
+    stopRefresh = MNUI.autoRefresh(rafraichir, RYTHME);
   }
 
   /**
-   * Relit le tableau partagé et redessine. On s'abstient pendant une action ou
-   * une fenêtre ouverte : redessiner sous les doigts de quelqu'un est pire que
-   * d'attendre le cycle suivant.
+   * Relit le tableau partagé et redessine s'il a changé.
+   *
+   * On s'abstient pendant une action ou une fenêtre ouverte : redessiner sous
+   * les doigts de quelqu'un est pire que d'attendre le passage suivant. Et on
+   * ne reconstruit la page que si quelque chose a bougé — à ce rythme, la
+   * refaire à vide ferait clignoter et perdrait le survol.
    */
   async function rafraichir() {
     if (busy || document.querySelector(".modal-back")) return;
+    const avant = MNDuty.board().updatedAt, souciAvant = MNDuty.souci();
     await MNDuty.load(true);
-    render();
+    /* Le message d'erreur compte aussi : sans ça, une panne qui s'installe
+       resterait invisible, et sa disparition tout autant. */
+    if (MNDuty.board().updatedAt !== avant || MNDuty.souci() !== souciAvant) render();
   }
 
   function denied() {

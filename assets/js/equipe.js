@@ -19,7 +19,9 @@
   let reorder = false;
   let ticker = null;
 
-  const RAFRAICHIR = 5 * 60 * 1000;
+  /* Les fiches changent moins vite que le tableau de service : on relit un
+     peu moins souvent que la page Service. */
+  const RYTHME = { vif: 20000, calme: 90000 };
 
   MNUI.start({ page: "equipe", title: "Équipe", onReady: init });
 
@@ -40,15 +42,16 @@
     clearInterval(ticker);
     ticker = setInterval(tick, 1000);
 
-    /* Et toutes les 5 minutes, on relit le tableau partagé : les heures de
-       service affichées ici viennent de là. */
+    /* Et on relit le tableau partagé en continu : les heures de service
+       affichées ici en viennent. */
     MNUI.autoRefresh(async () => {
       /* Jamais en pleine réorganisation ou fenêtre ouverte : on écraserait
          un travail en cours. */
       if (reorder || document.querySelector(".modal-back")) return;
+      const avant = MNDuty.board().updatedAt;
       await MNDuty.load(true);
-      render();
-    }, RAFRAICHIR);
+      if (MNDuty.board().updatedAt !== avant) render();
+    }, RYTHME);
   }
 
   function tick() {
