@@ -174,16 +174,21 @@ window.MNWebhook = (function () {
     });
   }
 
-  /** Durée lisible, sans dépendre du module de pointage. */
+  /**
+   * Durée lisible, à la seconde. Même découpage que MNDuty.dur, mais recopié
+   * ici : webhook.js sert aussi sur admin.html, où le pointage n'est pas chargé.
+   */
   function duree(sec) {
     const t = Math.max(0, Math.round(sec));
     const j = Math.floor(t / 86400);
     const h = Math.floor((t % 86400) / 3600);
     const m = Math.floor((t % 3600) / 60);
+    const s = t % 60;
     const p = [];
     if (j) p.push(j + " j");
     if (h || j) p.push(h + " h");
-    p.push(m + " min");
+    if (m || h || j) p.push(m + " min");
+    p.push(s + " s");
     return p.join(" ");
   }
 
