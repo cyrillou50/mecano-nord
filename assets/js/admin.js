@@ -1533,6 +1533,10 @@
       block("duty", "Prises de service",
         "Chaque arrivée et chaque départ de l'atelier y est annoncé, avec la durée du service.") +
 
+      block("conges", "Congés",
+        "Départs et retours de congés, avec les dates et le motif. " +
+        "<b>Laisse vide</b> pour qu'ils arrivent dans le salon des prises de service.") +
+
       '<div class="panel"><div class="panel__head"><h2>Apparence du bot</h2></div>' +
         '<div class="panel__body editor">' +
           '<div class="iconpick">' +
@@ -1601,6 +1605,7 @@
     const read = () => ({
       bt: MNWebhook.pack($("#w-bt").value.trim()),
       duty: MNWebhook.pack($("#w-duty").value.trim()),
+      conges: MNWebhook.pack($("#w-conges").value.trim()),
       mention: $("#w-mention").value.trim(),
       name: $("#w-name").value.trim(),
       avatar,
@@ -1609,9 +1614,10 @@
 
     $("#w-save").addEventListener("click", () => {
       const v = read();
-      for (const k of ["bt", "duty"]) {
+      const noms = { bt: "BT", duty: "services", conges: "congés" };
+      for (const k of ["bt", "duty", "conges"]) {
         if (v[k] && !MNWebhook.isValid(v[k])) {
-          return MNUI.toast("Adresse de webhook invalide (" + (k === "bt" ? "BT" : "services") + ")", "err");
+          return MNUI.toast("Adresse de webhook invalide (" + noms[k] + ")", "err");
         }
       }
       draft.settings.webhook = v;

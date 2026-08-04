@@ -66,11 +66,23 @@ window.MNWebhook = (function () {
     catch (_) { return ""; }
   }
 
+  /* Un message sans salon à lui part dans celui de son voisin le plus proche.
+     Les congés arrivent donc dans le salon des services tant qu'on ne leur en
+     donne pas un. */
+  const REPLI = { conges: "duty" };
+
+  /** Le salon réellement visé, une fois le repli appliqué. */
+  function salon(kind) {
+    const c = conf();
+    if (!String(c[kind] || "").trim() && REPLI[kind]) return REPLI[kind];
+    return kind;
+  }
+
   /**
    * Un envoi est-il possible pour ce type de message ?
    * Avec un relais, il connaît les adresses : rien à configurer côté site.
    */
-  const has = kind => !!relayUrl() || isValid(conf()[kind]);
+  const has = kind => !!relayUrl() || isValid(conf()[salon(kind)]);
 
   /** Chemin relatif → adresse absolue, indispensable pour l'avatar Discord. */
   function absUrl(u) {
@@ -83,7 +95,9 @@ window.MNWebhook = (function () {
   const COLORS = {
     bt: 0xff2bd1,        // rose : bon de travail
     dutyIn: 0xa8ff52,    // vert : prise de service
-    dutyOut: 0xffa92e    // ambre : fin de service
+    dutyOut: 0xffa92e,   // ambre : fin de service
+    leaveOn: 0x7fd7e8,   // bleu : congés posés
+    leaveOff: 0x8b8397   // gris : congés annulés
   };
 
   /**
@@ -94,6 +108,7 @@ window.MNWebhook = (function () {
    */
   async function send(kind, embed) {
     const c = conf();
+    kind = salon(kind);
     const stored = String(c[kind] || "").trim();
     if (!relayUrl()) {
       if (!stored) return { ok: false, skipped: true };
@@ -207,15 +222,56 @@ window.MNWebhook = (function () {
     });
   }
 
+  /** Jour lisible : « lundi 10 août 2026 ». */
+  function jourFr(j) {
+    /* Midi plutôt que minuit : aucun décalage de fuseau ne peut faire
+       basculer la date sur la veille. */
+    const d = new Date(String(j) + "T12:00:00");
+    if (isNaN(d)) return String(j);
+    return d.toLocaleDateString("fr-FR",
+      { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  }
+
+  /**
+   * Congés posés ou annulés.
+   * @param {object} i  action ("pose"|"annule"), pseudo, role, from, to,
+   *                    days, note, by (qui a agi, si ce n'est pas la personne)
+   */
+  function sendConge(i) {
+    const pose = i.action !== "annule";
+    const f = [];
+
+    if (i.role) f.push({ name: "Poste", value: i.role, inline: true });
+    f.push({ name: "Départ", value: jourFr(i.from), inline: true });
+    f.push({ name: "Retour", value: jourFr(i.to), inline: true });
+    f.push({
+      name: "Durée",
+      value: "**" + i.days + " jour" + (i.days > 1 ? "s" : "") + "**",
+      inline: true
+    });
+    if (i.by) {
+      f.push({ name: pose ? "Posés par" : "Annulés par", value: i.by, inline: true });
+    }
+    if (i.note) f.push({ name: "Motif", value: String(i.note).slice(0, 1024) });
+
+    return send("conges", {
+      title: (pose ? "🏖️ Congés posés" : "↩️ Congés annulés") + " — " + i.pseudo,
+      color: pose ? COLORS.leaveOn : COLORS.leaveOff,
+      fields: f
+    });
+  }
+
+  const NOMS = { bt: "bons de travail", duty: "services", conges: "congés" };
+
   /** Message de test depuis le panneau admin. */
   function sendTest(kind, by) {
     return send(kind, {
       title: "Test de configuration",
-      description: "Si tu lis ceci, le webhook « " +
-        (kind === "bt" ? "bons de travail" : "services") + " » fonctionne.\nEnvoyé par **" + by + "**.",
+      description: "Si tu lis ceci, le webhook « " + (NOMS[kind] || kind) +
+        " » fonctionne.\nEnvoyé par **" + by + "**.",
       color: 0x7fd7e8
     });
   }
 
-  return { isValid, has, send, sendBT, sendDuty, sendTest, pack, unpack, absUrl, relayUrl };
+  return { isValid, has, send, sendBT, sendDuty, sendConge, sendTest, pack, unpack, absUrl, relayUrl };
 })();

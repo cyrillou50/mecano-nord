@@ -19,10 +19,35 @@ window.MNDuty = (function () {
   let _board = null;
   let _souci = "";           // dernier problème rencontré, affiché à l'écran
 
-  const empty = () => ({ updatedAt: new Date(0).toISOString(), onDuty: [], log: [] });
+  const empty = () => ({ updatedAt: new Date(0).toISOString(), onDuty: [], log: [], conges: [] });
 
   /** Écart exact en secondes entre deux horodatages. */
   const secBetween = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 1000));
+
+  /* ---- Jours ------------------------------------------------------------------
+     Les congés se comptent en jours, pas en secondes : on les manipule en
+     « AAAA-MM-JJ », ce qui se compare directement et ne dérive pas d'un fuseau
+     à l'autre. */
+
+  /** Le jour d'une date, dans le fuseau de la personne. */
+  function jourLocal(d) {
+    const x = d || new Date();
+    const p = n => String(n).padStart(2, "0");
+    return x.getFullYear() + "-" + p(x.getMonth() + 1) + "-" + p(x.getDate());
+  }
+
+  /** « AAAA-MM-JJ » si la valeur en est une, sinon "". */
+  function jour(v) {
+    const s = String(v || "").slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s)) ? s : "";
+  }
+
+  /** Nombre de jours couverts, bornes comprises. */
+  function nbJours(from, to) {
+    const a = new Date(from + "T12:00:00"), b = new Date(to + "T12:00:00");
+    if (isNaN(a) || isNaN(b)) return 0;
+    return Math.max(1, Math.round((b - a) / 86400000) + 1);
+  }
 
   /**
    * fetch avec délai maximum. Sans ça, une adresse mal saisie ou un serveur
@@ -65,7 +90,17 @@ window.MNDuty = (function () {
           /* conservé : c'est ce qui distingue un oubli clôturé par un gérant */
           forced: e.forced === true
         };
-      })
+      }),
+      conges: (Array.isArray(b.conges) ? b.conges : []).map(e => ({
+        id: String(e.id || ""),
+        pseudo: String(e.pseudo || "?"),
+        roleId: String(e.roleId || ""),
+        from: jour(e.from),
+        to: jour(e.to),
+        note: String(e.note || "").slice(0, 300),
+        by: String(e.by || ""),          // vide = la personne les a posés elle-même
+        at: e.at || null
+      })).filter(e => e.id && e.from && e.to && e.from <= e.to)
     };
   }
 
@@ -121,6 +156,25 @@ window.MNDuty = (function () {
   const board = () => _board || empty();
   const entryOf = uid => board().onDuty.find(e => e.id === uid) || null;
   const isOn = uid => !!entryOf(uid);
+
+  /** Les congés en cours ou à venir d'une personne (un seul bloc à la fois). */
+  const congeOf = uid => board().conges.find(e => e.id === uid) || null;
+
+  /** Cette personne est-elle en congés aujourd'hui ? */
+  function enConge(uid, le) {
+    const c = congeOf(uid);
+    const j = le || jourLocal();
+    return !!(c && c.from <= j && j <= c.to);
+  }
+
+  /** Tous les congés, du plus proche au plus lointain. Les passés sont écartés. */
+  function conges(tout) {
+    const j = jourLocal();
+    return board().conges
+      .filter(c => tout || c.to >= j)
+      .slice()
+      .sort((a, b) => a.from.localeCompare(b.from));
+  }
 
   const relayUrl = () => {
     try { return MNStore.api("relais"); }
@@ -185,6 +239,14 @@ window.MNDuty = (function () {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(op)
       });
+      /* Un serveur plus ancien ne connaît pas les opérations récentes : on
+         renvoie null pour que l'appelant reprenne le chemin « tableau entier »
+         plutôt que d'échouer. */
+      if (r.status === 400) {
+        const d = await r.json().catch(() => ({}));
+        if (/opération inconnue/i.test(d.error || "")) return null;
+        return { ok: false, error: d.error || "Serveur : erreur 400" };
+      }
       if (!r.ok) return { ok: false, error: "Serveur : erreur " + r.status };
       const j = await r.json();
       if (j.board) { _board = normalize(j.board); saveLocal(_board); }
@@ -376,6 +438,77 @@ window.MNDuty = (function () {
     return { shared: shared.ok, shareError: shared.error };
   }
 
+  /* ---- Congés ------------------------------------------------------------------
+     Une personne n'a qu'un bloc de congés à la fois : en reposer remplace le
+     précédent. C'est suffisant à l'échelle de l'atelier et ça évite d'avoir à
+     gérer des chevauchements. */
+
+  const nomRole = id => {
+    try { const r = MNStore.roleById(id); return r ? r.name : ""; }
+    catch (_) { return ""; }
+  };
+
+  /** Ce que le webhook a besoin de savoir sur un bloc de congés. */
+  const infosConge = (c, action, par) => ({
+    action, pseudo: c.pseudo, role: nomRole(c.roleId),
+    from: c.from, to: c.to, note: c.note,
+    days: nbJours(c.from, c.to),
+    by: par || ""
+  });
+
+  /**
+   * Pose ou remplace les congés de quelqu'un.
+   * @param {string} by  qui les pose, si ce n'est pas la personne elle-même
+   */
+  async function setConge(user, from, to, note, by) {
+    const a = jour(from), b2 = jour(to);
+    if (!a || !b2) return { error: "Dates invalides." };
+    if (a > b2) return { error: "La date de retour précède le départ." };
+
+    const entree = {
+      id: user.id, pseudo: user.pseudo, roleId: user.roleId || "",
+      from: a, to: b2, note: String(note || "").slice(0, 300),
+      by: by || "", at: new Date().toISOString()
+    };
+
+    let etat = await envoyerOp(Object.assign({ op: "leave-set" }, entree));
+    if (!etat) {
+      await load(true);
+      const b = board();
+      const i = b.conges.findIndex(e => e.id === user.id);
+      if (i === -1) b.conges.push(entree); else b.conges[i] = entree;
+      b.updatedAt = entree.at;
+      saveLocal(b);
+      etat = await push(b, "Congés de " + user.pseudo);
+    }
+
+    const discord = await MNWebhook.sendConge(infosConge(entree, "pose", by));
+    return { shared: etat.ok, shareError: etat.error, discord, conge: entree };
+  }
+
+  /** Annule les congés de quelqu'un. */
+  async function clearConge(uid, by) {
+    const avant = congeOf(uid);
+    if (!avant) return { already: true };
+
+    let etat = await envoyerOp({ op: "leave-clear", id: uid });
+    if (!etat) {
+      await load(true);
+      const b = board();
+      const i = b.conges.findIndex(e => e.id === uid);
+      if (i === -1) return { already: true };
+      b.conges.splice(i, 1);
+      b.updatedAt = new Date().toISOString();
+      saveLocal(b);
+      etat = await push(b, "Congés de " + avant.pseudo + " annulés");
+    } else if (etat.deja) {
+      return { already: true };
+    }
+
+    const discord = await MNWebhook.sendConge(infosConge(avant, "annule", by));
+    return { shared: etat.ok, shareError: etat.error, discord, pseudo: avant.pseudo };
+  }
+
   /** Efface l'historique des pointages terminés (les personnes en service restent). */
   async function clearLog(byPseudo) {
     const op = await envoyerOp({ op: "clear-log" });
@@ -494,6 +627,7 @@ window.MNDuty = (function () {
     load, board, isOn, entryOf, canShare, isAuto, relayUrl, baseUrl,
     souci: () => _souci,
     clockIn, clockOut, forceOut, forceIn, clearLog, removeLog,
+    conges, congeOf, enConge, setConge, clearConge, jourLocal, nbJours,
     logOf, secondsFor, weekStart,
     totals, dur, sinceDur, secBetween, minutesBetween
   };

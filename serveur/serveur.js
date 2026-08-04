@@ -37,7 +37,9 @@ const ORIGINES = String(process.env.ORIGINE || "*")
 
 const WEBHOOKS = {
   bt: process.env.WEBHOOK_BT || "",
-  duty: process.env.WEBHOOK_DUTY || ""
+  duty: process.env.WEBHOOK_DUTY || "",
+  /* Sans salon dédié, les congés rejoignent celui des prises de service. */
+  conges: process.env.WEBHOOK_CONGES || process.env.WEBHOOK_DUTY || ""
 };
 
 const MAX_CORPS = 512 * 1024;      // 512 ko suffisent largement
@@ -72,6 +74,28 @@ const texte = (v, max) => (typeof v === "string" ? v.slice(0, max) : "");
 const nombre = (v, min, max) => Math.min(max, Math.max(min, Math.round(Number(v) || 0)));
 const dateIso = v => { const d = new Date(v); return isNaN(d) ? null : d.toISOString(); };
 
+/** Les congés se comptent en jours : « AAAA-MM-JJ », ou null. */
+const jour = v => {
+  const s = typeof v === "string" ? v.slice(0, 10) : "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s)) ? s : null;
+};
+
+function nettoyerConge(e) {
+  const from = jour(e && e.from), to = jour(e && e.to);
+  if (!from || !to || from > to) return null;
+  const id = texte(e.id, 60);
+  if (!id) return null;
+  return {
+    id,
+    pseudo: texte(e.pseudo, 60) || "?",
+    roleId: texte(e.roleId, 60),
+    from, to,
+    note: texte(e.note, 300),
+    by: texte(e.by, 60),
+    at: dateIso(e.at) || new Date().toISOString()
+  };
+}
+
 /**
  * On ne réécrit que ce qui ressemble vraiment à un tableau de service.
  * Tout champ inattendu est jeté, toute chaîne est bornée.
@@ -80,7 +104,8 @@ function nettoyer(b) {
   if (!b || typeof b !== "object") return null;
   const onDuty = Array.isArray(b.onDuty) ? b.onDuty : [];
   const log = Array.isArray(b.log) ? b.log : [];
-  if (onDuty.length > 60 || log.length > 300) return null;
+  const conges = Array.isArray(b.conges) ? b.conges : [];
+  if (onDuty.length > 60 || log.length > 300 || conges.length > 60) return null;
 
   return {
     updatedAt: dateIso(b.updatedAt) || new Date().toISOString(),
@@ -99,11 +124,12 @@ function nettoyer(b) {
       seconds: nombre(e.seconds, 0, 31_536_000),
       minutes: nombre(e.minutes, 0, 525_600),
       forced: e.forced === true
-    })).filter(e => e.id && e.in && e.out)
+    })).filter(e => e.id && e.in && e.out),
+    conges: conges.map(nettoyerConge).filter(Boolean)
   };
 }
 
-const VIDE = { updatedAt: new Date(0).toISOString(), onDuty: [], log: [] };
+const VIDE = { updatedAt: new Date(0).toISOString(), onDuty: [], log: [], conges: [] };
 const MAX_LOG = 300;
 
 /* ---- Opérations de pointage, appliquées côté serveur -------------------------
@@ -118,7 +144,8 @@ function appliquer(board, op) {
   const b = {
     updatedAt: maintenant,
     onDuty: board.onDuty.slice(),
-    log: board.log.slice()
+    log: board.log.slice(),
+    conges: (board.conges || []).slice()
   };
 
   const id = texte(op.id, 60);
@@ -161,6 +188,22 @@ function appliquer(board, op) {
       const n = Math.round(Number(op.index));
       if (!(n >= 0 && n < b.log.length)) return { board: b, deja: true };
       b.log.splice(n, 1);
+      return { board: b };
+    }
+
+    /* Un seul bloc de congés par personne : reposer remplace le précédent. */
+    case "leave-set": {
+      const c = nettoyerConge(op);
+      if (!c) return { erreur: "congés invalides" };
+      const j = b.conges.findIndex(e => e.id === c.id);
+      if (j === -1) b.conges.push(c); else b.conges[j] = c;
+      return { board: b };
+    }
+
+    case "leave-clear": {
+      const j = b.conges.findIndex(e => e.id === id);
+      if (j === -1) return { board: b, deja: true };
+      b.conges.splice(j, 1);
       return { board: b };
     }
 

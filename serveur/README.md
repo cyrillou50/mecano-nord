@@ -105,6 +105,7 @@ Environment=DONNEES=/opt/mecano-nord/donnees
 Environment=ORIGINE=https://cyrillou50.github.io
 Environment=WEBHOOK_BT=https://discord.com/api/webhooks/…
 Environment=WEBHOOK_DUTY=https://discord.com/api/webhooks/…
+Environment=WEBHOOK_CONGES=https://discord.com/api/webhooks/…
 Environment=GH_TOKEN=github_pat_…
 Environment=GH_OWNER=cyrillou50
 Environment=GH_REPO=mecano-nord
@@ -113,6 +114,9 @@ Environment=GH_BRANCH=main
 [Install]
 WantedBy=multi-user.target
 ```
+
+`WEBHOOK_CONGES` est facultatif : sans lui, les départs en congés sont
+annoncés dans le salon des prises de service.
 
 `Ctrl+O`, `Entrée`, `Ctrl+X` pour enregistrer. Puis :
 

@@ -67,16 +67,27 @@
       '<h1 class="page-title">Service</h1>' +
       '<p class="page-sub">Pointage de l\'atelier</p>' +
 
-      (canPoint ? myCard(mine) : "") +
+      (canPoint ? myCard(mine) + myLeaveCard() : "") +
       (MNDuty.souci()
         ? '<div class="alert alert--err" style="margin-bottom:18px">' + svg("alert") +
           "<span><b>" + esc(MNDuty.souci()) + "</b> Le tableau affiché peut être incomplet. " +
           "Vérifie l'adresse dans le panneau admin (Publier → Pointage de l'équipe).</span></div>"
         : "") +
       (MNDuty.canShare() ? "" : shareWarning()) +
-      (canView ? boardPanel(onDuty, canManage) + statsPanel(canManage) : teamCount(onDuty));
+      (canView ? boardPanel(onDuty, canManage) + leavePanel(canManage) + statsPanel(canManage)
+               : teamCount(onDuty));
 
     if (canPoint) $("#d-toggle").addEventListener("click", toggle);
+
+    const cg = $("#d-conge");
+    if (cg) cg.addEventListener("click", () => askLeave(me.uid, me.pseudo, me.roleId));
+    const cgx = $("#d-conge-off");
+    if (cgx) cgx.addEventListener("click", () => dropLeave(me.uid, me.pseudo));
+    const cgp = $("#d-conge-other");
+    if (cgp) cgp.addEventListener("click", leaveForSomeone);
+
+    document.querySelectorAll("[data-rmconge]").forEach(b =>
+      b.addEventListener("click", () => dropLeave(b.dataset.rmconge, b.dataset.pseudo)));
     $("#d-reload").addEventListener("click", async () => {
       await MNDuty.load(true); render(); MNUI.toast("Tableau actualisé", "ok");
     });
@@ -110,6 +121,86 @@
       "</div>" +
       '<button class="btn ' + (on ? "btn--danger" : "btn--solid") + '" id="d-toggle">' +
         svg(on ? "logout" : "login") + "<span>" + (on ? "Quitter le service" : "Prendre mon service") + "</span></button>" +
+    "</div>";
+  }
+
+  /* ---- Congés ---------------------------------------------------------------- */
+
+  /** « 10 août » — l'année n'apparaît que si ce n'est pas l'année en cours. */
+  function jourCourt(j) {
+    const d = new Date(String(j) + "T12:00:00");     // midi : jamais de bascule de fuseau
+    if (isNaN(d)) return String(j);
+    const opts = { day: "numeric", month: "long" };
+    if (d.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
+    return d.toLocaleDateString("fr-FR", opts);
+  }
+
+  /** « du 10 au 20 août · 11 jours » */
+  function periode(c) {
+    return "du " + jourCourt(c.from) + " au " + jourCourt(c.to) +
+      " · " + MNDuty.nbJours(c.from, c.to) + " jour" + (MNDuty.nbJours(c.from, c.to) > 1 ? "s" : "");
+  }
+
+  function myLeaveCard() {
+    const c = MNDuty.congeOf(me.uid);
+    const now = c && MNDuty.enConge(me.uid);
+    return '<div class="pubstate pubstate--' + (c ? "ok" : "off") + '" style="margin-bottom:18px">' +
+      '<div class="pubstate__ico">' + svg(c ? "calendar" : "calendar") + "</div>" +
+      '<div class="pubstate__txt">' +
+        "<b>" + (c
+          ? (now ? "Tu es en congés" : "Congés prévus")
+          : "Aucun congé prévu") + "</b>" +
+        "<span>" + (c
+          ? esc(periode(c)) + (c.note ? " — " + esc(c.note) : "") +
+            (c.by ? ' <span class="permtag">posés par ' + esc(c.by) + "</span>" : "")
+          : "Préviens l'équipe de ton absence, les dates partent sur Discord.") + "</span>" +
+      "</div>" +
+      (c
+        ? '<button class="btn btn--ghost" id="d-conge-off">' + svg("x") + "<span>Annuler</span></button>"
+        : "") +
+      '<button class="btn ' + (c ? "btn--ghost" : "btn--solid") + '" id="d-conge">' +
+        svg(c ? "edit" : "calendar") + "<span>" + (c ? "Modifier" : "Poser des congés") + "</span></button>" +
+    "</div>";
+  }
+
+  function leavePanel(canManage) {
+    const list = MNDuty.conges();
+    return '<div class="panel" style="margin-bottom:18px">' +
+      '<div class="panel__head"><h2>Congés</h2>' +
+        '<span class="pill' + (list.length ? " pill--ok" : "") + '">' + list.length + "</span>" +
+        '<span class="spacer"></span>' +
+        (canManage
+          ? '<button class="btn btn--ghost btn--sm" id="d-conge-other">' + svg("calendar") +
+            "<span>Poser pour quelqu'un</span></button>"
+          : "") +
+      "</div>" +
+      '<div class="panel__body">' +
+        (list.length
+          ? '<div class="rows">' + list.map(c => leaveRow(c, canManage)).join("") + "</div>"
+          : '<div class="empty">' + svg("calendar") + "<b>Personne en congés</b>" +
+            "<p>Aucune absence prévue pour le moment.</p></div>") +
+      "</div></div>";
+  }
+
+  function leaveRow(c, canManage) {
+    const role = MNStore.roleById(c.roleId);
+    const now = MNDuty.enConge(c.id);
+    return '<div class="trow">' +
+      '<div class="userchip__av" style="width:38px;height:38px;flex:none' +
+        (role ? ";background:" + esc(role.color) : "") + '">' + esc(MNUI.initials(c.pseudo)) + "</div>" +
+      '<div class="trow__main"><b>' + esc(c.pseudo) + "</b>" +
+        '<div class="trow__meta">' +
+          (now ? '<span class="permtag permtag--on">en congés</span>' : "<em>à venir</em>") +
+          (role ? '<span class="permtag" style="border-color:' + esc(role.color) +
+                  ';color:' + esc(role.color) + '">' + esc(role.name) + "</span>" : "") +
+          (c.note ? "<i>" + esc(c.note) + "</i>" : "") +
+          (c.by ? "<i>posés par " + esc(c.by) + "</i>" : "") +
+        "</div></div>" +
+      '<span class="trow__price">' + esc(periode(c)) + "</span>" +
+      (canManage || c.id === me.uid
+        ? '<button class="btn btn--icon" data-rmconge="' + esc(c.id) + '" data-pseudo="' + esc(c.pseudo) +
+          '" title="Annuler ces congés">' + svg("x") + "</button>"
+        : "") +
     "</div>";
   }
 
@@ -327,6 +418,140 @@
     } finally {
       busy = false;
     }
+  }
+
+  /* ---- Actions congés --------------------------------------------------------- */
+
+  /**
+   * Saisie des dates. `uid` peut être quelqu'un d'autre : dans ce cas Discord
+   * précise qui les a posés.
+   */
+  function askLeave(uid, pseudo, roleId) {
+    const dejaLa = MNDuty.congeOf(uid);
+    const pourMoi = uid === me.uid;
+    const demain = new Date(Date.now() + 86400000);
+
+    const body = document.createElement("div");
+    body.innerHTML =
+      '<div class="editor__grid">' +
+        '<div class="field"><label class="label" for="cg-from">Premier jour d\'absence</label>' +
+          '<input class="input" id="cg-from" type="date" value="' +
+            esc(dejaLa ? dejaLa.from : MNDuty.jourLocal(demain)) + '"></div>' +
+        '<div class="field"><label class="label" for="cg-to">Dernier jour d\'absence</label>' +
+          '<input class="input" id="cg-to" type="date" value="' +
+            esc(dejaLa ? dejaLa.to : MNDuty.jourLocal(demain)) + '"></div>' +
+      "</div>" +
+      '<div class="field"><label class="label" for="cg-note">Motif (facultatif)</label>' +
+        '<input class="input" id="cg-note" maxlength="300" placeholder="Vacances, examens, indisponible…" value="' +
+          esc(dejaLa ? dejaLa.note : "") + '"></div>' +
+      '<p class="hint" id="cg-sum" style="margin-top:10px"></p>';
+
+    const from = body.querySelector("#cg-from");
+    const to = body.querySelector("#cg-to");
+    const sum = body.querySelector("#cg-sum");
+
+    /* Le récapitulatif sert aussi de garde-fou : on y lit tout de suite qu'une
+       date de retour antérieure au départ ne passera pas. */
+    const paint = () => {
+      if (!from.value || !to.value) { sum.textContent = "Choisis les deux dates."; return; }
+      if (from.value > to.value) {
+        sum.innerHTML = '<b style="color:var(--rose)">Le retour est avant le départ.</b>';
+        return;
+      }
+      const n = MNDuty.nbJours(from.value, to.value);
+      sum.innerHTML = "Absence du <b>" + esc(jourCourt(from.value)) + "</b> au <b>" +
+        esc(jourCourt(to.value)) + "</b> — <b>" + n + " jour" + (n > 1 ? "s" : "") + "</b>." +
+        (pourMoi ? "" : " Discord précisera que c'est toi qui les as posés.");
+    };
+    /* Le retour suit le départ quand il devient incohérent. */
+    from.addEventListener("change", () => { if (to.value < from.value) to.value = from.value; paint(); });
+    to.addEventListener("change", paint);
+    paint();
+
+    MNUI.modal({
+      title: pourMoi ? (dejaLa ? "Modifier mes congés" : "Poser des congés")
+                     : "Congés de " + pseudo,
+      body,
+      actions: [
+        { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
+        {
+          label: "Enregistrer", variant: "btn--primary", icon: "save",
+          onClick: async (close, b, btn) => {
+            if (!from.value || !to.value) return MNUI.toast("Choisis les deux dates", "err");
+            if (from.value > to.value) return MNUI.toast("Le retour est avant le départ", "err");
+
+            btn.disabled = true;
+            btn.innerHTML = svg("refresh") + "<span>Un instant…</span>";
+            const r = await MNDuty.setConge(
+              { id: uid, pseudo, roleId: roleId || "" },
+              from.value, to.value, body.querySelector("#cg-note").value.trim(),
+              pourMoi ? "" : me.pseudo
+            );
+            if (r.error) {
+              btn.disabled = false;
+              btn.innerHTML = svg("save") + "<span>Enregistrer</span>";
+              return MNUI.toast(r.error, "err");
+            }
+            close(); render();
+            MNUI.toast(leaveToast("Congés enregistrés", r), r.discord && r.discord.ok !== false ? "ok" : "info");
+          }
+        }
+      ]
+    });
+  }
+
+  /** Assemble le retour d'une action de congés en une seule ligne. */
+  function leaveToast(tete, r) {
+    const bits = [tete];
+    if (r.discord && r.discord.skipped) bits.push("webhook Discord non configuré");
+    else if (r.discord && !r.discord.ok) bits.push("Discord : " + r.discord.error);
+    if (!r.shared && MNDuty.canShare()) bits.push("partage : " + (r.shareError || "échec"));
+    return bits.join(" · ");
+  }
+
+  async function dropLeave(uid, pseudo) {
+    const ok = await MNUI.confirm({
+      title: "Annuler les congés",
+      message: uid === me.uid
+        ? "Tes congés seront retirés du tableau et l'équipe prévenue sur Discord."
+        : "Les congés de « " + pseudo + " » seront retirés et l'équipe prévenue sur Discord.",
+      confirmLabel: "Annuler les congés", danger: true
+    });
+    if (!ok) return;
+
+    const r = await MNDuty.clearConge(uid, uid === me.uid ? "" : me.pseudo);
+    render();
+    MNUI.toast(r.already ? "Il n'y avait plus de congés" : leaveToast("Congés annulés", r),
+      r.already ? "info" : "ok");
+  }
+
+  /** Poser des congés pour un employé (gérant). */
+  function leaveForSomeone() {
+    const gens = MNStore.catalog().users.filter(u => u.active);
+    if (!gens.length) return MNUI.toast("Aucun employé actif", "info");
+
+    const body = document.createElement("div");
+    body.innerHTML =
+      '<div class="field"><label class="label" for="cgk">Employé</label>' +
+        '<select class="select" id="cgk">' + gens.map(u =>
+          '<option value="' + esc(u.id) + '">' + esc(u.pseudo) + " — " +
+          esc(MNStore.roleOf(u).name) +
+          (MNDuty.congeOf(u.id) ? " (congés déjà posés)" : "") + "</option>").join("") + "</select></div>";
+
+    MNUI.modal({
+      title: "Poser des congés", body,
+      actions: [
+        { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
+        {
+          label: "Continuer", variant: "btn--primary",
+          onClick: (close) => {
+            const u = gens.find(x => x.id === body.querySelector("#cgk").value);
+            close();
+            if (u) askLeave(u.id, u.pseudo, u.roleId);
+          }
+        }
+      ]
+    });
   }
 
   /** Mettre quelqu'un en service à sa place. */

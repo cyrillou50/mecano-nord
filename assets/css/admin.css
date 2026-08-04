@@ -258,6 +258,8 @@
   white-space: nowrap;
 }
 .permtag--none { background: rgba(255, 255, 255, .04); border-color: var(--line); color: var(--dim); }
+/* congés en cours : la même pastille, en bleu */
+.permtag--on { background: rgba(127, 215, 232, .12); border-color: rgba(127, 215, 232, .32); color: #a8e6f2; }
 
 /* ---- Publication ---------------------------------------------------------- */
 

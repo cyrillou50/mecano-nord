@@ -23,8 +23,10 @@
 
         GH_TOKEN     →  un jeton GitHub fine-grained, dépôt du site,
                         permission « Contents : Read and write »
-        WEBHOOK_BT   →  adresse Discord des bons de travail   (facultatif)
-        WEBHOOK_DUTY →  adresse Discord des prises de service (facultatif)
+        WEBHOOK_BT     →  adresse Discord des bons de travail   (facultatif)
+        WEBHOOK_DUTY   →  adresse Discord des prises de service (facultatif)
+        WEBHOOK_CONGES →  adresse Discord des congés (facultatif ; sans elle,
+                          les congés partent dans le salon des services)
 
       Et en type « Text » :
 
@@ -84,7 +86,12 @@ export default {
 /* ---- 1. Webhooks Discord ---------------------------------------------------- */
 
 async function relayerWebhook(corps, env, entetes) {
-  const cibles = { bt: env.WEBHOOK_BT, duty: env.WEBHOOK_DUTY };
+  const cibles = {
+    bt: env.WEBHOOK_BT,
+    duty: env.WEBHOOK_DUTY,
+    /* Sans salon dédié, les congés rejoignent celui des prises de service. */
+    conges: env.WEBHOOK_CONGES || env.WEBHOOK_DUTY
+  };
   const cible = cibles[corps.kind];
   if (!cible) return json({ error: "Webhook non configuré : " + corps.kind }, 400, entetes);
 
