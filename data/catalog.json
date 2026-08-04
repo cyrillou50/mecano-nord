@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-04T11:44:26.572Z",
+  "updatedAt": "2026-08-04T12:53:06.540Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -395,7 +395,7 @@
       "excludes": [],
       "cost": {
         "verre": 8,
-        "plastique": 30
+        "plastique": 25
       }
     },
     {
@@ -410,7 +410,7 @@
       "cost": {
         "ferraille": 60,
         "piece-detachee": 90,
-        "plastique": 80
+        "plastique": 75
       }
     },
     {
@@ -433,7 +433,7 @@
       "category": "kits",
       "icon": "assets/img/meca_peinture.png",
       "enabled": true,
-      "note": "(Couleur et vitre teintée)",
+      "note": "(Couleur et vitre teintée HORS fumée de pneus))",
       "max": 0,
       "excludes": [],
       "cost": {
@@ -465,7 +465,7 @@
       "max": 1,
       "excludes": [],
       "cost": {
-        "plastique": 120
+        "plastique": 125
       }
     },
     {
@@ -476,7 +476,10 @@
       "enabled": true,
       "note": "",
       "max": 1,
-      "excludes": [],
+      "excludes": [
+        "jantes-voitures",
+        "jantes-camions"
+      ],
       "cost": {
         "roue-moto": 2
       }
@@ -489,7 +492,9 @@
       "enabled": true,
       "note": "",
       "max": 1,
-      "excludes": [],
+      "excludes": [
+        "jantes-camions"
+      ],
       "cost": {
         "roue-voiture": 4
       }
