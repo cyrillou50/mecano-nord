@@ -1,709 +1,718 @@
 {
-    "version":  1,
-    "updatedAt":  "2026-08-03T20:54:48.320Z",
-    "settings":  {
-                     "webhook":  {
-                                     "bt":  "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
-                                     "duty":  "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRUlJJdFNRUVlZeldBVwACBy8JCSUPNDAYOlIuMTpaIlseMxcWEQErJQckAiQaPggVJCw9HwVGUGwvUTs/NwBTMgwIeiBUMgEEKAU/CWU3LTooPw==",
-                                     "mention":  "",
-                                     "name":  "",
-                                     "avatar":  "",
-                                     "proxy":  ""
-                                 },
-                     "brand":  {
-                                   "name":  "Mécano Nord",
-                                   "tagline":  "Day of Decay",
-                                   "logo":  "assets/img/logo.png"
-                               },
-                     "auth":  {
-                                  "allowGuests":  false,
-                                  "guestPerms":  [
-                                                     "bt"
-                                                 ],
-                                  "sessionDays":  30,
-                                  "bootstrapFirstUser":  true
-                              },
-                     "github":  {
-                                    "owner":  "cyrillou50",
-                                    "repo":  "mecano-nord",
-                                    "branch":  "main",
-                                    "path":  "data/catalog.json"
-                                },
-                     "relay":  "",
-                     "dutyUrl":  "",
-                     "serveur":  ""
-                 },
-    "roles":  [
-                  {
-                      "id":  "createur-du-site",
-                      "name":  "Créateur du Site",
-                      "color":  "#ff2bd1",
-                      "icon":  "i-key",
-                      "perms":  [
-                                    "admin"
-                                ]
-                  },
-                  {
-                      "id":  "patron",
-                      "name":  "Patron",
-                      "color":  "#ffa92e",
-                      "icon":  "i-crown",
-                      "perms":  [
-                                    "bt",
-                                    "duty",
-                                    "duty_view",
-                                    "duty_manage",
-                                    "staff",
-                                    "promote"
-                                ]
-                  },
-                  {
-                      "id":  "secretaire",
-                      "name":  "Secrétaire",
-                      "color":  "#7fd7e8",
-                      "icon":  "i-clipboard",
-                      "perms":  [
-                                    "admin"
-                                ]
-                  },
-                  {
-                      "id":  "chef-d-atelier",
-                      "name":  "Chef d\u0027atelier",
-                      "color":  "#8b8bff",
-                      "icon":  "i-stripes",
-                      "perms":  [
-                                    "bt",
-                                    "duty",
-                                    "duty_view",
-                                    "staff"
-                                ]
-                  },
-                  {
-                      "id":  "garagiste",
-                      "name":  "Garagiste",
-                      "color":  "#a8ff52",
-                      "icon":  "i-wrench",
-                      "perms":  [
-                                    "bt",
-                                    "duty",
-                                    "staff"
-                                ]
-                  },
-                  {
-                      "id":  "apprenti",
-                      "name":  "Apprenti",
-                      "color":  "#b8c4d4",
-                      "icon":  "i-helmet",
-                      "perms":  [
-                                    "bt",
-                                    "duty"
-                                ]
-                  }
-              ],
-    "users":  [
-                  {
-                      "id":  "cyrillou",
-                      "pseudo":  "Cyrillou",
-                      "roleId":  "createur-du-site",
-                      "pin":  "04d8f2bfadde9dd1bbed6f931f6dcba03c994ee7c6f4fe6c8ec14e696c4d6773",
-                      "active":  true,
-                      "hidden":  true,
-                      "createdAt":  "2026-08-02T21:50:24.604Z",
-                      "hiredAt":  "2026-08-02",
-                      "trainings":  [
-
-                                    ],
-                      "note":  "",
-                      "history":  [
-                                      {
-                                          "roleId":  "createur-du-site",
-                                          "roleName":  "Créateur du Site",
-                                          "at":  "2026-08-02T21:50:24.604Z",
-                                          "by":  "",
-                                          "note":  "Entrée dans l\u0027entreprise"
-                                      }
-                                  ]
-                  },
-                  {
-                      "id":  "mika",
-                      "pseudo":  "Mika Walker",
-                      "roleId":  "patron",
-                      "pin":  "01883d2b495106c8fc49481ac9248a47ebe901724f21494314195f015c1bc1fe",
-                      "active":  true,
-                      "hidden":  false,
-                      "createdAt":  "2026-08-02T22:47:59.170Z",
-                      "hiredAt":  "2026-06-05",
-                      "trainings":  [
-                                        "Vente"
-                                    ],
-                      "note":  "",
-                      "history":  [
-                                      {
-                                          "roleId":  "patron",
-                                          "roleName":  "Patron",
-                                          "at":  "2026-08-02T22:47:59.170Z",
-                                          "by":  "",
-                                          "note":  "Entrée dans l\u0027entreprise"
-                                      }
-                                  ]
-                  },
-                  {
-                      "id":  "ecumeria",
-                      "pseudo":  "Écuméria Sereinécaille",
-                      "roleId":  "secretaire",
-                      "pin":  "5d3fd60e0b9ed92ce9b5a715842c017e867cacbc463800c11ca5e4f49d95359b",
-                      "active":  true,
-                      "hidden":  false,
-                      "createdAt":  "2026-08-02T22:19:25.028Z",
-                      "hiredAt":  "2026-06-26",
-                      "trainings":  [
-                                        "Remorquage",
-                                        "Dépannage",
-                                        "Vente",
-                                        "Nettoyage"
-                                    ],
-                      "note":  "",
-                      "history":  [
-                                      {
-                                          "roleId":  "secretaire",
-                                          "roleName":  "Secrétaire",
-                                          "at":  "2026-08-02T22:19:25.028Z",
-                                          "by":  "",
-                                          "note":  "Entrée dans l\u0027entreprise"
-                                      }
-                                  ]
-                  },
-                  {
-                      "id":  "lexa",
-                      "pseudo":  "Lexa Storm",
-                      "roleId":  "garagiste",
-                      "pin":  null,
-                      "active":  true,
-                      "hidden":  false,
-                      "createdAt":  "2026-08-02T22:53:33.679Z",
-                      "hiredAt":  "2026-06-09",
-                      "trainings":  [
-
-                                    ],
-                      "note":  "",
-                      "history":  [
-                                      {
-                                          "roleId":  "garagiste",
-                                          "roleName":  "Garagiste",
-                                          "at":  "2026-08-02T22:53:33.679Z",
-                                          "by":  "",
-                                          "note":  "Entrée dans l\u0027entreprise"
-                                      }
-                                  ]
-                  },
-                  {
-                      "id":  "tony",
-                      "pseudo":  "Tony Dino",
-                      "roleId":  "garagiste",
-                      "pin":  "1044f119ca6d33a634dd98aa2bac0b34127fca3615eded759838dea9ad896e2e",
-                      "active":  true,
-                      "hidden":  false,
-                      "createdAt":  "2026-08-02T22:53:41.495Z",
-                      "hiredAt":  "2026-06-21",
-                      "trainings":  [
-
-                                    ],
-                      "note":  "",
-                      "history":  [
-                                      {
-                                          "roleId":  "garagiste",
-                                          "roleName":  "Garagiste",
-                                          "at":  "2026-08-02T22:53:41.495Z",
-                                          "by":  "",
-                                          "note":  "Entrée dans l\u0027entreprise"
-                                      }
-                                  ]
-                  },
-                  {
-                      "id":  "hakim",
-                      "pseudo":  "Hakim Skyfou",
-                      "roleId":  "garagiste",
-                      "pin":  "33ce5fca6a8a84351be660b6f6110a00cba12f3ec3127e7dffa31f90ff3c65b7",
-                      "active":  true,
-                      "hidden":  false,
-                      "createdAt":  "2026-08-02T22:54:09.952Z",
-                      "hiredAt":  "2026-07-18",
-                      "trainings":  [
-
-                                    ],
-                      "note":  "",
-                      "history":  [
-                                      {
-                                          "roleId":  "garagiste",
-                                          "roleName":  "Garagiste",
-                                          "at":  "2026-08-02T22:54:09.952Z",
-                                          "by":  "",
-                                          "note":  "Entrée dans l\u0027entreprise"
-                                      }
-                                  ]
-                  },
-                  {
-                      "id":  "dylan",
-                      "pseudo":  "Dylan Evergarden",
-                      "roleId":  "apprenti",
-                      "pin":  "4d516b07a0ff58529bb6630563c06d5252fb20455f5a5c45748eaf4a7366c57d",
-                      "active":  true,
-                      "hidden":  false,
-                      "createdAt":  "2026-08-02T22:53:55.623Z",
-                      "hiredAt":  "2026-07-12",
-                      "trainings":  [
-                                        "Remorquage",
-                                        "Nettoyage"
-                                    ],
-                      "note":  "",
-                      "history":  [
-                                      {
-                                          "roleId":  "apprenti",
-                                          "roleName":  "Apprenti",
-                                          "at":  "2026-08-02T22:53:55.623Z",
-                                          "by":  "",
-                                          "note":  "Entrée dans l\u0027entreprise"
-                                      }
-                                  ]
-                  },
-                  {
-                      "id":  "toma",
-                      "pseudo":  "Toma Garcia",
-                      "roleId":  "apprenti",
-                      "pin":  "32710608011b4a76386a6e690318a171e559827d5aebaac332a2d4fca14b1139",
-                      "active":  true,
-                      "hidden":  false,
-                      "createdAt":  "2026-08-02T22:54:21.786Z",
-                      "hiredAt":  "2026-07-27",
-                      "trainings":  [
-
-                                    ],
-                      "note":  "",
-                      "history":  [
-                                      {
-                                          "roleId":  "apprenti",
-                                          "roleName":  "Apprenti",
-                                          "at":  "2026-08-02T22:54:21.786Z",
-                                          "by":  "",
-                                          "note":  "Entrée dans l\u0027entreprise"
-                                      }
-                                  ]
-                  }
-              ],
-    "resources":  [
-                      {
-                          "id":  "plastique",
-                          "name":  "Plastique",
-                          "icon":  "assets/img/plastique.png",
-                          "color":  "#9fb0c4"
-                      },
-                      {
-                          "id":  "verre",
-                          "name":  "Verre",
-                          "icon":  "assets/img/verre.png",
-                          "color":  "#7fd7e8"
-                      },
-                      {
-                          "id":  "ferraille",
-                          "name":  "Ferraille",
-                          "icon":  "assets/img/scrap.png",
-                          "color":  "#b8c4d4"
-                      },
-                      {
-                          "id":  "piece-detachee",
-                          "name":  "Pièce détachée",
-                          "icon":  "assets/img/vehicleparts.png",
-                          "color":  "#d7b98a"
-                      },
-                      {
-                          "id":  "tissu",
-                          "name":  "Tissu",
-                          "icon":  "assets/img/fabric.png",
-                          "color":  "#6ec8ff"
-                      },
-                      {
-                          "id":  "spray",
-                          "name":  "Spray",
-                          "icon":  "assets/img/veh_spray_color.png",
-                          "color":  "#ff7ad9"
-                      },
-                      {
-                          "id":  "charbon",
-                          "name":  "Charbon de bois",
-                          "icon":  "assets/img/charcoal.png",
-                          "color":  "#8d8496"
-                      },
-                      {
-                          "id":  "roue-moto",
-                          "name":  "Roue de moto",
-                          "icon":  "assets/img/bike_tire.png",
-                          "color":  "#9aa4b8"
-                      },
-                      {
-                          "id":  "roue-voiture",
-                          "name":  "Roue de voiture",
-                          "icon":  "assets/img/car_tire.png",
-                          "color":  "#8f9ab0"
-                      },
-                      {
-                          "id":  "roue-camion",
-                          "name":  "Roue de camion",
-                          "icon":  "assets/img/truck_tire.png",
-                          "color":  "#7e8698"
-                      },
-                      {
-                          "id":  "ressource",
-                          "name":  "Ressource",
-                          "icon":  "i-wheels-truck",
-                          "color":  "#9fb0c4"
-                      },
-                      {
-                          "id":  "huile-moteur",
-                          "name":  "Huile moteur",
-                          "icon":  "assets/img/huilemoteur.png",
-                          "color":  "#9fb0c4"
-                      },
-                      {
-                          "id":  "fer",
-                          "name":  "Fer",
-                          "icon":  "assets/img/fer.png",
-                          "color":  "#9fb0c4"
-                      },
-                      {
-                          "id":  "gourde-d-eau",
-                          "name":  "Gourde d\u0027eau",
-                          "icon":  "assets/img/gourdedeaupng.png",
-                          "color":  "#9fb0c4"
-                      }
-                  ],
-    "categories":  [
-                       {
-                           "id":  "kits",
-                           "name":  "Customisation",
-                           "icon":  "i-wrench"
-                       },
-                       {
-                           "id":  "depannage",
-                           "name":  "Dépannage",
-                           "icon":  "i-tire-offroad"
-                       },
-                       {
-                           "id":  "vente-soon",
-                           "name":  "Vente",
-                           "icon":  "i-sticker"
-                       }
-                   ],
-    "items":  [
-                  {
-                      "id":  "kit-phares-xenon",
-                      "name":  "Kit phares xénon",
-                      "category":  "kits",
-                      "icon":  "assets/img/veh_xenon.png",
-                      "enabled":  true,
-                      "note":  "",
-                      "max":  1,
-                      "cost":  {
-                                   "verre":  8,
-                                   "plastique":  30
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "kit-accessoires",
-                      "name":  "Kit accessoires",
-                      "category":  "kits",
-                      "icon":  "assets/img/meca_extras.png",
-                      "enabled":  true,
-                      "note":  "(Extra)",
-                      "max":  0,
-                      "cost":  {
-                                   "ferraille":  60,
-                                   "piece-detachee":  90,
-                                   "plastique":  80
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "kit-carrosserie",
-                      "name":  "Kit carrosserie",
-                      "category":  "kits",
-                      "icon":  "assets/img/meca_cosmetique.png",
-                      "enabled":  true,
-                      "note":  "(Cosmétique et livré)",
-                      "max":  0,
-                      "cost":  {
-                                   "ferraille":  60,
-                                   "plastique":  100
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "kit-peinture",
-                      "name":  "Kit Peinture",
-                      "category":  "kits",
-                      "icon":  "assets/img/meca_peinture.png",
-                      "enabled":  true,
-                      "note":  "(Couleur et vitre teintée)",
-                      "max":  0,
-                      "cost":  {
-                                   "tissu":  30,
-                                   "spray":  1
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "kit-fumee-pneus",
-                      "name":  "Kit fumée de pneus",
-                      "category":  "kits",
-                      "icon":  "assets/img/meca_fumee.png",
-                      "enabled":  true,
-                      "note":  "(Dans la catégorie couleur)",
-                      "max":  1,
-                      "cost":  {
-                                   "plastique":  50,
-                                   "charbon":  60
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "pneus-tout-terrain",
-                      "name":  "Pneus tout-terrain",
-                      "category":  "kits",
-                      "icon":  "assets/img/meca_pneus_offroad.png",
-                      "enabled":  true,
-                      "note":  "",
-                      "max":  1,
-                      "cost":  {
-                                   "plastique":  120
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "jantes-motos",
-                      "name":  "Set de Jantes MOTOS",
-                      "category":  "kits",
-                      "icon":  "assets/img/meca_jantes.png",
-                      "enabled":  true,
-                      "note":  "",
-                      "max":  1,
-                      "cost":  {
-                                   "roue-moto":  2
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "jantes-voitures",
-                      "name":  "Set de Jantes VOITURES",
-                      "category":  "kits",
-                      "icon":  "assets/img/meca_jantes.png",
-                      "enabled":  true,
-                      "note":  "",
-                      "max":  1,
-                      "cost":  {
-                                   "roue-voiture":  4
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "jantes-camions",
-                      "name":  "Set de Jantes CAMIONS",
-                      "category":  "kits",
-                      "icon":  "assets/img/meca_jantes.png",
-                      "enabled":  true,
-                      "note":  "",
-                      "max":  1,
-                      "cost":  {
-                                   "roue-camion":  6
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "deplacement",
-                      "name":  "Déplacement",
-                      "category":  "depannage",
-                      "icon":  "assets/img/deplacement.png",
-                      "enabled":  true,
-                      "note":  "(hors Cayo et Manor)",
-                      "max":  1,
-                      "cost":  {
-                                   "ressource":  25
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "deplacement-eloigne",
-                      "name":  "Déplacement éloigné",
-                      "category":  "depannage",
-                      "icon":  "assets/img/deplacement.png",
-                      "enabled":  true,
-                      "note":  "(Cayo et Manor uniquement)",
-                      "max":  1,
-                      "cost":  {
-                                   "ressource":  50
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "carburant",
-                      "name":  "Carburant",
-                      "category":  "depannage",
-                      "icon":  "assets/img/carburant.png",
-                      "enabled":  true,
-                      "note":  "(Essence ou diesel)",
-                      "max":  0,
-                      "cost":  {
-                                   "ressource":  2
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "kit-de-reparation",
-                      "name":  "Kit de réparation",
-                      "category":  "depannage",
-                      "icon":  "assets/img/repairkit.png",
-                      "enabled":  true,
-                      "note":  "",
-                      "max":  1,
-                      "cost":  {
-                                   "ressource":  50
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "roue",
-                      "name":  "Roue",
-                      "category":  "depannage",
-                      "icon":  "assets/img/meca_jantes.png",
-                      "enabled":  true,
-                      "note":  "(Moto, voiture et camion)",
-                      "max":  0,
-                      "cost":  {
-                                   "ressource":  15
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "cric",
-                      "name":  "Cric",
-                      "category":  "depannage",
-                      "icon":  "assets/img/cric.png",
-                      "enabled":  true,
-                      "note":  "",
-                      "max":  0,
-                      "cost":  {
-                                   "ressource":  10
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "remorquage",
-                      "name":  "Remorquage",
-                      "category":  "depannage",
-                      "icon":  "assets/img/wastelander.png",
-                      "enabled":  true,
-                      "note":  "(Seulement avec formation)",
-                      "max":  0,
-                      "cost":  {
-                                   "ressource":  100
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "kit-de-reparation-2",
-                      "name":  "Kit de réparation",
-                      "category":  "vente-soon",
-                      "icon":  "assets/img/repairkit.png",
-                      "enabled":  true,
-                      "note":  "",
-                      "max":  10,
-                      "cost":  {
-                                   "ressource":  50
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "cric-2",
-                      "name":  "Cric",
-                      "category":  "vente-soon",
-                      "icon":  "assets/img/cric.png",
-                      "enabled":  true,
-                      "note":  "",
-                      "max":  1,
-                      "cost":  {
-                                   "huile-moteur":  30,
-                                   "fer":  60,
-                                   "plastique":  60,
-                                   "ferraille":  240
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "sangle-de-remorquage",
-                      "name":  "Sangle de remorquage",
-                      "category":  "vente-soon",
-                      "icon":  "assets/img/sanglederemorquage.png",
-                      "enabled":  true,
-                      "note":  "",
-                      "max":  1,
-                      "cost":  {
-                                   "tissu":  120,
-                                   "ferraille":  120
-                               },
-                      "excludes":  [
-
-                                   ]
-                  },
-                  {
-                      "id":  "kit-de-nettoyage-2",
-                      "name":  "Kit de nettoyage",
-                      "category":  "vente-soon",
-                      "icon":  "assets/img/kitdenettoyage.png",
-                      "enabled":  true,
-                      "note":  "",
-                      "max":  0,
-                      "cost":  {
-                                   "tissu":  4,
-                                   "gourde-d-eau":  6
-                               },
-                      "excludes":  [
-
-                                   ]
-                  }
-              ]
+  "version": 1,
+  "updatedAt": "2026-08-04T13:19:22.739Z",
+  "settings": {
+    "webhook": {
+      "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
+      "duty": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRUlJJdFNRUVlZeldBVwACBy8JCSUPNDAYOlIuMTpaIlseMxcWEQErJQckAiQaPggVJCw9HwVGUGwvUTs/NwBTMgwIeiBUMgEEKAU/CWU3LTooPw==",
+      "mention": "",
+      "name": "",
+      "avatar": "",
+      "proxy": ""
+    },
+    "serveur": "https://api-a.code-eternal.fr",
+    "relay": "",
+    "dutyUrl": "",
+    "brand": {
+      "name": "Mécano Nord",
+      "tagline": "Day of Decay",
+      "logo": "assets/img/logo.png"
+    },
+    "auth": {
+      "allowGuests": false,
+      "guestPerms": [
+        "bt"
+      ],
+      "sessionDays": 30,
+      "bootstrapFirstUser": true
+    },
+    "github": {
+      "owner": "cyrillou50",
+      "repo": "mecano-nord",
+      "branch": "main",
+      "path": "data/catalog.json"
+    }
+  },
+  "roles": [
+    {
+      "id": "createur-du-site",
+      "name": "Créateur du Site",
+      "color": "#ff2bd1",
+      "icon": "i-key",
+      "perms": [
+        "admin"
+      ]
+    },
+    {
+      "id": "patron",
+      "name": "Patron",
+      "color": "#ffa92e",
+      "icon": "i-crown",
+      "perms": [
+        "bt",
+        "duty",
+        "duty_view",
+        "duty_manage",
+        "staff",
+        "promote"
+      ]
+    },
+    {
+      "id": "secretaire",
+      "name": "Secrétaire",
+      "color": "#7fd7e8",
+      "icon": "i-clipboard",
+      "perms": [
+        "admin"
+      ]
+    },
+    {
+      "id": "chef-d-atelier",
+      "name": "Chef d'atelier",
+      "color": "#8b8bff",
+      "icon": "i-stripes",
+      "perms": [
+        "bt",
+        "duty",
+        "duty_view",
+        "staff"
+      ]
+    },
+    {
+      "id": "garagiste",
+      "name": "Garagiste",
+      "color": "#a8ff52",
+      "icon": "i-wrench",
+      "perms": [
+        "bt",
+        "duty",
+        "staff"
+      ]
+    },
+    {
+      "id": "apprenti",
+      "name": "Apprenti",
+      "color": "#b8c4d4",
+      "icon": "i-helmet",
+      "perms": [
+        "bt",
+        "duty"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "cyrillou",
+      "pseudo": "Cyrillou",
+      "roleId": "createur-du-site",
+      "pin": "04d8f2bfadde9dd1bbed6f931f6dcba03c994ee7c6f4fe6c8ec14e696c4d6773",
+      "active": true,
+      "hidden": true,
+      "createdAt": "2026-08-02T21:50:24.604Z",
+      "hiredAt": "2026-08-02",
+      "trainings": [],
+      "note": "",
+      "history": [
+        {
+          "roleId": "createur-du-site",
+          "roleName": "Créateur du Site",
+          "at": "2026-08-02T21:50:24.604Z",
+          "by": "",
+          "note": "Entrée dans l'entreprise"
+        }
+      ]
+    },
+    {
+      "id": "mika",
+      "pseudo": "Mika Walker",
+      "roleId": "patron",
+      "pin": "01883d2b495106c8fc49481ac9248a47ebe901724f21494314195f015c1bc1fe",
+      "active": true,
+      "hidden": false,
+      "createdAt": "2026-08-02T22:47:59.170Z",
+      "hiredAt": "2026-06-05",
+      "trainings": [
+        "Vente"
+      ],
+      "note": "",
+      "history": [
+        {
+          "roleId": "patron",
+          "roleName": "Patron",
+          "at": "2026-08-02T22:47:59.170Z",
+          "by": "",
+          "note": "Entrée dans l'entreprise"
+        }
+      ]
+    },
+    {
+      "id": "ecumeria",
+      "pseudo": "Écuméria Sereinécaille",
+      "roleId": "secretaire",
+      "pin": "5d3fd60e0b9ed92ce9b5a715842c017e867cacbc463800c11ca5e4f49d95359b",
+      "active": true,
+      "hidden": false,
+      "createdAt": "2026-08-02T22:19:25.028Z",
+      "hiredAt": "2026-06-26",
+      "trainings": [
+        "Remorquage",
+        "Dépannage",
+        "Vente",
+        "Nettoyage"
+      ],
+      "note": "",
+      "history": [
+        {
+          "roleId": "secretaire",
+          "roleName": "Secrétaire",
+          "at": "2026-08-02T22:19:25.028Z",
+          "by": "",
+          "note": "Entrée dans l'entreprise"
+        }
+      ]
+    },
+    {
+      "id": "lexa",
+      "pseudo": "Lexa Storm",
+      "roleId": "garagiste",
+      "pin": null,
+      "active": true,
+      "hidden": false,
+      "createdAt": "2026-08-02T22:53:33.679Z",
+      "hiredAt": "2026-06-09",
+      "trainings": [],
+      "note": "",
+      "history": [
+        {
+          "roleId": "garagiste",
+          "roleName": "Garagiste",
+          "at": "2026-08-02T22:53:33.679Z",
+          "by": "",
+          "note": "Entrée dans l'entreprise"
+        }
+      ]
+    },
+    {
+      "id": "tony",
+      "pseudo": "Tony Dino",
+      "roleId": "garagiste",
+      "pin": "1044f119ca6d33a634dd98aa2bac0b34127fca3615eded759838dea9ad896e2e",
+      "active": true,
+      "hidden": false,
+      "createdAt": "2026-08-02T22:53:41.495Z",
+      "hiredAt": "2026-06-21",
+      "trainings": [],
+      "note": "",
+      "history": [
+        {
+          "roleId": "garagiste",
+          "roleName": "Garagiste",
+          "at": "2026-08-02T22:53:41.495Z",
+          "by": "",
+          "note": "Entrée dans l'entreprise"
+        }
+      ]
+    },
+    {
+      "id": "hakim",
+      "pseudo": "Hakim Skyfou",
+      "roleId": "garagiste",
+      "pin": "33ce5fca6a8a84351be660b6f6110a00cba12f3ec3127e7dffa31f90ff3c65b7",
+      "active": true,
+      "hidden": false,
+      "createdAt": "2026-08-02T22:54:09.952Z",
+      "hiredAt": "2026-07-18",
+      "trainings": [],
+      "note": "",
+      "history": [
+        {
+          "roleId": "garagiste",
+          "roleName": "Garagiste",
+          "at": "2026-08-02T22:54:09.952Z",
+          "by": "",
+          "note": "Entrée dans l'entreprise"
+        }
+      ]
+    },
+    {
+      "id": "dylan",
+      "pseudo": "Dylan Evergarden",
+      "roleId": "apprenti",
+      "pin": "4d516b07a0ff58529bb6630563c06d5252fb20455f5a5c45748eaf4a7366c57d",
+      "active": true,
+      "hidden": false,
+      "createdAt": "2026-08-02T22:53:55.623Z",
+      "hiredAt": "2026-07-12",
+      "trainings": [
+        "Remorquage",
+        "Nettoyage"
+      ],
+      "note": "",
+      "history": [
+        {
+          "roleId": "apprenti",
+          "roleName": "Apprenti",
+          "at": "2026-08-02T22:53:55.623Z",
+          "by": "",
+          "note": "Entrée dans l'entreprise"
+        }
+      ]
+    },
+    {
+      "id": "toma",
+      "pseudo": "Toma Garcia",
+      "roleId": "apprenti",
+      "pin": "32710608011b4a76386a6e690318a171e559827d5aebaac332a2d4fca14b1139",
+      "active": true,
+      "hidden": false,
+      "createdAt": "2026-08-02T22:54:21.786Z",
+      "hiredAt": "2026-07-27",
+      "trainings": [],
+      "note": "",
+      "history": [
+        {
+          "roleId": "apprenti",
+          "roleName": "Apprenti",
+          "at": "2026-08-02T22:54:21.786Z",
+          "by": "",
+          "note": "Entrée dans l'entreprise"
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "id": "plastique",
+      "name": "Plastique",
+      "icon": "assets/img/plastique.png",
+      "color": "#9fb0c4"
+    },
+    {
+      "id": "verre",
+      "name": "Verre",
+      "icon": "assets/img/verre.png",
+      "color": "#7fd7e8"
+    },
+    {
+      "id": "ferraille",
+      "name": "Ferraille",
+      "icon": "assets/img/scrap.png",
+      "color": "#b8c4d4"
+    },
+    {
+      "id": "piece-detachee",
+      "name": "Pièce détachée",
+      "icon": "assets/img/vehicleparts.png",
+      "color": "#d7b98a"
+    },
+    {
+      "id": "tissu",
+      "name": "Tissu",
+      "icon": "assets/img/fabric.png",
+      "color": "#6ec8ff"
+    },
+    {
+      "id": "spray",
+      "name": "Spray",
+      "icon": "assets/img/veh_spray_color.png",
+      "color": "#ff7ad9"
+    },
+    {
+      "id": "charbon",
+      "name": "Charbon de bois",
+      "icon": "assets/img/charcoal.png",
+      "color": "#8d8496"
+    },
+    {
+      "id": "roue-moto",
+      "name": "Roue de moto",
+      "icon": "assets/img/bike_tire.png",
+      "color": "#9aa4b8"
+    },
+    {
+      "id": "roue-voiture",
+      "name": "Roue de voiture",
+      "icon": "assets/img/car_tire.png",
+      "color": "#8f9ab0"
+    },
+    {
+      "id": "roue-camion",
+      "name": "Roue de camion",
+      "icon": "assets/img/truck_tire.png",
+      "color": "#7e8698"
+    },
+    {
+      "id": "ressource",
+      "name": "Ressource",
+      "icon": "i-clipboard",
+      "color": "#9fb0c4"
+    },
+    {
+      "id": "huile-moteur",
+      "name": "Huile moteur",
+      "icon": "assets/img/huilemoteur.png",
+      "color": "#9fb0c4"
+    },
+    {
+      "id": "fer",
+      "name": "Fer",
+      "icon": "assets/img/fer.png",
+      "color": "#9fb0c4"
+    },
+    {
+      "id": "gourde-d-eau",
+      "name": "Gourde d'eau",
+      "icon": "assets/img/gourdedeaupng.png",
+      "color": "#9fb0c4"
+    }
+  ],
+  "categories": [
+    {
+      "id": "kits",
+      "name": "Customisation",
+      "icon": "i-wrench"
+    },
+    {
+      "id": "depannage",
+      "name": "Dépannage",
+      "icon": "i-tire-offroad"
+    },
+    {
+      "id": "vente-soon",
+      "name": "Vente",
+      "icon": "i-sticker"
+    }
+  ],
+  "items": [
+    {
+      "id": "kit-phares-xenon",
+      "name": "Kit phares xénon",
+      "category": "kits",
+      "icon": "assets/img/veh_xenon.png",
+      "enabled": true,
+      "note": "",
+      "max": 1,
+      "excludes": [],
+      "cost": {
+        "verre": 8,
+        "plastique": 25
+      }
+    },
+    {
+      "id": "kit-accessoires",
+      "name": "Kit accessoires",
+      "category": "kits",
+      "icon": "assets/img/meca_extras.png",
+      "enabled": true,
+      "note": "(Extra)",
+      "max": 0,
+      "excludes": [],
+      "cost": {
+        "ferraille": 60,
+        "piece-detachee": 90,
+        "plastique": 75
+      }
+    },
+    {
+      "id": "kit-carrosserie",
+      "name": "Kit carrosserie",
+      "category": "kits",
+      "icon": "assets/img/meca_cosmetique.png",
+      "enabled": true,
+      "note": "(Cosmétique et livré)",
+      "max": 0,
+      "excludes": [],
+      "cost": {
+        "ferraille": 60,
+        "plastique": 100
+      }
+    },
+    {
+      "id": "kit-peinture",
+      "name": "Kit Peinture",
+      "category": "kits",
+      "icon": "assets/img/meca_peinture.png",
+      "enabled": true,
+      "note": "(Couleur et vitre teintée ‎ ‎ ‎ ‎ HORS fumée de pneus ‎ ‎ ‎ ‎ ‎(Wheel smoke))",
+      "max": 7,
+      "excludes": [],
+      "cost": {
+        "tissu": 30,
+        "spray": 1
+      }
+    },
+    {
+      "id": "kit-fumee-pneus",
+      "name": "Kit fumée de pneus",
+      "category": "kits",
+      "icon": "assets/img/meca_fumee.png",
+      "enabled": true,
+      "note": "(Dans la catégorie couleur)",
+      "max": 1,
+      "excludes": [],
+      "cost": {
+        "plastique": 50,
+        "charbon": 60
+      }
+    },
+    {
+      "id": "pneus-tout-terrain",
+      "name": "Pneus tout-terrain",
+      "category": "kits",
+      "icon": "assets/img/meca_pneus_offroad.png",
+      "enabled": true,
+      "note": "",
+      "max": 1,
+      "excludes": [],
+      "cost": {
+        "plastique": 125
+      }
+    },
+    {
+      "id": "jantes-motos",
+      "name": "Set de Jantes MOTOS",
+      "category": "kits",
+      "icon": "assets/img/meca_jantes.png",
+      "enabled": true,
+      "note": "",
+      "max": 1,
+      "excludes": [
+        "jantes-voitures",
+        "jantes-camions"
+      ],
+      "cost": {
+        "roue-moto": 2
+      }
+    },
+    {
+      "id": "jantes-voitures",
+      "name": "Set de Jantes VOITURES",
+      "category": "kits",
+      "icon": "assets/img/meca_jantes.png",
+      "enabled": true,
+      "note": "",
+      "max": 1,
+      "excludes": [
+        "jantes-camions"
+      ],
+      "cost": {
+        "roue-voiture": 4
+      }
+    },
+    {
+      "id": "jantes-camions",
+      "name": "Set de Jantes CAMIONS",
+      "category": "kits",
+      "icon": "assets/img/meca_jantes.png",
+      "enabled": true,
+      "note": "",
+      "max": 1,
+      "excludes": [],
+      "cost": {
+        "roue-camion": 6
+      }
+    },
+    {
+      "id": "deplacement",
+      "name": "Déplacement",
+      "category": "depannage",
+      "icon": "assets/img/deplacement.png",
+      "enabled": true,
+      "note": "(hors Cayo et Manor)",
+      "max": 1,
+      "excludes": [
+        "deplacement-eloigne"
+      ],
+      "cost": {
+        "ressource": 25
+      }
+    },
+    {
+      "id": "deplacement-eloigne",
+      "name": "Déplacement éloigné",
+      "category": "depannage",
+      "icon": "assets/img/deplacement.png",
+      "enabled": true,
+      "note": "(Cayo et Manor uniquement)",
+      "max": 1,
+      "excludes": [],
+      "cost": {
+        "ressource": 50
+      }
+    },
+    {
+      "id": "carburant",
+      "name": "Carburant",
+      "category": "depannage",
+      "icon": "assets/img/carburant.png",
+      "enabled": true,
+      "note": "(Essence ou diesel)",
+      "max": 0,
+      "excludes": [],
+      "cost": {
+        "ressource": 2
+      }
+    },
+    {
+      "id": "kit-de-reparation",
+      "name": "Kit de réparation",
+      "category": "depannage",
+      "icon": "assets/img/repairkit.png",
+      "enabled": true,
+      "note": "",
+      "max": 1,
+      "excludes": [],
+      "cost": {
+        "ressource": 50
+      }
+    },
+    {
+      "id": "roue",
+      "name": "Roue",
+      "category": "depannage",
+      "icon": "assets/img/meca_jantes.png",
+      "enabled": true,
+      "note": "(Moto, voiture et camion)",
+      "max": 0,
+      "excludes": [],
+      "cost": {
+        "ressource": 15
+      }
+    },
+    {
+      "id": "cric",
+      "name": "Cric",
+      "category": "depannage",
+      "icon": "assets/img/cric.png",
+      "enabled": true,
+      "note": "",
+      "max": 0,
+      "excludes": [],
+      "cost": {
+        "ressource": 10
+      }
+    },
+    {
+      "id": "remorquage",
+      "name": "Remorquage",
+      "category": "depannage",
+      "icon": "assets/img/wastelander.png",
+      "enabled": true,
+      "note": "(Seulement avec formation)",
+      "max": 0,
+      "excludes": [],
+      "cost": {
+        "ressource": 100
+      }
+    },
+    {
+      "id": "kit-de-reparation-2",
+      "name": "Kit de réparation",
+      "category": "vente-soon",
+      "icon": "assets/img/repairkit.png",
+      "enabled": true,
+      "note": "",
+      "max": 10,
+      "excludes": [],
+      "cost": {
+        "ressource": 75
+      }
+    },
+    {
+      "id": "cric-2",
+      "name": "Cric",
+      "category": "vente-soon",
+      "icon": "assets/img/cric.png",
+      "enabled": true,
+      "note": "",
+      "max": 1,
+      "excludes": [],
+      "cost": {
+        "huile-moteur": 30,
+        "fer": 60,
+        "plastique": 60,
+        "ferraille": 240
+      }
+    },
+    {
+      "id": "sangle-de-remorquage",
+      "name": "Sangle de remorquage",
+      "category": "vente-soon",
+      "icon": "assets/img/sanglederemorquage.png",
+      "enabled": true,
+      "note": "",
+      "max": 1,
+      "excludes": [],
+      "cost": {
+        "tissu": 120,
+        "ferraille": 120
+      }
+    },
+    {
+      "id": "kit-de-nettoyage-2",
+      "name": "Kit de nettoyage",
+      "category": "vente-soon",
+      "icon": "assets/img/kitdenettoyage.png",
+      "enabled": true,
+      "note": "",
+      "max": 0,
+      "excludes": [],
+      "cost": {
+        "tissu": 4,
+        "gourde-d-eau": 6
+      }
+    },
+    {
+      "id": "roue-de-voiture",
+      "name": "Roue de voiture",
+      "category": "vente-soon",
+      "icon": "assets/img/car_tire.png",
+      "enabled": true,
+      "note": "",
+      "max": 10,
+      "excludes": [],
+      "cost": {
+        "ressource": 20
+      }
+    },
+    {
+      "id": "roue-de-moto",
+      "name": "Roue de moto",
+      "category": "vente-soon",
+      "icon": "assets/img/bike_tire.png",
+      "enabled": true,
+      "note": "",
+      "max": 10,
+      "excludes": [],
+      "cost": {
+        "ressource": 20
+      }
+    },
+    {
+      "id": "roue-de-camion",
+      "name": "Roue de camion",
+      "category": "vente-soon",
+      "icon": "assets/img/truck_tire.png",
+      "enabled": true,
+      "note": "",
+      "max": 10,
+      "excludes": [],
+      "cost": {
+        "ressource": 20
+      }
+    },
+    {
+      "id": "roue-de-velo",
+      "name": "Roue de vélo",
+      "category": "vente-soon",
+      "icon": "assets/img/rouevelopng.png",
+      "enabled": true,
+      "note": "",
+      "max": 10,
+      "excludes": [],
+      "cost": {
+        "ressource": 20
+      }
+    }
+  ]
 }
