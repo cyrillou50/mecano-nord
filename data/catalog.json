@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-04T11:39:52.560Z",
+  "updatedAt": "2026-08-04T11:43:21.958Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -688,6 +688,19 @@
       "name": "Roue de camion",
       "category": "vente-soon",
       "icon": "assets/img/truck_tire.png",
+      "enabled": true,
+      "note": "",
+      "max": 10,
+      "excludes": [],
+      "cost": {
+        "ressource": 20
+      }
+    },
+    {
+      "id": "roue-de-velo",
+      "name": "Roue de vélo",
+      "category": "kits",
+      "icon": "assets/img/rouevelopng.png",
       "enabled": true,
       "note": "",
       "max": 10,
