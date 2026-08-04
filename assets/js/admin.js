@@ -2120,19 +2120,28 @@
             body: JSON.stringify({ path: "interdit.txt", content: "x" })
           });
           const tj = await t.json().catch(() => ({}));
+          /* 403 = l'endpoint existe et refuse ce chemin : c'est le signe que tout va bien.
+             404 = le serveur tourne, mais avec une version antérieure à la publication. */
           pub = t.status === 403 ? "ok"
             : t.status === 501 ? "absent"
+            : t.status === 404 ? "vieux"
             : "inconnu:" + t.status + (tj.error ? " " + tj.error : "");
         } catch (_) { pub = "inconnu"; }
 
-        box.innerHTML = '<div class="alert alert--ok">' + svg("check") +
+        const pistes = {
+          ok: "<b>La publication passera par lui</b> — plus besoin de jeton.",
+          absent: "<b>La publication n'est pas configurée</b> : ajoute <code>GH_TOKEN</code>, " +
+            "<code>GH_OWNER</code> et <code>GH_REPO</code> dans le service, puis redémarre-le.",
+          vieux: "<b>Version trop ancienne</b> : ce serveur ne connaît pas encore la publication. " +
+            "Recopie <code>serveur/serveur.js</code> sur le VPS, puis " +
+            "<code>systemctl restart mecano-nord</code>."
+        };
+
+        const grave = pub !== "ok";
+        box.innerHTML = '<div class="alert alert--' + (grave ? "warn" : "ok") + '">' +
+          svg(grave ? "alert" : "check") +
           "<span>Serveur joignable" + (j.ops ? ", pointage sans conflit géré" : "") + ". " +
-          (pub === "ok"
-            ? "<b>La publication passera par lui</b> — plus besoin de jeton."
-            : pub === "absent"
-              ? "<b>La publication n'est pas configurée</b> : ajoute GH_TOKEN, GH_OWNER et GH_REPO " +
-                "dans le service, puis redémarre-le."
-              : "Publication : état indéterminé (" + esc(pub) + ").") +
+          (pistes[pub] || "Publication : état indéterminé (" + esc(pub) + ").") +
           "</span></div>";
       } catch (e) {
         box.innerHTML = '<div class="alert alert--err">' + svg("alert") +
@@ -2251,11 +2260,33 @@
       if (auto) {
         MNUI.toast("Envoi automatique impossible : " + e.message, "err");
       } else {
+        /* Le conseil dépend de ce qui a échoué : inutile d'envoyer quelqu'un
+           vérifier son jeton quand c'est le serveur qui est en cause. */
+        const m = String(e.message || "");
+        let piste;
+        if (/Chemin inconnu/i.test(m)) {
+          piste = "Ton serveur tourne avec une <b>version trop ancienne</b> : il ne connaît pas " +
+            "encore la publication. Recopie <code>serveur/serveur.js</code> sur le VPS, puis " +
+            "<code>systemctl restart mecano-nord</code>.";
+        } else if (/non configurée|GH_TOKEN/i.test(m)) {
+          piste = "Ton serveur n'a pas les accès GitHub. Ajoute <code>GH_TOKEN</code>, " +
+            "<code>GH_OWNER</code> et <code>GH_REPO</code> dans son service, puis redémarre-le.";
+        } else if (/injoignable|ne répond pas/i.test(m)) {
+          piste = "Ton serveur ne répond pas. Vérifie son adresse ci-dessous et qu'il tourne " +
+            "(<code>systemctl status mecano-nord</code>).";
+        } else if (/Chemin non autorisé/i.test(m)) {
+          piste = "Le serveur refuse d'écrire ce fichier. C'est volontaire : il n'autorise que " +
+            "le catalogue et les images.";
+        } else {
+          piste = "Vérifie le jeton et les infos du dépôt dans l'onglet « Publier », puis réessaie.";
+        }
+
         MNUI.modal({
           title: "La publication a échoué",
-          body: '<div class="alert alert--err">' + svg("alert") + "<span>" + esc(e.message) + "</span></div>" +
-            '<p class="hint" style="margin-top:12px">Vérifie le jeton et les infos du dépôt dans l\'onglet ' +
-            "« Publier », puis réessaie. Rien n'est perdu : tes modifications sont toujours dans le brouillon.</p>",
+          body: '<div class="alert alert--err">' + svg("alert") + "<span>" + esc(m) + "</span></div>" +
+            '<p class="hint" style="margin-top:12px">' + piste + "</p>" +
+            '<p class="hint" style="margin-top:8px">Rien n\'est perdu : tes modifications sont ' +
+            "toujours dans le brouillon.</p>",
           actions: [{ label: "Compris", variant: "btn--primary", onClick: c => c() }]
         });
       }

@@ -174,30 +174,77 @@ window.MNWebhook = (function () {
     });
   }
 
-  /** Durée lisible, sans dépendre du module de pointage. */
+  /**
+   * Durée lisible, à la seconde. Même découpage que MNDuty.dur, mais recopié
+   * ici : webhook.js sert aussi sur admin.html, où le pointage n'est pas chargé.
+   */
   function duree(sec) {
     const t = Math.max(0, Math.round(sec));
     const j = Math.floor(t / 86400);
     const h = Math.floor((t % 86400) / 3600);
     const m = Math.floor((t % 3600) / 60);
+    const s = t % 60;
     const p = [];
     if (j) p.push(j + " j");
     if (h || j) p.push(h + " h");
-    p.push(m + " min");
+    if (m || h || j) p.push(m + " min");
+    p.push(s + " s");
     return p.join(" ");
   }
 
-  /** Prise ou fin de service. `seconds` = durée exacte du service terminé. */
-  function sendDuty(pseudo, role, action, seconds) {
-    const inService = action === "in";
+  /**
+   * Horodatage Discord : chacun le lit dans son propre fuseau, et le style
+   * « T » descend jusqu'aux secondes.
+   */
+  function quand(iso) {
+    const t = Date.parse(iso);
+    if (!isFinite(t)) return "";
+    const u = Math.floor(t / 1000);
+    return "<t:" + u + ":D> à <t:" + u + ":T>";
+  }
+
+  /**
+   * Prise ou fin de service — tout y passe.
+   * @param {object} i
+   *   pseudo, role, action ("in"|"out"), since, out, seconds,
+   *   by (qui a pointé/clôturé à la place), weekSeconds, totalSeconds,
+   *   sessions (nombre de services terminés), onDuty (pseudos présents)
+   */
+  function sendDuty(i) {
+    const arrivee = i.action === "in";
     const f = [];
-    if (role) f.push({ name: "Poste", value: role, inline: true });
-    if (!inService && seconds != null) {
-      f.push({ name: "Durée", value: duree(seconds), inline: true });
+
+    if (i.role) f.push({ name: "Poste", value: i.role, inline: true });
+    if (i.since) f.push({ name: "Arrivée", value: quand(i.since), inline: true });
+    if (!arrivee && i.out) f.push({ name: "Départ", value: quand(i.out), inline: true });
+
+    if (!arrivee && i.seconds != null) {
+      f.push({ name: "Durée du service", value: "**" + duree(i.seconds) + "**", inline: true });
     }
+
+    if (i.by) {
+      f.push({ name: arrivee ? "Pointé par" : "Clôturé par", value: i.by, inline: true });
+    }
+
+    if (i.weekSeconds != null || i.totalSeconds != null) {
+      const p = [];
+      if (i.weekSeconds != null) p.push("Cette semaine : **" + duree(i.weekSeconds) + "**");
+      if (i.totalSeconds != null) p.push("Total : " + duree(i.totalSeconds));
+      if (i.sessions != null) p.push(i.sessions + " service" + (i.sessions > 1 ? "s" : "") + " enregistré" + (i.sessions > 1 ? "s" : ""));
+      f.push({ name: "Cumul de " + i.pseudo, value: p.join("\n") });
+    }
+
+    if (Array.isArray(i.onDuty)) {
+      const p = i.onDuty.filter(Boolean);
+      f.push({
+        name: "À l'atelier (" + p.length + ")",
+        value: (p.length ? p.map(n => "• " + n).join("\n") : "_personne_").slice(0, 1024)
+      });
+    }
+
     return send("duty", {
-      title: (inService ? "🟢 Prise de service" : "🔴 Fin de service") + " — " + pseudo,
-      color: inService ? COLORS.dutyIn : COLORS.dutyOut,
+      title: (arrivee ? "🟢 Prise de service" : "🔴 Fin de service") + " — " + i.pseudo,
+      color: arrivee ? COLORS.dutyIn : COLORS.dutyOut,
       fields: f
     });
   }

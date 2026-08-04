@@ -25,6 +25,9 @@ const path = require("node:path");
 /* ---- Réglages, tous par variables d'environnement -------------------------- */
 
 const PORT = Number(process.env.PORT || 8787);
+/* Derrière un proxy (nginx, Apache, Caddy), mets HOTE=127.0.0.1 : le serveur
+   n'est alors joignable que depuis la machine, jamais directement d'internet. */
+const HOTE = process.env.HOTE || "0.0.0.0";
 const DOSSIER = process.env.DONNEES || path.join(__dirname, "donnees");
 const FICHIER = path.join(DOSSIER, "duty.json");
 
@@ -433,9 +436,9 @@ const serveur = http.createServer(async (req, res) => {
   }
 });
 
-serveur.listen(PORT, () => {
+serveur.listen(PORT, HOTE, () => {
   console.log("Mécano Nord — serveur démarré");
-  console.log("  port      : " + PORT);
+  console.log("  écoute    : " + HOTE + ":" + PORT);
   console.log("  données   : " + FICHIER);
   console.log("  origines  : " + ORIGINES.join(", "));
   console.log("  webhooks  : " +

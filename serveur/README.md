@@ -129,12 +129,23 @@ curl localhost:8787/sante         # doit répondre {"ok":true,...}
 Caddy sert le site et redirige les appels vers le serveur Node.
 
 ```bash
-apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+apt install -y debian-keyring debian-archive-keyring apt-transport-https curl gnupg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
   | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
   | tee /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install -y caddy
+```
+
+> `gnupg` est indispensable et manque sur beaucoup d'images VPS minimales.
+> Sans lui, la clé n'est pas enregistrée, `apt install caddy` échoue en
+> silence, et toutes les commandes `systemctl … caddy` répondront ensuite
+> « Unit caddy.service not found ».
+
+Vérifie tout de suite que l'installation a réussi :
+
+```bash
+caddy version          # doit afficher v2.x
 ```
 
 ---
@@ -267,6 +278,137 @@ clair dans le dépôt et y restent pour toujours dans l'historique.
 
 ---
 
+# CHEMIN C — tu as déjà des sites sur ce VPS
+
+**C'est le cas le plus courant, et le plus simple.** Si nginx ou Apache sert
+déjà tes autres domaines sur les ports 80 et 443, ne touche à rien : tu lui
+ajoutes juste un vhost de plus. **Pas besoin de Caddy dans ce cas.**
+
+```bash
+systemctl disable --now caddy 2>/dev/null
+apt purge -y caddy 2>/dev/null
+ss -tulpn | grep -E ':(80|443)'      # qui sert déjà ?
+```
+
+### C1. Un sous-domaine
+
+Chez ton fournisseur DNS, ajoute un enregistrement **A** pour
+`api.tondomaine.fr` pointant vers l'IP de ton VPS. Puisque tu as déjà des
+domaines, autant t'en servir.
+
+### C2. Node en écoute locale seulement
+
+Dans `/etc/systemd/system/mecano-nord.service`, garde `PORT=8787` et ajoute :
+
+```ini
+Environment=HOTE=127.0.0.1
+```
+
+```bash
+systemctl daemon-reload && systemctl restart mecano-nord
+curl localhost:8787/sante
+```
+
+Le serveur n'est ainsi joignable que par le proxy, jamais directement.
+
+### C3-nginx. Si c'est nginx
+
+```bash
+nano /etc/nginx/sites-available/mecano-nord
+```
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name api.tondomaine.fr;
+
+    location / {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Forwarded-For   $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+```bash
+ln -s /etc/nginx/sites-available/mecano-nord /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
+apt install -y certbot python3-certbot-nginx
+certbot --nginx -d api.tondomaine.fr
+```
+
+### C3-apache. Si c'est Apache
+
+```bash
+a2enmod proxy proxy_http headers
+nano /etc/apache2/sites-available/mecano-nord.conf
+```
+
+```apache
+<VirtualHost *:80>
+    ServerName api.tondomaine.fr
+    ProxyPreserveHost On
+    ProxyPass        / http://127.0.0.1:8787/
+    ProxyPassReverse / http://127.0.0.1:8787/
+</VirtualHost>
+```
+
+```bash
+a2ensite mecano-nord && apache2ctl configtest && systemctl reload apache2
+apt install -y certbot python3-certbot-apache
+certbot --apache -d api.tondomaine.fr
+```
+
+### C4. Vérifier et brancher
+
+```
+https://api.tondomaine.fr/sante
+```
+
+Doit afficher `{"ok":true,...}`. Colle ensuite `https://api.tondomaine.fr`
+dans **Admin → Publier → Serveur de l'atelier**, clique **Tester**, puis
+enregistre et publie.
+
+Tes autres sites ne sont pas touchés : tu as simplement ajouté un vhost.
+
+---
+
+## Si Caddy refuse de démarrer
+
+Commence toujours par lire ce qu'il dit :
+
+```bash
+systemctl status caddy --no-pager -l
+journalctl -u caddy -n 40 --no-pager
+```
+
+| Message | Cause | Correction |
+|---|---|---|
+| `Unit caddy.service not found` | Caddy n'est pas installé | `gnupg` manquait : refais l'étape 4 en entier, puis `caddy version` |
+| `Job for caddy.service failed` | erreur dans le Caddyfile | `caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile` t'indique la ligne |
+| `address already in use` | Apache ou nginx occupe le port 80 | `systemctl disable --now apache2 nginx` |
+| `reload` échoue mais `start` marche | le service n'était pas lancé | `systemctl enable --now caddy` |
+
+`reload` ne fonctionne que si Caddy **tourne déjà**. En cas de doute :
+
+```bash
+systemctl restart caddy
+```
+
+Qui écoute sur les ports web :
+
+```bash
+ss -tulpn | grep -E ':(80|443)'
+```
+
+Enfin, vérifie que le pare-feu laisse passer :
+
+```bash
+ufw allow 80/tcp && ufw allow 443/tcp     # si ufw est actif
+```
+
 ## Au quotidien
 
 ```bash
@@ -284,8 +426,31 @@ cp sauvegardes/LE-FICHIER.json duty.json
 systemctl restart mecano-nord
 ```
 
-Pour mettre à jour le serveur, recopie `serveur.js` puis
-`systemctl restart mecano-nord`.
+## Mettre à jour le serveur
+
+Depuis ton PC, dans le dossier du site :
+
+```powershell
+scp "serveur\serveur.js" root@TON-IP:/opt/mecano-nord/
+```
+
+Puis sur le VPS :
+
+```bash
+systemctl restart mecano-nord
+```
+
+Fais-le à chaque fois que `serveur.js` change ici — sinon le VPS continue de
+tourner avec l'ancienne version, et les nouveautés ne répondent pas.
+
+**Symptôme typique :** en publiant depuis l'admin, tu obtiens
+`Chemin inconnu : /publier`. Ça veut dire que le serveur est bien joignable,
+mais qu'il est trop vieux pour connaître la publication. La mise à jour
+ci-dessus le corrige.
+
+Pour savoir où tu en es, va dans **Admin → Publier → Serveur de l'atelier**
+et clique **Tester** : il te dit s'il est à jour, si les accès GitHub manquent,
+ou s'il ne répond pas.
 
 ---
 
