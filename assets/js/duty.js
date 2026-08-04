@@ -251,38 +251,6 @@ window.MNDuty = (function () {
 
   const minutesBetween = (a, b) => Math.round(secBetween(a, b) / 60);
 
-  /* ---- Ce qu'on raconte à Discord -------------------------------------------- */
-
-  const nomRole = id => {
-    try { const r = MNStore.roleById(id); return r ? r.name : ""; }
-    catch (_) { return ""; }
-  };
-
-  /** Le pointage terminé le plus récent d'une personne (le log est antidaté). */
-  function dernierLog(uid) {
-    const l = board().log;
-    for (let i = 0; i < l.length; i++) if (l[i].id === uid && l[i].out) return l[i];
-    return null;
-  }
-
-  /**
-   * Rassemble tout ce que le webhook peut dire d'un pointage : horaires,
-   * cumuls, et qui reste à l'atelier. À appeler une fois le tableau à jour.
-   */
-  function infosDiscord(uid, pseudo, role, action, extra) {
-    const b = board();
-    return Object.assign({
-      pseudo, role, action,
-      weekSeconds: secondsFor(uid, weekStart()),
-      totalSeconds: secondsFor(uid),
-      sessions: b.log.filter(e => e.id === uid && e.out).length,
-      onDuty: b.onDuty.map(e => {
-        const r = nomRole(e.roleId);
-        return e.pseudo + (r ? " — " + r : "");
-      })
-    }, extra || {});
-  }
-
   /**
    * Prise de service.
    * @returns {Promise<{already?:boolean, shared:boolean, shareError?:string, discord:object}>}
@@ -294,11 +262,7 @@ window.MNDuty = (function () {
     });
     if (op) {
       if (op.deja) return { already: true, shared: true, discord: { skipped: true } };
-      const moi = entryOf(session.uid);
-      const discord = await MNWebhook.sendDuty(
-        infosDiscord(session.uid, session.pseudo, session.role, "in",
-          { since: moi ? moi.since : new Date().toISOString() })
-      );
+      const discord = await MNWebhook.sendDuty(session.pseudo, session.role, "in");
       return { shared: op.ok, shareError: op.error, discord };
     }
 
@@ -306,39 +270,26 @@ window.MNDuty = (function () {
     const b = board();
     if (isOn(session.uid)) return { already: true, shared: false, discord: { skipped: true } };
 
-    const since = new Date().toISOString();
     b.onDuty.push({
       id: session.uid,
       pseudo: session.pseudo,
       roleId: session.roleId || "",
-      since
+      since: new Date().toISOString()
     });
-    b.updatedAt = since;
+    b.updatedAt = new Date().toISOString();
     saveLocal(b);
 
     const shared = await push(b, "Prise de service de " + session.pseudo);
-    const discord = await MNWebhook.sendDuty(
-      infosDiscord(session.uid, session.pseudo, session.role, "in", { since })
-    );
+    const discord = await MNWebhook.sendDuty(session.pseudo, session.role, "in");
     return { shared: shared.ok, shareError: shared.error, discord };
   }
 
   /** Fin de service. */
   async function clockOut(session) {
-    /* Les horaires viennent du tableau d'avant l'opération : le serveur ne
-       renvoie que la durée. */
-    const avant = entryOf(session.uid);
     const op = await envoyerOp({ op: "out", id: session.uid });
     if (op) {
       if (op.deja) return { already: true, shared: true, discord: { skipped: true } };
-      const fin = dernierLog(session.uid);
-      const discord = await MNWebhook.sendDuty(
-        infosDiscord(session.uid, session.pseudo, session.role, "out", {
-          seconds: op.seconds != null ? op.seconds : (fin ? fin.seconds : null),
-          since: fin ? fin.in : (avant ? avant.since : null),
-          out: fin ? fin.out : new Date().toISOString()
-        })
-      );
+      const discord = await MNWebhook.sendDuty(session.pseudo, session.role, "out", op.seconds);
       return { shared: op.ok, shareError: op.error, discord, seconds: op.seconds };
     }
 
@@ -360,10 +311,7 @@ window.MNDuty = (function () {
     saveLocal(b);
 
     const shared = await push(b, "Fin de service de " + session.pseudo);
-    const discord = await MNWebhook.sendDuty(
-      infosDiscord(session.uid, session.pseudo, session.role, "out",
-        { seconds, since: e.since, out })
-    );
+    const discord = await MNWebhook.sendDuty(session.pseudo, session.role, "out", seconds);
     return { shared: shared.ok, shareError: shared.error, discord, seconds };
   }
 
@@ -374,15 +322,7 @@ window.MNDuty = (function () {
     if (op) {
       if (op.deja) return { already: true };
       const nom = cible ? cible.pseudo : uid;
-      const fin = dernierLog(uid);
-      await MNWebhook.sendDuty(
-        infosDiscord(uid, nom, nomRole(cible ? cible.roleId : ""), "out", {
-          seconds: op.seconds != null ? op.seconds : (fin ? fin.seconds : null),
-          since: fin ? fin.in : (cible ? cible.since : null),
-          out: fin ? fin.out : new Date().toISOString(),
-          by: byPseudo
-        })
-      );
+      await MNWebhook.sendDuty(nom + " (sorti par " + byPseudo + ")", "", "out", op.seconds);
       return { shared: op.ok, shareError: op.error, seconds: op.seconds, pseudo: nom };
     }
 
@@ -403,10 +343,7 @@ window.MNDuty = (function () {
     saveLocal(b);
 
     const shared = await push(b, "Fin de service de " + e.pseudo + " (par " + byPseudo + ")");
-    await MNWebhook.sendDuty(
-      infosDiscord(uid, e.pseudo, nomRole(e.roleId), "out",
-        { seconds, since: e.since, out, by: byPseudo })
-    );
+    await MNWebhook.sendDuty(e.pseudo + " (sorti par " + byPseudo + ")", "", "out", seconds);
     return { shared: shared.ok, shareError: shared.error, seconds, pseudo: e.pseudo };
   }
 
@@ -417,13 +354,7 @@ window.MNDuty = (function () {
     });
     if (op) {
       if (op.deja) return { already: true };
-      const mis = entryOf(user.id);
-      await MNWebhook.sendDuty(
-        infosDiscord(user.id, user.pseudo, nomRole(user.roleId), "in", {
-          since: mis ? mis.since : new Date().toISOString(),
-          by: byPseudo
-        })
-      );
+      await MNWebhook.sendDuty(user.pseudo + " (pointé par " + byPseudo + ")", "", "in");
       return { shared: op.ok, shareError: op.error };
     }
 
@@ -431,20 +362,17 @@ window.MNDuty = (function () {
     const b = board();
     if (isOn(user.id)) return { already: true };
 
-    const since = new Date().toISOString();
     b.onDuty.push({
       id: user.id,
       pseudo: user.pseudo,
       roleId: user.roleId || "",
-      since
+      since: new Date().toISOString()
     });
-    b.updatedAt = since;
+    b.updatedAt = new Date().toISOString();
     saveLocal(b);
 
     const shared = await push(b, "Prise de service de " + user.pseudo + " (par " + byPseudo + ")");
-    await MNWebhook.sendDuty(
-      infosDiscord(user.id, user.pseudo, nomRole(user.roleId), "in", { since, by: byPseudo })
-    );
+    await MNWebhook.sendDuty(user.pseudo + " (pointé par " + byPseudo + ")", "", "in");
     return { shared: shared.ok, shareError: shared.error };
   }
 
