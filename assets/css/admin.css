@@ -357,6 +357,8 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
   box-shadow: 0 0 10px var(--toxic);
   animation: pulse 2.4s ease-in-out infinite;
 }
+/* même pastille, pour l'état inverse : absent plutôt que présent */
+.dutydot--conge { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
 
 /* pastille de rôle colorée */
 .rolechip {

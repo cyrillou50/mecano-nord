@@ -48,9 +48,11 @@
       /* Jamais en pleine réorganisation ou fenêtre ouverte : on écraserait
          un travail en cours. */
       if (reorder || document.querySelector(".modal-back")) return;
-      const avant = MNDuty.board().updatedAt;
+      /* Le jour compte autant que le tableau : un congé qui commence demain
+         ne fait bouger aucune donnée, seulement la date. */
+      const avant = MNDuty.board().updatedAt + "|" + MNDuty.jourLocal();
       await MNDuty.load(true);
-      if (MNDuty.board().updatedAt !== avant) render();
+      if (MNDuty.board().updatedAt + "|" + MNDuty.jourLocal() !== avant) render();
     }, RYTHME);
   }
 
@@ -121,6 +123,37 @@
   const roleOf = u => draft.roles.find(r => r.id === u.roleId) ||
     { id: "", name: "Sans rôle", color: "#6a6280", perms: [] };
 
+  /* ---- Congés en cours -------------------------------------------------------
+     La page ne montre que l'absence du jour : les périodes à venir se
+     consultent sur la page Service. */
+
+  /** La période qui couvre aujourd'hui, s'il y en a une. */
+  function congeEnCours(uid) {
+    const j = MNDuty.jourLocal();
+    return MNDuty.congesOf(uid, true).find(c => c.from <= j && j <= c.to) || null;
+  }
+
+  /** « 20 août » — l'année n'apparaît que si ce n'est pas l'année en cours. */
+  function jourCourt(j) {
+    const d = new Date(String(j) + "T12:00:00");   // midi : pas de bascule de fuseau
+    if (isNaN(d)) return String(j);
+    const o = { day: "numeric", month: "long" };
+    if (d.getFullYear() !== new Date().getFullYear()) o.year = "numeric";
+    return d.toLocaleDateString("fr-FR", o);
+  }
+
+  /** Info-bulle de la pastille rouge. */
+  function titreConge(uid) {
+    const c = congeEnCours(uid);
+    return c ? "En congés jusqu'au " + jourCourt(c.to) : "En congés";
+  }
+
+  /** Complément de la pastille de la fiche : « jusqu'au 20 août ». */
+  function retourConge(uid) {
+    const c = congeEnCours(uid);
+    return c ? " jusqu'au " + jourCourt(c.to) : "";
+  }
+
   /** Les personnes masquées ne sortent que si un responsable le demande. */
   const visibleUsers = () =>
     draft.users.filter(u => !u.hidden || (canEdit && showHidden));
@@ -173,7 +206,12 @@
             '<span class="staffrow__txt"><b>' + esc(u.pseudo) + "</b>" +
               '<i style="color:' + esc(r.color) + '">' + esc(r.name) + "</i></span>" +
             (u.hidden ? '<span class="staffrow__eye" title="Masqué de l\'équipe">' + svg("lock") + "</span>" : "") +
-            (on ? '<span class="dutydot" title="En service"></span>' : "") +
+            /* Une même pastille pour deux états qui s'excluent : vert en
+               service, rouge en congés. */
+            (on ? '<span class="dutydot" title="En service"></span>'
+                : MNDuty.enConge(u.id)
+                  ? '<span class="dutydot dutydot--conge" title="' + esc(titreConge(u.id)) + '"></span>'
+                  : "") +
           "</div>";
         }).join("") : '<p class="hint" style="padding:12px">Personne ne correspond.</p>') +
       "</div>" +
@@ -267,6 +305,9 @@
             '<span class="rolechip rolechip--ico" style="color:' + esc(r.color) + '">' +
               mnIcon(r.icon) + esc(r.name) + "</span>" +
             (on ? '<span class="pill pill--ok">en service</span>' : "") +
+            (MNDuty.enConge(u.id)
+              ? '<span class="pill pill--danger">en congés' + esc(retourConge(u.id)) + "</span>"
+              : "") +
             (u.pin ? '<span class="pill pill--dim">' + svg("lock", "inline-lock") + " code</span>" : "") +
           "</div>" +
           (canEdit

@@ -66,11 +66,14 @@
    */
   async function rafraichir() {
     if (busy || document.querySelector(".modal-back")) return;
-    const avant = MNDuty.board().updatedAt, souciAvant = MNDuty.souci();
+    /* Le jour fait partie de l'état affiché : un congé qui commence demain ne
+       change aucune donnée, seulement la date. */
+    const etat = () => MNDuty.board().updatedAt + "|" + MNDuty.jourLocal() + "|" + MNDuty.souci();
+    const avant = etat();
     await MNDuty.load(true);
     /* Le message d'erreur compte aussi : sans ça, une panne qui s'installe
        resterait invisible, et sa disparition tout autant. */
-    if (MNDuty.board().updatedAt !== avant || MNDuty.souci() !== souciAvant) render();
+    if (etat() !== avant) render();
   }
 
   function denied() {
