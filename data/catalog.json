@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T08:54:05.739Z",
+  "updatedAt": "2026-08-05T08:55:14.176Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -632,6 +632,45 @@
       }
     },
     {
+      "id": "gasoil",
+      "name": "Gasoil",
+      "category": "vente-soon",
+      "icon": "assets/img/gasoil.png",
+      "enabled": true,
+      "note": "",
+      "max": 200,
+      "excludes": [],
+      "cost": {
+        "ressource": 2
+      }
+    },
+    {
+      "id": "essence",
+      "name": "Essence",
+      "category": "vente-soon",
+      "icon": "assets/img/essence.png",
+      "enabled": true,
+      "note": "",
+      "max": 200,
+      "excludes": [],
+      "cost": {
+        "ressource": 4
+      }
+    },
+    {
+      "id": "roue-de-velo",
+      "name": "Roue",
+      "category": "vente-soon",
+      "icon": "assets/img/rouevelopng.png",
+      "enabled": true,
+      "note": "(Camion, moto, voiture ou vélo)",
+      "max": 10,
+      "excludes": [],
+      "cost": {
+        "ressource": 20
+      }
+    },
+    {
       "id": "cric-2",
       "name": "Cric",
       "category": "vente-soon",
@@ -662,30 +701,16 @@
       }
     },
     {
-      "id": "kit-de-nettoyage-2",
-      "name": "Kit de nettoyage",
+      "id": "10-pieces-detachees",
+      "name": "10 Pièces détachées",
       "category": "vente-soon",
-      "icon": "assets/img/kitdenettoyage.png",
+      "icon": "assets/img/vehicleparts.png",
       "enabled": true,
       "note": "",
       "max": 0,
       "excludes": [],
       "cost": {
-        "tissu": 4,
-        "gourde-d-eau": 6
-      }
-    },
-    {
-      "id": "roue-de-velo",
-      "name": "Roue",
-      "category": "vente-soon",
-      "icon": "assets/img/rouevelopng.png",
-      "enabled": true,
-      "note": "(Camion, moto, voiture ou vélo)",
-      "max": 10,
-      "excludes": [],
-      "cost": {
-        "ressource": 20
+        "ressource": 1
       }
     },
     {
@@ -702,42 +727,17 @@
       }
     },
     {
-      "id": "10-pieces-detachees",
-      "name": "10 Pièces détachées",
+      "id": "kit-de-nettoyage-2",
+      "name": "Kit de nettoyage",
       "category": "vente-soon",
-      "icon": "assets/img/vehicleparts.png",
+      "icon": "assets/img/kitdenettoyage.png",
       "enabled": true,
       "note": "",
       "max": 0,
       "excludes": [],
       "cost": {
-        "ressource": 1
-      }
-    },
-    {
-      "id": "gasoil",
-      "name": "Gasoil",
-      "category": "vente-soon",
-      "icon": "assets/img/gasoil.png",
-      "enabled": true,
-      "note": "",
-      "max": 200,
-      "excludes": [],
-      "cost": {
-        "ressource": 2
-      }
-    },
-    {
-      "id": "essence",
-      "name": "Essence",
-      "category": "vente-soon",
-      "icon": "assets/img/essence.png",
-      "enabled": true,
-      "note": "",
-      "max": 200,
-      "excludes": [],
-      "cost": {
-        "ressource": 4
+        "tissu": 4,
+        "gourde-d-eau": 6
       }
     }
   ]
