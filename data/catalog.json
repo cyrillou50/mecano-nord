@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T19:05:00.210Z",
+  "updatedAt": "2026-08-05T19:06:04.482Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -387,12 +387,6 @@
       "parent": ""
     },
     {
-      "id": "performance",
-      "name": "Performance",
-      "icon": "i-key",
-      "parent": ""
-    },
-    {
       "id": "depannage",
       "name": "Dépannage",
       "icon": "i-tire-offroad",
@@ -561,7 +555,7 @@
     {
       "id": "deplacement",
       "name": "Déplacement",
-      "category": "depannage",
+      "category": "deplacement",
       "icon": "assets/img/deplacement.png",
       "enabled": true,
       "note": "(hors Cayo et Manor)",
@@ -576,7 +570,7 @@
     {
       "id": "deplacement-eloigne",
       "name": "Déplacement éloigné",
-      "category": "depannage",
+      "category": "deplacement",
       "icon": "assets/img/deplacement.png",
       "enabled": true,
       "note": "(Cayo et Manor uniquement)",
@@ -791,7 +785,7 @@
     {
       "id": "freins",
       "name": "Freins",
-      "category": "performance",
+      "category": "performance-2",
       "icon": "assets/img/freins.png",
       "enabled": true,
       "note": "",
@@ -802,7 +796,7 @@
     {
       "id": "moteur",
       "name": "Moteur",
-      "category": "performance",
+      "category": "performance-2",
       "icon": "assets/img/moteur.png",
       "enabled": true,
       "note": "",
@@ -813,7 +807,7 @@
     {
       "id": "suspension",
       "name": "Suspension",
-      "category": "performance",
+      "category": "performance-2",
       "icon": "assets/img/suspension.png",
       "enabled": true,
       "note": "",
@@ -824,7 +818,7 @@
     {
       "id": "transmission",
       "name": "Transmission",
-      "category": "performance",
+      "category": "performance-2",
       "icon": "assets/img/transmission.png",
       "enabled": true,
       "note": "",
@@ -835,7 +829,7 @@
     {
       "id": "turbo",
       "name": "Turbo",
-      "category": "performance",
+      "category": "performance-2",
       "icon": "assets/img/turbo.png",
       "enabled": true,
       "note": "",
