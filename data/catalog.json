@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T19:23:51.701Z",
+  "updatedAt": "2026-08-05T19:24:51.690Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -678,7 +678,7 @@
     {
       "id": "kit-de-reparation-2",
       "name": "Kit de réparation",
-      "category": "vente-soon",
+      "category": "vehicule",
       "icon": "assets/img/repairkit.png",
       "enabled": true,
       "note": "",
@@ -692,7 +692,7 @@
     {
       "id": "gasoil",
       "name": "Diesel",
-      "category": "vente-soon",
+      "category": "vehicule",
       "icon": "assets/img/diesel.png",
       "enabled": true,
       "note": "",
@@ -705,7 +705,7 @@
     {
       "id": "essence",
       "name": "Essence",
-      "category": "vente-soon",
+      "category": "vehicule",
       "icon": "assets/img/essence.png",
       "enabled": true,
       "note": "",
@@ -718,7 +718,7 @@
     {
       "id": "roue-de-velo",
       "name": "Roue",
-      "category": "vente-soon",
+      "category": "vehicule",
       "icon": "assets/img/rouevelopng.png",
       "enabled": true,
       "note": "(Camion, moto, voiture ou vélo)",
@@ -731,7 +731,7 @@
     {
       "id": "cric-2",
       "name": "Cric",
-      "category": "vente-soon",
+      "category": "remorquage",
       "icon": "assets/img/cric.png",
       "enabled": true,
       "note": "",
@@ -747,7 +747,7 @@
     {
       "id": "sangle-de-remorquage",
       "name": "Sangle de remorquage",
-      "category": "vente-soon",
+      "category": "remorquage",
       "icon": "assets/img/sanglederemorquage.png",
       "enabled": true,
       "note": "",
@@ -761,7 +761,7 @@
     {
       "id": "chaine-de-remorquage",
       "name": "Chaîne de remorquage",
-      "category": "vente-soon",
+      "category": "remorquage",
       "icon": "assets/img/chainederemorquage.png",
       "enabled": true,
       "note": "",
@@ -775,7 +775,7 @@
     {
       "id": "10-pieces-detachees",
       "name": "10 Pièces détachées",
-      "category": "vente-soon",
+      "category": "atelier",
       "icon": "assets/img/vehicleparts.png",
       "enabled": true,
       "note": "",
@@ -788,7 +788,7 @@
     {
       "id": "huile-moteur",
       "name": "Huile moteur",
-      "category": "vente-soon",
+      "category": "atelier",
       "icon": "assets/img/huilemoteur.png",
       "enabled": true,
       "note": "",
@@ -801,7 +801,7 @@
     {
       "id": "kit-de-nettoyage-2",
       "name": "Kit de nettoyage",
-      "category": "vente-soon",
+      "category": "vehicule",
       "icon": "assets/img/kitdenettoyage.png",
       "enabled": true,
       "note": "",
