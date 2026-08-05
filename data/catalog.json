@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T19:26:34.715Z",
+  "updatedAt": "2026-08-05T19:28:13.059Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -442,7 +442,7 @@
     },
     {
       "id": "remorquage",
-      "name": "Remorquage",
+      "name": "Intervention",
       "icon": "i-wheels-moto",
       "parent": "vente-soon"
     },
@@ -639,7 +639,7 @@
     {
       "id": "roue",
       "name": "Roue",
-      "category": "service",
+      "category": "consommable",
       "icon": "assets/img/meca_jantes.png",
       "enabled": true,
       "note": "(Moto, voiture et camion)",
