@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T08:44:53.815Z",
+  "updatedAt": "2026-08-05T08:54:05.739Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -676,51 +676,12 @@
       }
     },
     {
-      "id": "roue-de-voiture",
-      "name": "Roue de voiture",
-      "category": "vente-soon",
-      "icon": "assets/img/car_tire.png",
-      "enabled": true,
-      "note": "",
-      "max": 10,
-      "excludes": [],
-      "cost": {
-        "ressource": 20
-      }
-    },
-    {
-      "id": "roue-de-moto",
-      "name": "Roue de moto",
-      "category": "vente-soon",
-      "icon": "assets/img/bike_tire.png",
-      "enabled": true,
-      "note": "",
-      "max": 10,
-      "excludes": [],
-      "cost": {
-        "ressource": 20
-      }
-    },
-    {
-      "id": "roue-de-camion",
-      "name": "Roue de camion",
-      "category": "vente-soon",
-      "icon": "assets/img/truck_tire.png",
-      "enabled": true,
-      "note": "",
-      "max": 10,
-      "excludes": [],
-      "cost": {
-        "ressource": 20
-      }
-    },
-    {
       "id": "roue-de-velo",
-      "name": "Roue de vélo",
+      "name": "Roue",
       "category": "vente-soon",
       "icon": "assets/img/rouevelopng.png",
       "enabled": true,
-      "note": "",
+      "note": "(Camion, moto, voiture ou vélo)",
       "max": 10,
       "excludes": [],
       "cost": {
@@ -760,7 +721,7 @@
       "icon": "assets/img/gasoil.png",
       "enabled": true,
       "note": "",
-      "max": 0,
+      "max": 200,
       "excludes": [],
       "cost": {
         "ressource": 2
@@ -773,7 +734,7 @@
       "icon": "assets/img/essence.png",
       "enabled": true,
       "note": "",
-      "max": 0,
+      "max": 200,
       "excludes": [],
       "cost": {
         "ressource": 4
