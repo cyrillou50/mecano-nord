@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T19:01:55.193Z",
+  "updatedAt": "2026-08-05T19:02:57.407Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -441,7 +441,7 @@
     {
       "id": "kit-accessoires",
       "name": "Kit accessoires",
-      "category": "kits",
+      "category": "carrosserie",
       "icon": "assets/img/meca_extras.png",
       "enabled": true,
       "note": "(Extra)",
@@ -456,7 +456,7 @@
     {
       "id": "kit-carrosserie",
       "name": "Kit carrosserie",
-      "category": "kits",
+      "category": "carrosserie",
       "icon": "assets/img/meca_cosmetique.png",
       "enabled": true,
       "note": "(Cosmétique et livré)",
@@ -470,7 +470,7 @@
     {
       "id": "kit-peinture",
       "name": "Kit Peinture",
-      "category": "kits",
+      "category": "carrosserie",
       "icon": "assets/img/meca_peinture.png",
       "enabled": true,
       "note": "(Couleur et vitre teintée ‎ ‎ ‎ ‎ HORS fumée de pneus ‎ ‎ ‎ ‎ ‎(Wheel smoke))",
@@ -484,7 +484,7 @@
     {
       "id": "kit-fumee-pneus",
       "name": "Kit fumée de pneus",
-      "category": "kits",
+      "category": "carrosserie",
       "icon": "assets/img/meca_fumee.png",
       "enabled": true,
       "note": "(Dans la catégorie couleur)",
@@ -498,7 +498,7 @@
     {
       "id": "pneus-tout-terrain",
       "name": "Pneus tout-terrain",
-      "category": "kits",
+      "category": "pneumatique",
       "icon": "assets/img/meca_pneus_offroad.png",
       "enabled": true,
       "note": "",
@@ -511,7 +511,7 @@
     {
       "id": "jantes-motos",
       "name": "Set de Jantes MOTOS",
-      "category": "kits",
+      "category": "pneumatique",
       "icon": "assets/img/meca_jantes.png",
       "enabled": true,
       "note": "",
@@ -527,7 +527,7 @@
     {
       "id": "jantes-voitures",
       "name": "Set de Jantes VOITURES",
-      "category": "kits",
+      "category": "pneumatique",
       "icon": "assets/img/meca_jantes.png",
       "enabled": true,
       "note": "",
@@ -542,7 +542,7 @@
     {
       "id": "jantes-camions",
       "name": "Set de Jantes CAMIONS",
-      "category": "kits",
+      "category": "pneumatique",
       "icon": "assets/img/meca_jantes.png",
       "enabled": true,
       "note": "",
