@@ -140,6 +140,10 @@ window.MNStore = (function () {
         note: it.note ? String(it.note) : "",
         /* Quantité maximale par bon de travail. 0 = illimité. */
         max: Math.max(0, Math.min(999, Math.round(Number(it.max) || 0))),
+        /* Taille du lot : « Pièces détachées » avec pack = 10 s'annonce
+           « 10 Pièces détachées », et « 20 » quand on en prend deux. Le coût
+           en ressources, lui, reste celui d'un lot. 0 ou 1 = pas de lot. */
+        pack: Math.max(0, Math.min(9999, Math.round(Number(it.pack) || 0))),
         /* Objets incompatibles : en choisir un bloque les autres. */
         excludes: (Array.isArray(it.excludes) ? it.excludes : [])
           .map(String).filter(x => x && x !== id),
@@ -364,6 +368,18 @@ window.MNStore = (function () {
   const categoryScope = (id, cat) =>
     [id].concat(subCategories(id, cat).map(c => c.id));
 
+  /**
+   * Nom d'un objet pour une quantité donnée.
+   * Sans lot, c'est son nom. Avec un lot de 10 : « 10 Pièces détachées » à
+   * l'unité, « 20 » pour deux. Une quantité nulle affiche le lot simple —
+   * c'est ce qu'on obtiendra en en prenant un.
+   */
+  function itemLabel(it, qty) {
+    if (!it) return "";
+    if (!(it.pack > 1)) return it.name;
+    return (it.pack * Math.max(1, Math.round(Number(qty) || 0))) + " " + it.name;
+  }
+
   /** Récapitulatif d'un panier { itemId: quantité }. */
   function totals(cart, cat) {
     const c = cat || _catalog;
@@ -417,7 +433,7 @@ window.MNStore = (function () {
     saveDraft, discardDraft, toJSON, download,
     catalog, published, hasDraft, origin, settings, brand, api,
     roleById, roleOf, itemById, resourceById, categoryById,
-    topCategories, subCategories, categoryScope, totals,
+    topCategories, subCategories, categoryScope, itemLabel, totals,
     getCart, setCart, getBTs, addBT, removeBT, clearBTs
   };
 })();

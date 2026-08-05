@@ -291,7 +291,7 @@
         : "") +
       (blocker ? '<span class="item__lock">' + svg("lock") + "</span>" : "") +
       '<div class="item__icon">' + mnIcon(it.icon) + "</div>" +
-      '<h3 class="item__name">' + esc(it.name) + "</h3>" +
+      '<h3 class="item__name">' + esc(MNStore.itemLabel(it, qty)) + "</h3>" +
       (blocker
         ? '<p class="item__note item__note--block">Incompatible avec ' + esc(blocker.name) + "</p>"
         : it.note ? '<p class="item__note">' + esc(it.note) + "</p>" : "") +
@@ -529,7 +529,7 @@
       '<div class="recap">' +
         t.lines.map(l =>
           '<div class="recap__line">' + mnIcon(l.item.icon) +
-            "<b>" + esc(l.item.name) + "</b>" +
+            "<b>" + esc(MNStore.itemLabel(l.item, l.qty)) + "</b>" +
             '<span class="recap__chips">' + costChips(l.item, l.qty) + "</span>" +
             "<i>×" + l.qty + "</i>" +
           "</div>"
@@ -563,7 +563,9 @@
         by: s ? s.pseudo : "?",
         client: g("#f-client"),
         note: g("#f-note"),
-        lines: t.lines.map(l => ({ id: l.item.id, name: l.item.name, qty: l.qty })),
+        /* Le nom enregistré porte déjà le lot : le bon reste lisible même si
+           l'objet est renommé ou sa taille de lot changée plus tard. */
+        lines: t.lines.map(l => ({ id: l.item.id, name: MNStore.itemLabel(l.item, l.qty), qty: l.qty })),
         resources: t.resources.map(r => ({ id: r.resource.id, name: r.resource.name, qty: r.qty })),
         count: t.count
       };

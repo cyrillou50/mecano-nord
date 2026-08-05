@@ -182,12 +182,28 @@
         '<button class="btn btn--primary" id="add">' + svg("plus") + "<span>Nouvel objet</span></button>" +
       "</div>" +
       (list.length
-        ? cats.map(c => {
-            const items = list.filter(i => i.category === c.id);
-            if (!items.length) return "";
-            return '<div><h3 class="section-title">' + esc(c.name) +
-              '<span class="count">' + items.length + "</span></h3>" +
-              '<div class="rows">' + items.map(it => itemRow(it, c)).join("") + "</div></div>";
+        /* Les objets sont rangés sous leur catégorie principale, les
+           sous-catégories formant des sous-blocs plutôt que des sections
+           séparées : c'est l'arborescence de la facturation. */
+        ? cats.filter(c => !c.parent).map(p => {
+            const directs = list.filter(i => i.category === p.id);
+            const sous = cats.filter(c => c.parent === p.id)
+              .map(s => ({ s, items: list.filter(i => i.category === s.id) }))
+              .filter(x => x.items.length);
+            const total = directs.length + sous.reduce((n, x) => n + x.items.length, 0);
+            if (!total) return "";
+
+            return '<div class="catblock"><h3 class="section-title">' + esc(p.name) +
+              '<span class="count">' + total + "</span></h3>" +
+              (directs.length
+                ? '<div class="rows">' + directs.map(it => itemRow(it, p)).join("") + "</div>"
+                : "") +
+              sous.map(x =>
+                '<div class="subblock"><h4 class="section-subtitle">' + esc(x.s.name) +
+                  '<span class="count">' + x.items.length + "</span></h4>" +
+                  '<div class="rows">' + x.items.map(it => itemRow(it, x.s)).join("") + "</div>" +
+                "</div>").join("") +
+            "</div>";
           }).join("")
         : '<div class="empty">' + svg("box") + "<b>Aucun objet</b><p>Clique sur « Nouvel objet » pour commencer.</p></div>");
 
@@ -232,6 +248,7 @@
         "<b>" + esc(it.name) + (it.enabled ? "" : " <span class=\"pill pill--dim\">masqué</span>") + "</b>" +
         '<div class="trow__meta"><i>' + esc(cat ? cat.name : "?") + "</i>" +
           (it.max > 0 ? '<span class="permtag">max ' + it.max + " / BT</span>" : "") +
+          (it.pack > 1 ? '<span class="permtag">lot de ' + it.pack + "</span>" : "") +
           (it.excludes.length
             ? '<span class="permtag">✕ ' + it.excludes.length + " incompatibilité" +
               (it.excludes.length > 1 ? "s" : "") + "</span>"
@@ -282,7 +299,7 @@
     const isNew = !it;
     const cur = it ? MNStore.clone(it) : {
       id: "", name: "", category: draft.categories[0].id, icon: "i-box",
-      enabled: true, note: "", max: 0, excludes: [], cost: {}
+      enabled: true, note: "", max: 0, pack: 0, excludes: [], cost: {}
     };
 
     const body = document.createElement("div");
@@ -318,6 +335,13 @@
           '<input class="input input--num" id="e-max" type="number" min="0" max="999" value="' + Number(cur.max || 0) + '">' +
           '<p class="hint"><b>0 = illimité.</b> Mettre 2 empêche d\'en prendre plus de 2 sur un même bon de travail.</p></div>' +
       "</div>" +
+
+      '<div class="field"><label class="label" for="e-pack">Quantité par lot</label>' +
+        '<input class="input input--num" id="e-pack" type="number" min="0" max="9999" value="' + Number(cur.pack || 0) + '">' +
+        '<p class="hint"><b>0 = pas de lot</b>, l\'objet s\'affiche sous son nom. Mettre 10 sur ' +
+          "<i>Pièces détachées</i> l'affiche « 10 Pièces détachées », puis « 20 » quand on en " +
+          "prend deux. Le nom ne doit alors <b>pas</b> contenir le nombre. Le coût en ressources " +
+          "reste celui d'un lot.</p></div>" +
 
       '<div class="fieldset"><span class="label">Objets incompatibles</span>' +
         '<p class="hint" style="margin-bottom:10px">Coche les objets qui ne peuvent pas figurer sur le ' +
@@ -427,6 +451,7 @@
               icon: body.querySelector("#e-ico").value.trim() || "i-box",
               note: body.querySelector("#e-note").value.trim(),
               max: Math.max(0, Math.min(999, Math.round(Number(body.querySelector("#e-max").value) || 0))),
+              pack: Math.max(0, Math.min(9999, Math.round(Number(body.querySelector("#e-pack").value) || 0))),
               enabled: body.querySelector("#e-on").checked,
               excludes: excl,
               cost
