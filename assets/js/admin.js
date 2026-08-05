@@ -171,14 +171,67 @@
      OBJETS
      ========================================================================= */
 
+  /* ---- Repliage des blocs -----------------------------------------------------
+     L'état vit dans le navigateur : chacun retrouve ses sections comme il les
+     a laissées, sans que ça encombre le catalogue partagé. */
+
+  const K_FOLD = "mn.admin.folds";
+
+  function foldsGet() {
+    try {
+      const v = JSON.parse(localStorage.getItem(K_FOLD));
+      return Array.isArray(v) ? v.map(String) : [];
+    } catch (_) { return []; }
+  }
+
+  function foldsSet(list) {
+    try { localStorage.setItem(K_FOLD, JSON.stringify(list.slice(0, 400))); }
+    catch (_) { /* quota : le repliage n'est pas vital */ }
+  }
+
+  function foldToggle(key) {
+    const l = foldsGet(), i = l.indexOf(key);
+    if (i === -1) l.push(key); else l.splice(i, 1);
+    foldsSet(l);
+  }
+
   function paneItems(host) {
     const cats = draft.categories;
     const f = filter.toLowerCase();
     const list = draft.items.filter(i => !f || i.name.toLowerCase().indexOf(f) !== -1);
 
+    /* Pendant une recherche, tout est déplié : masquer un résultat trouvé
+       serait absurde. L'état enregistré n'est pas touché pour autant. */
+    const plies = f ? [] : foldsGet();
+    const estPlie = k => plies.indexOf(k) !== -1;
+
+    /* Toutes les clés repliables de la vue, pour les boutons « tout … ». */
+    const cles = [];
+    cats.filter(c => !c.parent).forEach(p => {
+      cles.push("cat:" + p.id);
+      cats.filter(c => c.parent === p.id).forEach(s => cles.push("sub:" + s.id));
+    });
+    const toutPlie = cles.length > 0 && cles.every(estPlie);
+
+    const tete = (balise, classe, key, nom, n) =>
+      "<" + balise + ' class="' + classe + ' fold" data-fold="' + esc(key) +
+        '" role="button" tabindex="0" aria-expanded="' + (estPlie(key) ? "false" : "true") + '">' +
+        svg("chevDown", "fold__chev") + esc(nom) +
+        '<span class="count">' + n + "</span></" + balise + ">";
+
+    const bloc = (classe, balise, titre, key, nom, n, corps) =>
+      '<div class="' + classe + (estPlie(key) ? " is-folded" : "") + '">' +
+        tete(balise, titre, key, nom, n) +
+        '<div class="fold__body">' + corps + "</div>" +
+      "</div>";
+
     host.innerHTML =
       '<div class="toolbar">' +
         '<input class="input" id="f-search" placeholder="Filtrer les objets…" value="' + esc(filter) + '">' +
+        (cles.length && !f
+          ? '<button class="btn btn--ghost" id="f-fold">' + svg(toutPlie ? "chevDown" : "chevUp") +
+            "<span>" + (toutPlie ? "Tout déplier" : "Tout replier") + "</span></button>"
+          : "") +
         '<button class="btn btn--primary" id="add">' + svg("plus") + "<span>Nouvel objet</span></button>" +
       "</div>" +
       (list.length
@@ -193,17 +246,14 @@
             const total = directs.length + sous.reduce((n, x) => n + x.items.length, 0);
             if (!total) return "";
 
-            return '<div class="catblock"><h3 class="section-title">' + esc(p.name) +
-              '<span class="count">' + total + "</span></h3>" +
+            return bloc("catblock", "h3", "section-title", "cat:" + p.id, p.name, total,
               (directs.length
                 ? '<div class="rows">' + directs.map(it => itemRow(it, p)).join("") + "</div>"
                 : "") +
               sous.map(x =>
-                '<div class="subblock"><h4 class="section-subtitle">' + esc(x.s.name) +
-                  '<span class="count">' + x.items.length + "</span></h4>" +
-                  '<div class="rows">' + x.items.map(it => itemRow(it, x.s)).join("") + "</div>" +
-                "</div>").join("") +
-            "</div>";
+                bloc("subblock", "h4", "section-subtitle", "sub:" + x.s.id, x.s.name, x.items.length,
+                  '<div class="rows">' + x.items.map(it => itemRow(it, x.s)).join("") + "</div>")
+              ).join(""));
           }).join("")
         : '<div class="empty">' + svg("box") + "<b>Aucun objet</b><p>Clique sur « Nouvel objet » pour commencer.</p></div>");
 
@@ -215,6 +265,28 @@
       const ns = $("#f-search"); ns.focus(); ns.setSelectionRange(pos, pos);
     });
     $("#add").addEventListener("click", () => editItem(null));
+
+    const fold = $("#f-fold");
+    if (fold) fold.addEventListener("click", () => {
+      foldsSet(toutPlie ? [] : cles);
+      paneItems(host);
+    });
+
+    /* On bascule la classe plutôt que de tout reconstruire : le champ de
+       recherche garde son focus, et la liste ne saute pas. */
+    host.querySelectorAll("[data-fold]").forEach(h => {
+      const bascule = () => {
+        foldToggle(h.dataset.fold);
+        const plie = h.parentElement.classList.toggle("is-folded");
+        h.setAttribute("aria-expanded", plie ? "false" : "true");
+      };
+      h.addEventListener("click", bascule);
+      h.addEventListener("keydown", e => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        bascule();
+      });
+    });
 
     host.querySelectorAll("[data-row]").forEach(row => {
       const id = row.dataset.row;

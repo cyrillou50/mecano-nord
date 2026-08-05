@@ -436,6 +436,22 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 .section-subtitle .count { font-size: 11px; letter-spacing: .08em; color: var(--dim); opacity: .7; }
 
+/* ---- Blocs repliables ------------------------------------------------------ */
+
+.fold { cursor: pointer; user-select: none; }
+.fold:hover { color: var(--txt); }
+.fold:focus-visible { outline: 2px solid var(--pink); outline-offset: 3px; border-radius: 4px; }
+
+.fold__chev {
+  width: 15px; height: 15px; flex: none;
+  opacity: .65;
+  transition: transform .15s ease;
+}
+.is-folded > .fold .fold__chev { transform: rotate(-90deg); }
+.is-folded > .fold__body { display: none; }
+/* Replié, le titre n'a plus rien à espacer en dessous. */
+.is-folded > .section-title, .is-folded > .section-subtitle { margin-bottom: 0; }
+
 .page-title {
   margin: clamp(22px, 5vw, 44px) 0 clamp(18px, 3vw, 28px);
   text-align: center;
