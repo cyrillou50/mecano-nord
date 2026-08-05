@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T19:28:13.059Z",
+  "updatedAt": "2026-08-05T19:39:00.703Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -462,6 +462,7 @@
       "enabled": true,
       "note": "",
       "max": 1,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "verre": 8,
@@ -476,6 +477,7 @@
       "enabled": true,
       "note": "(Extra)",
       "max": 0,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "ferraille": 60,
@@ -491,6 +493,7 @@
       "enabled": true,
       "note": "(Cosmétique et livré)",
       "max": 0,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "ferraille": 60,
@@ -505,6 +508,7 @@
       "enabled": true,
       "note": "(Couleur et vitre teintée ‎ ‎ ‎ ‎ HORS fumée de pneus ‎ ‎ ‎ ‎ ‎(Wheel smoke))",
       "max": 7,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "tissu": 30,
@@ -519,6 +523,7 @@
       "enabled": true,
       "note": "(Dans la catégorie couleur)",
       "max": 1,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "plastique": 50,
@@ -533,6 +538,7 @@
       "enabled": true,
       "note": "",
       "max": 1,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "plastique": 125
@@ -546,6 +552,7 @@
       "enabled": true,
       "note": "",
       "max": 1,
+      "pack": 0,
       "excludes": [
         "jantes-voitures",
         "jantes-camions"
@@ -562,6 +569,7 @@
       "enabled": true,
       "note": "",
       "max": 1,
+      "pack": 0,
       "excludes": [
         "jantes-camions"
       ],
@@ -577,6 +585,7 @@
       "enabled": true,
       "note": "",
       "max": 1,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "roue-camion": 6
@@ -590,6 +599,7 @@
       "enabled": true,
       "note": "(hors Cayo et Manor)",
       "max": 1,
+      "pack": 0,
       "excludes": [
         "deplacement-eloigne"
       ],
@@ -605,6 +615,7 @@
       "enabled": true,
       "note": "(Cayo et Manor uniquement)",
       "max": 1,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "ressource": 50
@@ -618,6 +629,7 @@
       "enabled": true,
       "note": "(Essence ou diesel)",
       "max": 0,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "ressource": 2
@@ -631,6 +643,7 @@
       "enabled": true,
       "note": "",
       "max": 1,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "ressource": 50
@@ -644,6 +657,7 @@
       "enabled": true,
       "note": "(Moto, voiture et camion)",
       "max": 0,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "ressource": 15
@@ -657,6 +671,7 @@
       "enabled": true,
       "note": "",
       "max": 0,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "ressource": 10
@@ -670,6 +685,7 @@
       "enabled": true,
       "note": "(Seulement avec formation)",
       "max": 0,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "ressource": 100
@@ -683,6 +699,7 @@
       "enabled": true,
       "note": "",
       "max": 10,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "ferraille": 30,
@@ -697,6 +714,7 @@
       "enabled": true,
       "note": "",
       "max": 200,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "ressource": 2
@@ -710,6 +728,7 @@
       "enabled": true,
       "note": "",
       "max": 200,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "ressource": 4
@@ -723,6 +742,7 @@
       "enabled": true,
       "note": "(Camion, moto, voiture ou vélo)",
       "max": 10,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "ressource": 20
@@ -736,6 +756,7 @@
       "enabled": true,
       "note": "",
       "max": 1,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "huile-moteur": 30,
@@ -752,6 +773,7 @@
       "enabled": true,
       "note": "",
       "max": 1,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "tissu": 120,
@@ -766,6 +788,7 @@
       "enabled": true,
       "note": "",
       "max": 1,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "fer": 60,
@@ -774,12 +797,13 @@
     },
     {
       "id": "10-pieces-detachees",
-      "name": "10 Pièces détachées",
+      "name": "Pièces détachées",
       "category": "atelier",
       "icon": "assets/img/vehicleparts.png",
       "enabled": true,
       "note": "",
       "max": 0,
+      "pack": 10,
       "excludes": [],
       "cost": {
         "ressource": 1
@@ -793,6 +817,7 @@
       "enabled": true,
       "note": "",
       "max": 0,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "ressource": 10
@@ -806,6 +831,7 @@
       "enabled": true,
       "note": "",
       "max": 0,
+      "pack": 0,
       "excludes": [],
       "cost": {
         "tissu": 4,
@@ -820,6 +846,7 @@
       "enabled": true,
       "note": "",
       "max": 0,
+      "pack": 0,
       "excludes": [],
       "cost": {}
     },
@@ -831,6 +858,7 @@
       "enabled": true,
       "note": "",
       "max": 0,
+      "pack": 0,
       "excludes": [],
       "cost": {}
     },
@@ -842,6 +870,7 @@
       "enabled": true,
       "note": "",
       "max": 0,
+      "pack": 0,
       "excludes": [],
       "cost": {}
     },
@@ -853,6 +882,7 @@
       "enabled": true,
       "note": "",
       "max": 0,
+      "pack": 0,
       "excludes": [],
       "cost": {}
     },
@@ -864,6 +894,7 @@
       "enabled": true,
       "note": "",
       "max": 0,
+      "pack": 0,
       "excludes": [],
       "cost": {}
     }
