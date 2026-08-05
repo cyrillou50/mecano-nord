@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T08:10:02.613Z",
+  "updatedAt": "2026-08-05T08:21:20.804Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -364,6 +364,18 @@
       "id": "gourde-d-eau",
       "name": "Gourde d'eau",
       "icon": "assets/img/gourdedeaupng.png",
+      "color": "#9fb0c4"
+    },
+    {
+      "id": "gasoil",
+      "name": "Gasoil",
+      "icon": "assets/img/gasoil.png",
+      "color": "#9fb0c4"
+    },
+    {
+      "id": "essence",
+      "name": "Essence",
+      "icon": "r-metal",
       "color": "#9fb0c4"
     }
   ],
@@ -739,6 +751,32 @@
       "excludes": [],
       "cost": {
         "ressource": 1
+      }
+    },
+    {
+      "id": "gasoil",
+      "name": "Gasoil",
+      "category": "kits",
+      "icon": "i-box",
+      "enabled": true,
+      "note": "",
+      "max": 0,
+      "excludes": [],
+      "cost": {
+        "ressource": 2
+      }
+    },
+    {
+      "id": "essence",
+      "name": "Essence",
+      "category": "kits",
+      "icon": "i-box",
+      "enabled": true,
+      "note": "",
+      "max": 0,
+      "excludes": [],
+      "cost": {
+        "ressource": 4
       }
     }
   ]
