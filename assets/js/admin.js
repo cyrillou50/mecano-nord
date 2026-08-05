@@ -292,9 +292,7 @@
         '<div class="field"><label class="label" for="e-name">Nom de l\'objet</label>' +
           '<input class="input" id="e-name" maxlength="60" value="' + esc(cur.name) + '" placeholder="Ex. Kit Phares Xénon"></div>' +
         '<div class="field"><label class="label" for="e-cat">Catégorie</label>' +
-          '<select class="select" id="e-cat">' + draft.categories.map(c =>
-            '<option value="' + esc(c.id) + '"' + (c.id === cur.category ? " selected" : "") + ">" + esc(c.name) + "</option>"
-          ).join("") + "</select></div>" +
+          '<select class="select" id="e-cat">' + catOptions(cur.category) + "</select></div>" +
       "</div>" +
 
       '<div class="field"><label class="label">Icône</label>' +
@@ -741,45 +739,131 @@
      ========================================================================= */
 
   function paneCats(host) {
+    /* La liste reste un tableau à plat — c'est ce qui porte l'ordre — mais on
+       l'affiche en arbre : chaque principale suivie des siennes. */
+    const rangees = [];
+    draft.categories.filter(c => !c.parent).forEach(p => {
+      rangees.push(p);
+      draft.categories.filter(c => c.parent === p.id).forEach(s => rangees.push(s));
+    });
+
+    const freres = c => draft.categories.filter(x => x.parent === c.parent);
+
     host.innerHTML =
       '<div class="toolbar">' +
         '<span class="subtitle">Ordre d\'affichage sur la page de facturation</span>' +
         '<span class="spacer"></span>' +
         '<button class="btn btn--primary" id="add">' + svg("plus") + "<span>Nouvelle catégorie</span></button>" +
       "</div>" +
-      '<div class="rows">' + draft.categories.map((c, i) => {
+      '<div class="rows">' + rangees.map(c => {
         const n = draft.items.filter(x => x.category === c.id).length;
-        return '<div class="trow" data-row="' + esc(c.id) + '">' +
+        const f = freres(c);
+        const rang = f.indexOf(c);
+        const sous = draft.categories.filter(x => x.parent === c.id).length;
+        return '<div class="trow' + (c.parent ? " trow--sub" : "") + '" data-row="' + esc(c.id) + '">' +
           '<div class="ord">' +
-            '<button data-a="up"' + (i === 0 ? " disabled" : "") + ">" + svg("chevUp") + "</button>" +
-            '<button data-a="down"' + (i === draft.categories.length - 1 ? " disabled" : "") + ">" + svg("chevDown") + "</button>" +
+            '<button data-a="up"' + (rang === 0 ? " disabled" : "") + ">" + svg("chevUp") + "</button>" +
+            '<button data-a="down"' + (rang === f.length - 1 ? " disabled" : "") + ">" + svg("chevDown") + "</button>" +
           "</div>" +
           '<div class="trow__ico">' + mnIcon(c.icon) + "</div>" +
           '<div class="trow__main"><b>' + esc(c.name) + "</b>" +
-            '<div class="trow__meta"><i>' + n + " objet" + (n > 1 ? "s" : "") + "</i></div></div>" +
+            '<div class="trow__meta"><i>' + n + " objet" + (n > 1 ? "s" : "") + "</i>" +
+              (sous ? "<em>" + sous + " sous-catégorie" + (sous > 1 ? "s" : "") + "</em>" : "") +
+            "</div></div>" +
           '<div class="trow__acts">' +
+            (c.parent
+              ? ""
+              : '<button class="btn btn--icon" data-a="sub" title="Ajouter une sous-catégorie">' +
+                svg("plus") + "</button>") +
             '<button class="btn btn--icon" data-a="edit" title="Modifier">' + svg("edit") + "</button>" +
             '<button class="btn btn--icon" data-a="del" title="Supprimer">' + svg("trash") + "</button>" +
           "</div></div>";
       }).join("") + "</div>";
 
-    $("#add").addEventListener("click", () => editCat(null));
+    $("#add").addEventListener("click", () => editCat(null, ""));
     bindRows(host, draft.categories, {
       edit: c => editCat(c),
-      del: c => deleteCat(c)
+      sub: c => editCat(null, c.id),
+      del: c => deleteCat(c),
+      /* Le déplacement se fait entre voisins de même niveau : une
+         sous-catégorie ne saute pas par-dessus sa parente. */
+      up: c => moveCat(c, -1),
+      down: c => moveCat(c, 1)
     });
   }
 
-  function editCat(c) {
+  /** Échange une catégorie avec sa voisine de même parent. */
+  function moveCat(c, dir) {
+    const f = draft.categories.filter(x => x.parent === c.parent);
+    const cible = f[f.indexOf(c) + dir];
+    if (!cible) return;
+    const a = draft.categories.indexOf(c), b = draft.categories.indexOf(cible);
+    draft.categories[a] = cible;
+    draft.categories[b] = c;
+    commit();
+  }
+
+  /**
+   * Liste déroulante des catégories, sous-catégories groupées sous la leur.
+   * Un objet se range indifféremment dans une principale ou une sous.
+   */
+  function catOptions(selected) {
+    const opt = c => '<option value="' + esc(c.id) + '"' +
+      (c.id === selected ? " selected" : "") + ">" + esc(c.name) + "</option>";
+
+    return draft.categories.filter(c => !c.parent).map(p => {
+      const enfants = draft.categories.filter(c => c.parent === p.id);
+      if (!enfants.length) return opt(p);
+      return opt(p) +
+        '<optgroup label="' + esc(p.name) + ' ›">' + enfants.map(opt).join("") + "</optgroup>";
+    }).join("");
+  }
+
+  /**
+   * @param {object} c        la catégorie à modifier, ou null pour en créer une
+   * @param {string} parentId parent imposé à la création ; "" pour une principale
+   */
+  function editCat(c, parentId) {
     const isNew = !c;
-    const cur = c || { name: "", icon: "i-box" };
+    const cur = c || { name: "", icon: "i-box", parent: parentId || "" };
+
+    /* On ne propose comme parents que les principales — le modèle n'accepte
+       qu'un niveau — et jamais la catégorie elle-même. */
+    const parentables = draft.categories.filter(x => !x.parent && (!c || x.id !== c.id));
+    /* Une catégorie qui a déjà des sous-catégories ne peut pas en devenir une. */
+    const aDesEnfants = !!c && draft.categories.some(x => x.parent === c.id);
+
+    const choix = parentables.map(x =>
+      '<option value="' + esc(x.id) + '"' + (cur.parent === x.id ? " selected" : "") + ">" +
+      esc(x.name) + "</option>").join("");
+
+    const extra = aDesEnfants
+      ? '<p class="hint">Cette catégorie contient des sous-catégories : elle reste au premier niveau.</p>'
+      : '<div class="field"><label class="label" for="s-parent">Rattachée à</label>' +
+          '<select class="select" id="s-parent">' +
+            '<option value=""' + (cur.parent ? "" : " selected") + ">Aucune — catégorie principale</option>" +
+            choix +
+          "</select>" +
+          '<p class="hint">Une sous-catégorie apparaît sous sa catégorie, dans une seconde rangée ' +
+            "d'onglets sur la page de facturation.</p></div>";
+
     simpleEditor({
-      title: isNew ? "Nouvelle catégorie" : "Modifier la catégorie",
+      title: isNew
+        ? (parentId ? "Nouvelle sous-catégorie" : "Nouvelle catégorie")
+        : "Modifier la catégorie",
       name: cur.name, icon: cur.icon,
-      placeholder: "Ex. Pneumatique",
-      onSave: (name, icon, close) => {
-        if (isNew) draft.categories.push({ id: MNStore.uniqueId(name, draft.categories.map(x => x.id)), name, icon });
-        else { c.name = name; c.icon = icon; }
+      placeholder: parentId ? "Ex. Jantes 19 pouces" : "Ex. Pneumatique",
+      extra,
+      onSave: (name, icon, close, _color, body) => {
+        const sel = body.querySelector("#s-parent");
+        const parent = aDesEnfants ? "" : (sel ? sel.value : cur.parent);
+        if (isNew) {
+          draft.categories.push({
+            id: MNStore.uniqueId(name, draft.categories.map(x => x.id)), name, icon, parent
+          });
+        } else {
+          c.name = name; c.icon = icon; c.parent = parent;
+        }
         commit(); close();
         MNUI.toast(isNew ? "Catégorie créée" : "Catégorie mise à jour", "ok");
       }
@@ -787,19 +871,31 @@
   }
 
   async function deleteCat(c) {
-    if (draft.categories.length <= 1) return MNUI.toast("Il faut au moins une catégorie", "err");
+    if (draft.categories.filter(x => !x.parent).length <= 1 && !c.parent) {
+      return MNUI.toast("Il faut au moins une catégorie principale", "err");
+    }
+    const enfants = draft.categories.filter(x => x.parent === c.id);
     const n = draft.items.filter(x => x.category === c.id).length;
+    const repli = draft.categories.find(x => x.id !== c.id && x.parent !== c.id);
+    if (!repli) return MNUI.toast("Il faut au moins une autre catégorie", "err");
+
+    const dit = [];
+    if (n) dit.push(n + " objet" + (n > 1 ? "s" : "") + " ser" + (n > 1 ? "ont" : "a") +
+      " déplacé" + (n > 1 ? "s" : "") + " dans « " + repli.name + " »");
+    if (enfants.length) dit.push("ses " + enfants.length + " sous-catégorie" +
+      (enfants.length > 1 ? "s remonteront" : " remontera") + " au premier niveau");
+
     const ok = await MNUI.confirm({
       title: "Supprimer la catégorie",
-      message: n
-        ? "« " + c.name + " » contient " + n + " objet" + (n > 1 ? "s" : "") +
-          ". Ils seront déplacés dans « " + draft.categories.find(x => x.id !== c.id).name + " »."
-        : "« " + c.name + " » sera supprimée.",
+      message: "« " + c.name + " » sera supprimée" + (dit.length ? " : " + dit.join(", ") : "") + ".",
       confirmLabel: "Supprimer", danger: true
     });
     if (!ok) return;
-    const fallback = draft.categories.find(x => x.id !== c.id).id;
-    draft.items.forEach(i => { if (i.category === c.id) i.category = fallback; });
+
+    /* Les sous-catégories survivent à leur parente : les supprimer avec elle
+       ferait disparaître des objets sans prévenir. */
+    enfants.forEach(x => { x.parent = ""; });
+    draft.items.forEach(i => { if (i.category === c.id) i.category = repli.id; });
     draft.categories = draft.categories.filter(x => x.id !== c.id);
     commit();
     MNUI.toast("Catégorie supprimée", "ok");
@@ -893,7 +989,9 @@
       (opt.color !== undefined
         ? '<div class="field"><label class="label" for="s-color">Couleur</label>' +
           '<input class="input" id="s-color" type="color" value="' + esc(opt.color) + '" style="height:44px;padding:5px"></div>'
-        : "");
+        : "") +
+      /* Champs propres à l'appelant ; il les relit lui-même depuis `body`. */
+      (opt.extra || "");
 
     const prev = body.querySelector("#s-prev");
     const ico = body.querySelector("#s-ico");
@@ -912,7 +1010,7 @@
           onClick: close => {
             const name = body.querySelector("#s-name").value.trim();
             if (!name) return MNUI.toast("Le nom est obligatoire", "err");
-            opt.onSave(name, ico.value.trim() || "i-box", close, col ? col.value : undefined);
+            opt.onSave(name, ico.value.trim() || "i-box", close, col ? col.value : undefined, body);
           }
         }
       ]
@@ -927,8 +1025,10 @@
         const obj = arr.find(x => x.id === id);
         if (!obj) return;
         const a = b.dataset.a;
+        /* Un gestionnaire explicite prime : les catégories ont leur propre
+           façon de se déplacer, par niveau. */
+        if (handlers[a]) return handlers[a](obj);
         if (a === "up" || a === "down") return moveInArray(arr, id, a === "up" ? -1 : 1);
-        if (handlers[a]) handlers[a](obj);
       }));
     });
   }

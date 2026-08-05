@@ -12,6 +12,7 @@
   let cart = {};
   let lastResKey = "";
   let activeCat = localStorage.getItem("mn.cat") || "all";
+  let activeSub = localStorage.getItem("mn.sub") || "";
   let showCosts = localStorage.getItem("mn.showCosts") === "1";
   let canBT = false;
 
@@ -23,8 +24,15 @@
     canBT = MNAuth.can("bt");
     cart = MNStore.getCart();
 
-    /* La catégorie mémorisée peut avoir été supprimée entre-temps. */
-    if (activeCat !== "all" && !MNStore.categoryById(activeCat)) activeCat = "all";
+    /* La catégorie mémorisée peut avoir été supprimée entre-temps, ou être
+       devenue une sous-catégorie : dans ce cas on remonte sur son parent. */
+    const memo = activeCat !== "all" && MNStore.categoryById(activeCat);
+    if (activeCat !== "all" && !memo) activeCat = "all";
+    else if (memo && memo.parent) { activeSub = memo.id; activeCat = memo.parent; }
+    if (activeSub && activeSub !== "__direct") {
+      const s = MNStore.categoryById(activeSub);
+      if (!s || s.parent !== activeCat) activeSub = "";
+    }
 
     bindCostsToggle();
     bindDock();
@@ -69,8 +77,13 @@
 
   const visibleItems = () => MNStore.catalog().items.filter(i => i.enabled);
 
+  /** Les objets visibles d'une catégorie, sous-catégories comprises. */
+  const itemsUnder = id => {
+    const scope = MNStore.categoryScope(id);
+    return visibleItems().filter(i => scope.indexOf(i.category) !== -1);
+  };
+
   function renderTabs() {
-    const cat = MNStore.catalog();
     const host = $("#cattabs");
     const all = visibleItems();
 
@@ -86,8 +99,10 @@
 
     host.innerHTML =
       // tab("all", "Customs", null, all) +
-      cat.categories
-        .map(c => ({ c, items: all.filter(i => i.category === c.id) }))
+      MNStore.topCategories()
+        /* Une catégorie compte pour ce qu'elle contient, directement ou par
+           ses sous-catégories. */
+        .map(c => ({ c, items: itemsUnder(c.id) }))
         .filter(x => x.items.length)
         .map(x => tab(x.c.id, x.c.name, x.c.icon, x.items))
         .join("");
@@ -95,8 +110,59 @@
     host.querySelectorAll("[data-cat]").forEach(b => b.addEventListener("click", () => {
       if (activeCat === b.dataset.cat) return;
       activeCat = b.dataset.cat;
+      activeSub = "";                       // on repart du contenu complet
       localStorage.setItem("mn.cat", activeCat);
+      localStorage.setItem("mn.sub", "");
       host.querySelectorAll("[data-cat]").forEach(x => x.classList.toggle("is-active", x === b));
+      renderSubTabs();
+      renderCatalog();
+    }));
+
+    renderSubTabs();
+  }
+
+  /**
+   * Deuxième rangée, affichée seulement quand la catégorie active se divise.
+   * « Tout » y figure toujours : sans lui, on ne pourrait plus voir d'un coup
+   * ce que contient la catégorie.
+   */
+  function renderSubTabs() {
+    const host = $("#subtabs");
+    const subs = MNStore.subCategories(activeCat)
+      .map(c => ({ c, items: visibleItems().filter(i => i.category === c.id) }))
+      .filter(x => x.items.length);
+
+    if (!subs.length) {
+      host.hidden = true;
+      host.innerHTML = "";
+      return;
+    }
+    host.hidden = false;
+
+    const direct = visibleItems().filter(i => i.category === activeCat);
+    const onglet = (id, name, icon, items) => {
+      const picked = items.reduce((n, i) => n + (cart[i.id] || 0), 0);
+      return '<button class="subtab' + (activeSub === id ? " is-active" : "") +
+        '" data-sub="' + esc(id) + '">' +
+        (icon ? mnIcon(icon) : "") +
+        "<span>" + esc(name) + "</span>" +
+        '<span class="subtab__n">' + items.length + "</span>" +
+        (picked ? '<span class="subtab__dot">' + picked + "</span>" : "") +
+      "</button>";
+    };
+
+    host.innerHTML =
+      onglet("", "Tout", null, itemsUnder(activeCat)) +
+      /* Les objets rangés dans la catégorie elle-même méritent leur onglet,
+         sinon ils ne seraient joignables que par « Tout ». */
+      (direct.length ? onglet("__direct", "Autres", null, direct) : "") +
+      subs.map(x => onglet(x.c.id, x.c.name, x.c.icon, x.items)).join("");
+
+    host.querySelectorAll("[data-sub]").forEach(b => b.addEventListener("click", () => {
+      if (activeSub === b.dataset.sub) return;
+      activeSub = b.dataset.sub;
+      localStorage.setItem("mn.sub", activeSub);
+      host.querySelectorAll("[data-sub]").forEach(x => x.classList.toggle("is-active", x === b));
       renderCatalog();
     }));
   }
@@ -108,19 +174,30 @@
    */
   function updateTabBadges() {
     const all = visibleItems();
-    $("#cattabs").querySelectorAll("[data-cat]").forEach(btn => {
-      const id = btn.dataset.cat;
-      const items = id === "all" ? all : all.filter(i => i.category === id);
-      const picked = items.reduce((n, i) => n + (cart[i.id] || 0), 0);
-      let dot = btn.querySelector(".cattab__dot");
 
+    const poser = (btn, items, classe) => {
+      const picked = items.reduce((n, i) => n + (cart[i.id] || 0), 0);
+      let dot = btn.querySelector("." + classe);
       if (!picked) { if (dot) dot.remove(); return; }
       if (!dot) {
         dot = document.createElement("span");
-        dot.className = "cattab__dot";
+        dot.className = classe;
         btn.appendChild(dot);
       }
       if (dot.textContent !== String(picked)) dot.textContent = picked;
+    };
+
+    $("#cattabs").querySelectorAll("[data-cat]").forEach(btn => {
+      const id = btn.dataset.cat;
+      poser(btn, id === "all" ? all : itemsUnder(id), "cattab__dot");
+    });
+
+    $("#subtabs").querySelectorAll("[data-sub]").forEach(btn => {
+      const id = btn.dataset.sub;
+      const items = id === ""
+        ? itemsUnder(activeCat)
+        : all.filter(i => i.category === (id === "__direct" ? activeCat : id));
+      poser(btn, items, "subtab__dot");
     });
   }
 
@@ -140,20 +217,34 @@
     }
     empty.hidden = true;
 
-    const cats = activeCat === "all"
-      ? cat.categories
-      : cat.categories.filter(c => c.id === activeCat);
+    /* Chaque bloc est une catégorie ou une sous-catégorie. Le titre n'apparaît
+       que s'il y en a plusieurs : au-dessus d'une liste unique, il ne dirait
+       rien que l'onglet actif ne dise déjà. */
+    let blocs;
+    if (activeCat === "all") {
+      blocs = cat.categories;
+    } else if (activeSub === "__direct") {
+      blocs = cat.categories.filter(c => c.id === activeCat);
+    } else if (activeSub) {
+      blocs = cat.categories.filter(c => c.id === activeSub);
+    } else {
+      blocs = cat.categories.filter(c => c.id === activeCat || c.parent === activeCat);
+    }
 
-    host.innerHTML = cats.map(c => {
-      const items = visibleItems().filter(i => i.category === c.id);
-      if (!items.length) return "";
-      return '<section class="cat">' +
-        (activeCat === "all"
-          ? '<h2 class="section-title">' + esc(c.name) + '<span class="count">' + items.length + "</span></h2>"
+    const remplis = blocs
+      .map(c => ({ c, items: visibleItems().filter(i => i.category === c.id) }))
+      .filter(x => x.items.length);
+
+    const titres = remplis.length > 1;
+    host.innerHTML = remplis.map(x =>
+      '<section class="cat">' +
+        (titres
+          ? '<h2 class="section-title">' + esc(x.c.name) +
+            '<span class="count">' + x.items.length + "</span></h2>"
           : "") +
-        '<div class="grid">' + items.map(itemCard).join("") + "</div>" +
-      "</section>";
-    }).join("");
+        '<div class="grid">' + x.items.map(itemCard).join("") + "</div>" +
+      "</section>"
+    ).join("");
   }
 
   function costChips(it, unit) {

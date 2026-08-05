@@ -105,9 +105,20 @@ window.MNStore = (function () {
     const seenC = [];
     c.categories = (Array.isArray(c.categories) ? c.categories : []).map(k => {
       const id = uniqueId(k.id || k.name, seenC); seenC.push(id);
-      return { id, name: String(k.name || id), icon: k.icon || "i-box" };
+      /* `parent` vide = catégorie principale ; sinon l'id de celle qui la
+         contient. Les objets, eux, pointent indifféremment sur l'une ou
+         l'autre : une sous-catégorie est une catégorie comme les autres. */
+      return { id, name: String(k.name || id), icon: k.icon || "i-box", parent: String(k.parent || "") };
     });
-    if (!c.categories.length) c.categories = [{ id: "divers", name: "Divers", icon: "i-box" }];
+    if (!c.categories.length) c.categories = [{ id: "divers", name: "Divers", icon: "i-box", parent: "" }];
+
+    /* Un seul niveau d'imbrication : une sous-catégorie ne peut pas en
+       contenir. Tout parent qui n'est pas lui-même principal est ignoré, ce
+       qui règle du même coup les cycles et les parents disparus. */
+    const principales = c.categories.filter(k => !k.parent).map(k => k.id);
+    c.categories.forEach(k => {
+      if (principales.indexOf(k.parent) === -1) k.parent = "";
+    });
 
     /* --- objets --- */
     const resIds = c.resources.map(r => r.id);
@@ -339,6 +350,20 @@ window.MNStore = (function () {
   const resourceById = id => (_catalog.resources || []).find(r => r.id === id) || null;
   const categoryById = id => (_catalog.categories || []).find(c => c.id === id) || null;
 
+  /** Les catégories principales, dans l'ordre d'affichage. */
+  const topCategories = cat => ((cat || _catalog).categories || []).filter(c => !c.parent);
+
+  /** Les sous-catégories d'une catégorie, dans l'ordre d'affichage. */
+  const subCategories = (id, cat) =>
+    ((cat || _catalog).categories || []).filter(c => c.parent === id);
+
+  /**
+   * La catégorie et ses sous-catégories : ce qu'un onglet principal recouvre.
+   * @returns {string[]} identifiants
+   */
+  const categoryScope = (id, cat) =>
+    [id].concat(subCategories(id, cat).map(c => c.id));
+
   /** Récapitulatif d'un panier { itemId: quantité }. */
   function totals(cart, cat) {
     const c = cat || _catalog;
@@ -391,7 +416,8 @@ window.MNStore = (function () {
     load, normalize, slugify, uniqueId, clone, onChange, recordPromotion,
     saveDraft, discardDraft, toJSON, download,
     catalog, published, hasDraft, origin, settings, brand, api,
-    roleById, roleOf, itemById, resourceById, categoryById, totals,
+    roleById, roleOf, itemById, resourceById, categoryById,
+    topCategories, subCategories, categoryScope, totals,
     getCart, setCart, getBTs, addBT, removeBT, clearBTs
   };
 })();

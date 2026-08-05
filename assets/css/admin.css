@@ -101,6 +101,19 @@
   transition: border-color .14s, background .14s;
 }
 .trow:hover { border-color: var(--line-2); background: linear-gradient(180deg, #1a1526, #120f1b); }
+
+/* sous-catégorie : décalée et reliée à sa parente par un trait */
+.trow--sub {
+  margin-left: 28px;
+  position: relative;
+  background: linear-gradient(180deg, #16121f, #0f0c17);
+}
+.trow--sub::before {
+  content: "";
+  position: absolute; left: -17px; top: 50%;
+  width: 11px; height: 1px;
+  background: var(--line-2);
+}
 .trow.is-off { opacity: .48; }
 
 .trow__ico {
