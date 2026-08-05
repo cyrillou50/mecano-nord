@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T19:24:51.690Z",
+  "updatedAt": "2026-08-05T19:26:34.715Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -418,7 +418,7 @@
     },
     {
       "id": "performance-2",
-      "name": "Performance",
+      "name": "Performance (soon)",
       "icon": "r-chip",
       "parent": "kits"
     },
