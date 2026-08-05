@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T09:12:16.055Z",
+  "updatedAt": "2026-08-05T09:20:26.758Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -763,6 +763,39 @@
     {
       "id": "freins",
       "name": "Freins",
+      "category": "performance",
+      "icon": "assets/img/freins.png",
+      "enabled": true,
+      "note": "",
+      "max": 0,
+      "excludes": [],
+      "cost": {}
+    },
+    {
+      "id": "moteur",
+      "name": "Moteur",
+      "category": "performance",
+      "icon": "assets/img/moteur.png",
+      "enabled": true,
+      "note": "",
+      "max": 0,
+      "excludes": [],
+      "cost": {}
+    },
+    {
+      "id": "transmission",
+      "name": "Transmission",
+      "category": "performance",
+      "icon": "i-box",
+      "enabled": true,
+      "note": "",
+      "max": 0,
+      "excludes": [],
+      "cost": {}
+    },
+    {
+      "id": "turbo",
+      "name": "Turbo",
       "category": "performance",
       "icon": "i-box",
       "enabled": true,
