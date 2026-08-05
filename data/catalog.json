@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T19:15:40.349Z",
+  "updatedAt": "2026-08-05T19:23:51.701Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -433,6 +433,24 @@
       "name": "Service",
       "icon": "i-badge",
       "parent": "depannage"
+    },
+    {
+      "id": "vehicule",
+      "name": "Véhicule",
+      "icon": "i-headlight",
+      "parent": "vente-soon"
+    },
+    {
+      "id": "remorquage",
+      "name": "Remorquage",
+      "icon": "i-wheels-moto",
+      "parent": "vente-soon"
+    },
+    {
+      "id": "atelier",
+      "name": "Atelier",
+      "icon": "i-suspension",
+      "parent": "vente-soon"
     }
   ],
   "items": [
