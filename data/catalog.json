@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T09:21:51.506Z",
+  "updatedAt": "2026-08-05T09:26:30.693Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -797,7 +797,7 @@
       "id": "turbo",
       "name": "Turbo",
       "category": "performance",
-      "icon": "i-box",
+      "icon": "assets/img/turbo.png",
       "enabled": true,
       "note": "",
       "max": 0,
