@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T19:06:04.482Z",
+  "updatedAt": "2026-08-05T19:15:40.349Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -421,6 +421,18 @@
       "name": "Performance",
       "icon": "r-chip",
       "parent": "kits"
+    },
+    {
+      "id": "consommable",
+      "name": "Consommable",
+      "icon": "i-helmet",
+      "parent": "depannage"
+    },
+    {
+      "id": "service",
+      "name": "Service",
+      "icon": "i-badge",
+      "parent": "depannage"
     }
   ],
   "items": [
@@ -583,7 +595,7 @@
     {
       "id": "carburant",
       "name": "Carburant",
-      "category": "depannage",
+      "category": "consommable",
       "icon": "assets/img/carburant.png",
       "enabled": true,
       "note": "(Essence ou diesel)",
@@ -596,7 +608,7 @@
     {
       "id": "kit-de-reparation",
       "name": "Kit de réparation",
-      "category": "depannage",
+      "category": "consommable",
       "icon": "assets/img/repairkit.png",
       "enabled": true,
       "note": "",
@@ -609,7 +621,7 @@
     {
       "id": "roue",
       "name": "Roue",
-      "category": "depannage",
+      "category": "service",
       "icon": "assets/img/meca_jantes.png",
       "enabled": true,
       "note": "(Moto, voiture et camion)",
@@ -622,7 +634,7 @@
     {
       "id": "cric",
       "name": "Cric",
-      "category": "depannage",
+      "category": "service",
       "icon": "assets/img/cric.png",
       "enabled": true,
       "note": "",
@@ -635,7 +647,7 @@
     {
       "id": "remorquage",
       "name": "Remorquage",
-      "category": "depannage",
+      "category": "service",
       "icon": "assets/img/wastelander.png",
       "enabled": true,
       "note": "(Seulement avec formation)",
