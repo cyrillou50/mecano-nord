@@ -102,6 +102,14 @@
 }
 .trow:hover { border-color: var(--line-2); background: linear-gradient(180deg, #1a1526, #120f1b); }
 
+/* rangée escamotée par le repliage de sa parente */
+.trow.is-collapsed { display: none; }
+
+/* chevron de repliage, en tête de rangée */
+.fold__btn { flex: none; color: var(--dim); }
+.fold__btn:hover { color: var(--txt); }
+.fold__btn svg { width: 15px; height: 15px; }
+
 /* sous-catégorie : décalée et reliée à sa parente par un trait */
 .trow--sub {
   margin-left: 28px;

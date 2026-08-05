@@ -421,6 +421,37 @@ window.MNUI = (function () {
     });
   }
 
+  /* ---- Repliage ---------------------------------------------------------------
+     Quels blocs sont fermés. C'est un confort de lecture personnel : ça vit
+     dans le navigateur, jamais dans le catalogue partagé.
+
+     @param {string} cle  emplacement de stockage, propre à chaque écran */
+
+  function folds(cle) {
+    const lire = () => {
+      try {
+        const v = JSON.parse(localStorage.getItem(cle));
+        return Array.isArray(v) ? v.map(String) : [];
+      } catch (_) { return []; }
+    };
+    const ecrire = l => {
+      try { localStorage.setItem(cle, JSON.stringify(l.slice(0, 400))); }
+      catch (_) { /* quota : le repliage n'est pas vital */ }
+    };
+    return {
+      all: lire,
+      has: k => lire().indexOf(k) !== -1,
+      set: ecrire,
+      /** Bascule une clé et renvoie son nouvel état (true = replié). */
+      toggle: k => {
+        const l = lire(), i = l.indexOf(k);
+        if (i === -1) l.push(k); else l.splice(i, 1);
+        ecrire(l);
+        return i === -1;
+      }
+    };
+  }
+
   /* ---- Rafraîchissement de fond --------------------------------------------- */
 
   /**
@@ -490,6 +521,6 @@ window.MNUI = (function () {
 
   return {
     svg, esc, num, ago, initials, brandMark, syncFavicon,
-    toast, modal, confirm, copy, mountTopbar, showGate, start, autoRefresh
+    toast, modal, confirm, copy, mountTopbar, showGate, start, autoRefresh, folds
   };
 })();

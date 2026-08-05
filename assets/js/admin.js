@@ -171,29 +171,10 @@
      OBJETS
      ========================================================================= */
 
-  /* ---- Repliage des blocs -----------------------------------------------------
-     L'état vit dans le navigateur : chacun retrouve ses sections comme il les
-     a laissées, sans que ça encombre le catalogue partagé. */
-
-  const K_FOLD = "mn.admin.folds";
-
-  function foldsGet() {
-    try {
-      const v = JSON.parse(localStorage.getItem(K_FOLD));
-      return Array.isArray(v) ? v.map(String) : [];
-    } catch (_) { return []; }
-  }
-
-  function foldsSet(list) {
-    try { localStorage.setItem(K_FOLD, JSON.stringify(list.slice(0, 400))); }
-    catch (_) { /* quota : le repliage n'est pas vital */ }
-  }
-
-  function foldToggle(key) {
-    const l = foldsGet(), i = l.indexOf(key);
-    if (i === -1) l.push(key); else l.splice(i, 1);
-    foldsSet(l);
-  }
+  /* Repliage : un tiroir par écran, pour que fermer une catégorie dans
+     « Objets » ne la ferme pas dans « Catégories ». */
+  const plisObjets = MNUI.folds("mn.admin.folds");
+  const plisCats = MNUI.folds("mn.admin.catfolds");
 
   function paneItems(host) {
     const cats = draft.categories;
@@ -202,7 +183,7 @@
 
     /* Pendant une recherche, tout est déplié : masquer un résultat trouvé
        serait absurde. L'état enregistré n'est pas touché pour autant. */
-    const plies = f ? [] : foldsGet();
+    const plies = f ? [] : plisObjets.all();
     const estPlie = k => plies.indexOf(k) !== -1;
 
     /* Toutes les clés repliables de la vue, pour les boutons « tout … ». */
@@ -268,7 +249,7 @@
 
     const fold = $("#f-fold");
     if (fold) fold.addEventListener("click", () => {
-      foldsSet(toutPlie ? [] : cles);
+      plisObjets.set(toutPlie ? [] : cles);
       paneItems(host);
     });
 
@@ -276,7 +257,7 @@
        recherche garde son focus, et la liste ne saute pas. */
     host.querySelectorAll("[data-fold]").forEach(h => {
       const bascule = () => {
-        foldToggle(h.dataset.fold);
+        plisObjets.toggle(h.dataset.fold);
         const plie = h.parentElement.classList.toggle("is-folded");
         h.setAttribute("aria-expanded", plie ? "false" : "true");
       };
@@ -857,7 +838,16 @@
         const f = freres(c);
         const rang = f.indexOf(c);
         const sous = draft.categories.filter(x => x.parent === c.id).length;
-        return '<div class="trow' + (c.parent ? " trow--sub" : "") + '" data-row="' + esc(c.id) + '">' +
+        /* Une sous-catégorie disparaît quand sa parente est repliée. On la
+           masque plutôt que de l'envelopper : la liste garde son espacement. */
+        const cache = !!c.parent && plisCats.has(c.parent);
+        return '<div class="trow' + (c.parent ? " trow--sub" : "") +
+          (cache ? " is-collapsed" : "") + '" data-row="' + esc(c.id) + '">' +
+          (sous
+            ? '<button class="btn btn--icon fold__btn" data-a="fold" aria-label="Replier" ' +
+              'aria-expanded="' + (plisCats.has(c.id) ? "false" : "true") + '">' +
+              svg(plisCats.has(c.id) ? "chevDown" : "chevUp") + "</button>"
+            : "") +
           '<div class="ord">' +
             '<button data-a="up"' + (rang === 0 ? " disabled" : "") + ">" + svg("chevUp") + "</button>" +
             '<button data-a="down"' + (rang === f.length - 1 ? " disabled" : "") + ">" + svg("chevDown") + "</button>" +
@@ -865,7 +855,10 @@
           '<div class="trow__ico">' + mnIcon(c.icon) + "</div>" +
           '<div class="trow__main"><b>' + esc(c.name) + "</b>" +
             '<div class="trow__meta"><i>' + n + " objet" + (n > 1 ? "s" : "") + "</i>" +
-              (sous ? "<em>" + sous + " sous-catégorie" + (sous > 1 ? "s" : "") + "</em>" : "") +
+              (sous
+                ? "<em>" + sous + " sous-catégorie" + (sous > 1 ? "s" : "") +
+                  (plisCats.has(c.id) ? " (repliées)" : "") + "</em>"
+                : "") +
             "</div></div>" +
           '<div class="trow__acts">' +
             (c.parent
@@ -882,6 +875,7 @@
       edit: c => editCat(c),
       sub: c => editCat(null, c.id),
       del: c => deleteCat(c),
+      fold: c => { plisCats.toggle(c.id); paneCats(host); },
       /* Le déplacement se fait entre voisins de même niveau : une
          sous-catégorie ne saute pas par-dessus sa parente. */
       up: c => moveCat(c, -1),

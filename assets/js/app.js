@@ -13,6 +13,8 @@
   let lastResKey = "";
   let activeCat = localStorage.getItem("mn.cat") || "all";
   let activeSub = localStorage.getItem("mn.sub") || "";
+  /* Catégories repliées sur cette page, gardées dans ce navigateur. */
+  const plis = MNUI.folds("mn.fact.folds");
   let showCosts = localStorage.getItem("mn.showCosts") === "1";
   let canBT = false;
 
@@ -235,16 +237,36 @@
       .map(c => ({ c, items: visibleItems().filter(i => i.category === c.id) }))
       .filter(x => x.items.length);
 
+    /* Les titres n'apparaissent qu'à partir de deux blocs — et avec eux la
+       possibilité de replier. Sur un bloc unique il n'y aurait rien à
+       refermer, l'onglet actif dit déjà de quoi il s'agit. */
     const titres = remplis.length > 1;
-    host.innerHTML = remplis.map(x =>
-      '<section class="cat">' +
+    host.innerHTML = remplis.map(x => {
+      const plie = titres && plis.has(x.c.id);
+      return '<section class="cat' + (plie ? " is-folded" : "") + '">' +
         (titres
-          ? '<h2 class="section-title">' + esc(x.c.name) +
+          ? '<h2 class="section-title fold" data-fold="' + esc(x.c.id) +
+            '" role="button" tabindex="0" aria-expanded="' + (plie ? "false" : "true") + '">' +
+            svg("chevDown", "fold__chev") + esc(x.c.name) +
             '<span class="count">' + x.items.length + "</span></h2>"
           : "") +
-        '<div class="grid">' + x.items.map(itemCard).join("") + "</div>" +
-      "</section>"
-    ).join("");
+        '<div class="fold__body"><div class="grid">' + x.items.map(itemCard).join("") + "</div></div>" +
+      "</section>";
+    }).join("");
+
+    host.querySelectorAll("[data-fold]").forEach(h => {
+      const bascule = () => {
+        const plie = plis.toggle(h.dataset.fold);
+        h.parentElement.classList.toggle("is-folded", plie);
+        h.setAttribute("aria-expanded", plie ? "false" : "true");
+      };
+      h.addEventListener("click", bascule);
+      h.addEventListener("keydown", e => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        bascule();
+      });
+    });
   }
 
   function costChips(it, unit) {
