@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T09:04:44.909Z",
+  "updatedAt": "2026-08-05T09:12:16.055Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -386,6 +386,11 @@
       "icon": "i-wrench"
     },
     {
+      "id": "performance",
+      "name": "Performance",
+      "icon": "i-key"
+    },
+    {
       "id": "depannage",
       "name": "Dépannage",
       "icon": "i-tire-offroad"
@@ -754,6 +759,17 @@
         "tissu": 4,
         "gourde-d-eau": 6
       }
+    },
+    {
+      "id": "freins",
+      "name": "Freins",
+      "category": "performance",
+      "icon": "i-box",
+      "enabled": true,
+      "note": "",
+      "max": 0,
+      "excludes": [],
+      "cost": {}
     }
   ]
 }
