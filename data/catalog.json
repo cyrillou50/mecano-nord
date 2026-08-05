@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T08:09:42.678Z",
+  "updatedAt": "2026-08-05T08:10:02.613Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -364,12 +364,6 @@
       "id": "gourde-d-eau",
       "name": "Gourde d'eau",
       "icon": "assets/img/gourdedeaupng.png",
-      "color": "#9fb0c4"
-    },
-    {
-      "id": "tout-type-de-roue",
-      "name": "Tout type de roue",
-      "icon": "r-rubber",
       "color": "#9fb0c4"
     }
   ],
