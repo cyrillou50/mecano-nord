@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T08:43:35.824Z",
+  "updatedAt": "2026-08-05T08:44:53.815Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -756,8 +756,8 @@
     {
       "id": "gasoil",
       "name": "Gasoil",
-      "category": "kits",
-      "icon": "i-box",
+      "category": "vente-soon",
+      "icon": "assets/img/gasoil.png",
       "enabled": true,
       "note": "",
       "max": 0,
@@ -769,8 +769,8 @@
     {
       "id": "essence",
       "name": "Essence",
-      "category": "kits",
-      "icon": "i-box",
+      "category": "vente-soon",
+      "icon": "assets/img/essence.png",
       "enabled": true,
       "note": "",
       "max": 0,
