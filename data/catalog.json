@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-04T14:07:52.653Z",
+  "updatedAt": "2026-08-05T08:03:03.552Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -365,6 +365,12 @@
       "name": "Gourde d'eau",
       "icon": "assets/img/gourdedeaupng.png",
       "color": "#9fb0c4"
+    },
+    {
+      "id": "tout-type-de-roue",
+      "name": "Tout type de roue",
+      "icon": "r-rubber",
+      "color": "#9fb0c4"
     }
   ],
   "categories": [
@@ -673,7 +679,7 @@
       "max": 10,
       "excludes": [],
       "cost": {
-        "ressource": 20
+        "piece-detachee": 20
       }
     },
     {
@@ -686,7 +692,7 @@
       "max": 10,
       "excludes": [],
       "cost": {
-        "ressource": 20
+        "piece-detachee": 20
       }
     },
     {
@@ -699,7 +705,7 @@
       "max": 10,
       "excludes": [],
       "cost": {
-        "ressource": 20
+        "piece-detachee": 20
       }
     },
     {
@@ -712,7 +718,33 @@
       "max": 10,
       "excludes": [],
       "cost": {
-        "ressource": 20
+        "piece-detachee": 20
+      }
+    },
+    {
+      "id": "huile-moteur",
+      "name": "Huile moteur",
+      "category": "vente-soon",
+      "icon": "assets/img/huilemoteur.png",
+      "enabled": true,
+      "note": "",
+      "max": 0,
+      "excludes": [],
+      "cost": {
+        "piece-detachee": 10
+      }
+    },
+    {
+      "id": "10-pieces-detachees",
+      "name": "10 Pièces détachées",
+      "category": "vente-soon",
+      "icon": "assets/img/vehicleparts.png",
+      "enabled": true,
+      "note": "",
+      "max": 0,
+      "excludes": [],
+      "cost": {
+        "tout-type-de-roue": 1
       }
     }
   ]
