@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T09:00:21.603Z",
+  "updatedAt": "2026-08-05T09:04:44.909Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -628,7 +628,8 @@
       "max": 10,
       "excludes": [],
       "cost": {
-        "ressource": 75
+        "ferraille": 30,
+        "piece-detachee": 25
       }
     },
     {
