@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T18:59:34.377Z",
+  "updatedAt": "2026-08-05T19:01:55.193Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -407,8 +407,20 @@
     {
       "id": "carrosserie",
       "name": "Carrosserie",
-      "icon": "i-box",
+      "icon": "i-spray",
       "parent": "kits"
+    },
+    {
+      "id": "pneumatique",
+      "name": "Pneumatique",
+      "icon": "i-bumper",
+      "parent": "kits"
+    },
+    {
+      "id": "deplacement",
+      "name": "Déplacement",
+      "icon": "r-glass",
+      "parent": "depannage"
     }
   ],
   "items": [
