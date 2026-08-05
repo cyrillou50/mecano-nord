@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T09:26:30.693Z",
+  "updatedAt": "2026-08-05T09:44:15.554Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -786,7 +786,7 @@
       "id": "transmission",
       "name": "Transmission",
       "category": "performance",
-      "icon": "i-box",
+      "icon": "assets/img/transmission.png",
       "enabled": true,
       "note": "",
       "max": 0,
@@ -798,6 +798,17 @@
       "name": "Turbo",
       "category": "performance",
       "icon": "assets/img/turbo.png",
+      "enabled": true,
+      "note": "",
+      "max": 0,
+      "excludes": [],
+      "cost": {}
+    },
+    {
+      "id": "suspension",
+      "name": "Suspension",
+      "category": "performance",
+      "icon": "assets/img/suspension.png",
       "enabled": true,
       "note": "",
       "max": 0,
