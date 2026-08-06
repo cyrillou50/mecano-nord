@@ -672,13 +672,19 @@
     const name = await askFileName(suggested);
     if (!name) return null;
     const path = IMG_DIR + "/" + name;
-    await MNGitHub.uploadImage(path, dataUri, "Ajout de l'image " + name + " depuis le panneau admin");
+
+    /* L'image et le manifeste partent dans le même commit : deux commits, ce
+       serait deux reconstructions du site pour un seul dépôt de fichier. */
+    const fichiers = [{ path, content: MNGitHub.imageBrute(dataUri), base64: true }];
     try {
-      const fresh = await listRepoImages(true);
-      await MNGitHub.putText(IMG_DIR + "/index.json",
-        JSON.stringify(fresh.names, null, 2) + "\n",
-        "Mise à jour de la liste des images");
+      const noms = (await listRepoImages(true)).names.slice();
+      if (noms.indexOf(name) === -1) noms.push(name);
+      noms.sort();
+      fichiers.push({ path: IMG_DIR + "/index.json", content: JSON.stringify(noms, null, 2) + "\n" });
     } catch (_) { /* le manifeste n'est qu'un confort, pas bloquant */ }
+
+    await MNGitHub.putFiles(fichiers, "Ajout de l'image " + name + " depuis le panneau admin");
+    imgCache = null;
     return path;
   }
 
@@ -1471,7 +1477,17 @@
             btn.disabled = true;
             btn.innerHTML = svg("refresh") + "<span>Renommage…</span>";
             try {
-              await MNGitHub.renameFile(from, to, "Renommage de l'image " + name);
+              /* Le manifeste voyage avec le renommage : un seul commit. */
+              let manifeste = [];
+              try {
+                const noms = (await listRepoImages(true)).names
+                  .filter(x => x !== name)
+                  .concat(to.slice(IMG_DIR.length + 1))
+                  .sort();
+                manifeste = [{ path: IMG_DIR + "/index.json", content: JSON.stringify(noms, null, 2) + "\n" }];
+              } catch (_) { /* manifeste : simple confort */ }
+
+              await MNGitHub.renameFile(from, to, "Renommage de l'image " + name, manifeste);
               const n = replacePath(from, to);
               if (n) commit(); else render();
               imgCache = null;
@@ -1504,14 +1520,17 @@
     if (!ok) return;
 
     try {
-      await MNGitHub.deleteFile(path, "Suppression de l'image " + name);
+      /* Suppression et manifeste dans le même commit : une seule
+         reconstruction du site au lieu de deux. */
+      const fichiers = [{ path, remove: true }];
+      try {
+        const noms = (await listRepoImages(true)).names.filter(x => x !== name);
+        fichiers.push({ path: IMG_DIR + "/index.json", content: JSON.stringify(noms, null, 2) + "\n" });
+      } catch (_) { /* manifeste : simple confort */ }
+
+      await MNGitHub.putFiles(fichiers, "Suppression de l'image " + name);
       const n = replacePath(path, "i-box");
       imgCache = null;
-      try {
-        const fresh = await listRepoImages(true);
-        await MNGitHub.putText(IMG_DIR + "/index.json",
-          JSON.stringify(fresh.names, null, 2) + "\n", "Mise à jour de la liste des images");
-      } catch (_) { /* manifeste : simple confort */ }
       if (n) commit();
       MNUI.toast("Image supprimée" + (n ? " — " + n + " élément(s) remis sur l'icône par défaut" : ""), "ok");
       if (tab === "images") paneImages($("#pane"));

@@ -282,16 +282,79 @@ function b64(s) {
   return Buffer.from(s, "utf8").toString("base64");
 }
 
+const ENTETES_GH = () => ({
+  Authorization: "Bearer " + GH.token,
+  Accept: "application/vnd.github+json",
+  "X-GitHub-Api-Version": "2022-11-28",
+  "User-Agent": "mecano-nord",
+  "Content-Type": "application/json"
+});
+
+/* ---- Écriture groupée ----------------------------------------------------------
+   L'API Contents n'écrit qu'un fichier par appel, donc un commit par fichier —
+   et GitHub Pages reconstruit le site à chaque commit. Déposer une image en
+   déclenchait deux, qui se mettaient en file d'attente.
+
+   L'API Git permet de bâtir un commit complet : blobs, arbre, commit, puis on
+   avance la branche. Un seul build, quel que soit le nombre de fichiers. */
+
+async function githubEcrireLot(fichiers, message) {
+  const racine = "https://api.github.com/repos/" + GH.owner + "/" + GH.repo;
+  const h = ENTETES_GH();
+  const br = encodeURIComponent(GH.branche);
+
+  const lire = async (url, opts) => {
+    const r = await fetch(url, Object.assign({ headers: h }, opts));
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error("GitHub " + r.status + " " + (d.message || ""));
+    }
+    return r.json();
+  };
+
+  try {
+    const ref = await lire(racine + "/git/ref/heads/" + br);
+    const parent = ref.object.sha;
+    const commitParent = await lire(racine + "/git/commits/" + parent);
+
+    const arbre = [];
+    for (const f of fichiers) {
+      /* `sha: null` retire le fichier du commit : supprimer et écrire d'un
+         même geste. */
+      if (f.remove) {
+        arbre.push({ path: f.path, mode: "100644", type: "blob", sha: null });
+        continue;
+      }
+      const blob = await lire(racine + "/git/blobs", {
+        method: "POST",
+        body: JSON.stringify({ content: f.contenu, encoding: "base64" })
+      });
+      arbre.push({ path: f.path, mode: "100644", type: "blob", sha: blob.sha });
+    }
+
+    const tree = await lire(racine + "/git/trees", {
+      method: "POST",
+      body: JSON.stringify({ base_tree: commitParent.tree.sha, tree: arbre })
+    });
+    const commit = await lire(racine + "/git/commits", {
+      method: "POST",
+      body: JSON.stringify({ message, tree: tree.sha, parents: [parent] })
+    });
+    await lire(racine + "/git/refs/heads/" + br, {
+      method: "PATCH",
+      body: JSON.stringify({ sha: commit.sha })
+    });
+
+    return { ok: true, commit: commit.sha.slice(0, 7) };
+  } catch (e) {
+    return { ok: false, error: e.message || "GitHub injoignable" };
+  }
+}
+
 async function githubEcrire(chemin, contenuB64, message) {
   const base = "https://api.github.com/repos/" + GH.owner + "/" + GH.repo +
     "/contents/" + encodeURI(chemin);
-  const entetes = {
-    Authorization: "Bearer " + GH.token,
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-    "User-Agent": "mecano-nord",
-    "Content-Type": "application/json"
-  };
+  const entetes = ENTETES_GH();
 
   try {
     let sha = null;
@@ -429,14 +492,37 @@ const serveur = http.createServer(async (req, res) => {
         }, req);
       }
       const c = await corpsJson(req);
-      const cible = texte(c.path, 200);
 
       /* On n'autorise QUE les fichiers de données et les images : personne
          ne peut réécrire le code du site par cette porte. */
-      const permis = cible === "data/catalog.json" ||
-        cible === "assets/img/index.json" ||
-        /^assets\/img\/[\w.-]+\.(png|jpe?g|webp|gif|svg|avif)$/i.test(cible);
-      if (!permis) return repondre(res, 403, { error: "Chemin non autorisé : " + cible }, req);
+      const permis = p => p === "data/catalog.json" || p === "assets/img/index.json" ||
+        /^assets\/img\/[\w.-]+\.(png|jpe?g|webp|gif|svg|avif)$/i.test(p);
+
+      /* Forme groupée : plusieurs fichiers, un seul commit, un seul build. */
+      if (Array.isArray(c.files)) {
+        if (!c.files.length) return repondre(res, 400, { error: "Aucun fichier" }, req);
+        if (c.files.length > 30) return repondre(res, 400, { error: "Trop de fichiers" }, req);
+
+        const lot = [];
+        for (const f of c.files) {
+          const p = texte(f && f.path, 200);
+          if (!permis(p)) return repondre(res, 403, { error: "Chemin non autorisé : " + p }, req);
+          if (f.remove === true) { lot.push({ path: p, remove: true }); continue; }
+          const contenu = typeof f.base64 === "string"
+            ? f.base64.replace(/^data:[^,]*,/, "")
+            : b64(String(f.content || ""));
+          if (!contenu) return repondre(res, 400, { error: "Contenu vide : " + p }, req);
+          lot.push({ path: p, contenu });
+        }
+
+        const r = await githubEcrireLot(lot, texte(c.message, 150) || "Mise à jour depuis le site");
+        if (!r.ok) return repondre(res, 502, { error: r.error }, req);
+        console.log(new Date().toISOString(), "publié :", lot.length, "fichiers", r.commit || "");
+        return repondre(res, 200, { ok: true, commit: r.commit }, req);
+      }
+
+      const cible = texte(c.path, 200);
+      if (!permis(cible)) return repondre(res, 403, { error: "Chemin non autorisé : " + cible }, req);
 
       /* `content` est du texte, `base64` une image déjà encodée. */
       const contenu = typeof c.base64 === "string"

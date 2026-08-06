@@ -207,6 +207,116 @@ window.MNGitHub = (function () {
   const putText = (path, text, message) =>
     serveurUrl() ? viaServeur(path, text, message, false) : putFile(path, b64(text), message);
 
+  /* ---- Écriture groupée ---------------------------------------------------------
+     L'API Contents n'écrit qu'un fichier par appel, donc un commit par
+     fichier — et GitHub Pages reconstruit le site à chaque commit. Déposer une
+     image en déclenchait deux (l'image, puis le manifeste), qui se mettaient
+     en file d'attente et retardaient la mise en ligne.
+
+     L'API Git, elle, permet de bâtir un commit complet : on crée les blobs,
+     un arbre, un commit, puis on avance la branche. Un seul build. */
+
+  /**
+   * Écrit plusieurs fichiers en un seul commit.
+   * @param {Array<{path:string, content:string, base64?:boolean}>} files
+   * @returns {Promise<{ok:boolean, commit:string|null, groupe:boolean}>}
+   */
+  async function putFilesDirect(files, message) {
+    const c = repoConfig();
+    if (!c.owner || !c.repo) throw err("no-repo", "Dépôt GitHub non configuré.");
+    const base = `/repos/${c.owner}/${c.repo}`;
+    const br = encodeURIComponent(c.branch);
+
+    const ref = await api(`${base}/git/ref/heads/${br}`);
+    const parent = ref.object.sha;
+    const commitParent = await api(`${base}/git/commits/${parent}`);
+
+    /* Un blob par fichier : c'est le seul point qui reste proportionnel au
+       nombre de fichiers, mais ça ne crée aucun commit. */
+    const arbre = [];
+    for (const f of files) {
+      /* `sha: null` dans un arbre = le fichier disparaît du commit. C'est ce
+         qui permet de supprimer et d'écrire d'un même geste. */
+      if (f.remove) {
+        arbre.push({ path: f.path, mode: "100644", type: "blob", sha: null });
+        continue;
+      }
+      const blob = await api(`${base}/git/blobs`, {
+        method: "POST",
+        body: JSON.stringify({
+          content: f.base64 ? f.content : b64(f.content),
+          encoding: "base64"
+        })
+      });
+      arbre.push({ path: f.path, mode: "100644", type: "blob", sha: blob.sha });
+    }
+
+    const tree = await api(`${base}/git/trees`, {
+      method: "POST",
+      body: JSON.stringify({ base_tree: commitParent.tree.sha, tree: arbre })
+    });
+    const commit = await api(`${base}/git/commits`, {
+      method: "POST",
+      body: JSON.stringify({ message, tree: tree.sha, parents: [parent] })
+    });
+    await api(`${base}/git/refs/heads/${br}`, {
+      method: "PATCH",
+      body: JSON.stringify({ sha: commit.sha })
+    });
+
+    return { ok: true, commit: commit.sha.slice(0, 7), groupe: true };
+  }
+
+  /**
+   * Écrit plusieurs fichiers, en un commit si possible.
+   *
+   * Retombe sur des écritures séparées quand le groupage n'aboutit pas — un
+   * serveur d'une version antérieure, par exemple. Le résultat est le même,
+   * seulement en plusieurs commits.
+   */
+  async function putFiles(files, message) {
+    const utiles = (files || []).filter(f => f && f.path);
+    if (!utiles.length) return { ok: true, commit: null, groupe: false };
+
+    try {
+      if (serveurUrl()) {
+        const r = await fetch(serveurUrl(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message,
+            files: utiles.map(f => (
+              f.remove ? { path: f.path, remove: true }
+                : f.base64 ? { path: f.path, base64: f.content }
+                  : { path: f.path, content: f.content }))
+          })
+        });
+        if (r.ok) {
+          const d = await r.json().catch(() => ({}));
+          return { ok: true, commit: d.commit || null, groupe: true };
+        }
+        /* 400/404 : ce serveur ne sait pas grouper. On ne jette pas pour
+           autant, on repasse par les écritures une à une. */
+        if (r.status !== 400 && r.status !== 404) {
+          const d = await r.json().catch(() => ({}));
+          throw err("server", d.error || "Le serveur a répondu " + r.status);
+        }
+      } else if (hasToken()) {
+        return await putFilesDirect(utiles, message);
+      }
+    } catch (e) {
+      if (e.code === "server" || e.code === "auth" || e.code === "no-repo") throw e;
+      /* Groupage impossible : on continue en séparé plutôt que d'échouer. */
+    }
+
+    for (const f of utiles) {
+      if (f.remove) await deleteFile(f.path, message);
+      else if (f.base64) await uploadRaw(f.path, f.content, message);
+      else await putText(f.path, f.content, message);
+    }
+    return { ok: true, commit: null, groupe: false };
+  }
+
   /** Liste le contenu d'un dossier du dépôt. */
   async function listDir(dir) {
     const c = repoConfig();
@@ -237,23 +347,37 @@ window.MNGitHub = (function () {
     });
   }
 
-  /** Renomme un fichier : copie au nouveau nom puis supprime l'ancien. */
-  async function renameFile(from, to, message) {
+  /**
+   * Renomme un fichier. Copie et suppression voyagent ensemble : en deux
+   * commits, le site se reconstruisait une fois avec les deux copies, une
+   * fois sans l'ancienne.
+   * @param {Array} extra  fichiers à joindre au même commit
+   */
+  async function renameFile(from, to, message, extra) {
     if (from === to) return { ok: true, unchanged: true };
     if (await currentSha(to)) throw err("exists", "Un fichier porte déjà ce nom : " + to);
     const f = await getFile(from);
-    await putFile(to, f.content, message || ("Renommage : " + from + " → " + to));
-    await deleteFile(from, "Renommage : ancien fichier " + from);
-    return { ok: true };
+    return putFiles(
+      [{ path: to, content: f.content, base64: true }, { path: from, remove: true }]
+        .concat(extra || []),
+      message || ("Renommage : " + from + " → " + to)
+    );
+  }
+
+  /** Écrit un fichier binaire déjà encodé en base64. */
+  const uploadRaw = (path, base64, message) =>
+    serveurUrl() ? viaServeur(path, base64, message, true) : putFile(path, base64, message);
+
+  /** `data:image/...;base64,...` → la partie utile. */
+  function imageBrute(dataUri) {
+    const i = String(dataUri).indexOf(",");
+    if (i === -1) throw err("bad-data", "Image invalide.");
+    return String(dataUri).slice(i + 1);
   }
 
   /** Dépose une image (donnée `data:image/...;base64,...`) dans le dépôt. */
   function uploadImage(path, dataUri, message) {
-    const i = String(dataUri).indexOf(",");
-    if (i === -1) throw err("bad-data", "Image invalide.");
-    const brut = String(dataUri).slice(i + 1);
-    const msg = message || ("Ajout de l'image " + path);
-    return serveurUrl() ? viaServeur(path, brut, msg, true) : putFile(path, brut, msg);
+    return uploadRaw(path, imageBrute(dataUri), message || ("Ajout de l'image " + path));
   }
 
   /**
@@ -288,7 +412,7 @@ window.MNGitHub = (function () {
     getToken, setToken, hasToken, forgetToken,
     detect, repoConfig, isConfigured,
     check, publish, lastPublish,
-    putFile, putText, listDir, uploadImage, getFile, deleteFile, renameFile,
+    putFile, putText, putFiles, listDir, uploadImage, imageBrute, getFile, deleteFile, renameFile,
     serveurUrl, canPublish
   };
 })();
