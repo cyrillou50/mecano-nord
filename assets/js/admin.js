@@ -1439,6 +1439,10 @@
           : "Le dossier " + IMG_DIR + "/ du dépôt") + "</span>" +
         '<span class="spacer"></span>' +
         '<button class="btn btn--ghost" id="i-refresh">' + svg("refresh") + "<span>Actualiser</span></button>" +
+        (surServeur()
+          ? '<button class="btn btn--ghost" id="i-migrate">' + svg("cloud") +
+            "<span>Transférer vers le serveur</span></button>"
+          : "") +
         '<button class="btn btn--primary" id="i-add">' + svg("upload") + "<span>Ajouter une image</span></button>" +
         '<input type="file" id="i-file" accept="image/*" hidden>' +
       "</div>" +
@@ -1449,6 +1453,8 @@
       '<div id="i-list"><p class="hint">Lecture du dossier…</p></div>';
 
     $("#i-refresh").addEventListener("click", () => { imgCache = null; paneImages(host); });
+    const mig = $("#i-migrate");
+    if (mig) mig.addEventListener("click", () => migrerImages(host));
     $("#i-add").addEventListener("click", () => $("#i-file").click());
     $("#i-file").addEventListener("change", e => {
       const f = e.target.files[0];
@@ -1516,6 +1522,69 @@
         else deleteImage(name, host, srv);
       }));
     });
+  }
+
+  /**
+   * Copie les images du dépôt vers le serveur et fait suivre les références.
+   *
+   * Les fichiers du dépôt ne sont pas supprimés : ils ne gênent pas, et les
+   * garder laisse un filet si le serveur venait à être réinstallé.
+   */
+  async function migrerImages(host) {
+    const { refs, serveur } = await listRepoImages(true);
+    const aFaire = refs.filter(x => !x.serveur && serveur.indexOf(x.name) === -1);
+
+    if (!aFaire.length) {
+      return MNUI.toast(refs.length === serveur.length
+        ? "Toutes les images sont déjà sur le serveur"
+        : "Rien à transférer", "info");
+    }
+
+    const ok = await MNUI.confirm({
+      title: "Transférer vers le serveur",
+      message: aFaire.length + " image" + (aFaire.length > 1 ? "s" : "") + " du dépôt " +
+        (aFaire.length > 1 ? "seront copiées" : "sera copiée") + " sur le serveur, et le " +
+        "catalogue mis à jour pour les y chercher. Les fichiers restent dans le dépôt, " +
+        "en réserve — tu pourras les y supprimer plus tard.",
+      confirmLabel: "Transférer"
+    });
+    if (!ok) return;
+
+    const list = $("#i-list");
+    let faites = 0, ratees = 0, refaites = 0;
+
+    for (const x of aFaire) {
+      if (list) {
+        list.innerHTML = '<p class="hint">Transfert… ' + (faites + ratees + 1) + " / " +
+          aFaire.length + " — " + esc(x.name) + "</p>";
+      }
+      try {
+        /* L'image est déjà servie par le site : on la relit là où elle est
+           plutôt que de repasser par l'API GitHub. */
+        const r = await fetch(x.ref + "?v=" + Date.now(), { cache: "no-store" });
+        if (!r.ok) throw new Error("lecture " + r.status);
+        const base64 = await new Promise((res, rej) => {
+          const fr = new FileReader();
+          fr.onerror = () => rej(new Error("lecture impossible"));
+          fr.onload = () => res(String(fr.result).split(",")[1] || "");
+          r.blob().then(b => fr.readAsDataURL(b), rej);
+        });
+
+        await apiImages({ name: x.name, base64 });
+        refaites += replacePath(x.ref, MNStore.IMG_TAG + x.name);
+        faites++;
+      } catch (e) {
+        console.error(x.name, e);
+        ratees++;
+      }
+    }
+
+    imgCache = null;
+    if (refaites) commit();
+    paneImages(host);
+    MNUI.toast(faites + " image(s) transférée(s)" +
+      (refaites ? " — " + refaites + " référence(s) mise(s) à jour" : "") +
+      (ratees ? " · " + ratees + " en échec" : ""), ratees ? "info" : "ok");
   }
 
   function renameImage(name, host, srv) {
@@ -2426,11 +2495,17 @@
             "<code>systemctl restart mecano-nord</code>."
         };
 
-        const grave = pub !== "ok";
+        /* `images` n'apparaît que sur les versions récentes : son absence dit
+           que le fichier du VPS n'a pas été recopié. */
+        const grave = pub !== "ok" || !j.images;
         box.innerHTML = '<div class="alert alert--' + (grave ? "warn" : "ok") + '">' +
           svg(grave ? "alert" : "check") +
           "<span>Serveur joignable" + (j.ops ? ", pointage sans conflit géré" : "") + ". " +
           (pistes[pub] || "Publication : état indéterminé (" + esc(pub) + ").") +
+          (j.images
+            ? " <b>Il héberge aussi les images</b> — elles ne passent plus par GitHub."
+            : " <b>Il n'héberge pas encore les images</b> : recopie <code>serveur.js</code> " +
+              "sur le VPS, puis <code>systemctl restart mecano-nord</code>.") +
           "</span></div>";
       } catch (e) {
         box.innerHTML = '<div class="alert alert--err">' + svg("alert") +
