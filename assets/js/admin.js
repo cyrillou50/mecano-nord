@@ -540,6 +540,25 @@
   const isData = v => /^data:image/i.test(v);
   const weight = v => Math.round(v.length * 0.75 / 1024);
 
+  /* ---- Images hébergées par le serveur -----------------------------------------
+     Déposer une image dans le dépôt coûtait un commit et une reconstruction
+     complète du site. Sur le serveur, elle est en ligne immédiatement. Les
+     images déjà dans le dépôt continuent de fonctionner : on ne migre rien. */
+
+  const surServeur = () => MNStore.imagesHebergees();
+
+  /** Appelle /images. `corps` absent = simple lecture de la liste. */
+  async function apiImages(corps) {
+    const base = MNStore.api("images");
+    if (!base) throw new Error("Aucun serveur configuré.");
+    const r = await fetch(base + (corps ? "" : "?t=" + Date.now()), corps
+      ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) }
+      : { cache: "no-store" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "Le serveur a répondu " + r.status);
+    return j;
+  }
+
   /**
    * Met une image au gabarit : on retire les marges transparentes, puis on
    * centre le motif dans un carré de ICON_PX. Résultat : toutes les icônes
@@ -614,9 +633,19 @@
    * Avec un jeton GitHub on lit le dépôt (toujours exact) ; sinon on retombe
    * sur le manifeste assets/img/index.json, tenu à jour à chaque dépôt.
    */
+  /**
+   * Toutes les images disponibles, celles du serveur d'abord.
+   * Chaque entrée porte sa référence : « srv:nom.png » ou « assets/img/nom.png ».
+   */
   async function listRepoImages(force) {
     if (imgCache && !force) return imgCache;
-    let names = [], source = "none";
+    let names = [], source = "none", serveur = [];
+
+    if (surServeur()) {
+      try {
+        serveur = (await apiImages()).images || [];
+      } catch (_) { /* serveur muet : on se rabat sur le dépôt */ }
+    }
 
     if (MNGitHub.hasToken() && MNGitHub.isConfigured()) {
       try {
@@ -636,11 +665,17 @@
       } catch (_) { /* rien de listable */ }
     }
     names.sort((a, b) => a.localeCompare(b, "fr"));
-    imgCache = { names, source };
+    serveur.sort((a, b) => a.localeCompare(b, "fr"));
+
+    /* `refs` est ce que l'admin manipule : nom affiché + valeur à enregistrer. */
+    const refs = serveur.map(n => ({ name: n, ref: MNStore.IMG_TAG + n, serveur: true }))
+      .concat(names.map(n => ({ name: n, ref: IMG_DIR + "/" + n, serveur: false })));
+
+    imgCache = { names, serveur, refs, source };
     return imgCache;
   }
 
-  /** Demande un nom de fichier avant dépôt dans le dépôt GitHub. */
+  /** Demande un nom de fichier avant dépôt. */
   function askFileName(suggested) {
     return new Promise(resolve => {
       let done = false;
@@ -649,11 +684,14 @@
       body.innerHTML =
         '<div class="field"><label class="label" for="fn">Nom du fichier</label>' +
           '<input class="input" id="fn" value="' + esc(suggested) + '" maxlength="48"></div>' +
-        '<p class="hint" style="margin-top:10px">L\'image sera déposée dans <code>' + IMG_DIR +
-          "/</code> puis référencée par son chemin : le fichier de données reste léger " +
-          "et l'image apparaît dans la liste pour toute l'équipe.</p>";
+        '<p class="hint" style="margin-top:10px">' + (surServeur()
+          ? "L'image part sur <b>le serveur de l'atelier</b> : elle est en ligne " +
+            "immédiatement, sans commit ni reconstruction du site."
+          : "L'image sera déposée dans <code>" + IMG_DIR + "/</code> puis référencée par " +
+            "son chemin : le fichier de données reste léger et l'image apparaît dans la " +
+            "liste pour toute l'équipe.") + "</p>";
       MNUI.modal({
-        title: "Déposer l'image dans le dépôt", body,
+        title: surServeur() ? "Déposer l'image" : "Déposer l'image dans le dépôt", body,
         onClose: () => finish(null),
         actions: [
           { label: "Annuler", variant: "btn--ghost", onClick: c => { finish(null); c(); } },
@@ -670,14 +708,22 @@
     });
   }
 
-  /** Dépose l'image dans le dépôt et met à jour le manifeste. */
+  /**
+   * Dépose une image et renvoie la référence à enregistrer.
+   * Sur le serveur quand il est configuré — instantané, aucun commit. Sinon
+   * dans le dépôt, image et manifeste dans le même commit.
+   */
   async function uploadToRepo(dataUri, suggested) {
     const name = await askFileName(suggested);
     if (!name) return null;
-    const path = IMG_DIR + "/" + name;
 
-    /* L'image et le manifeste partent dans le même commit : deux commits, ce
-       serait deux reconstructions du site pour un seul dépôt de fichier. */
+    if (surServeur()) {
+      await apiImages({ name, base64: MNGitHub.imageBrute(dataUri) });
+      imgCache = null;
+      return MNStore.IMG_TAG + name;
+    }
+
+    const path = IMG_DIR + "/" + name;
     const fichiers = [{ path, content: MNGitHub.imageBrute(dataUri), base64: true }];
     try {
       const noms = (await listRepoImages(true)).names.slice();
@@ -747,26 +793,32 @@
     /* --- grille des images du dossier --- */
     async function paintImages(force) {
       imgs.innerHTML = '<p class="hint">Lecture du dossier…</p>';
-      const { names, source } = await listRepoImages(force);
+      const { refs, serveur, source } = await listRepoImages(force);
 
-      if (!names.length) {
-        imgs.innerHTML = '<p class="hint">Aucune image trouvée. Clique sur <b>Ajouter une image</b>, ' +
-          "ou dépose tes fichiers dans <code>" + IMG_DIR + "/</code> sur GitHub." +
-          (MNGitHub.hasToken() ? "" : " (Configure le jeton GitHub dans l'onglet « Publier » " +
-            "pour que la liste se mette à jour toute seule.)") + "</p>";
+      if (!refs.length) {
+        imgs.innerHTML = '<p class="hint">Aucune image trouvée. Clique sur <b>Ajouter une image</b>' +
+          (surServeur() ? "." : ", ou dépose tes fichiers dans <code>" + IMG_DIR + "/</code> sur GitHub." +
+            (MNGitHub.hasToken() ? "" : " (Configure le jeton GitHub dans l'onglet « Publier » " +
+              "pour que la liste se mette à jour toute seule.)")) + "</p>";
         return;
       }
 
+      const nRepo = refs.length - serveur.length;
       imgs.innerHTML =
         '<div class="iconlist" style="grid-template-columns:repeat(auto-fill,minmax(62px,1fr));max-height:240px">' +
-          names.map(n => {
-            const p = IMG_DIR + "/" + n;
-            return '<button type="button" data-img="' + esc(p) + '" title="' + esc(n) + '"' +
-              (p === sel ? ' class="is-on"' : "") + '><img src="' + esc(p) + '" alt="" loading="lazy"></button>';
+          refs.map(x => {
+            const src = x.serveur ? MNStore.imageUrl(x.name) : x.ref;
+            return '<button type="button" data-img="' + esc(x.ref) + '" title="' + esc(x.name) +
+              (x.serveur ? " — sur le serveur" : " — dans le dépôt") + '"' +
+              (x.ref === sel ? ' class="is-on"' : "") +
+              '><img src="' + esc(src) + '" alt="" loading="lazy"></button>';
           }).join("") +
         "</div>" +
-        '<p class="hint" style="margin-top:9px">' + names.length + " image" + (names.length > 1 ? "s" : "") +
-          (source === "github" ? " — lues directement dans le dépôt." : " — d'après le manifeste du dossier.") +
+        '<p class="hint" style="margin-top:9px">' +
+          (serveur.length ? serveur.length + " sur le serveur" : "") +
+          (serveur.length && nRepo ? " · " : "") +
+          (nRepo ? nRepo + " dans le dépôt" +
+            (source === "github" ? " (lues directement)" : " (d'après le manifeste)") : "") +
         "</p>";
 
       imgs.querySelectorAll("[data-img]").forEach(b =>
@@ -1375,20 +1427,22 @@
   }
 
   async function paneImages(host) {
-    /* Ajouter passe par le serveur ; renommer et supprimer exigent encore un
-       jeton personnel (le serveur n'autorise que l'écriture). */
-    const peutAjouter = MNGitHub.canPublish();
+    const peutAjouter = MNGitHub.canPublish() || surServeur();
+    /* Sur le serveur, tout se fait sans jeton. Dans le dépôt, renommer et
+       supprimer en exigent un. */
     const ready = MNGitHub.hasToken() && MNGitHub.isConfigured();
 
     host.innerHTML =
       '<div class="toolbar">' +
-        '<span class="subtitle">Le dossier ' + IMG_DIR + "/ du dépôt</span>" +
+        '<span class="subtitle">' + (surServeur()
+          ? "Sur le serveur de l'atelier — en ligne aussitôt"
+          : "Le dossier " + IMG_DIR + "/ du dépôt") + "</span>" +
         '<span class="spacer"></span>' +
         '<button class="btn btn--ghost" id="i-refresh">' + svg("refresh") + "<span>Actualiser</span></button>" +
         '<button class="btn btn--primary" id="i-add">' + svg("upload") + "<span>Ajouter une image</span></button>" +
         '<input type="file" id="i-file" accept="image/*" hidden>' +
       "</div>" +
-      (ready ? "" :
+      (ready || surServeur() ? "" :
         '<div class="alert alert--warn">' + svg("alert") +
         "<span>Sans jeton GitHub sur cet appareil, tu peux consulter les images mais pas les " +
         "renommer ni les supprimer. Configure-le dans l'onglet « Publier ».</span></div>") +
@@ -1413,48 +1467,59 @@
     });
 
     const list = $("#i-list");
-    const { names, source } = await listRepoImages(false);
+    const { refs, serveur, source } = await listRepoImages(false);
 
-    if (!names.length) {
+    if (!refs.length) {
       list.innerHTML = '<div class="empty">' + svg("file") + "<b>Aucune image</b>" +
         "<p>Clique sur « Ajouter une image » pour commencer.</p></div>";
       return;
     }
 
     list.innerHTML =
-      '<div class="rows">' + names.map(n => {
-        const path = IMG_DIR + "/" + n;
-        const uses = usesOf(path);
-        return '<div class="trow" data-img="' + esc(n) + '">' +
-          '<div class="trow__ico"><img src="' + esc(path) + '" alt="" loading="lazy" decoding="async"></div>' +
-          '<div class="trow__main"><b>' + esc(n) + "</b>" +
+      '<div class="rows">' + refs.map(x => {
+        const uses = usesOf(x.ref);
+        const src = x.serveur ? MNStore.imageUrl(x.name) : x.ref;
+        /* Une image du dépôt reste intouchable sans jeton ; celles du serveur
+           ne demandent rien. */
+        const modifiable = x.serveur || ready;
+        return '<div class="trow" data-img="' + esc(x.name) + '" data-srv="' + (x.serveur ? "1" : "") + '">' +
+          '<div class="trow__ico"><img src="' + esc(src) + '" alt="" loading="lazy" decoding="async"></div>' +
+          '<div class="trow__main"><b>' + esc(x.name) + "</b>" +
             '<div class="trow__meta">' +
+              '<span class="permtag' + (x.serveur ? " permtag--on" : "") + '">' +
+                (x.serveur ? "serveur" : "dépôt") + "</span>" +
               (uses.length
                 ? uses.map(u => '<span class="permtag">' + esc(u.kind) + " : " + esc(u.name) + "</span>").join("")
                 : '<i style="color:var(--amber)">non utilisée</i>') +
             "</div></div>" +
           '<div class="trow__acts">' +
-            '<button class="btn btn--icon" data-a="ren" title="Renommer"' + (ready ? "" : " disabled") + ">" +
+            '<button class="btn btn--icon" data-a="ren" title="Renommer"' + (modifiable ? "" : " disabled") + ">" +
               svg("edit") + "</button>" +
-            '<button class="btn btn--icon" data-a="del" title="Supprimer"' + (ready ? "" : " disabled") + ">" +
+            '<button class="btn btn--icon" data-a="del" title="Supprimer"' + (modifiable ? "" : " disabled") + ">" +
               svg("trash") + "</button>" +
           "</div></div>";
       }).join("") + "</div>" +
-      '<p class="hint" style="margin-top:10px">' + names.length + " image" + (names.length > 1 ? "s" : "") +
-        (source === "github" ? " — lues dans le dépôt." : " — d'après le manifeste du dossier.") + "</p>";
+      '<p class="hint" style="margin-top:10px">' +
+        (serveur.length ? serveur.length + " sur le serveur" : "") +
+        (serveur.length && refs.length - serveur.length ? " · " : "") +
+        (refs.length - serveur.length
+          ? (refs.length - serveur.length) + " dans le dépôt" +
+            (source === "github" ? " (lues directement)" : " (d'après le manifeste)")
+          : "") + "</p>";
 
     list.querySelectorAll("[data-img]").forEach(row => {
       const name = row.dataset.img;
+      const srv = row.dataset.srv === "1";
       row.querySelectorAll("[data-a]").forEach(b => b.addEventListener("click", () => {
         if (b.disabled) return;
-        if (b.dataset.a === "ren") renameImage(name, host);
-        else deleteImage(name, host);
+        if (b.dataset.a === "ren") renameImage(name, host, srv);
+        else deleteImage(name, host, srv);
       }));
     });
   }
 
-  function renameImage(name, host) {
-    const from = IMG_DIR + "/" + name;
+  function renameImage(name, host, srv) {
+    const from = srv ? MNStore.IMG_TAG + name : IMG_DIR + "/" + name;
     const ext = (name.match(/\.[a-z0-9]+$/i) || [".png"])[0];
     const uses = usesOf(from);
 
@@ -1475,22 +1540,24 @@
         {
           label: "Renommer", variant: "btn--primary", icon: "save",
           onClick: async (close, b, btn) => {
-            const to = IMG_DIR + "/" + MNStore.slugify(body.querySelector("#rn").value) + ext;
+            const nom2 = MNStore.slugify(body.querySelector("#rn").value) + ext;
+            const to = srv ? MNStore.IMG_TAG + nom2 : IMG_DIR + "/" + nom2;
             if (to === from) return close();
             btn.disabled = true;
             btn.innerHTML = svg("refresh") + "<span>Renommage…</span>";
             try {
-              /* Le manifeste voyage avec le renommage : un seul commit. */
-              let manifeste = [];
-              try {
-                const noms = (await listRepoImages(true)).names
-                  .filter(x => x !== name)
-                  .concat(to.slice(IMG_DIR.length + 1))
-                  .sort();
-                manifeste = [{ path: IMG_DIR + "/index.json", content: JSON.stringify(noms, null, 2) + "\n" }];
-              } catch (_) { /* manifeste : simple confort */ }
-
-              await MNGitHub.renameFile(from, to, "Renommage de l'image " + name, manifeste);
+              if (srv) {
+                await apiImages({ op: "rename", from: name, to: nom2 });
+              } else {
+                /* Le manifeste voyage avec le renommage : un seul commit. */
+                let manifeste = [];
+                try {
+                  const noms = (await listRepoImages(true)).names
+                    .filter(x => x !== name).concat(nom2).sort();
+                  manifeste = [{ path: IMG_DIR + "/index.json", content: JSON.stringify(noms, null, 2) + "\n" }];
+                } catch (_) { /* manifeste : simple confort */ }
+                await MNGitHub.renameFile(from, to, "Renommage de l'image " + name, manifeste);
+              }
               const n = replacePath(from, to);
               if (n) commit(); else render();
               imgCache = null;
@@ -1508,8 +1575,8 @@
     });
   }
 
-  async function deleteImage(name, host) {
-    const path = IMG_DIR + "/" + name;
+  async function deleteImage(name, host, srv) {
+    const path = srv ? MNStore.IMG_TAG + name : IMG_DIR + "/" + name;
     const uses = usesOf(path);
 
     const ok = await MNUI.confirm({
@@ -1517,21 +1584,24 @@
       message: uses.length
         ? "« " + name + " » est utilisée par " + uses.length + " élément" + (uses.length > 1 ? "s" : "") +
           " (" + uses.map(u => u.name).join(", ") + "). Ils repasseront sur une icône par défaut."
-        : "« " + name + " » sera supprimée du dépôt. C'est définitif.",
+        : "« " + name + " » sera supprimée " + (srv ? "du serveur" : "du dépôt") + ". C'est définitif.",
       confirmLabel: "Supprimer", danger: true
     });
     if (!ok) return;
 
     try {
-      /* Suppression et manifeste dans le même commit : une seule
-         reconstruction du site au lieu de deux. */
-      const fichiers = [{ path, remove: true }];
-      try {
-        const noms = (await listRepoImages(true)).names.filter(x => x !== name);
-        fichiers.push({ path: IMG_DIR + "/index.json", content: JSON.stringify(noms, null, 2) + "\n" });
-      } catch (_) { /* manifeste : simple confort */ }
-
-      await MNGitHub.putFiles(fichiers, "Suppression de l'image " + name);
+      if (srv) {
+        await apiImages({ op: "delete", name });
+      } else {
+        /* Suppression et manifeste dans le même commit : une seule
+           reconstruction du site au lieu de deux. */
+        const fichiers = [{ path, remove: true }];
+        try {
+          const noms = (await listRepoImages(true)).names.filter(x => x !== name);
+          fichiers.push({ path: IMG_DIR + "/index.json", content: JSON.stringify(noms, null, 2) + "\n" });
+        } catch (_) { /* manifeste : simple confort */ }
+        await MNGitHub.putFiles(fichiers, "Suppression de l'image " + name);
+      }
       const n = replacePath(path, "i-box");
       imgCache = null;
       if (n) commit();

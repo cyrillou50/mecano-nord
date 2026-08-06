@@ -347,6 +347,29 @@ window.MNStore = (function () {
     return "";
   }
 
+  /* ---- Images hébergées par le serveur -----------------------------------------
+     Une image du dépôt s'écrit « assets/img/turbo.png », une image du serveur
+     « srv:turbo.png ». Le préfixe évite toute ambiguïté : les deux peuvent
+     coexister, et rien ne casse si le serveur disparaît — seules les images
+     qui en dépendent manquent, visiblement. */
+
+  const IMG_TAG = "srv:";
+
+  /** « srv:turbo.png » → nom de fichier, sinon "". */
+  const imageName = v => {
+    const s = String(v || "");
+    return s.indexOf(IMG_TAG) === 0 ? s.slice(IMG_TAG.length) : "";
+  };
+
+  /** Adresse à laquelle le navigateur ira chercher l'image. */
+  function imageUrl(nom) {
+    const base = api("images");
+    return base ? base + "/" + encodeURIComponent(nom) : "";
+  }
+
+  /** Le serveur peut-il héberger les images ? */
+  const imagesHebergees = () => !!api("images");
+
   const roleById = id => (_catalog.roles || []).find(r => r.id === id) || null;
   const roleOf = user => (user && roleById(user.roleId)) ||
     { id: "", name: "Sans rôle", color: "#6a6280", perms: [] };
@@ -434,6 +457,7 @@ window.MNStore = (function () {
     catalog, published, hasDraft, origin, settings, brand, api,
     roleById, roleOf, itemById, resourceById, categoryById,
     topCategories, subCategories, categoryScope, itemLabel, totals,
+    IMG_TAG, imageName, imageUrl, imagesHebergees,
     getCart, setCart, getBTs, addBT, removeBT, clearBTs
   };
 })();

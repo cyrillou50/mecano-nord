@@ -70,18 +70,28 @@ window.MN_ICON_GROUPS = {
 };
 
 /* Rendu d'une icône.
-   `id` accepte :  un identifiant du jeu ci-dessus  |  une URL d'image  |  un emoji. */
+   `id` accepte :  un identifiant du jeu ci-dessus  |  « srv:nom.png », image
+   hébergée par le serveur de l'atelier  |  une URL d'image  |  un emoji. */
 window.mnIcon = function (id, cls) {
   const klass = cls ? ' class="' + cls + '"' : "";
   const open = '<svg' + klass + ' viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
     ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+  const img = src => '<img' + klass + ' src="' +
+    String(src).replace(/"/g, "&quot;").replace(/</g, "&lt;") +
+    '" alt="" loading="lazy" decoding="async">';
 
   if (!id) return open + window.MN_ICONS["i-box"] + "</svg>";
   if (window.MN_ICONS[id]) return open + window.MN_ICONS[id] + "</svg>";
 
+  /* Image du serveur. Sans serveur configuré, on retombe sur l'icône par
+     défaut : mieux qu'une image cassée. */
+  if (String(id).indexOf("srv:") === 0) {
+    const url = window.MNStore ? MNStore.imageUrl(String(id).slice(4)) : "";
+    return url ? img(url) : open + window.MN_ICONS["i-box"] + "</svg>";
+  }
+
   if (/^(https?:\/\/|\.{0,2}\/|data:image)/i.test(id) || /\.(png|jpe?g|webp|gif|svg|avif)$/i.test(id)) {
-    const safe = String(id).replace(/"/g, "&quot;").replace(/</g, "&lt;");
-    return '<img' + klass + ' src="' + safe + '" alt="" loading="lazy" decoding="async">';
+    return img(id);
   }
 
   const txt = String(id).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));

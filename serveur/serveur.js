@@ -10,6 +10,11 @@
      PUT  /duty.json   → le remplace (le site l'appelle quand quelqu'un pointe)
      POST /relais      → transmet un message à Discord, sans jamais exposer
                          l'adresse du webhook
+     POST /publier     → écrit le catalogue sur GitHub, sans que personne
+                         n'ait de jeton
+     GET  /images      → la liste des images hébergées ici
+     GET  /images/x.png→ l'image elle-même
+     POST /images      → en déposer une, la renommer ou la supprimer
      GET  /sante       → « ok », pratique pour vérifier que tout tourne
 
    Le guide d'installation complet est dans serveur/README.md
@@ -30,6 +35,9 @@ const PORT = Number(process.env.PORT || 8787);
 const HOTE = process.env.HOTE || "0.0.0.0";
 const DOSSIER = process.env.DONNEES || path.join(__dirname, "donnees");
 const FICHIER = path.join(DOSSIER, "duty.json");
+/* Les images vivent ici plutôt que dans le dépôt : les y déposer coûtait un
+   commit et une reconstruction complète du site pour un fichier de 30 ko. */
+const DOSSIER_IMG = path.join(DOSSIER, "images");
 
 /* Origines autorisées, séparées par des virgules. « * » = tout le monde. */
 const ORIGINES = String(process.env.ORIGINE || "*")
@@ -267,6 +275,72 @@ async function ecrire(board) {
   await fsp.rename(tmp, FICHIER);
 }
 
+/* ---- Images -------------------------------------------------------------------
+   Hébergées ici, elles s'affichent dès le dépôt : ni commit, ni attente d'une
+   reconstruction GitHub Pages. Le site les référence par « srv:nom.png ». */
+
+const IMG_TYPES = {
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+  ".webp": "image/webp", ".gif": "image/gif", ".svg": "image/svg+xml",
+  ".avif": "image/avif"
+};
+
+/**
+ * Nom de fichier sûr, ou null.
+ * Ni dossier, ni « .. », ni extension inattendue : on ne sort pas du dossier
+ * d'images et on n'y dépose pas n'importe quoi.
+ */
+function nomImage(v) {
+  const s = texte(v, 120).trim();
+  if (!/^[\w.-]+$/.test(s) || s.indexOf("..") !== -1) return null;
+  return IMG_TYPES[path.extname(s).toLowerCase()] ? s : null;
+}
+
+async function listerImages() {
+  try {
+    const noms = await fsp.readdir(DOSSIER_IMG);
+    return noms.filter(n => nomImage(n)).sort((a, b) => a.localeCompare(b, "fr"));
+  } catch (_) {
+    return [];                    // dossier pas encore créé : simplement vide
+  }
+}
+
+/** Envoie le fichier au navigateur. Renvoie false s'il n'existe pas. */
+async function servirImage(res, nom, req) {
+  const f = path.join(DOSSIER_IMG, nom);
+  let st;
+  try { st = await fsp.stat(f); } catch (_) { return false; }
+  if (!st.isFile()) return false;
+
+  /* Une image ne change pas sous le même nom en pratique ; une minute de
+     cache suffit à éviter de la retélécharger à chaque page. */
+  const etag = '"' + st.size.toString(36) + "-" + st.mtimeMs.toString(36) + '"';
+  const entetesImg = Object.assign(entetes(req), {
+    "Content-Type": IMG_TYPES[path.extname(nom).toLowerCase()],
+    "Cache-Control": "public, max-age=60",
+    ETag: etag
+  });
+
+  if (req.headers["if-none-match"] === etag) {
+    res.writeHead(304, entetesImg);
+    res.end();
+    return true;
+  }
+
+  entetesImg["Content-Length"] = st.size;
+  res.writeHead(200, entetesImg);
+  fs.createReadStream(f).pipe(res);
+  return true;
+}
+
+/** Écrit une image, de façon atomique comme le tableau de service. */
+async function ecrireImage(nom, base64) {
+  await fsp.mkdir(DOSSIER_IMG, { recursive: true });
+  const tmp = path.join(DOSSIER_IMG, "." + nom + ".tmp");
+  await fsp.writeFile(tmp, Buffer.from(base64, "base64"));
+  await fsp.rename(tmp, path.join(DOSSIER_IMG, nom));
+}
+
 /* ---- Écriture sur GitHub ------------------------------------------------------
    Le jeton reste ici. Le site n'en a jamais besoin : il demande au serveur,
    le serveur écrit. C'est ce qui permet à toute l'équipe de publier. */
@@ -436,16 +510,68 @@ const serveur = http.createServer(async (req, res) => {
     return res.end();
   }
   if (!origineAutorisee(req)) return repondre(res, 403, { error: "Origine refusée" }, req);
-  if (tropDeRequetes(ip)) return repondre(res, 429, { error: "Trop de requêtes" }, req);
+
+  /* Une page affiche des dizaines d'images : les compter épuiserait le quota
+     en un chargement. Ce sont des lectures de fichiers, sans effet de bord. */
+  const lectureImage = req.method === "GET" && /^\/images\/./.test(chemin);
+  if (!lectureImage && tropDeRequetes(ip)) {
+    return repondre(res, 429, { error: "Trop de requêtes" }, req);
+  }
 
   try {
     /* --- santé --- */
     if (chemin === "/sante" && req.method === "GET") {
       /* « ops: true » indique au site qu'il peut envoyer des opérations
-         plutôt que tout le tableau : c'est ce qui évite les écrasements. */
+         plutôt que tout le tableau : c'est ce qui évite les écrasements.
+         « images: true » qu'il peut héberger les images ici. */
       return repondre(res, 200, {
-        ok: true, ops: true, depuis: Math.round(process.uptime()) + " s"
+        ok: true, ops: true, images: true, depuis: Math.round(process.uptime()) + " s"
       }, req);
+    }
+
+    /* --- images --- */
+    if (chemin === "/images" && req.method === "GET") {
+      return repondre(res, 200, { ok: true, images: await listerImages() }, req);
+    }
+
+    if (lectureImage) {
+      const nom = nomImage(decodeURIComponent(chemin.slice("/images/".length)));
+      if (!nom) return repondre(res, 400, { error: "Nom d'image invalide" }, req);
+      if (await servirImage(res, nom, req)) return;
+      return repondre(res, 404, { error: "Image introuvable : " + nom }, req);
+    }
+
+    if (chemin === "/images" && req.method === "POST") {
+      const c = await corpsJson(req);
+
+      if (c.op === "delete") {
+        const nom = nomImage(c.name);
+        if (!nom) return repondre(res, 400, { error: "Nom d'image invalide" }, req);
+        try { await fsp.unlink(path.join(DOSSIER_IMG, nom)); }
+        catch (_) { return repondre(res, 200, { ok: true, deja: true }, req); }
+        console.log(new Date().toISOString(), "image supprimée :", nom);
+        return repondre(res, 200, { ok: true }, req);
+      }
+
+      if (c.op === "rename") {
+        const de = nomImage(c.from), vers = nomImage(c.to);
+        if (!de || !vers) return repondre(res, 400, { error: "Nom d'image invalide" }, req);
+        if (fs.existsSync(path.join(DOSSIER_IMG, vers))) {
+          return repondre(res, 409, { error: "Une image porte déjà ce nom : " + vers }, req);
+        }
+        try { await fsp.rename(path.join(DOSSIER_IMG, de), path.join(DOSSIER_IMG, vers)); }
+        catch (_) { return repondre(res, 404, { error: "Image introuvable : " + de }, req); }
+        console.log(new Date().toISOString(), "image renommée :", de, "→", vers);
+        return repondre(res, 200, { ok: true }, req);
+      }
+
+      const nom = nomImage(c.name);
+      if (!nom) return repondre(res, 400, { error: "Nom d'image invalide" }, req);
+      const brut = String(c.base64 || "").replace(/^data:[^,]*,/, "");
+      if (!brut) return repondre(res, 400, { error: "Image vide" }, req);
+      await ecrireImage(nom, brut);
+      console.log(new Date().toISOString(), "image déposée :", nom);
+      return repondre(res, 200, { ok: true, name: nom }, req);
     }
 
     /* --- tableau de service --- */

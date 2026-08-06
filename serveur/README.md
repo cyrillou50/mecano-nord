@@ -422,7 +422,9 @@ systemctl restart mecano-nord    # redémarrer
 ```
 
 Les données sont dans `/opt/mecano-nord/donnees/duty.json`, avec les
-20 dernières versions dans `donnees/sauvegardes/`. Pour revenir en arrière :
+20 dernières versions dans `donnees/sauvegardes/`. Les images déposées
+depuis l'admin sont dans `donnees/images/` — **pense à les sauvegarder**,
+elles ne sont plus dans le dépôt GitHub. Pour revenir en arrière :
 
 ```bash
 cd /opt/mecano-nord/donnees
