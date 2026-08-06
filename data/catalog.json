@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-05T19:39:00.703Z",
+  "updatedAt": "2026-08-06T16:11:50.041Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -897,6 +897,20 @@
       "pack": 0,
       "excludes": [],
       "cost": {}
+    },
+    {
+      "id": "batterie-6volt",
+      "name": "Batterie 6Volt",
+      "category": "vehicule",
+      "icon": "assets/img/batterie6volt.png",
+      "enabled": true,
+      "note": "",
+      "max": 0,
+      "pack": 0,
+      "excludes": [],
+      "cost": {
+        "ressource": 3000
+      }
     }
   ]
 }
