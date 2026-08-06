@@ -295,24 +295,33 @@ window.MNGitHub = (function () {
           const d = await r.json().catch(() => ({}));
           return { ok: true, commit: d.commit || null, groupe: true };
         }
-        /* 400/404 : ce serveur ne sait pas grouper. On ne jette pas pour
-           autant, on repasse par les écritures une à une. */
-        if (r.status !== 400 && r.status !== 404) {
-          const d = await r.json().catch(() => ({}));
-          throw err("server", d.error || "Le serveur a répondu " + r.status);
-        }
+        /* Un refus, quel qu'il soit, veut dire que ce serveur ne comprend pas
+           la forme groupée — un serveur antérieur lit `path`, ne le trouve pas
+           et répond 403. On ne jette donc pas ici : les écritures une à une
+           qui suivent feront remonter la vraie erreur s'il y en a une. */
       } else if (hasToken()) {
         return await putFilesDirect(utiles, message);
       }
     } catch (e) {
-      if (e.code === "server" || e.code === "auth" || e.code === "no-repo") throw e;
+      /* Un jeton refusé ou un dépôt absent ne se règlent pas en réessayant. */
+      if (e.code === "auth" || e.code === "no-repo") throw e;
       /* Groupage impossible : on continue en séparé plutôt que d'échouer. */
     }
 
     for (const f of utiles) {
-      if (f.remove) await deleteFile(f.path, message);
-      else if (f.base64) await uploadRaw(f.path, f.content, message);
-      else await putText(f.path, f.content, message);
+      if (f.remove) {
+        /* Seule la forme groupée sait supprimer via le serveur. Sans elle et
+           sans jeton, l'opération est impossible : autant le dire. */
+        if (!hasToken() && serveurUrl()) {
+          throw err("server", "Ton serveur est trop ancien pour supprimer un fichier. " +
+            "Recopie serveur.js sur le VPS, puis redémarre-le.");
+        }
+        await deleteFile(f.path, message);
+      } else if (f.base64) {
+        await uploadRaw(f.path, f.content, message);
+      } else {
+        await putText(f.path, f.content, message);
+      }
     }
     return { ok: true, commit: null, groupe: false };
   }

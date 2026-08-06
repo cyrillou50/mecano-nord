@@ -13,7 +13,10 @@
   const K_STAMP = "mn.gh.stamp";
 
   const K_AUTO = "mn.gh.auto";
-  const AUTO_DELAY = 4000;      // on regroupe les modifs pour éviter 1 commit par clic
+  /* Chaque commit déclenche une reconstruction GitHub Pages, et elles se font
+     à la queue leu leu : quinze secondes d'attente en regroupent beaucoup, et
+     ne coûtent rien puisque la mise en ligne prend de toute façon plus. */
+  const AUTO_DELAY = 15000;
 
   let draft = null;
   let tab = "items";
