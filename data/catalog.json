@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-07T06:57:42.722Z",
+  "updatedAt": "2026-08-07T11:38:33.245Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -17,7 +17,7 @@
     "brand": {
       "name": "Mécano Nord",
       "tagline": "Day of Decay",
-      "logo": "srv:logo.png"
+      "logo": "assets/img/logo.png"
     },
     "auth": {
       "allowGuests": false,
