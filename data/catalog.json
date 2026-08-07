@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-07T00:45:02.733Z",
+  "updatedAt": "2026-08-07T06:57:42.722Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -47,7 +47,7 @@
     {
       "id": "patron",
       "name": "Patron",
-      "color": "#ffa92e",
+      "color": "#ff3b5c",
       "icon": "i-crown",
       "perms": [
         "bt",
@@ -61,7 +61,7 @@
     {
       "id": "secretaire",
       "name": "Secrétaire",
-      "color": "#7fd7e8",
+      "color": "#8b8bff",
       "icon": "i-clipboard",
       "perms": [
         "admin"
@@ -70,7 +70,7 @@
     {
       "id": "chef-d-atelier",
       "name": "Chef d'atelier",
-      "color": "#8b8bff",
+      "color": "#7fd7e8",
       "icon": "i-stripes",
       "perms": [
         "bt",
@@ -93,7 +93,7 @@
     {
       "id": "apprenti",
       "name": "Apprenti",
-      "color": "#b8c4d4",
+      "color": "#ffa92e",
       "icon": "i-helmet",
       "perms": [
         "bt",
