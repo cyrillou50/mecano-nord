@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-07T11:38:33.245Z",
+  "updatedAt": "2026-08-09T11:13:17.647Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -845,7 +845,7 @@
       "icon": "srv:freins.png",
       "enabled": true,
       "note": "",
-      "max": 0,
+      "max": 1,
       "pack": 0,
       "excludes": [],
       "cost": {}
@@ -857,7 +857,7 @@
       "icon": "srv:moteur.png",
       "enabled": true,
       "note": "",
-      "max": 0,
+      "max": 1,
       "pack": 0,
       "excludes": [],
       "cost": {}
@@ -869,7 +869,7 @@
       "icon": "srv:suspension.png",
       "enabled": true,
       "note": "",
-      "max": 0,
+      "max": 1,
       "pack": 0,
       "excludes": [],
       "cost": {}
@@ -881,7 +881,7 @@
       "icon": "srv:transmission.png",
       "enabled": true,
       "note": "",
-      "max": 0,
+      "max": 1,
       "pack": 0,
       "excludes": [],
       "cost": {}
@@ -893,7 +893,7 @@
       "icon": "srv:turbo.png",
       "enabled": true,
       "note": "",
-      "max": 0,
+      "max": 1,
       "pack": 0,
       "excludes": [],
       "cost": {}
