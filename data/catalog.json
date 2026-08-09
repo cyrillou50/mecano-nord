@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-09T12:25:09.150Z",
+  "updatedAt": "2026-08-09T12:46:36.402Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -42,6 +42,19 @@
       "icon": "i-key",
       "perms": [
         "admin"
+      ]
+    },
+    {
+      "id": "administrateur",
+      "name": "Administrateur",
+      "color": "#ff7ae0",
+      "icon": "i-badge",
+      "perms": [
+        "duty_view",
+        "staff",
+        "users",
+        "promote",
+        "duty_manage"
       ]
     },
     {
@@ -124,6 +137,34 @@
       ]
     },
     {
+      "id": "staff",
+      "pseudo": "Staff",
+      "roleId": "administrateur",
+      "pin": null,
+      "active": true,
+      "hidden": false,
+      "createdAt": "2026-08-09T12:22:38.215Z",
+      "hiredAt": "2026-08-09",
+      "trainings": [],
+      "note": "",
+      "history": [
+        {
+          "roleId": "secretaire",
+          "roleName": "Secrétaire",
+          "at": "2026-08-09T10:00:00.000Z",
+          "by": "Écuméria Sereinécaille",
+          "note": "Entrée dans l'entreprise"
+        },
+        {
+          "roleId": "administrateur",
+          "roleName": "Administrateur",
+          "at": "2026-08-09T12:45:00.000Z",
+          "by": "Écuméria Sereinécaille",
+          "note": ""
+        }
+      ]
+    },
+    {
       "id": "mika",
       "pseudo": "Mika Walker",
       "roleId": "patron",
@@ -142,27 +183,6 @@
           "roleName": "Patron",
           "at": "2026-08-02T22:47:59.170Z",
           "by": "",
-          "note": "Entrée dans l'entreprise"
-        }
-      ]
-    },
-    {
-      "id": "staff",
-      "pseudo": "Staff",
-      "roleId": "secretaire",
-      "pin": null,
-      "active": true,
-      "hidden": false,
-      "createdAt": "2026-08-09T12:22:38.215Z",
-      "hiredAt": "2026-08-09",
-      "trainings": [],
-      "note": "",
-      "history": [
-        {
-          "roleId": "secretaire",
-          "roleName": "Secrétaire",
-          "at": "2026-08-09T10:00:00.000Z",
-          "by": "Écuméria Sereinécaille",
           "note": "Entrée dans l'entreprise"
         }
       ]
