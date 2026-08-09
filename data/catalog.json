@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-09T11:13:17.647Z",
+  "updatedAt": "2026-08-09T11:24:34.536Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -173,23 +173,30 @@
       ]
     },
     {
-      "id": "lexa",
+      "id": "lexa-storm",
       "pseudo": "Lexa Storm",
       "roleId": "garagiste",
       "pin": null,
       "active": true,
       "hidden": false,
-      "createdAt": "2026-08-02T22:53:33.679Z",
+      "createdAt": "2026-08-09T11:20:20.159Z",
       "hiredAt": "2026-06-09",
       "trainings": [],
       "note": "",
       "history": [
         {
+          "roleId": "apprenti",
+          "roleName": "Apprenti",
+          "at": "2026-06-09T10:00:00.000Z",
+          "by": "Écuméria Sereinécaille",
+          "note": "Entrée dans l'entreprise"
+        },
+        {
           "roleId": "garagiste",
           "roleName": "Garagiste",
-          "at": "2026-08-02T22:53:33.679Z",
-          "by": "",
-          "note": "Entrée dans l'entreprise"
+          "at": "2026-07-12T11:20:00.000Z",
+          "by": "Écuméria Sereinécaille",
+          "note": ""
         }
       ]
     },
@@ -215,23 +222,30 @@
       ]
     },
     {
-      "id": "hakim",
+      "id": "hakim-skyfou",
       "pseudo": "Hakim Skyfou",
       "roleId": "garagiste",
-      "pin": "33ce5fca6a8a84351be660b6f6110a00cba12f3ec3127e7dffa31f90ff3c65b7",
+      "pin": "79d6e82e51a2710325a0595b94b59d891019d5bf72136e55c383d81013143309",
       "active": true,
       "hidden": false,
-      "createdAt": "2026-08-02T22:54:09.952Z",
+      "createdAt": "2026-08-09T11:18:53.610Z",
       "hiredAt": "2026-07-18",
       "trainings": [],
       "note": "",
       "history": [
         {
+          "roleId": "apprenti",
+          "roleName": "Apprenti",
+          "at": "2026-07-18T10:00:00.000Z",
+          "by": "Écuméria Sereinécaille",
+          "note": "Entrée dans l'entreprise"
+        },
+        {
           "roleId": "garagiste",
           "roleName": "Garagiste",
-          "at": "2026-08-02T22:54:09.952Z",
-          "by": "",
-          "note": "Entrée dans l'entreprise"
+          "at": "2026-07-25T11:18:00.000Z",
+          "by": "Écuméria Sereinécaille",
+          "note": ""
         }
       ]
     },
