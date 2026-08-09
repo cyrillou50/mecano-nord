@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-09T11:24:34.536Z",
+  "updatedAt": "2026-08-09T12:23:11.745Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -142,6 +142,27 @@
           "roleName": "Patron",
           "at": "2026-08-02T22:47:59.170Z",
           "by": "",
+          "note": "Entrée dans l'entreprise"
+        }
+      ]
+    },
+    {
+      "id": "staff",
+      "pseudo": "Staff",
+      "roleId": "secretaire",
+      "pin": null,
+      "active": true,
+      "hidden": false,
+      "createdAt": "2026-08-09T12:22:38.215Z",
+      "hiredAt": "2026-08-09",
+      "trainings": [],
+      "note": "",
+      "history": [
+        {
+          "roleId": "secretaire",
+          "roleName": "Secrétaire",
+          "at": "2026-08-09T10:00:00.000Z",
+          "by": "Écuméria Sereinécaille",
           "note": "Entrée dans l'entreprise"
         }
       ]
