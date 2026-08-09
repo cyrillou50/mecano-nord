@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-09T12:46:54.975Z",
+  "updatedAt": "2026-08-09T12:47:44.838Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -142,7 +142,7 @@
       "roleId": "administrateur",
       "pin": "153e5964aa11e0b76528ec2c0698929544590c5822cd516da8541728d725483b",
       "active": true,
-      "hidden": false,
+      "hidden": true,
       "createdAt": "2026-08-09T12:22:38.215Z",
       "hiredAt": "2026-08-09",
       "trainings": [],
