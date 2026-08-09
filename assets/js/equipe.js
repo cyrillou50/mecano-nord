@@ -410,14 +410,22 @@
       let day = wk.days.find(x => x.key === dKey);
       if (!day) {
         day = {
-          key: dKey, seconds: 0, slots: [], forced: false,
+          key: dKey, at: new Date(d).setHours(0, 0, 0, 0), seconds: 0, slots: [], forced: false,
           label: d.toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "2-digit" })
         };
         wk.days.push(day);
       }
       day.seconds += e.seconds;
-      day.slots.push(hhmm(e.in) + "–" + hhmm(e.out));
+      day.slots.push({ at: d.getTime(), txt: hhmm(e.in) + "–" + hhmm(e.out) });
       if (e.forced) day.forced = true;
+    });
+
+    /* Le journal arrive du plus récent au plus ancien : c'est ce qu'il faut
+       pour lister les semaines, mais à l'intérieur d'une semaine on lit une
+       journée dans le sens où elle s'est déroulée. */
+    weeks.forEach(wk => {
+      wk.days.sort((a, b) => a.at - b.at);
+      wk.days.forEach(d => d.slots.sort((a, b) => a.at - b.at));
     });
 
     /* La semaine en cours est dépliée, les précédentes repliées. */
@@ -436,7 +444,7 @@
             '<div class="svc__day">' +
               '<span class="svc__date">' + esc(d.label) + "</span>" +
               '<span class="svc__slots">' + d.slots.map(s =>
-                '<span class="svc__slot tnum">' + esc(s) + "</span>").join("") +
+                '<span class="svc__slot tnum">' + esc(s.txt) + "</span>").join("") +
                 (d.forced ? '<span class="permtag">clôturé par un gérant</span>' : "") +
               "</span>" +
               '<span class="svc__tot tnum">' + MNDuty.dur(d.seconds) + "</span>" +
@@ -526,14 +534,9 @@
         '<select class="select" id="p-role">' + draft.roles.map(r =>
           '<option value="' + esc(r.id) + '"' + (r.id === u.roleId ? " selected" : "") + ">" +
           esc(r.name) + "</option>").join("") + "</select></div>" +
-      '<div class="editor__grid">' +
-        '<div class="field"><label class="label" for="p-date">Date de la montée</label>' +
-          '<input class="input" id="p-date" type="date" value="' + new Date().toISOString().slice(0, 10) +
-            '" max="' + new Date().toISOString().slice(0, 10) + '"></div>' +
-        '<div class="field"><label class="label" for="p-time">Heure</label>' +
-          '<input class="input" id="p-time" type="time" value="' +
-            new Date().toTimeString().slice(0, 5) + '"></div>' +
-      "</div>" +
+      '<div class="field"><label class="label" for="p-date">Date de la montée</label>' +
+        '<input class="input" id="p-date" type="date" value="' + MNDuty.jourLocal() +
+          '" max="' + MNDuty.jourLocal() + '"></div>' +
       '<div class="field"><label class="label" for="p-note">Motif (facultatif)</label>' +
         '<input class="input" id="p-note" maxlength="80" placeholder="Ex. promotion après formation remorquage"></div>' +
       '<p class="hint">La date est pré-remplie à aujourd\'hui, mais tu peux la reculer si la promotion ' +
@@ -556,11 +559,13 @@
                 return MNUI.toast("Ce grade te retirerait la gestion de l'équipe", "err");
               }
             }
-            /* Date choisie : on la borne à maintenant, une promotion
-               ne peut pas être datée dans le futur. */
+            /* Seul le jour est demandé. Pour aujourd'hui on garde l'heure
+               courante, ce qui ordonne correctement plusieurs changements le
+               même jour ; pour une date passée, midi — un horaire neutre que
+               ni le fuseau ni l'heure d'été ne font basculer de journée. */
             const jour = body.querySelector("#p-date").value;
-            const heure = body.querySelector("#p-time").value || "12:00";
-            let quand = jour ? new Date(jour + "T" + heure + ":00") : new Date();
+            let quand = new Date();
+            if (jour && jour !== MNDuty.jourLocal()) quand = new Date(jour + "T12:00:00");
             if (isNaN(quand) || quand > new Date()) quand = new Date();
 
             const to = draft.roles.find(x => x.id === roleId);
