@@ -98,7 +98,7 @@ window.MNTheme = (function () {
      évite qu'un thème oublie une nuance et casse un écran. */
 
   const THEMES = [
-    { id: "neon",     nom: "Néon",          accent: "#ff2bd1", fond: "#06050a",
+    { id: "neon",     nom: "Néon",          accent: "#ff2bd1", fond: "#06050a", surface: "#15111e",
       note: "Le thème d'origine : magenta d'enseigne sur noir." },
     { id: "atelier",  nom: "Atelier",       accent: "#ffa92e", fond: "#0b0805",
       note: "Ambiance chaude, lampe de garage." },
@@ -133,6 +133,22 @@ window.MNTheme = (function () {
     const vers = clair ? assombrir : eclaircir;
     const txt = dessus(fond);
 
+    /* Couleur des encadrés — cartes, rangées, panneaux. Réglable à part :
+       la déduire du fond donnait des gris ternes, alors que la nuance des
+       cartes fait une bonne part de l'ambiance. Sans valeur, on la déduit. */
+    const surf = lire(t.surface) || vers(fond, 0.075);
+
+    /**
+     * Les autres niveaux s'échelonnent depuis cette couleur, toujours en
+     * s'assombrissant : ce qui est en creux est plus sombre que sa surface,
+     * en thème clair comme en thème sombre. Les déduire « vers le fond »
+     * inversait la hiérarchie en clair, où le fond est le plus lumineux.
+     *
+     * Les proportions sont plus fortes en sombre : sur du presque noir il faut
+     * beaucoup pour voir un écart, sur du papier très peu suffit.
+     */
+    const creux = (k, kClair) => assombrir(surf, clair ? kClair : k);
+
     const out = {
       "--accent-rgb": acc.map(Math.round).join(" "),
       "--pink": hex(acc),
@@ -143,18 +159,20 @@ window.MNTheme = (function () {
       "--on-accent-rgb": dessus(acc).map(Math.round).join(" "),
 
       "--bg": hex(fond),
-      "--surface": hex(vers(fond, 0.045)),
-      "--surface-2": hex(vers(fond, 0.075)),
-      "--surface-3": hex(vers(fond, 0.12)),
+      "--surface": hex(creux(0.28, 0.045)),
+      "--surface-2": hex(surf),
+      "--surface-3": hex(vers(surf, 0.045)),
 
-      /* Trois nuances de plus, sans lesquelles un thème clair garderait des
+      /* Quatre nuances de plus, sans lesquelles un thème clair garderait des
          champs de saisie noirs :
-         `sunk`  ce qui est en creux — champs, fonds de listes, bas de dégradé
-         `raise` ce qui ressort au survol
-         `edge`  les traits marqués : ascenseurs, séparateurs */
-      "--sunk": hex(clair ? assombrir(fond, 0.05) : assombrir(fond, 0.45)),
-      "--raise": hex(clair ? assombrir(fond, 0.09) : eclaircir(fond, 0.11)),
-      "--edge": hex(clair ? assombrir(fond, 0.24) : eclaircir(fond, 0.18)),
+         `surface-lo` le bas des dégradés de cartes, à peine sous la surface
+         `sunk`       ce qui est en creux — champs, fonds de listes
+         `raise`      ce qui ressort au survol
+         `edge`       les traits marqués : ascenseurs, séparateurs */
+      "--surface-lo": hex(creux(0.18, 0.03)),
+      "--sunk": hex(creux(0.45, 0.075)),
+      "--raise": hex(vers(surf, 0.035)),
+      "--edge": hex(clair ? assombrir(fond, 0.24) : eclaircir(surf, 0.14)),
 
       "--txt": hex(txt),
       "--muted": hex(melange(txt, fond, 0.35)),
@@ -203,11 +221,16 @@ window.MNTheme = (function () {
   function normalize(t) {
     const base = THEMES[0];
     const o = (t && typeof t === "object") ? t : (parId(t) || base);
+    const fond = lire(o.fond) ? String(o.fond) : base.fond;
     return {
       id: String(o.id || "perso"),
       nom: String(o.nom || "Personnalisé"),
       accent: lire(o.accent) ? String(o.accent) : base.accent,
-      fond: lire(o.fond) ? String(o.fond) : base.fond,
+      fond,
+      /* Sans couleur de surface donnée, on la déduit du fond : les thèmes qui
+         n'en précisent pas gardent le comportement d'avant. */
+      surface: lire(o.surface) ? String(o.surface)
+        : hex((clarte(lire(fond)) > 0.5 ? assombrir : eclaircir)(lire(fond), 0.075)),
       amber: o.amber || "", toxic: o.toxic || "", danger: o.danger || ""
     };
   }

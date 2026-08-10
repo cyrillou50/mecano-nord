@@ -448,7 +448,8 @@ window.MNUI = (function () {
     return '<button type="button" class="thcard' + (actif ? " is-on" : "") +
       '" data-th="' + esc(t.id) + '" title="' + esc(t.note || t.nom) + '">' +
       '<span class="thcard__vue" style="background:' + esc(p["--bg"]) + '">' +
-        '<span style="background:' + esc(p["--surface-2"]) + '"></span>' +
+        '<span style="background:linear-gradient(180deg,' + esc(p["--surface-2"]) + "," +
+          esc(p["--surface-lo"]) + ');border:1px solid ' + esc(p["--line"]) + '"></span>' +
         '<span style="background:' + esc(p["--pink"]) + '"></span>' +
         '<span style="background:' + esc(p["--pink-soft"]) + '"></span>' +
       "</span>" +
@@ -467,17 +468,20 @@ window.MNUI = (function () {
         MNTheme.THEMES.map(t => themeCard(t, t.id === courant.id)).join("") +
       "</div>" +
       '<div class="fieldset" style="margin-top:16px"><span class="label">Couleurs libres</span>' +
-        '<div class="editor__grid">' +
-          '<div class="field"><label class="label" for="th-acc">Couleur d\'accent</label>' +
+        '<div class="editor__grid editor__grid--3">' +
+          '<div class="field"><label class="label" for="th-acc">Accent</label>' +
             '<input class="input" id="th-acc" type="color" value="' + esc(courant.accent) +
               '" style="height:44px;padding:5px"></div>' +
           '<div class="field"><label class="label" for="th-bg">Fond</label>' +
             '<input class="input" id="th-bg" type="color" value="' + esc(courant.fond) +
               '" style="height:44px;padding:5px"></div>' +
+          '<div class="field"><label class="label" for="th-su">Encadrés</label>' +
+            '<input class="input" id="th-su" type="color" value="' + esc(courant.surface) +
+              '" style="height:44px;padding:5px"></div>' +
         "</div>" +
-        '<p class="hint" style="margin-top:10px">Le reste — surfaces, textes, contrastes — se ' +
-          "calcule à partir de ces deux couleurs. Un fond clair bascule automatiquement " +
-          "l'ensemble en thème clair.</p>" +
+        '<p class="hint" style="margin-top:10px">« Encadrés » est la couleur des cartes, ' +
+          "rangées et panneaux. Le reste — textes, bordures, contrastes — se calcule à partir " +
+          "de ces trois couleurs. Un fond clair bascule automatiquement l'ensemble en thème clair.</p>" +
       "</div>" +
       '<p class="hint" style="margin-top:12px">Les changements s\'appliquent en direct.</p>';
 
@@ -487,6 +491,7 @@ window.MNUI = (function () {
     const grid = body.querySelector("#th-grid");
     const acc = body.querySelector("#th-acc");
     const bg = body.querySelector("#th-bg");
+    const su = body.querySelector("#th-su");
 
     const peindre = id => grid.querySelectorAll("[data-th]").forEach(b =>
       b.classList.toggle("is-on", b.dataset.th === id));
@@ -494,17 +499,19 @@ window.MNUI = (function () {
     grid.querySelectorAll("[data-th]").forEach(b => b.addEventListener("click", () => {
       const t = MNTheme.THEMES.find(x => x.id === b.dataset.th);
       if (!t) return;
-      MNTheme.choisir(t.id);
-      acc.value = t.accent; bg.value = t.fond;
+      const n = MNTheme.choisir(t.id);
+      acc.value = n.accent; bg.value = n.fond; su.value = n.surface;
       peindre(t.id);
     }));
 
-    const libre = () => {
-      MNTheme.choisir({ id: "perso", nom: "Personnalisé", accent: acc.value, fond: bg.value });
+    const surMesure = () => {
+      MNTheme.choisir({
+        id: "perso", nom: "Personnalisé",
+        accent: acc.value, fond: bg.value, surface: su.value
+      });
       peindre("perso");
     };
-    acc.addEventListener("input", libre);
-    bg.addEventListener("input", libre);
+    [acc, bg, su].forEach(x => x.addEventListener("input", surMesure));
 
     modal({
       title: "Apparence", body,

@@ -25,7 +25,7 @@
   position: relative;
   display: inline-flex; align-items: center; gap: 11px;
   padding: 13px 22px;
-  background: linear-gradient(180deg, var(--surface-2), var(--sunk));
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-lo));
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--muted);
@@ -146,7 +146,7 @@
   display: flex; flex-direction: column;
   cursor: pointer;
   padding: 20px 16px 16px;
-  background: linear-gradient(180deg, var(--surface-2), var(--sunk));
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-lo));
   border: 1px solid var(--line);
   border-radius: 14px;
   /* box-shadow volontairement hors transition : l'animer force un repaint de
@@ -156,7 +156,7 @@
 .item:hover {
   border-color: rgba(255, 255, 255, .18);
   transform: translateY(-2px);
-  background: linear-gradient(180deg, var(--raise), var(--sunk));
+  background: linear-gradient(180deg, var(--raise), var(--surface-lo));
 }
 .item.is-picked {
   border-color: var(--pink);
@@ -280,7 +280,7 @@
   cursor: not-allowed;
   border-style: dashed;
   border-color: rgba(255, 255, 255, .1);
-  background: linear-gradient(180deg, var(--sunk), var(--sunk));
+  background: linear-gradient(180deg, var(--surface-lo), var(--sunk));
 }
 .item.is-blocked:hover { transform: none; border-color: rgba(255, 255, 255, .14); }
 .item.is-blocked .item__icon,
@@ -323,7 +323,7 @@
   z-index: 500;
   /* Fond opaque : c'est la plus grande surface de la page, un backdrop-filter
      ici coûtait un flou plein écran à chaque défilement. */
-  background: linear-gradient(180deg, var(--sunk), var(--sunk));
+  background: linear-gradient(180deg, var(--surface-lo), var(--sunk));
   border-top: 1px solid rgb(var(--accent-rgb) / .38);
   box-shadow: 0 -12px 40px -18px rgb(var(--accent-rgb) / .45), 0 -20px 60px -30px #000;
   transition: transform .26s cubic-bezier(.3, .8, .3, 1);

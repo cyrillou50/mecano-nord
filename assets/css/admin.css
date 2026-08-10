@@ -42,7 +42,7 @@
   top: calc(var(--topbar-h) + 22px);
   display: flex; flex-direction: column; gap: 3px;
   padding: 10px;
-  background: linear-gradient(180deg, var(--surface), var(--sunk));
+  background: linear-gradient(180deg, var(--surface), var(--surface-lo));
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
 }
@@ -95,12 +95,12 @@
 .trow {
   display: flex; align-items: center; gap: 13px;
   padding: 11px 14px;
-  background: linear-gradient(180deg, var(--surface-2), var(--sunk));
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-lo));
   border: 1px solid var(--line);
   border-radius: var(--r);
   transition: border-color .14s, background .14s;
 }
-.trow:hover { border-color: var(--line-2); background: linear-gradient(180deg, var(--raise), var(--sunk)); }
+.trow:hover { border-color: var(--line-2); background: linear-gradient(180deg, var(--raise), var(--surface-lo)); }
 
 /* rangée escamotée par le repliage de sa parente */
 .trow.is-collapsed { display: none; }
@@ -114,7 +114,7 @@
 .trow--sub {
   margin-left: 28px;
   position: relative;
-  background: linear-gradient(180deg, var(--raise), var(--sunk));
+  background: linear-gradient(180deg, var(--raise), var(--surface-lo));
 }
 .trow--sub::before {
   content: "";
@@ -423,7 +423,7 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
   top: calc(var(--topbar-h) + 22px);
   display: flex; flex-direction: column;
   max-height: calc(100vh - var(--topbar-h) - 44px);
-  background: linear-gradient(180deg, var(--surface), var(--sunk));
+  background: linear-gradient(180deg, var(--surface), var(--surface-lo));
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   overflow: hidden;

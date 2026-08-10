@@ -51,6 +51,7 @@
      fortement en thème clair, où ils saliraient le fond au lieu de le creuser. */
   --halo: .20;
   --vign: .65;
+  --surface-lo: #100d18;
   --sunk:  #0a0810;
   --raise: #1a1526;
   --edge:  #2a2338;
@@ -407,7 +408,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 /* ---- Blocs -------------------------------------------------------------- */
 
 .panel {
-  background: linear-gradient(180deg, var(--surface), var(--sunk));
+  background: linear-gradient(180deg, var(--surface), var(--surface-lo));
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow);
@@ -619,7 +620,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   width: min(620px, 100%);
   max-height: min(86vh, 900px);
   display: flex; flex-direction: column;
-  background: linear-gradient(180deg, var(--raise), var(--sunk));
+  background: linear-gradient(180deg, var(--raise), var(--surface-lo));
   border: 1px solid var(--line-2);
   border-radius: var(--r-lg);
   box-shadow: 0 40px 90px -30px #000, 0 0 60px -30px rgb(var(--accent-rgb) / .5);

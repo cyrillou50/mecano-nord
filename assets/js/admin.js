@@ -1860,7 +1860,8 @@
       return '<button type="button" class="thcard' + (x.id === t.id ? " is-on" : "") +
         '" data-th="' + esc(x.id) + '" title="' + esc(x.note || x.nom) + '">' +
         '<span class="thcard__vue" style="background:' + esc(p["--bg"]) + '">' +
-          '<span style="background:' + esc(p["--surface-2"]) + '"></span>' +
+          '<span style="background:linear-gradient(180deg,' + esc(p["--surface-2"]) + "," +
+            esc(p["--surface-lo"]) + ');border:1px solid ' + esc(p["--line"]) + '"></span>' +
           '<span style="background:' + esc(p["--pink"]) + '"></span>' +
           '<span style="background:' + esc(p["--pink-soft"]) + '"></span>' +
         "</span><b>" + esc(x.nom) + "</b></button>";
@@ -1887,16 +1888,20 @@
         (MNTheme.THEMES.some(x => x.id === t.id) ? "" : '<span class="pill pill--ok">personnalisé</span>') +
       "</div>" +
         '<div class="panel__body editor">' +
-          '<div class="editor__grid">' +
-            '<div class="field"><label class="label" for="t-acc">Couleur d\'accent</label>' +
+          '<div class="editor__grid editor__grid--3">' +
+            '<div class="field"><label class="label" for="t-acc">Accent</label>' +
               '<input class="input" id="t-acc" type="color" value="' + esc(t.accent) +
                 '" style="height:46px;padding:5px"></div>' +
             '<div class="field"><label class="label" for="t-bg">Fond</label>' +
               '<input class="input" id="t-bg" type="color" value="' + esc(t.fond) +
                 '" style="height:46px;padding:5px"></div>' +
+            '<div class="field"><label class="label" for="t-su">Encadrés</label>' +
+              '<input class="input" id="t-su" type="color" value="' + esc(t.surface) +
+                '" style="height:46px;padding:5px"></div>' +
           "</div>" +
-          '<p class="hint">Deux couleurs suffisent : surfaces, textes, bordures et contrastes ' +
-            "en sont déduits. Un fond clair fait basculer tout le site en thème clair, y compris " +
+          '<p class="hint">« Encadrés » donne leur couleur aux cartes, rangées et panneaux — ' +
+            "c'est elle qui fait l'essentiel de l'ambiance. Textes, bordures et contrastes en " +
+            "sont déduits. Un fond clair fait basculer tout le site en thème clair, y compris " +
             "les champs de formulaire.</p>" +
           '<div id="t-apercu"></div>' +
         "</div></div>" +
@@ -1917,44 +1922,71 @@
         '<button class="btn btn--primary" id="t-save">' + svg("save") + "<span>Enregistrer</span></button>" +
       "</div>";
 
-    const acc = $("#t-acc"), bg = $("#t-bg"), apercu = $("#t-apercu");
+    const acc = $("#t-acc"), bg = $("#t-bg"), su = $("#t-su"), apercu = $("#t-apercu");
 
-    /* L'aperçu montre les éléments les plus exposés aux mauvais contrastes :
-       un bouton plein, une pastille, une carte. */
+    /* L'aperçu montre une carte posée sur le fond : c'est le rapport entre les
+       deux qui se juge, plus que chaque couleur prise isolément. */
     const peindre = () => {
-      const p = MNTheme.palette({ accent: acc.value, fond: bg.value });
+      const p = MNTheme.palette({ accent: acc.value, fond: bg.value, surface: su.value });
       apercu.innerHTML =
         '<div style="margin-top:4px;padding:16px;border-radius:var(--r);background:' +
           esc(p["--bg"]) + ";border:1px solid " + esc(p["--line-2"]) + '">' +
-          '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
-            '<span style="padding:9px 16px;border-radius:999px;font-weight:700;background:' +
-              esc(p["--pink"]) + ";color:" + esc(p["--on-accent"]) + '">Bouton</span>' +
-            '<span style="padding:5px 12px;border-radius:999px;background:' +
-              esc(p["--surface-2"]) + ";color:" + esc(p["--pink-soft"]) + ";border:1px solid " +
-              esc(p["--line"]) + '">Pastille</span>' +
-            '<span style="color:' + esc(p["--txt"]) + '">Texte principal</span>' +
-            '<span style="color:' + esc(p["--muted"]) + '">secondaire</span>' +
-            '<span style="color:' + esc(p["--dim"]) + '">discret</span>' +
-          "</div></div>";
+          '<div style="padding:14px;border-radius:12px;border:1px solid ' + esc(p["--line"]) +
+            ";background:linear-gradient(180deg," + esc(p["--surface-2"]) + "," +
+            esc(p["--surface-lo"]) + ')">' +
+            '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+              '<span style="padding:9px 16px;border-radius:999px;font-weight:700;background:' +
+                esc(p["--pink"]) + ";color:" + esc(p["--on-accent"]) + '">Bouton</span>' +
+              '<span style="padding:5px 12px;border-radius:999px;background:' +
+                esc(p["--sunk"]) + ";color:" + esc(p["--pink-soft"]) + ";border:1px solid " +
+                esc(p["--line"]) + '">Champ</span>' +
+              '<span style="color:' + esc(p["--txt"]) + '">Texte principal</span>' +
+              '<span style="color:' + esc(p["--muted"]) + '">secondaire</span>' +
+              '<span style="color:' + esc(p["--dim"]) + '">discret</span>' +
+            "</div></div></div>" +
+            avertissement(p);
     };
+
+    /**
+     * Les couleurs sont libres, donc on peut en choisir de mauvaises. Plutôt
+     * que de les corriger en douce, on dit ce qui cloche : certains fonds —
+     * les gris moyens surtout — ne laissent aucune encre bien contraster.
+     */
+    function avertissement(p) {
+      const c = (a, b) => MNTheme.contraste(MNTheme.lire(p[a]), MNTheme.lire(p[b]));
+      const soucis = [];
+      if (c("--bg", "--txt") < 7) soucis.push("le texte sur le fond (" + c("--bg", "--txt").toFixed(1) + ":1)");
+      if (c("--surface-2", "--txt") < 7) soucis.push("le texte sur les encadrés (" + c("--surface-2", "--txt").toFixed(1) + ":1)");
+      if (c("--pink", "--on-accent") < 4.5) soucis.push("le texte des boutons (" + c("--pink", "--on-accent").toFixed(1) + ":1)");
+      if (c("--bg", "--surface-2") < 1.04) soucis.push("les encadrés, indistincts du fond");
+
+      if (!soucis.length) return "";
+      return '<div class="alert alert--warn" style="margin-top:10px">' + svg("alert") +
+        "<span>Lisibilité juste sur " + soucis.join(", ") +
+        ". Un fond très clair ou très sombre laisse plus de marge qu'un ton moyen.</span></div>";
+    }
+
     peindre();
 
     host.querySelectorAll("[data-th]").forEach(b => b.addEventListener("click", () => {
       const x = MNTheme.THEMES.find(y => y.id === b.dataset.th);
       if (!x) return;
-      acc.value = x.accent; bg.value = x.fond;
-      draft.settings.theme = MNTheme.normalize(x);
+      const n = MNTheme.normalize(x);
+      acc.value = n.accent; bg.value = n.fond; su.value = n.surface;
+      draft.settings.theme = n;
       host.querySelectorAll("[data-th]").forEach(y => y.classList.toggle("is-on", y === b));
       peindre();
     }));
 
-    acc.addEventListener("input", peindre);
-    bg.addEventListener("input", peindre);
+    [acc, bg, su].forEach(x => x.addEventListener("input", peindre));
 
     const lu = () => {
-      const preset = MNTheme.THEMES.find(x => x.accent === acc.value && x.fond === bg.value);
+      const preset = MNTheme.THEMES.find(x => {
+        const n = MNTheme.normalize(x);
+        return n.accent === acc.value && n.fond === bg.value && n.surface === su.value;
+      });
       return MNTheme.normalize(preset || {
-        id: "perso", nom: "Personnalisé", accent: acc.value, fond: bg.value
+        id: "perso", nom: "Personnalisé", accent: acc.value, fond: bg.value, surface: su.value
       });
     };
 
