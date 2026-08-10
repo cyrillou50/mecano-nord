@@ -18,7 +18,7 @@
   --dim:   #6a6280;
 
   /* Accents.
-     Ces valeurs sont celles du thème « Day of Decay ». theme.js les réécrit
+     Ces valeurs sont celles du thème « Néon ». theme.js les réécrit
      sur <html> au chargement ; elles restent le repli si le script échoue.
      `--accent-rgb` est donné en composantes séparées pour permettre
      `rgb(var(--accent-rgb) / .3)` partout où il faut une transparence. */
