@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-10T18:16:51.027Z",
+  "updatedAt": "2026-08-10T18:17:07.661Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -70,15 +70,6 @@
         "staff",
         "promote",
         "items",
-        "admin"
-      ]
-    },
-    {
-      "id": "secretaire",
-      "name": "Secrétaire",
-      "color": "#8b8bff",
-      "icon": "i-clipboard",
-      "perms": [
         "admin"
       ]
     },
