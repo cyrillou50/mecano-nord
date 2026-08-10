@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-10T19:27:20.162Z",
+  "updatedAt": "2026-08-10T20:33:39.109Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -226,27 +226,6 @@
           "at": "2026-07-12T11:20:00.000Z",
           "by": "Écuméria Sereinécaille",
           "note": ""
-        }
-      ]
-    },
-    {
-      "id": "tony",
-      "pseudo": "Tony Dino",
-      "roleId": "garagiste",
-      "pin": "1044f119ca6d33a634dd98aa2bac0b34127fca3615eded759838dea9ad896e2e",
-      "active": true,
-      "hidden": false,
-      "createdAt": "2026-08-02T22:53:41.495Z",
-      "hiredAt": "2026-06-21",
-      "trainings": [],
-      "note": "",
-      "history": [
-        {
-          "roleId": "garagiste",
-          "roleName": "Garagiste",
-          "at": "2026-08-02T22:53:41.495Z",
-          "by": "",
-          "note": "Entrée dans l'entreprise"
         }
       ]
     },
@@ -941,5 +920,13 @@
       "excludes": [],
       "cost": {}
     }
-  ]
+  ],
+  "vehicleCats": [
+    {
+      "id": "voitures",
+      "name": "Voitures",
+      "icon": "i-wheels-car"
+    }
+  ],
+  "vehicles": []
 }
