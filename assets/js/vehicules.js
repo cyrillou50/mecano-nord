@@ -15,13 +15,15 @@
   let me = null;
   let sel = null;
   let filter = "";
-  let canEdit = false;
+  let canEdit = false;      // modifier et supprimer n'importe quel véhicule
+  let canValid = false;     // approuver ou refuser une proposition
 
   MNUI.start({ page: "vehicules", title: "Véhicules", onReady: init });
 
   function init(session) {
     me = session;
     canEdit = MNAuth.canAny("vehicles", "admin");
+    canValid = MNAuth.canAny("vehicles_validate", "vehicles", "admin");
     draft = MNStore.clone(MNStore.catalog());
     const first = liste()[0];
     sel = first ? first.id : null;
@@ -32,6 +34,8 @@
 
   const catOf = v => draft.vehicleCats.find(c => c.id === v.category) ||
     { id: "", name: "Sans catégorie", icon: "i-box" };
+
+  const enAttente = v => v.status === "attente";
 
   /** Les véhicules correspondant au filtre, dans l'ordre du catalogue. */
   function liste() {
@@ -79,11 +83,28 @@
     const host = $("#v-list");
     const items = liste();
 
+    /* Les propositions restent hors du parc jusqu'à validation, mais tout le
+       monde les voit : celui qui propose doit pouvoir suivre où en est sa
+       demande, et les valideurs les trouver sans les chercher. */
+    const attente = items.filter(enAttente);
+    const valides = items.filter(v => !enAttente(v));
+
     /* Regroupement par catégorie : c'est la demande principale, et ça évite
        une liste à plat qui deviendrait vite illisible. */
     const groupes = draft.vehicleCats
-      .map(c => ({ c, vs: items.filter(v => v.category === c.id) }))
+      .map(c => ({ c, vs: valides.filter(v => v.category === c.id) }))
       .filter(g => g.vs.length);
+
+    const ligne = v =>
+      '<button class="staffrow' + (v.id === sel ? " is-active" : "") +
+        (enAttente(v) ? " is-attente" : "") +
+        '" data-v="' + esc(v.id) + '" type="button">' +
+        '<span class="vthumb">' + mnIcon(v.image || "i-wheels-car") + "</span>" +
+        '<span class="staffrow__txt"><b>' + esc(v.name) + "</b>" +
+          "<i>" + esc(enAttente(v)
+            ? "proposé par " + (v.proposePar || "?")
+            : (v.type || catOf(v).name)) + "</i></span>" +
+      "</button>";
 
     host.innerHTML =
       '<div class="stafflist__top">' +
@@ -91,31 +112,35 @@
           esc(filter) + '">' +
       "</div>" +
       '<div class="stafflist__body">' +
+        (attente.length
+          ? '<div class="vgroup vgroup--attente"><span class="vgroup__t">' + svg("history") +
+              "En attente<i>" + attente.length + "</i></span>" +
+              attente.map(ligne).join("") +
+            "</div>"
+          : "") +
         (groupes.length
           ? groupes.map(g =>
               '<div class="vgroup"><span class="vgroup__t">' + mnIcon(g.c.icon) +
                 esc(g.c.name) + '<i>' + g.vs.length + "</i></span>" +
-                g.vs.map(v =>
-                  '<button class="staffrow' + (v.id === sel ? " is-active" : "") +
-                    '" data-v="' + esc(v.id) + '" type="button">' +
-                    '<span class="vthumb">' + mnIcon(v.image || "i-wheels-car") + "</span>" +
-                    '<span class="staffrow__txt"><b>' + esc(v.name) + "</b>" +
-                      "<i>" + esc(v.type || g.c.name) + "</i></span>" +
-                  "</button>").join("") +
+                g.vs.map(ligne).join("") +
               "</div>").join("")
-          : '<p class="hint" style="padding:12px">' +
+          : (attente.length ? "" : '<p class="hint" style="padding:12px">' +
             (draft.vehicles.length ? "Aucun véhicule ne correspond." : "Aucun véhicule enregistré.") +
-            "</p>") +
+            "</p>")) +
       "</div>" +
       '<div class="stafflist__foot">' +
-        '<span class="hint">' + items.length + " véhicule" + (items.length > 1 ? "s" : "") + "</span>" +
-        (canEdit
-          ? '<span class="row" style="gap:4px">' +
-            '<button class="btn btn--ghost btn--sm" id="v-cats" title="Catégories">' +
-              svg("layers") + "</button>" +
-            '<button class="btn btn--primary btn--sm" id="v-add">' + svg("plus") +
-              "<span>Ajouter</span></button></span>"
-          : "") +
+        '<span class="hint">' + valides.length + " véhicule" + (valides.length > 1 ? "s" : "") +
+          (attente.length ? " · " + attente.length + " en attente" : "") + "</span>" +
+        '<span class="row" style="gap:4px">' +
+          (canEdit
+            ? '<button class="btn btn--ghost btn--sm" id="v-cats" title="Catégories">' +
+              svg("layers") + "</button>"
+            : "") +
+          /* Proposer est ouvert à tous : c'est la validation qui filtre, pas
+             l'accès au formulaire. */
+          '<button class="btn btn--primary btn--sm" id="v-add">' + svg("plus") +
+            "<span>" + (canEdit ? "Ajouter" : "Proposer") + "</span></button>" +
+        "</span>" +
       "</div>";
 
     const s = $("#v-search");
@@ -149,21 +174,41 @@
       return;
     }
     const c = catOf(v);
+    const attente = enAttente(v);
+    /* Celui qui a proposé peut corriger sa demande tant qu'elle attend. */
+    const monBrouillon = attente && v.proposePar === me.pseudo;
 
     pane.innerHTML =
       '<div class="panel vcard">' +
         '<div class="vcard__head">' +
           "<h2>" + esc(v.name) + "</h2>" +
-          '<span class="permtag">' + esc(c.name) + "</span>" +
+          '<span class="permtag' + (attente ? " permtag--none" : "") + '">' +
+            esc(attente ? "proposition" : c.name) + "</span>" +
           '<span class="spacer"></span>' +
-          (canEdit
+          (canEdit || monBrouillon
             ? '<button class="btn btn--ghost btn--sm" id="v-edit">' + svg("edit") +
-                "<span>Modifier</span></button>" +
-              '<button class="btn btn--icon" id="v-del" title="Supprimer">' + svg("trash") + "</button>"
+                "<span>Modifier</span></button>"
+            : "") +
+          (canEdit || monBrouillon
+            ? '<button class="btn btn--icon" id="v-del" title="Supprimer">' + svg("trash") + "</button>"
             : "") +
         "</div>" +
 
         '<div class="vcard__body">' +
+          (attente
+            ? '<div class="alert alert--warn" style="margin-bottom:16px">' + svg("history") +
+              "<span><b>En attente de validation.</b> Proposé par " +
+              esc(v.proposePar || "?") +
+              (v.proposeLe ? " " + MNUI.ago(new Date(v.proposeLe).getTime()) : "") +
+              ". Ce véhicule n'apparaîtra dans le parc qu'une fois approuvé.</span></div>" +
+              (canValid
+                ? '<div class="row" style="margin-bottom:18px">' +
+                  '<button class="btn btn--solid" id="v-ok">' + svg("check") +
+                    "<span>Approuver</span></button>" +
+                  '<button class="btn btn--danger" id="v-no">' + svg("x") +
+                    "<span>Refuser</span></button></div>"
+                : "")
+            : "") +
           '<div class="vshot">' + mnIcon(v.image || "i-wheels-car") + "</div>" +
 
           (v.note ? '<p class="hint vcard__note">' + esc(v.note) + "</p>" : "") +
@@ -181,6 +226,33 @@
     if (e) e.addEventListener("click", () => editVehicle(v));
     const d = $("#v-del");
     if (d) d.addEventListener("click", () => deleteVehicle(v));
+    const ok = $("#v-ok");
+    if (ok) ok.addEventListener("click", () => valider(v));
+    const no = $("#v-no");
+    if (no) no.addEventListener("click", () => refuser(v));
+  }
+
+  /* ---- Validation ---------------------------------------------------------- */
+
+  function valider(v) {
+    const cible = draft.vehicles.find(x => x.id === v.id);
+    cible.status = "valide";
+    commit();
+    MNUI.toast(v.name + " est entré dans le parc", "ok");
+  }
+
+  async function refuser(v) {
+    const ok = await MNUI.confirm({
+      title: "Refuser la proposition",
+      message: "« " + v.name + " », proposé par " + (v.proposePar || "?") +
+        ", sera supprimé. Il faudra le reproposer pour revenir dessus.",
+      confirmLabel: "Refuser", danger: true
+    });
+    if (!ok) return;
+    draft.vehicles = draft.vehicles.filter(x => x.id !== v.id);
+    if (sel === v.id) { const f = liste()[0]; sel = f ? f.id : null; }
+    commit();
+    MNUI.toast("Proposition refusée", "ok");
   }
 
   /* ---- Édition ----------------------------------------------------------- */
@@ -271,14 +343,26 @@
 
             if (isNew) {
               data.id = MNStore.uniqueId(nom, draft.vehicles.map(x => x.id));
+              /* Qui peut gérer le parc y écrit directement ; les autres
+                 proposent, et leur ajout attend une validation. */
+              data.status = canEdit ? "valide" : "attente";
+              data.proposePar = me.pseudo;
+              data.proposeLe = new Date().toISOString();
               draft.vehicles.push(data);
               sel = data.id;
             } else {
-              Object.assign(draft.vehicles.find(x => x.id === v.id), data);
+              const cible = draft.vehicles.find(x => x.id === v.id);
+              /* Modifier sa propre proposition ne la fait pas passer : elle
+                 reste en attente, avec son auteur. */
+              Object.assign(cible, data, {
+                status: cible.status, proposePar: cible.proposePar, proposeLe: cible.proposeLe
+              });
             }
             commit();
             close();
-            MNUI.toast(isNew ? "Véhicule ajouté" : "Véhicule mis à jour", "ok");
+            MNUI.toast(isNew
+              ? (canEdit ? "Véhicule ajouté" : "Proposition envoyée — elle attend une validation")
+              : "Véhicule mis à jour", "ok");
           }
         }
       ]
@@ -287,8 +371,9 @@
 
   async function deleteVehicle(v) {
     const ok = await MNUI.confirm({
-      title: "Supprimer le véhicule",
-      message: "« " + v.name + " » sera retiré du parc. C'est définitif.",
+      title: enAttente(v) ? "Retirer la proposition" : "Supprimer le véhicule",
+      message: "« " + v.name + " » sera " +
+        (enAttente(v) ? "retiré des propositions" : "retiré du parc") + ". C'est définitif.",
       confirmLabel: "Supprimer", danger: true
     });
     if (!ok) return;

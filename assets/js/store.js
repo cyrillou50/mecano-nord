@@ -194,6 +194,12 @@ window.MNStore = (function () {
         category: vcIds.indexOf(v.category) !== -1 ? v.category : vcIds[0],
         /* Image du véhicule : même écriture que les icônes (dépôt, serveur…). */
         image: String(v.image || ""),
+        /* Une proposition n'entre dans le parc qu'une fois validée. Tout ce
+           qui existait avant ce mécanisme est considéré comme validé, sans
+           quoi le parc disparaîtrait d'un coup. */
+        status: v.status === "attente" ? "attente" : "valide",
+        proposePar: String(v.proposePar || ""),
+        proposeLe: v.proposeLe || null,
         carburant: String(v.carburant || ""),
         places: Math.max(0, Math.min(99, Math.round(Number(v.places) || 0))),
         coffre: String(v.coffre || ""),

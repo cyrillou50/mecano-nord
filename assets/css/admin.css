@@ -777,3 +777,10 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
 @media (max-width: 900px) {
   .vshot { height: 160px; }
 }
+
+/* Propositions en attente : ambrées, comme le bandeau des modifications non
+   publiées — même code visuel pour « ceci n'est pas encore officiel ». */
+.vgroup--attente .vgroup__t { color: var(--amber); }
+.staffrow.is-attente { box-shadow: inset 2px 0 0 var(--amber); }
+.staffrow.is-attente .staffrow__txt i { color: var(--amber); opacity: .85; }
+.staffrow.is-attente.is-active { background: rgba(255, 169, 46, .12); }
