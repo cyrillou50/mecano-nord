@@ -185,23 +185,15 @@ window.MNStore = (function () {
 
     const vcIds = c.vehicleCats.map(k => k.id);
     const seenV = [];
-    /* Les performances sont des notes sur 100 : c'est ce que le jeu affiche,
-       et ça se compare d'un véhicule à l'autre sans conversion. */
-    const note = v => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
 
     c.vehicles = (Array.isArray(c.vehicles) ? c.vehicles : []).map(v => {
       const id = uniqueId(v.id || v.name, seenV); seenV.push(id);
-      const s = v.stats || {};
       return {
         id,
         name: String(v.name || id),
         category: vcIds.indexOf(v.category) !== -1 ? v.category : vcIds[0],
         /* Image du véhicule : même écriture que les icônes (dépôt, serveur…). */
         image: String(v.image || ""),
-        stats: {
-          vitesse: note(s.vitesse), accel: note(s.accel),
-          freinage: note(s.freinage), traction: note(s.traction)
-        },
         carburant: String(v.carburant || ""),
         places: Math.max(0, Math.min(99, Math.round(Number(v.places) || 0))),
         coffre: String(v.coffre || ""),

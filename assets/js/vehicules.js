@@ -11,15 +11,6 @@
   const $ = s => document.querySelector(s);
   const svg = MNUI.svg, esc = MNUI.esc;
 
-  /* Les quatre performances affichées, dans l'ordre de la fiche. */
-  const PERFS = [
-    { key: "vitesse",  label: "Vitesse" },
-    { key: "accel",    label: "Accél." },
-    { key: "freinage", label: "Freinage" },
-    { key: "traction", label: "Traction" }
-  ];
-  const SEGMENTS = 20;              // barre découpée : plus lisible qu'un trait plein
-
   let draft = null;
   let me = null;
   let sel = null;
@@ -144,16 +135,6 @@
     if (cats) cats.addEventListener("click", editCats);
   }
 
-  /** Une barre segmentée : autant de crans remplis que la note sur 100. */
-  function barre(valeur) {
-    const pleins = Math.round((Math.max(0, Math.min(100, valeur)) / 100) * SEGMENTS);
-    let out = "";
-    for (let i = 0; i < SEGMENTS; i++) {
-      out += '<span class="vbar__s' + (i < pleins ? " is-on" : "") + '"></span>';
-    }
-    return '<span class="vbar">' + out + "</span>";
-  }
-
   const boite = (label, valeur) =>
     '<div class="vbox"><span class="vbox__l">' + esc(label) + "</span>" +
       "<b>" + (valeur ? esc(valeur) : "—") + "</b></div>";
@@ -187,14 +168,6 @@
 
           (v.note ? '<p class="hint vcard__note">' + esc(v.note) + "</p>" : "") +
 
-          '<h3 class="section-title vcard__st">Performances</h3>' +
-          '<div class="vperfs">' +
-            PERFS.map(p =>
-              '<div class="vperf"><span class="vperf__l">' + esc(p.label) + "</span>" +
-                barre(v.stats[p.key]) +
-                '<b class="tnum">' + v.stats[p.key] + "</b></div>").join("") +
-          "</div>" +
-
           '<div class="vboxes">' +
             boite("Carburant", v.carburant) +
             boite("Places", v.places || "") +
@@ -216,7 +189,6 @@
     const isNew = !v;
     const cur = v ? MNStore.clone(v) : {
       name: "", category: draft.vehicleCats[0].id, image: "",
-      stats: { vitesse: 0, accel: 0, freinage: 0, traction: 0 },
       carburant: "", places: 0, coffre: "", type: "", note: ""
     };
 
@@ -243,17 +215,6 @@
             '<button class="btn btn--ghost btn--sm" id="e-vi-pick" type="button">' +
               "Choisir dans la bibliothèque</button>" +
           "</div></div></div>" +
-
-      '<div class="fieldset"><span class="label">Performances (0 à 100)</span>' +
-        '<div class="editor__grid">' +
-          PERFS.map(p =>
-            '<div class="field"><label class="label" for="e-p-' + p.key + '">' +
-              esc(p.label) + "</label>" +
-              '<input class="input input--num" id="e-p-' + p.key +
-                '" type="number" min="0" max="100" value="' +
-                Number(cur.stats[p.key] || 0) + '"></div>'
-          ).join("") +
-        "</div></div>" +
 
       '<div class="editor__grid editor__grid--3">' +
         '<div class="field"><label class="label" for="e-vf">Carburant</label>' +
@@ -297,17 +258,10 @@
             if (!nom) return MNUI.toast("Le nom est obligatoire", "err");
 
             const g = s => body.querySelector(s).value.trim();
-            const stats = {};
-            PERFS.forEach(p => {
-              stats[p.key] = Math.max(0, Math.min(100,
-                Math.round(Number(body.querySelector("#e-p-" + p.key).value) || 0)));
-            });
-
             const data = {
               name: nom,
               category: body.querySelector("#e-vc").value,
               image: g("#e-vi"),
-              stats,
               carburant: g("#e-vf"),
               places: Math.max(0, Math.min(99, Math.round(Number(g("#e-vp")) || 0))),
               coffre: g("#e-vk"),

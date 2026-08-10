@@ -753,29 +753,6 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
 .vshot img { max-height: 100%; width: auto; object-fit: contain; }
 .vshot svg { width: 78px; height: 78px; stroke-width: 1.2; }
 
-.vcard__st { margin: 0 0 14px; font-size: 13px; }
-
-/* ---- Barres de performance -------------------------------------------------
-   Segmentées plutôt que pleines : on lit une valeur d'un coup d'œil, et deux
-   véhicules se comparent en comptant les crans. */
-
-.vperfs { display: flex; flex-direction: column; gap: 9px; margin-bottom: 22px; }
-.vperf { display: flex; align-items: center; gap: 14px; }
-.vperf__l {
-  width: 92px; flex: none;
-  font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
-  color: var(--muted);
-}
-.vperf b { width: 34px; flex: none; text-align: right; font-size: 14px; }
-
-.vbar { flex: 1; display: flex; gap: 3px; height: 14px; }
-.vbar__s {
-  flex: 1;
-  border-radius: 2px;
-  background: var(--raise);
-}
-.vbar__s.is-on { background: var(--pink); }
-
 /* ---- Caractéristiques ------------------------------------------------------ */
 
 .vboxes {
@@ -798,6 +775,5 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
 .vbox b { font-size: 15px; font-weight: 600; }
 
 @media (max-width: 900px) {
-  .vperf__l { width: 74px; font-size: 11px; }
   .vshot { height: 160px; }
 }
