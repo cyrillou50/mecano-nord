@@ -274,6 +274,9 @@ window.MNUI = (function () {
         (MNAuth.canAny("duty", "duty_view")
           ? '<a class="navlink' + (active === "service" ? " is-active" : "") + '" href="service.html">Service</a>'
           : "") +
+        /* Les véhicules sont un catalogue de consultation : ouvert à tous. */
+        '<a class="navlink' + (active === "vehicules" ? " is-active" : "") +
+          '" href="vehicules.html">Véhicules</a>' +
         (MNAuth.canAny("staff", "promote", "users")
           ? '<a class="navlink' + (active === "equipe" ? " is-active" : "") + '" href="equipe.html">Équipe</a>'
           : "") +

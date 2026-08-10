@@ -39,6 +39,7 @@ window.MN_PERMS = [
   { key: "staff",     name: "Voir les fiches",     desc: "Consulter les fiches employés : ancienneté, formations, carrière." },
   { key: "promote",   name: "Gérer les carrières", desc: "Promouvoir, changer les formations et compléter les fiches." },
   { key: "items",     name: "Gérer le catalogue",  desc: "Créer / modifier objets, catégories, ressources et coûts." },
+  { key: "vehicles",  name: "Gérer les véhicules", desc: "Ajouter des véhicules, leurs performances et leurs catégories. Tout le monde peut les consulter." },
   { key: "users",     name: "Gérer l'équipe",      desc: "Ajouter des employés, créer des rôles et régler leurs droits." },
   { key: "publish",   name: "Publier en ligne",    desc: "Envoyer les modifications sur le site public." },
   { key: "theme",     name: "Gérer l'apparence",   desc: "Choisir le thème et les couleurs de tout le site, et décider si chacun peut se faire les siennes." },
