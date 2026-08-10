@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-10T19:15:49.080Z",
+  "updatedAt": "2026-08-10T19:27:20.162Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -12,9 +12,9 @@
       "proxy": ""
     },
     "theme": {
-      "id": "cendre",
-      "nom": "Cendre",
-      "accent": "#b9a9d6",
+      "id": "perso",
+      "nom": "Personnalisé",
+      "accent": "#6ebfa0",
       "fond": "#0a0a0d",
       "surface": "#1c1c1f",
       "amber": "",
