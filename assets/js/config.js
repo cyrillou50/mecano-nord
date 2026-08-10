@@ -41,6 +41,7 @@ window.MN_PERMS = [
   { key: "items",     name: "Gérer le catalogue",  desc: "Créer / modifier objets, catégories, ressources et coûts." },
   { key: "users",     name: "Gérer l'équipe",      desc: "Ajouter des employés, créer des rôles et régler leurs droits." },
   { key: "publish",   name: "Publier en ligne",    desc: "Envoyer les modifications sur le site public." },
+  { key: "theme",     name: "Gérer l'apparence",   desc: "Choisir le thème et les couleurs de tout le site, et décider si chacun peut se faire les siennes." },
   { key: "admin",     name: "Patron (tout)",       desc: "Accès complet : implique toutes les permissions." }
 ];
 

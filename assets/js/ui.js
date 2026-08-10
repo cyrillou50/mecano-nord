@@ -260,7 +260,7 @@ window.MNUI = (function () {
     if (!el) return;
     const b = MNStore.brand();
     const s = MNAuth.session();
-    const canAdmin = MNAuth.canAny("items", "users", "publish", "admin");
+    const canAdmin = MNAuth.canAny("items", "users", "publish", "theme", "admin");
     const mark = brandMark();
 
     el.innerHTML =
@@ -280,8 +280,12 @@ window.MNUI = (function () {
         (canAdmin ? '<a class="navlink' + (active === "admin" ? " is-active" : "") + '" href="admin.html">Admin</a>' : "") +
       "</nav>" +
       '<div class="topbar__spacer"></div>' +
-      '<button class="btn btn--icon" id="btn-theme" title="Apparence" aria-label="Changer l\'apparence">' +
-        svg("palette") + "</button>" +
+      /* La palette n'apparaît que si chacun a le droit de se choisir une
+         apparence — sinon le bouton ne mènerait nulle part. */
+      (MNTheme.libre()
+        ? '<button class="btn btn--icon" id="btn-theme" title="Apparence" aria-label="Changer l\'apparence">' +
+          svg("palette") + "</button>"
+        : "") +
       (s
         ? '<div class="userchip">' +
             '<div class="userchip__id"><b>' + esc(s.pseudo) + "</b><span" +

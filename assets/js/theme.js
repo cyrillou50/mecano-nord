@@ -98,8 +98,8 @@ window.MNTheme = (function () {
      évite qu'un thème oublie une nuance et casse un écran. */
 
   const THEMES = [
-    { id: "decay",    nom: "Day of Decay",  accent: "#ff2bd1", fond: "#06050a",
-      note: "Le thème d'origine : néon magenta sur noir." },
+    { id: "neon",     nom: "Néon",          accent: "#ff2bd1", fond: "#06050a",
+      note: "Le thème d'origine : magenta d'enseigne sur noir." },
     { id: "atelier",  nom: "Atelier",       accent: "#ffa92e", fond: "#0b0805",
       note: "Ambiance chaude, lampe de garage." },
     { id: "toxique",  nom: "Toxique",       accent: "#a8ff52", fond: "#050a05",
@@ -224,6 +224,20 @@ window.MNTheme = (function () {
     } catch (_) { return null; }
   }
 
+  /**
+   * A-t-on le droit de se choisir une apparence ?
+   * Ouvert par défaut. Un responsable peut le fermer, mais celui qui gère
+   * l'apparence garde évidemment la main — sinon il ne pourrait plus juger de
+   * ses propres réglages.
+   */
+  function libre() {
+    try {
+      if (window.MNAuth && MNAuth.can("theme")) return true;
+      const s = window.MNStore && MNStore.settings();
+      return !s || s.themeLibre !== false;
+    } catch (_) { return true; }
+  }
+
   function perso() {
     try {
       const v = localStorage.getItem(K_PERSO);
@@ -232,9 +246,13 @@ window.MNTheme = (function () {
     } catch (_) { return null; }
   }
 
-  /** Applique le bon thème : préférence personnelle, sinon celui du site. */
+  /**
+   * Applique le bon thème : préférence personnelle, sinon celui du site.
+   * Un choix personnel enregistré avant que le droit soit retiré est ignoré,
+   * pas effacé — il revient si le droit est rendu.
+   */
   function refresh() {
-    return apply(perso() || duSite() || THEMES[0]);
+    return apply((libre() && perso()) || duSite() || THEMES[0]);
   }
 
   /** Choisit un thème pour soi. `null` = revenir à celui du site. */
@@ -252,7 +270,7 @@ window.MNTheme = (function () {
   apply(perso() || THEMES[0]);
 
   return {
-    THEMES, palette, apply, refresh, choisir, normalize,
+    THEMES, palette, apply, refresh, choisir, normalize, libre,
     actuel: () => _actuel,
     aUnChoixPerso: () => !!perso(),
     lire, hex, clarte, dessus, contraste

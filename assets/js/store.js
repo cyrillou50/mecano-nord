@@ -75,9 +75,12 @@ window.MNStore = (function () {
       /* Apparence commune à toute l'équipe. Chacun peut la remplacer pour
          lui-même depuis la barre du haut ; ceci n'est que le point de départ. */
       theme: (function (t) {
-        try { return window.MNTheme ? MNTheme.normalize(t || "decay") : null; }
+        try { return window.MNTheme ? MNTheme.normalize(t || "neon") : null; }
         catch (_) { return null; }
       })(s.theme),
+      /* Chacun peut-il se composer ses propres couleurs ? Vrai par défaut :
+         c'est un confort personnel qui n'affecte personne d'autre. */
+      themeLibre: s.themeLibre !== false,
       /* Adresse de ton serveur (VPS). Une seule à renseigner : le site en
          déduit /duty.json, /relais, /publier et /sante. Avec elle, personne
          n'a besoin de jeton — ni pour pointer, ni pour publier. */

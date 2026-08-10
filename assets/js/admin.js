@@ -29,7 +29,7 @@
   /* ---- Démarrage ---------------------------------------------------------- */
 
   function init() {
-    if (!MNAuth.canAny("items", "users", "publish", "admin")) return denied();
+    if (!MNAuth.canAny("items", "users", "publish", "theme", "admin")) return denied();
     draft = MNStore.clone(MNStore.catalog());
     tab = firstAllowedTab();
     render();
@@ -54,7 +54,7 @@
     { id: "images",  name: "Images",     icon: "file",     perm: "items" },
     { id: "users",   name: "Employés",   icon: "users",    perm: "users", n: () => draft.users.length },
     { id: "roles",   name: "Rôles",      icon: "tag",      perm: "users", n: () => draft.roles.length },
-    { id: "theme",   name: "Apparence",  icon: "palette",  perm: "admin" },
+    { id: "theme",   name: "Apparence",  icon: "palette",  perm: "theme" },
     { id: "discord", name: "Discord",    icon: "cloud",    perm: "admin" },
     { id: "site",    name: "Le site",    icon: "settings", perm: "admin" },
     { id: "publish", name: "Publier",    icon: "github",   perm: "publish" }
@@ -1901,6 +1901,17 @@
           '<div id="t-apercu"></div>' +
         "</div></div>" +
 
+      '<div class="panel"><div class="panel__head"><h2>Liberté de chacun</h2></div>' +
+        '<div class="panel__body editor">' +
+          '<label class="switch"><input type="checkbox" id="t-libre"' +
+            (draft.settings.themeLibre !== false ? " checked" : "") + ">" +
+            "<span>Chacun peut choisir son apparence</span></label>" +
+          '<p class="hint">La palette de la barre du haut n\'apparaît que si c\'est coché. ' +
+            "Un choix personnel ne change rien pour les autres — et ceux qui gèrent " +
+            "l'apparence gardent la main dans tous les cas, sans quoi ils ne pourraient " +
+            "plus juger de leurs propres réglages.</p>" +
+        "</div></div>" +
+
       '<div class="row" style="justify-content:flex-end">' +
         '<button class="btn btn--ghost" id="t-essai">' + svg("refresh") + "<span>Essayer</span></button>" +
         '<button class="btn btn--primary" id="t-save">' + svg("save") + "<span>Enregistrer</span></button>" +
@@ -1956,6 +1967,7 @@
 
     $("#t-save").addEventListener("click", () => {
       draft.settings.theme = lu();
+      draft.settings.themeLibre = $("#t-libre").checked;
       commit();
       MNTheme.refresh();
       MNUI.toast(MNTheme.aUnChoixPerso()
