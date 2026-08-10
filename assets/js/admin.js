@@ -54,6 +54,7 @@
     { id: "images",  name: "Images",     icon: "file",     perm: "items" },
     { id: "users",   name: "Employés",   icon: "users",    perm: "users", n: () => draft.users.length },
     { id: "roles",   name: "Rôles",      icon: "tag",      perm: "users", n: () => draft.roles.length },
+    { id: "theme",   name: "Apparence",  icon: "palette",  perm: "admin" },
     { id: "discord", name: "Discord",    icon: "cloud",    perm: "admin" },
     { id: "site",    name: "Le site",    icon: "settings", perm: "admin" },
     { id: "publish", name: "Publier",    icon: "github",   perm: "publish" }
@@ -106,7 +107,7 @@
     ({
       items: paneItems, cats: paneCats, res: paneRes, images: paneImages,
       users: paneUsers, roles: paneRoles, discord: paneDiscord,
-      site: paneSite, publish: panePublish
+      theme: paneTheme, site: paneSite, publish: panePublish
     }[tab] || paneItems)($("#pane"));
   }
 
@@ -1841,6 +1842,126 @@
     draft.roles = draft.roles.filter(x => x.id !== r.id);
     commit();
     MNUI.toast("Rôle supprimé", "ok");
+  }
+
+  /* =========================================================================
+     APPARENCE
+     Ce qu'on règle ici est le thème de départ de toute l'équipe. Chacun peut
+     ensuite en choisir un autre pour lui, depuis la palette de la barre du
+     haut — ce choix personnel n'est pas enregistré dans le catalogue.
+     ========================================================================= */
+
+  function paneTheme(host) {
+    const t = MNTheme.normalize(draft.settings.theme);
+    const perso = MNTheme.aUnChoixPerso();
+
+    const vignette = x => {
+      const p = MNTheme.palette(x);
+      return '<button type="button" class="thcard' + (x.id === t.id ? " is-on" : "") +
+        '" data-th="' + esc(x.id) + '" title="' + esc(x.note || x.nom) + '">' +
+        '<span class="thcard__vue" style="background:' + esc(p["--bg"]) + '">' +
+          '<span style="background:' + esc(p["--surface-2"]) + '"></span>' +
+          '<span style="background:' + esc(p["--pink"]) + '"></span>' +
+          '<span style="background:' + esc(p["--pink-soft"]) + '"></span>' +
+        "</span><b>" + esc(x.nom) + "</b></button>";
+    };
+
+    host.innerHTML =
+      '<div class="toolbar">' +
+        '<span class="subtitle">Le thème de départ de toute l\'équipe</span>' +
+      "</div>" +
+
+      (perso
+        ? '<div class="alert alert--warn">' + svg("alert") +
+          "<span>Tu as choisi une apparence <b>personnelle</b> depuis la palette de la barre du " +
+          "haut : c'est elle que tu vois, pas celle réglée ici. Utilise « Reprendre celui du " +
+          "site » dans cette palette pour juger du rendu réel.</span></div>"
+        : "") +
+
+      '<div class="panel"><div class="panel__head"><h2>Thèmes</h2></div>' +
+        '<div class="panel__body"><div class="thgrid" id="t-grid">' +
+          MNTheme.THEMES.map(vignette).join("") +
+        "</div></div></div>" +
+
+      '<div class="panel"><div class="panel__head"><h2>Couleurs libres</h2>' +
+        (MNTheme.THEMES.some(x => x.id === t.id) ? "" : '<span class="pill pill--ok">personnalisé</span>') +
+      "</div>" +
+        '<div class="panel__body editor">' +
+          '<div class="editor__grid">' +
+            '<div class="field"><label class="label" for="t-acc">Couleur d\'accent</label>' +
+              '<input class="input" id="t-acc" type="color" value="' + esc(t.accent) +
+                '" style="height:46px;padding:5px"></div>' +
+            '<div class="field"><label class="label" for="t-bg">Fond</label>' +
+              '<input class="input" id="t-bg" type="color" value="' + esc(t.fond) +
+                '" style="height:46px;padding:5px"></div>' +
+          "</div>" +
+          '<p class="hint">Deux couleurs suffisent : surfaces, textes, bordures et contrastes ' +
+            "en sont déduits. Un fond clair fait basculer tout le site en thème clair, y compris " +
+            "les champs de formulaire.</p>" +
+          '<div id="t-apercu"></div>' +
+        "</div></div>" +
+
+      '<div class="row" style="justify-content:flex-end">' +
+        '<button class="btn btn--ghost" id="t-essai">' + svg("refresh") + "<span>Essayer</span></button>" +
+        '<button class="btn btn--primary" id="t-save">' + svg("save") + "<span>Enregistrer</span></button>" +
+      "</div>";
+
+    const acc = $("#t-acc"), bg = $("#t-bg"), apercu = $("#t-apercu");
+
+    /* L'aperçu montre les éléments les plus exposés aux mauvais contrastes :
+       un bouton plein, une pastille, une carte. */
+    const peindre = () => {
+      const p = MNTheme.palette({ accent: acc.value, fond: bg.value });
+      apercu.innerHTML =
+        '<div style="margin-top:4px;padding:16px;border-radius:var(--r);background:' +
+          esc(p["--bg"]) + ";border:1px solid " + esc(p["--line-2"]) + '">' +
+          '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+            '<span style="padding:9px 16px;border-radius:999px;font-weight:700;background:' +
+              esc(p["--pink"]) + ";color:" + esc(p["--on-accent"]) + '">Bouton</span>' +
+            '<span style="padding:5px 12px;border-radius:999px;background:' +
+              esc(p["--surface-2"]) + ";color:" + esc(p["--pink-soft"]) + ";border:1px solid " +
+              esc(p["--line"]) + '">Pastille</span>' +
+            '<span style="color:' + esc(p["--txt"]) + '">Texte principal</span>' +
+            '<span style="color:' + esc(p["--muted"]) + '">secondaire</span>' +
+            '<span style="color:' + esc(p["--dim"]) + '">discret</span>' +
+          "</div></div>";
+    };
+    peindre();
+
+    host.querySelectorAll("[data-th]").forEach(b => b.addEventListener("click", () => {
+      const x = MNTheme.THEMES.find(y => y.id === b.dataset.th);
+      if (!x) return;
+      acc.value = x.accent; bg.value = x.fond;
+      draft.settings.theme = MNTheme.normalize(x);
+      host.querySelectorAll("[data-th]").forEach(y => y.classList.toggle("is-on", y === b));
+      peindre();
+    }));
+
+    acc.addEventListener("input", peindre);
+    bg.addEventListener("input", peindre);
+
+    const lu = () => {
+      const preset = MNTheme.THEMES.find(x => x.accent === acc.value && x.fond === bg.value);
+      return MNTheme.normalize(preset || {
+        id: "perso", nom: "Personnalisé", accent: acc.value, fond: bg.value
+      });
+    };
+
+    /* « Essayer » applique sans enregistrer : on voit le vrai site, pas un
+       aperçu, et on peut revenir en arrière en changeant d'onglet. */
+    $("#t-essai").addEventListener("click", () => {
+      MNTheme.apply(lu());
+      MNUI.toast("Aperçu appliqué — non enregistré", "info");
+    });
+
+    $("#t-save").addEventListener("click", () => {
+      draft.settings.theme = lu();
+      commit();
+      MNTheme.refresh();
+      MNUI.toast(MNTheme.aUnChoixPerso()
+        ? "Apparence du site enregistrée (ton choix personnel reste actif)"
+        : "Apparence du site enregistrée", "ok");
+    });
   }
 
   /* =========================================================================

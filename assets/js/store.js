@@ -23,7 +23,12 @@ window.MNStore = (function () {
 
   const listeners = [];
   const onChange = fn => listeners.push(fn);
-  const emit = () => listeners.forEach(fn => { try { fn(_catalog); } catch (e) { console.error(e); } });
+  const emit = () => {
+    /* Le thème du site vit dans le catalogue : dès qu'il change, la page doit
+       suivre, sans attendre un rechargement. */
+    try { if (window.MNTheme) MNTheme.refresh(); } catch (e) { console.error(e); }
+    listeners.forEach(fn => { try { fn(_catalog); } catch (e) { console.error(e); } });
+  };
 
   /* ---- Utilitaires ------------------------------------------------------ */
 
@@ -67,6 +72,12 @@ window.MNStore = (function () {
         /* Ancien emplacement du relais, repris ci-dessous */
         proxy: ""
       },
+      /* Apparence commune à toute l'équipe. Chacun peut la remplacer pour
+         lui-même depuis la barre du haut ; ceci n'est que le point de départ. */
+      theme: (function (t) {
+        try { return window.MNTheme ? MNTheme.normalize(t || "decay") : null; }
+        catch (_) { return null; }
+      })(s.theme),
       /* Adresse de ton serveur (VPS). Une seule à renseigner : le site en
          déduit /duty.json, /relais, /publier et /sante. Avec elle, personne
          n'a besoin de jeton — ni pour pointer, ni pour publier. */

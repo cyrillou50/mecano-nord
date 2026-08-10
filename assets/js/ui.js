@@ -42,7 +42,8 @@ window.MNUI = (function () {
     refresh: '<path d="M20 11a8 8 0 0 0-14-4.5L3 9"/><path d="M4 13a8 8 0 0 0 14 4.5L21 15"/><path d="M3 4v5h5M21 20v-5h-5"/>',
     key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 8-8 2.5 2.5-1.7 1.7-2-2-1.6 1.6 1.9 1.9-2.3 2.3"/>',
     tag: '<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.4"/>',
-    calendar: '<rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17"/><path d="M8 3v4M16 3v4"/><path d="M8 14h3M8 17.5h6"/>'
+    calendar: '<rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17"/><path d="M8 3v4M16 3v4"/><path d="M8 14h3M8 17.5h6"/>',
+    palette: '<path d="M12 3a9 9 0 1 0 0 18c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.5-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 0 0 5-5c0-4.1-4-7.6-9-7.6z"/><circle cx="7.5" cy="12" r="1.1"/><circle cx="10" cy="7.8" r="1.1"/><circle cx="15" cy="8.4" r="1.1"/>'
   };
 
   function svg(name, cls) {
@@ -92,16 +93,22 @@ window.MNUI = (function () {
     if (b.logo && isImg(b.logo)) {
       href = b.logo;
     } else {
-      const bg = "%23ff2bd1";
+      /* Le favicon suit le thème : sans ça, l'onglet resterait rose alors que
+         tout le site aurait changé de couleur. */
+      const t = (window.MNTheme && MNTheme.actuel()) || null;
+      const enc = c => "%23" + String(c).replace(/^#/, "");
+      const bg = enc(t ? t.accent : "#ff2bd1");
+      const encre = enc(t ? MNTheme.hex(MNTheme.dessus(MNTheme.lire(t.accent))) : "#140611");
+
       let inner;
       if (b.logo && window.MN_ICONS[b.logo]) {
-        inner = '<g transform="translate(4 4) scale(1)" fill="none" stroke="%23140611" ' +
+        inner = '<g transform="translate(4 4) scale(1)" fill="none" stroke="' + encre + '" ' +
           'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
           window.MN_ICONS[b.logo].replace(/"/g, "'") + "</g>";
       } else {
         const txt = b.logo ? b.logo : initials(b.name);
         inner = '<text x="16" y="22" font-family="sans-serif" font-size="' +
-          (b.logo ? 19 : 14) + '" font-weight="bold" fill="%23140611" text-anchor="middle">' +
+          (b.logo ? 19 : 14) + '" font-weight="bold" fill="' + encre + '" text-anchor="middle">' +
           esc(txt).replace(/#/g, "%23") + "</text>";
       }
       href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E" +
@@ -273,6 +280,8 @@ window.MNUI = (function () {
         (canAdmin ? '<a class="navlink' + (active === "admin" ? " is-active" : "") + '" href="admin.html">Admin</a>' : "") +
       "</nav>" +
       '<div class="topbar__spacer"></div>' +
+      '<button class="btn btn--icon" id="btn-theme" title="Apparence" aria-label="Changer l\'apparence">' +
+        svg("palette") + "</button>" +
       (s
         ? '<div class="userchip">' +
             '<div class="userchip__id"><b>' + esc(s.pseudo) + "</b><span" +
@@ -285,6 +294,9 @@ window.MNUI = (function () {
             "</button>" +
           "</div>"
         : "");
+
+    const th = document.getElementById("btn-theme");
+    if (th) th.addEventListener("click", themeModal);
 
     const out = document.getElementById("btn-logout");
     if (out) out.addEventListener("click", async () => {
@@ -418,6 +430,91 @@ window.MNUI = (function () {
           svg("alert") + "<span><b>La page n'a pas pu se charger.</b> " +
           esc(e && e.message ? e.message : String(e)) + "</span></div>";
       }
+    });
+  }
+
+  /* ---- Choix de l'apparence ---------------------------------------------------
+     Ouvert à tout le monde : chacun règle son écran comme il veut, sans
+     toucher à ce que voient les autres. Un responsable fixe le point de
+     départ commun depuis le panneau admin. */
+
+  /** Vignette cliquable d'un thème. */
+  function themeCard(t, actif) {
+    const p = MNTheme.palette(t);
+    return '<button type="button" class="thcard' + (actif ? " is-on" : "") +
+      '" data-th="' + esc(t.id) + '" title="' + esc(t.note || t.nom) + '">' +
+      '<span class="thcard__vue" style="background:' + esc(p["--bg"]) + '">' +
+        '<span style="background:' + esc(p["--surface-2"]) + '"></span>' +
+        '<span style="background:' + esc(p["--pink"]) + '"></span>' +
+        '<span style="background:' + esc(p["--pink-soft"]) + '"></span>' +
+      "</span>" +
+      "<b>" + esc(t.nom) + "</b></button>";
+  }
+
+  function themeModal() {
+    const courant = MNTheme.actuel() || MNTheme.THEMES[0];
+    const perso = MNTheme.aUnChoixPerso();
+
+    const body = document.createElement("div");
+    body.innerHTML =
+      '<p class="hint">Ce réglage ne vaut que pour <b>toi</b>, sur cet appareil. ' +
+        "Il ne change rien pour le reste de l'équipe.</p>" +
+      '<div class="thgrid" id="th-grid">' +
+        MNTheme.THEMES.map(t => themeCard(t, t.id === courant.id)).join("") +
+      "</div>" +
+      '<div class="fieldset" style="margin-top:16px"><span class="label">Couleurs libres</span>' +
+        '<div class="editor__grid">' +
+          '<div class="field"><label class="label" for="th-acc">Couleur d\'accent</label>' +
+            '<input class="input" id="th-acc" type="color" value="' + esc(courant.accent) +
+              '" style="height:44px;padding:5px"></div>' +
+          '<div class="field"><label class="label" for="th-bg">Fond</label>' +
+            '<input class="input" id="th-bg" type="color" value="' + esc(courant.fond) +
+              '" style="height:44px;padding:5px"></div>' +
+        "</div>" +
+        '<p class="hint" style="margin-top:10px">Le reste — surfaces, textes, contrastes — se ' +
+          "calcule à partir de ces deux couleurs. Un fond clair bascule automatiquement " +
+          "l'ensemble en thème clair.</p>" +
+      "</div>" +
+      '<p class="hint" style="margin-top:12px">Les changements s\'appliquent en direct.</p>';
+
+    /* On mémorise l'état de départ pour pouvoir tout remettre en place si la
+       personne annule après avoir tâtonné. */
+    const avant = perso ? Object.assign({}, courant) : null;
+    const grid = body.querySelector("#th-grid");
+    const acc = body.querySelector("#th-acc");
+    const bg = body.querySelector("#th-bg");
+
+    const peindre = id => grid.querySelectorAll("[data-th]").forEach(b =>
+      b.classList.toggle("is-on", b.dataset.th === id));
+
+    grid.querySelectorAll("[data-th]").forEach(b => b.addEventListener("click", () => {
+      const t = MNTheme.THEMES.find(x => x.id === b.dataset.th);
+      if (!t) return;
+      MNTheme.choisir(t.id);
+      acc.value = t.accent; bg.value = t.fond;
+      peindre(t.id);
+    }));
+
+    const libre = () => {
+      MNTheme.choisir({ id: "perso", nom: "Personnalisé", accent: acc.value, fond: bg.value });
+      peindre("perso");
+    };
+    acc.addEventListener("input", libre);
+    bg.addEventListener("input", libre);
+
+    modal({
+      title: "Apparence", body,
+      actions: [
+        {
+          label: "Reprendre celui du site", variant: "btn--ghost",
+          onClick: c => { MNTheme.choisir(null); c(); toast("Apparence du site rétablie", "ok"); }
+        },
+        {
+          label: "Annuler", variant: "btn--ghost",
+          onClick: c => { MNTheme.choisir(avant); c(); }
+        },
+        { label: "Garder", variant: "btn--primary", icon: "check", onClick: c => c() }
+      ]
     });
   }
 
