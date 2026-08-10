@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-10T19:05:43.423Z",
+  "updatedAt": "2026-08-10T19:15:49.080Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -12,11 +12,11 @@
       "proxy": ""
     },
     "theme": {
-      "id": "neon",
-      "nom": "Néon",
-      "accent": "#ff2bd1",
-      "fond": "#06050a",
-      "surface": "#15111e",
+      "id": "cendre",
+      "nom": "Cendre",
+      "accent": "#b9a9d6",
+      "fond": "#0a0a0d",
+      "surface": "#1c1c1f",
       "amber": "",
       "toxic": "",
       "danger": ""
