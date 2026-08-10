@@ -12,6 +12,8 @@
                          l'adresse du webhook
      POST /publier     → écrit le catalogue sur GitHub, sans que personne
                          n'ait de jeton
+     GET  /vehicules   → le parc automobile (categories + vehicules)
+     POST /vehicules   → y ajouter, valider ou retirer un vehicule
      GET  /images      → la liste des images hébergées ici
      GET  /images/x.png→ l'image elle-même
      POST /images      → en déposer une, la renommer ou la supprimer
@@ -38,6 +40,10 @@ const FICHIER = path.join(DOSSIER, "duty.json");
 /* Les images vivent ici plutôt que dans le dépôt : les y déposer coûtait un
    commit et une reconstruction complète du site pour un fichier de 30 ko. */
 const DOSSIER_IMG = path.join(DOSSIER, "images");
+/* Le parc automobile vit ici, pas dans le dépôt : chacun peut proposer un
+   véhicule sans avoir le droit de publier, et le catalogue GitHub reste
+   réservé à ce qui touche au site lui-même. */
+const FICHIER_VEH = path.join(DOSSIER, "vehicules.json");
 
 /* Origines autorisées, séparées par des virgules. « * » = tout le monde. */
 const ORIGINES = String(process.env.ORIGINE || "*")
@@ -273,6 +279,127 @@ async function ecrire(board) {
   } catch (_) { /* la sauvegarde est un confort, pas un bloquant */ }
 
   await fsp.rename(tmp, FICHIER);
+}
+
+/* ---- Parc automobile -----------------------------------------------------------
+   Même principe que le tableau de service : le site envoie une opération, le
+   serveur lit, applique et écrit, le tout sérialisé. Deux propositions
+   déposées à la même seconde ne peuvent donc pas s'effacer.
+
+   Le serveur ne connaît pas les permissions — il n'a aucune notion d'identité.
+   C'est le site qui décide si un ajout est « valide » ou « en attente », comme
+   pour le pointage. Le serveur, lui, borne les champs et refuse tout le reste. */
+
+const PARC_VIDE = { updatedAt: new Date(0).toISOString(), cats: [], vehicles: [] };
+
+function nettoyerVehicule(v, catIds) {
+  const id = texte(v && v.id, 60);
+  if (!id) return null;
+  const cat = texte(v.category, 60);
+  return {
+    id,
+    name: texte(v.name, 60) || id,
+    category: catIds.indexOf(cat) !== -1 ? cat : (catIds[0] || ""),
+    image: texte(v.image, 300),
+    status: v.status === "attente" ? "attente" : "valide",
+    proposePar: texte(v.proposePar, 60),
+    proposeLe: dateIso(v.proposeLe),
+    carburant: texte(v.carburant, 40),
+    places: nombre(v.places, 0, 99),
+    coffre: texte(v.coffre, 40),
+    type: texte(v.type, 40),
+    note: texte(v.note, 300)
+  };
+}
+
+function nettoyerParc(p) {
+  if (!p || typeof p !== "object") return null;
+  const cats = Array.isArray(p.cats) ? p.cats : [];
+  const vehicles = Array.isArray(p.vehicles) ? p.vehicles : [];
+  if (cats.length > 60 || vehicles.length > 500) return null;
+
+  const propres = cats.map(c => ({
+    id: texte(c && c.id, 60),
+    name: texte(c && c.name, 60) || "Sans nom",
+    icon: texte(c && c.icon, 60) || "i-wheels-car"
+  })).filter(c => c.id);
+
+  const catIds = propres.map(c => c.id);
+  return {
+    updatedAt: dateIso(p.updatedAt) || new Date().toISOString(),
+    cats: propres,
+    vehicles: vehicles.map(v => nettoyerVehicule(v, catIds)).filter(Boolean)
+  };
+}
+
+function appliquerParc(parc, op) {
+  const p = {
+    updatedAt: new Date().toISOString(),
+    cats: parc.cats.slice(),
+    vehicles: parc.vehicles.slice()
+  };
+  const catIds = p.cats.map(c => c.id);
+
+  switch (op.op) {
+    /* Ajoute ou remplace un véhicule. Le site envoie l'objet complet : c'est
+       plus simple qu'un champ à la fois, et le volume reste minuscule. */
+    case "set": {
+      const v = nettoyerVehicule(op.vehicle, catIds);
+      if (!v) return { erreur: "véhicule invalide" };
+      const i = p.vehicles.findIndex(x => x.id === v.id);
+      if (i === -1) p.vehicles.push(v); else p.vehicles[i] = v;
+      return { parc: p };
+    }
+
+    case "remove": {
+      const id = texte(op.id, 60);
+      const i = p.vehicles.findIndex(x => x.id === id);
+      if (i === -1) return { parc: p, deja: true };
+      p.vehicles.splice(i, 1);
+      return { parc: p };
+    }
+
+    case "status": {
+      const id = texte(op.id, 60);
+      const v = p.vehicles.find(x => x.id === id);
+      if (!v) return { parc: p, deja: true };
+      p.vehicles = p.vehicles.map(x => x.id === id
+        ? Object.assign({}, x, { status: op.status === "attente" ? "attente" : "valide" })
+        : x);
+      return { parc: p };
+    }
+
+    /* Les catégories sont peu nombreuses et se réordonnent : on remplace la
+       liste entière plutôt que d'inventer une opération par mouvement. */
+    case "cats": {
+      const propre = nettoyerParc({ cats: op.cats, vehicles: [] });
+      if (!propre || !propre.cats.length) return { erreur: "catégories invalides" };
+      p.cats = propre.cats;
+      const ids = p.cats.map(c => c.id);
+      /* Un véhicule dont la catégorie disparaît rejoint la première. */
+      p.vehicles = p.vehicles.map(v => ids.indexOf(v.category) !== -1
+        ? v : Object.assign({}, v, { category: ids[0] }));
+      return { parc: p };
+    }
+
+    default:
+      return { erreur: "opération inconnue : " + op.op };
+  }
+}
+
+async function lireParc() {
+  try {
+    return nettoyerParc(JSON.parse(await fsp.readFile(FICHIER_VEH, "utf8"))) || PARC_VIDE;
+  } catch (_) {
+    return PARC_VIDE;
+  }
+}
+
+async function ecrireParc(parc) {
+  await fsp.mkdir(DOSSIER, { recursive: true });
+  const tmp = FICHIER_VEH + ".tmp";
+  await fsp.writeFile(tmp, JSON.stringify(parc, null, 2) + "\n", "utf8");
+  await fsp.rename(tmp, FICHIER_VEH);
 }
 
 /* ---- Images -------------------------------------------------------------------
@@ -525,8 +652,39 @@ const serveur = http.createServer(async (req, res) => {
          plutôt que tout le tableau : c'est ce qui évite les écrasements.
          « images: true » qu'il peut héberger les images ici. */
       return repondre(res, 200, {
-        ok: true, ops: true, images: true, depuis: Math.round(process.uptime()) + " s"
+        ok: true, ops: true, images: true, vehicules: true,
+        depuis: Math.round(process.uptime()) + " s"
       }, req);
+    }
+
+    /* --- parc automobile --- */
+    if (chemin === "/vehicules") {
+      if (req.method === "GET") return repondre(res, 200, await lireParc(), req);
+
+      if (req.method === "POST") {
+        const op = await corpsJson(req);
+        if (!op || !op.op) return repondre(res, 400, { error: "Opération manquante" }, req);
+
+        const r = await enFile(async () => {
+          const actuel = await lireParc();
+          /* Premier écrit : le site peut joindre ce qu'il a déjà, pour ne pas
+             repartir d'un parc vide. */
+          if (!actuel.vehicles.length && !actuel.cats.length && op.depart) {
+            const d = nettoyerParc(op.depart);
+            if (d) { actuel.cats = d.cats; actuel.vehicles = d.vehicles; }
+          }
+          const res2 = appliquerParc(actuel, op);
+          if (res2.erreur) return res2;
+          await ecrireParc(res2.parc);
+          return res2;
+        });
+
+        if (r.erreur) return repondre(res, 400, { error: r.erreur }, req);
+        console.log(new Date().toISOString(), "parc :", op.op, "—",
+          r.parc.vehicles.length, "véhicules");
+        return repondre(res, 200, { ok: true, parc: r.parc, deja: !!r.deja }, req);
+      }
+      return repondre(res, 405, { error: "Méthode non autorisée" }, req);
     }
 
     /* --- images --- */

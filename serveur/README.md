@@ -421,7 +421,8 @@ journalctl -u mecano-nord -f     # journal en direct
 systemctl restart mecano-nord    # redémarrer
 ```
 
-Les données sont dans `/opt/mecano-nord/donnees/duty.json`, avec les
+Les données sont dans `/opt/mecano-nord/donnees/` : `duty.json` pour le
+pointage, `vehicules.json` pour le parc automobile, avec les
 20 dernières versions dans `donnees/sauvegardes/`. Les images déposées
 depuis l'admin sont dans `donnees/images/` — **pense à les sauvegarder**,
 elles ne sont plus dans le dépôt GitHub. Pour revenir en arrière :

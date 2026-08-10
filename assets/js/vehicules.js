@@ -11,7 +11,6 @@
   const $ = s => document.querySelector(s);
   const svg = MNUI.svg, esc = MNUI.esc;
 
-  let draft = null;
   let me = null;
   let sel = null;
   let filter = "";
@@ -20,11 +19,15 @@
 
   MNUI.start({ page: "vehicules", title: "Véhicules", onReady: init });
 
-  function init(session) {
+  async function init(session) {
     me = session;
     canEdit = MNAuth.canAny("vehicles", "admin");
     canValid = MNAuth.canAny("vehicles_validate", "vehicles", "admin");
-    draft = MNStore.clone(MNStore.catalog());
+
+    /* Le parc vient du serveur : une proposition doit être visible par les
+       autres sans passer par une publication. */
+    await MNParc.load(true).catch(e => console.error(e));
+
     const first = liste()[0];
     sel = first ? first.id : null;
     render();
@@ -32,7 +35,9 @@
 
   /* ---- Données ---------------------------------------------------------- */
 
-  const catOf = v => draft.vehicleCats.find(c => c.id === v.category) ||
+  const P = () => MNParc.parc();
+
+  const catOf = v => P().cats.find(c => c.id === v.category) ||
     { id: "", name: "Sans catégorie", icon: "i-box" };
 
   const enAttente = v => v.status === "attente";
@@ -40,15 +45,22 @@
   /** Les véhicules correspondant au filtre, dans l'ordre du catalogue. */
   function liste() {
     const f = filter.toLowerCase();
-    return draft.vehicles.filter(v => !f ||
+    return P().vehicles.filter(v => !f ||
       v.name.toLowerCase().indexOf(f) !== -1 ||
       catOf(v).name.toLowerCase().indexOf(f) !== -1);
   }
 
-  function commit() {
-    draft = MNStore.saveDraft(draft);
-    MNAuth.refresh();
+  /**
+   * Rend compte d'une écriture. Le parc distant est déjà à jour côté serveur ;
+   * on ne redessine qu'ensuite pour ne pas montrer un état qui n'a pas pris.
+   */
+  function rendu(r, message) {
     render();
+    if (!r || r.ok) {
+      MNUI.toast(message + (r && r.local ? " — pense à publier" : ""), "ok");
+    } else {
+      MNUI.toast("Enregistrement impossible : " + (r.error || "échec"), "err");
+    }
   }
 
   /* ---- Rendu ------------------------------------------------------------- */
@@ -64,16 +76,37 @@
     renderDraftbar();
   }
 
+  /**
+   * Avec un serveur, le parc est partagé dès l'enregistrement : rien à
+   * publier. Sans serveur, il retombe dans le catalogue et il faut le dire —
+   * une proposition resterait sinon invisible pour tout le monde.
+   */
   function renderDraftbar() {
     const bar = $("#draftbar");
     if (!bar) return;
-    const dirty = MNStore.hasDraft();
-    bar.hidden = !dirty || !canEdit;
+
+    /* Un souci réseau se signale en premier : c'est précisément quand le
+       serveur ne répond pas que `estDistant()` est faux, donc le tester
+       d'abord ferait taire l'alerte au moment où elle sert. */
+    const s = MNParc.souci();
+    if (s) {
+      bar.hidden = false;
+      bar.innerHTML = '<span class="draftbar__dot"></span>' +
+        '<span class="draftbar__txt"><b>' + esc(s) + "</b> " +
+        "<span>Le parc affiché vient du catalogue et peut être incomplet ; " +
+        "n'enregistre rien tant que le serveur n'a pas répondu.</span></span>";
+      return;
+    }
+
+    if (MNParc.surServeur() && MNParc.estDistant()) { bar.hidden = true; return; }
+
+    bar.hidden = !MNStore.hasDraft();
     if (bar.hidden) return;
     bar.innerHTML =
       '<span class="draftbar__dot"></span>' +
-      '<span class="draftbar__txt"><b>Modifications non publiées</b> ' +
-        "<span>— elles ne sont visibles que par toi tant qu'elles ne sont pas envoyées.</span></span>" +
+      '<span class="draftbar__txt"><b>Parc non publié</b> ' +
+        "<span>— sans serveur configuré, il vit dans le catalogue : personne ne le verra " +
+        "tant qu'il n'est pas publié.</span></span>" +
       (MNAuth.can("publish")
         ? '<a class="btn btn--primary btn--sm" href="admin.html">' + svg("cloud") + "<span>Publier</span></a>"
         : "");
@@ -91,7 +124,7 @@
 
     /* Regroupement par catégorie : c'est la demande principale, et ça évite
        une liste à plat qui deviendrait vite illisible. */
-    const groupes = draft.vehicleCats
+    const groupes = P().cats
       .map(c => ({ c, vs: valides.filter(v => v.category === c.id) }))
       .filter(g => g.vs.length);
 
@@ -125,7 +158,7 @@
                 g.vs.map(ligne).join("") +
               "</div>").join("")
           : (attente.length ? "" : '<p class="hint" style="padding:12px">' +
-            (draft.vehicles.length ? "Aucun véhicule ne correspond." : "Aucun véhicule enregistré.") +
+            (P().vehicles.length ? "Aucun véhicule ne correspond." : "Aucun véhicule enregistré.") +
             "</p>")) +
       "</div>" +
       '<div class="stafflist__foot">' +
@@ -166,7 +199,7 @@
 
   function renderCard() {
     const pane = $("#v-card");
-    const v = draft.vehicles.find(x => x.id === sel);
+    const v = P().vehicles.find(x => x.id === sel);
 
     if (!v) {
       pane.innerHTML = '<div class="empty">' + svg("car") + "<b>Aucun véhicule sélectionné</b>" +
@@ -234,11 +267,8 @@
 
   /* ---- Validation ---------------------------------------------------------- */
 
-  function valider(v) {
-    const cible = draft.vehicles.find(x => x.id === v.id);
-    cible.status = "valide";
-    commit();
-    MNUI.toast(v.name + " est entré dans le parc", "ok");
+  async function valider(v) {
+    rendu(await MNParc.setStatus(v.id, "valide"), v.name + " est entré dans le parc");
   }
 
   async function refuser(v) {
@@ -249,10 +279,9 @@
       confirmLabel: "Refuser", danger: true
     });
     if (!ok) return;
-    draft.vehicles = draft.vehicles.filter(x => x.id !== v.id);
+    const r = await MNParc.removeVehicle(v.id);
     if (sel === v.id) { const f = liste()[0]; sel = f ? f.id : null; }
-    commit();
-    MNUI.toast("Proposition refusée", "ok");
+    rendu(r, "Proposition refusée");
   }
 
   /* ---- Édition ----------------------------------------------------------- */
@@ -260,7 +289,7 @@
   function editVehicle(v) {
     const isNew = !v;
     const cur = v ? MNStore.clone(v) : {
-      name: "", category: draft.vehicleCats[0].id, image: "",
+      name: "", category: P().cats[0].id, image: "",
       carburant: "", places: 0, coffre: "", type: "", note: ""
     };
 
@@ -272,7 +301,7 @@
           '<input class="input" id="e-vn" maxlength="40" value="' + esc(cur.name) +
             '" placeholder="Ex. BF400"></div>' +
         '<div class="field"><label class="label" for="e-vc">Catégorie</label>' +
-          '<select class="select" id="e-vc">' + draft.vehicleCats.map(c =>
+          '<select class="select" id="e-vc">' + P().cats.map(c =>
             '<option value="' + esc(c.id) + '"' + (c.id === cur.category ? " selected" : "") + ">" +
             esc(c.name) + "</option>").join("") + "</select></div>" +
       "</div>" +
@@ -325,7 +354,7 @@
         { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
         {
           label: "Enregistrer", variant: "btn--primary", icon: "save",
-          onClick: close => {
+          onClick: async close => {
             const nom = body.querySelector("#e-vn").value.trim();
             if (!nom) return MNUI.toast("Le nom est obligatoire", "err");
 
@@ -342,27 +371,26 @@
             };
 
             if (isNew) {
-              data.id = MNStore.uniqueId(nom, draft.vehicles.map(x => x.id));
+              data.id = MNStore.uniqueId(nom, P().vehicles.map(x => x.id));
               /* Qui peut gérer le parc y écrit directement ; les autres
                  proposent, et leur ajout attend une validation. */
               data.status = canEdit ? "valide" : "attente";
               data.proposePar = me.pseudo;
               data.proposeLe = new Date().toISOString();
-              draft.vehicles.push(data);
               sel = data.id;
             } else {
-              const cible = draft.vehicles.find(x => x.id === v.id);
+              const cible = P().vehicles.find(x => x.id === v.id);
               /* Modifier sa propre proposition ne la fait pas passer : elle
                  reste en attente, avec son auteur. */
-              Object.assign(cible, data, {
-                status: cible.status, proposePar: cible.proposePar, proposeLe: cible.proposeLe
+              Object.assign(data, {
+                id: cible.id, status: cible.status,
+                proposePar: cible.proposePar, proposeLe: cible.proposeLe
               });
             }
-            commit();
             close();
-            MNUI.toast(isNew
+            rendu(await MNParc.setVehicle(data), isNew
               ? (canEdit ? "Véhicule ajouté" : "Proposition envoyée — elle attend une validation")
-              : "Véhicule mis à jour", "ok");
+              : "Véhicule mis à jour");
           }
         }
       ]
@@ -377,10 +405,16 @@
       confirmLabel: "Supprimer", danger: true
     });
     if (!ok) return;
-    draft.vehicles = draft.vehicles.filter(x => x.id !== v.id);
+    const r = await MNParc.removeVehicle(v.id);
     if (sel === v.id) { const f = liste()[0]; sel = f ? f.id : null; }
-    commit();
-    MNUI.toast("Véhicule supprimé", "ok");
+    rendu(r, "Véhicule supprimé");
+  }
+
+  /** Enregistre la liste complète des catégories, puis rafraîchit la fenêtre. */
+  async function enregistrerCats(cats, apres, message) {
+    const r = await MNParc.setCats(cats);
+    rendu(r, message);
+    if (apres) apres();
   }
 
   /** Gestion des catégories, dans une seule fenêtre. */
@@ -389,12 +423,12 @@
 
     const peindre = () => {
       body.innerHTML =
-        '<div class="rows" id="c-rows">' + draft.vehicleCats.map((c, i) => {
-          const n = draft.vehicles.filter(v => v.category === c.id).length;
+        '<div class="rows" id="c-rows">' + P().cats.map((c, i) => {
+          const n = P().vehicles.filter(v => v.category === c.id).length;
           return '<div class="trow" data-c="' + esc(c.id) + '">' +
             '<div class="ord">' +
               '<button data-a="up"' + (i === 0 ? " disabled" : "") + ">" + svg("chevUp") + "</button>" +
-              '<button data-a="down"' + (i === draft.vehicleCats.length - 1 ? " disabled" : "") + ">" +
+              '<button data-a="down"' + (i === P().cats.length - 1 ? " disabled" : "") + ">" +
                 svg("chevDown") + "</button>" +
             "</div>" +
             '<div class="trow__ico">' + mnIcon(c.icon) + "</div>" +
@@ -413,22 +447,24 @@
       body.querySelector("#c-add").addEventListener("click", () => {
         const nom = body.querySelector("#c-new").value.trim();
         if (!nom) return MNUI.toast("Donne un nom", "err");
-        draft.vehicleCats.push({
-          id: MNStore.uniqueId(nom, draft.vehicleCats.map(x => x.id)),
+        const cats = MNStore.clone(P().cats);
+        cats.push({
+          id: MNStore.uniqueId(nom, cats.map(x => x.id)),
           name: nom, icon: "i-wheels-car"
         });
-        commit(); peindre();
+        enregistrerCats(cats, peindre, "Catégorie ajoutée");
       });
 
       body.querySelectorAll("[data-c]").forEach(row => {
-        const c = draft.vehicleCats.find(x => x.id === row.dataset.c);
+        const c = P().cats.find(x => x.id === row.dataset.c);
         row.querySelectorAll("[data-a]").forEach(b => b.addEventListener("click", () => {
           const a = b.dataset.a;
           if (a === "up" || a === "down") {
-            const i = draft.vehicleCats.indexOf(c), j = i + (a === "up" ? -1 : 1);
-            if (j < 0 || j >= draft.vehicleCats.length) return;
-            draft.vehicleCats.splice(j, 0, draft.vehicleCats.splice(i, 1)[0]);
-            commit(); peindre();
+            const cats = MNStore.clone(P().cats);
+            const i = cats.findIndex(x => x.id === c.id), j = i + (a === "up" ? -1 : 1);
+            if (j < 0 || j >= cats.length) return;
+            cats.splice(j, 0, cats.splice(i, 1)[0]);
+            enregistrerCats(cats, peindre, "Ordre enregistré");
             return;
           }
           if (a === "ren") return renommer(c, peindre);
@@ -460,9 +496,12 @@
           onClick: k => {
             const n = body.querySelector("#c-n").value.trim();
             if (!n) return MNUI.toast("Le nom est obligatoire", "err");
-            c.name = n;
-            c.icon = body.querySelector("#c-i").value.trim() || "i-wheels-car";
-            commit(); k(); apres();
+            const cats = MNStore.clone(P().cats);
+            const cible = cats.find(x => x.id === c.id);
+            cible.name = n;
+            cible.icon = body.querySelector("#c-i").value.trim() || "i-wheels-car";
+            k();
+            enregistrerCats(cats, apres, "Catégorie renommée");
           }
         }
       ]
@@ -470,11 +509,11 @@
   }
 
   async function supprimerCat(c, apres) {
-    if (draft.vehicleCats.length <= 1) {
+    if (P().cats.length <= 1) {
       return MNUI.toast("Il faut au moins une catégorie", "err");
     }
-    const n = draft.vehicles.filter(v => v.category === c.id).length;
-    const repli = draft.vehicleCats.find(x => x.id !== c.id);
+    const n = P().vehicles.filter(v => v.category === c.id).length;
+    const repli = P().cats.find(x => x.id !== c.id);
     const ok = await MNUI.confirm({
       title: "Supprimer la catégorie",
       message: "« " + c.name + " » sera supprimée" +
@@ -483,8 +522,8 @@
       confirmLabel: "Supprimer", danger: true
     });
     if (!ok) return;
-    draft.vehicles.forEach(v => { if (v.category === c.id) v.category = repli.id; });
-    draft.vehicleCats = draft.vehicleCats.filter(x => x.id !== c.id);
-    commit(); apres();
+    /* Le serveur reclasse lui-même les véhicules orphelins : on ne lui envoie
+       que la nouvelle liste. */
+    enregistrerCats(P().cats.filter(x => x.id !== c.id), apres, "Catégorie supprimée");
   }
 })();
