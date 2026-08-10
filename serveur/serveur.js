@@ -307,7 +307,7 @@ function nettoyerVehicule(v, catIds) {
     carburant: texte(v.carburant, 40),
     places: nombre(v.places, 0, 99),
     coffre: texte(v.coffre, 40),
-    type: texte(v.type, 40),
+    litres: nombre(v.litres, 0, 9999),
     note: texte(v.note, 300)
   };
 }

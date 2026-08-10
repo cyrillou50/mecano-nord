@@ -1,0 +1,239 @@
+/* ==========================================================================
+   Bibliothèque d'images partagée.
+
+   Lister ce qui existe, déposer une photo, en choisir une. Le panneau admin a
+   son propre sélecteur, plus riche (il propose aussi les icônes vectorielles
+   et les emojis) ; celui-ci ne s'occupe que d'images, et sert aux écrans qui
+   en ont besoin sans embarquer tout l'admin.
+
+   Le dépôt se fait sur le serveur de l'atelier quand il est configuré :
+   l'image est en ligne aussitôt, sans commit ni reconstruction du site. Sinon
+   il retombe sur le dépôt GitHub, ce qui demande le droit de publier.
+   ========================================================================== */
+
+window.MNImagier = (function () {
+  "use strict";
+
+  const IMG_DIR = "assets/img";
+  const IMG_RE = /\.(png|jpe?g|webp|gif|svg|avif)$/i;
+
+  let cache = null;
+
+  const esc = s => MNUI.esc(s);
+  const surServeur = () => MNStore.imagesHebergees();
+
+  async function api(corps) {
+    const base = MNStore.api("images");
+    if (!base) throw new Error("Aucun serveur configuré.");
+    const r = await fetch(base + (corps ? "" : "?t=" + Date.now()), corps
+      ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) }
+      : { cache: "no-store" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "Le serveur a répondu " + r.status);
+    return j;
+  }
+
+  /**
+   * Toutes les images disponibles, celles du serveur d'abord.
+   * Chaque entrée porte sa référence telle qu'on l'enregistre.
+   */
+  async function lister(force) {
+    if (cache && !force) return cache;
+    let serveur = [], depot = [];
+
+    if (surServeur()) {
+      try { serveur = (await api()).images || []; } catch (_) { /* on se rabat */ }
+    }
+    try {
+      const r = await fetch(IMG_DIR + "/index.json?v=" + Date.now(), { cache: "no-store" });
+      if (r.ok) {
+        const j = await r.json();
+        depot = (Array.isArray(j) ? j : j.images || []).filter(n => IMG_RE.test(n));
+      }
+    } catch (_) { /* manifeste absent */ }
+
+    const tri = (a, b) => a.localeCompare(b, "fr");
+    cache = serveur.sort(tri).map(n => ({ name: n, ref: MNStore.IMG_TAG + n, serveur: true }))
+      .concat(depot.sort(tri).map(n => ({ name: n, ref: IMG_DIR + "/" + n, serveur: false })));
+    return cache;
+  }
+
+  const vider = () => { cache = null; };
+
+  /** L'adresse à laquelle afficher une référence. */
+  const src = ref => (String(ref).indexOf(MNStore.IMG_TAG) === 0
+    ? MNStore.imageUrl(String(ref).slice(MNStore.IMG_TAG.length))
+    : ref);
+
+  /* ---- Mise au gabarit -----------------------------------------------------
+     Une photo prise sur internet fait souvent plusieurs mégaoctets. On la
+     réduit avant de l'envoyer : le stockage reste léger et l'affichage
+     immédiat. On garde les proportions — contrairement aux icônes, une voiture
+     ne se met pas dans un carré. */
+
+  function redimensionner(img, max) {
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    if (!w || !h) throw new Error("dimensions inconnues");
+
+    const k = Math.min(max / w, max / h, 1);
+    const cv = document.createElement("canvas");
+    cv.width = Math.max(1, Math.round(w * k));
+    cv.height = Math.max(1, Math.round(h * k));
+    cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+    return cv.toDataURL("image/png");
+  }
+
+  /** Fichier choisi → image réduite, en `data:`. */
+  function depuisFichier(file, max) {
+    return new Promise((resolve, reject) => {
+      if (!/^image\//.test(file.type)) return reject(new Error("Ce fichier n'est pas une image."));
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        try { resolve(redimensionner(img, max || 640)); }
+        catch (e) { reject(new Error("Image impossible à convertir.")); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image illisible.")); };
+      img.src = url;
+    });
+  }
+
+  /** Dépose une image et renvoie la référence à enregistrer. */
+  async function deposer(dataUri, nomSuggere) {
+    const nom = MNStore.slugify(String(nomSuggere || "image").replace(/\.[a-z0-9]+$/i, "")) + ".png";
+    const brut = MNGitHub.imageBrute(dataUri);
+
+    if (surServeur()) {
+      await api({ name: nom, base64: brut });
+      vider();
+      return MNStore.IMG_TAG + nom;
+    }
+
+    /* Sans serveur : dans le dépôt, avec le manifeste dans le même commit. */
+    const chemin = IMG_DIR + "/" + nom;
+    const fichiers = [{ path: chemin, content: brut, base64: true }];
+    try {
+      const noms = (await lister(true)).filter(x => !x.serveur).map(x => x.name);
+      if (noms.indexOf(nom) === -1) noms.push(nom);
+      fichiers.push({ path: IMG_DIR + "/index.json", content: JSON.stringify(noms.sort(), null, 2) + "\n" });
+    } catch (_) { /* manifeste : simple confort */ }
+
+    await MNGitHub.putFiles(fichiers, "Ajout de l'image " + nom);
+    vider();
+    return chemin;
+  }
+
+  /* ---- Fenêtre de choix ------------------------------------------------------ */
+
+  /**
+   * Ouvre la bibliothèque.
+   * @param {string} actuel   référence déjà sélectionnée
+   * @param {function} cb     appelée avec la référence retenue
+   * @param {{max:number}} opt taille maximale des images déposées
+   */
+  function choisir(actuel, cb, opt) {
+    const max = (opt && opt.max) || 640;
+    let sel = actuel || "";
+
+    const body = document.createElement("div");
+    body.innerHTML =
+      '<div class="row" style="margin-bottom:12px">' +
+        '<button class="btn btn--primary" id="g-up" type="button">' + MNUI.svg("upload") +
+          "<span>Déposer une photo</span></button>" +
+        '<input type="file" id="g-file" accept="image/*" hidden>' +
+        '<button class="btn btn--ghost" id="g-refresh" type="button">' + MNUI.svg("refresh") +
+          "<span>Actualiser</span></button>" +
+        '<span class="spacer"></span>' +
+        '<button class="btn btn--ghost" id="g-none" type="button">' + MNUI.svg("x") +
+          "<span>Aucune</span></button>" +
+      "</div>" +
+      '<div id="g-grid"><p class="hint">Lecture de la bibliothèque…</p></div>' +
+      '<div class="field" style="margin-top:12px">' +
+        '<label class="label" for="g-url">Ou colle une adresse</label>' +
+        '<input class="input mono" id="g-url" value="' + esc(actuel) +
+          '" placeholder="https://… ou assets/img/bf400.png"></div>';
+
+    const grid = body.querySelector("#g-grid");
+    const champ = body.querySelector("#g-url");
+
+    const peindre = async force => {
+      grid.innerHTML = '<p class="hint">Lecture de la bibliothèque…</p>';
+      let refs = [];
+      try { refs = await lister(force); } catch (_) { /* rien de listable */ }
+
+      if (!refs.length) {
+        grid.innerHTML = '<p class="hint">Aucune image pour le moment. ' +
+          "Clique sur <b>Déposer une photo</b> pour en ajouter une.</p>";
+        return;
+      }
+      grid.innerHTML =
+        '<div class="iconlist" style="grid-template-columns:repeat(auto-fill,minmax(78px,1fr));max-height:300px">' +
+          refs.map(x =>
+            '<button type="button" data-ref="' + esc(x.ref) + '" title="' + esc(x.name) +
+              (x.serveur ? " — sur le serveur" : " — dans le dépôt") + '"' +
+              (x.ref === sel ? ' class="is-on"' : "") +
+              '><img src="' + esc(src(x.ref)) + '" alt="" loading="lazy"></button>').join("") +
+        "</div>" +
+        '<p class="hint" style="margin-top:8px">' + refs.length + " image" +
+          (refs.length > 1 ? "s" : "") + "</p>";
+
+      grid.querySelectorAll("[data-ref]").forEach(b => b.addEventListener("click", () => {
+        sel = b.dataset.ref;
+        champ.value = sel;
+        grid.querySelectorAll("[data-ref]").forEach(x => x.classList.toggle("is-on", x === b));
+      }));
+    };
+    peindre(false);
+
+    body.querySelector("#g-refresh").addEventListener("click", () => peindre(true));
+    champ.addEventListener("input", () => { sel = champ.value.trim(); });
+    body.querySelector("#g-none").addEventListener("click", () => { sel = ""; champ.value = ""; });
+
+    body.querySelector("#g-up").addEventListener("click", () => body.querySelector("#g-file").click());
+    body.querySelector("#g-file").addEventListener("change", async e => {
+      const file = e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+
+      const bouton = body.querySelector("#g-up");
+      bouton.disabled = true;
+      bouton.innerHTML = MNUI.svg("refresh") + "<span>Envoi…</span>";
+      try {
+        const data = await depuisFichier(file, max);
+        /* Sans serveur ni jeton, on garde l'image dans les données plutôt que
+           d'échouer : elle marche tout de suite, au prix d'un fichier plus
+           lourd. */
+        if (!surServeur() && !MNGitHub.canPublish()) {
+          sel = data;
+          champ.value = data;
+          MNUI.toast("Image intégrée aux données — aucun serveur pour l'héberger", "info");
+        } else {
+          sel = await deposer(data, file.name);
+          champ.value = sel;
+          await peindre(true);
+          MNUI.toast("Photo déposée", "ok");
+        }
+      } catch (err) {
+        MNUI.toast("Dépôt impossible : " + err.message, "err");
+      } finally {
+        bouton.disabled = false;
+        bouton.innerHTML = MNUI.svg("upload") + "<span>Déposer une photo</span>";
+      }
+    });
+
+    MNUI.modal({
+      title: "Bibliothèque d'images", body,
+      actions: [
+        { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
+        {
+          label: "Choisir", variant: "btn--primary", icon: "check",
+          onClick: c => { cb(sel); c(); }
+        }
+      ]
+    });
+  }
+
+  return { lister, vider, src, deposer, depuisFichier, choisir };
+})();

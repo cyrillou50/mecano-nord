@@ -136,7 +136,7 @@
         '<span class="staffrow__txt"><b>' + esc(v.name) + "</b>" +
           "<i>" + esc(enAttente(v)
             ? "proposé par " + (v.proposePar || "?")
-            : (v.type || catOf(v).name)) + "</i></span>" +
+            : catOf(v).name) + "</i></span>" +
       "</button>";
 
     host.innerHTML =
@@ -250,7 +250,7 @@
             boite("Carburant", v.carburant) +
             boite("Places", v.places || "") +
             boite("Coffre", v.coffre) +
-            boite("Type", v.type) +
+            boite("Réservoir", v.litres ? v.litres + " L" : "") +
           "</div>" +
         "</div>" +
       "</div>";
@@ -290,7 +290,7 @@
     const isNew = !v;
     const cur = v ? MNStore.clone(v) : {
       name: "", category: P().cats[0].id, image: "",
-      carburant: "", places: 0, coffre: "", type: "", note: ""
+      carburant: "", places: 0, coffre: "", litres: 0, note: ""
     };
 
     const body = document.createElement("div");
@@ -330,21 +330,26 @@
       "</div>" +
 
       '<div class="editor__grid">' +
-        '<div class="field"><label class="label" for="e-vt">Type</label>' +
-          '<input class="input" id="e-vt" maxlength="24" value="' + esc(cur.type) +
-            '" placeholder="moto"></div>' +
+        '<div class="field"><label class="label" for="e-vt">Réservoir (litres)</label>' +
+          '<input class="input input--num" id="e-vt" type="number" min="0" max="9999" value="' +
+            Number(cur.litres || 0) + '"></div>' +
         '<div class="field"><label class="label" for="e-vnote">Note (facultatif)</label>' +
           '<input class="input" id="e-vnote" maxlength="120" value="' + esc(cur.note) + '"></div>' +
       "</div>";
 
     const prev = body.querySelector("#e-vi-prev");
     const img = body.querySelector("#e-vi");
-    img.addEventListener("input", () => { prev.innerHTML = mnIcon(img.value.trim() || "i-wheels-car"); });
+    const rafraichirApercu = () => {
+      prev.innerHTML = mnIcon(img.value.trim() || "i-wheels-car");
+    };
+    img.addEventListener("input", rafraichirApercu);
     body.querySelector("#e-vi-pick").addEventListener("click", () => {
-      /* Le sélecteur d'images vit dans le panneau admin ; ici on saisit le
-         chemin, ce qui suffit et évite d'embarquer tout ce code. */
-      MNUI.toast("Colle le chemin de l'image, ou dépose-la depuis Admin → Images", "info");
-      img.focus();
+      /* 720 px : la fiche affiche la photo sur 210 px de haut, le double
+         suffit pour les écrans à forte densité sans alourdir le stockage. */
+      MNImagier.choisir(img.value.trim(), ref => {
+        img.value = ref;
+        rafraichirApercu();
+      }, { max: 720 });
     });
 
     MNUI.modal({
@@ -366,7 +371,7 @@
               carburant: g("#e-vf"),
               places: Math.max(0, Math.min(99, Math.round(Number(g("#e-vp")) || 0))),
               coffre: g("#e-vk"),
-              type: g("#e-vt"),
+              litres: Math.max(0, Math.min(9999, Math.round(Number(g("#e-vt")) || 0))),
               note: g("#e-vnote")
             };
 

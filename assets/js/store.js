@@ -203,7 +203,9 @@ window.MNStore = (function () {
         carburant: String(v.carburant || ""),
         places: Math.max(0, Math.min(99, Math.round(Number(v.places) || 0))),
         coffre: String(v.coffre || ""),
-        type: String(v.type || ""),
+        /* Contenance du réservoir. `type` était un texte libre (moto, berline) ;
+           il a laissé la place à cette valeur, plus utile à l'atelier. */
+        litres: Math.max(0, Math.min(9999, Math.round(Number(v.litres) || 0))),
         note: String(v.note || "").slice(0, 300)
       };
     });
