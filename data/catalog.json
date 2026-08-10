@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-10T18:15:48.799Z",
+  "updatedAt": "2026-08-10T18:16:51.027Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -59,8 +59,8 @@
     },
     {
       "id": "patron",
-      "name": "Patron",
-      "color": "#ff3b5c",
+      "name": "Patronne",
+      "color": "#8b8bff",
       "icon": "i-crown",
       "perms": [
         "bt",
@@ -68,7 +68,9 @@
         "duty_view",
         "duty_manage",
         "staff",
-        "promote"
+        "promote",
+        "items",
+        "admin"
       ]
     },
     {
@@ -167,7 +169,7 @@
     {
       "id": "ecumeria",
       "pseudo": "Écuméria Sereinécaille",
-      "roleId": "secretaire",
+      "roleId": "patron",
       "pin": "5d3fd60e0b9ed92ce9b5a715842c017e867cacbc463800c11ca5e4f49d95359b",
       "active": true,
       "hidden": false,
@@ -187,6 +189,13 @@
           "at": "2026-08-02T22:19:25.028Z",
           "by": "",
           "note": "Entrée dans l'entreprise"
+        },
+        {
+          "roleId": "patron",
+          "roleName": "Patronne",
+          "at": "2026-08-10T18:16:51.025Z",
+          "by": "Écuméria Sereinécaille",
+          "note": ""
         }
       ]
     },
