@@ -17,6 +17,16 @@
   let canEdit = false;      // modifier et supprimer n'importe quel véhicule
   let canValid = false;     // approuver ou refuser une proposition
 
+  /* Le tri est une habitude : on le retient. Les filtres carburant et
+     catégorie sont une recherche du moment — les retrouver au retour ferait
+     croire à un parc vide. */
+  const K_TRI = "mn.veh.tri";
+  const plis = MNUI.folds("mn.veh.folds");
+
+  let tri = localStorage.getItem(K_TRI) || "az";
+  let fCarb = "";           // "", "Essence" ou "Diesel"
+  let fCat = "";            // "" = toutes
+
   MNUI.start({ page: "vehicules", title: "Véhicules", onReady: init });
 
   async function init(session) {
@@ -42,12 +52,25 @@
 
   const enAttente = v => v.status === "attente";
 
-  /** Les véhicules correspondant au filtre, dans l'ordre du catalogue. */
+  /** Un filtre est-il en cours ? Sert à tout déplier et à proposer un retour. */
+  const filtre = () => !!(filter.trim() || fCarb || fCat);
+
+  /** Les véhicules retenus par la recherche et les filtres, triés. */
   function liste() {
-    const f = filter.toLowerCase();
-    return P().vehicles.filter(v => !f ||
-      v.name.toLowerCase().indexOf(f) !== -1 ||
-      catOf(v).name.toLowerCase().indexOf(f) !== -1);
+    const f = filter.trim().toLowerCase();
+    const out = P().vehicles.filter(v => {
+      if (fCarb && v.carburant !== fCarb) return false;
+      if (fCat && v.category !== fCat) return false;
+      if (!f) return true;
+      return v.name.toLowerCase().indexOf(f) !== -1 ||
+        catOf(v).name.toLowerCase().indexOf(f) !== -1;
+    });
+
+    /* `localeCompare` avec `numeric` classe « Yosemite 3 » avant
+       « Yosemite 1500 », ce qu'un tri de chaînes ferait à l'envers. */
+    out.sort((a, b) => a.name.localeCompare(b.name, "fr", { numeric: true }));
+    if (tri === "za") out.reverse();
+    return out;
   }
 
   /**
@@ -139,24 +162,53 @@
             : catOf(v).name) + "</i></span>" +
       "</button>";
 
+    /* Un filtre en cours déplie tout : masquer un résultat trouvé n'aurait
+       aucun sens. L'état enregistré n'est pas touché pour autant. */
+    const plie = id => !filtre() && plis.has(id);
+
+    const bloc = (key, tete, contenu, classe) =>
+      '<div class="vgroup' + (classe ? " " + classe : "") + (plie(key) ? " is-folded" : "") + '">' +
+        '<span class="vgroup__t fold" data-fold="' + esc(key) + '" role="button" tabindex="0"' +
+          ' aria-expanded="' + (plie(key) ? "false" : "true") + '">' +
+          svg("chevDown", "fold__chev") + tete + "</span>" +
+        '<div class="fold__body">' + contenu + "</div>" +
+      "</div>";
+
     host.innerHTML =
       '<div class="stafflist__top">' +
-        '<input class="input" id="v-search" placeholder="Filtrer les véhicules…" value="' +
+        '<input class="input" id="v-search" placeholder="Rechercher un véhicule…" value="' +
           esc(filter) + '">' +
+        '<div class="vfilters">' +
+          '<select class="select" id="v-tri" title="Ordre">' +
+            '<option value="az"' + (tri === "az" ? " selected" : "") + ">A → Z</option>" +
+            '<option value="za"' + (tri === "za" ? " selected" : "") + ">Z → A</option>" +
+          "</select>" +
+          '<select class="select" id="v-carb" title="Carburant">' +
+            '<option value="">Tout carburant</option>' +
+            ["Essence", "Diesel"].map(c =>
+              '<option value="' + c + '"' + (fCarb === c ? " selected" : "") + ">" + c + "</option>").join("") +
+          "</select>" +
+          '<select class="select" id="v-cat" title="Catégorie">' +
+            '<option value="">Toutes catégories</option>' +
+            P().cats.map(c =>
+              '<option value="' + esc(c.id) + '"' + (fCat === c.id ? " selected" : "") + ">" +
+              esc(c.name) + "</option>").join("") +
+          "</select>" +
+        "</div>" +
+        (filtre()
+          ? '<button class="btn btn--ghost btn--sm" id="v-clear" style="width:100%;margin-top:6px">' +
+            svg("x") + "<span>Tout afficher</span></button>"
+          : "") +
       "</div>" +
       '<div class="stafflist__body">' +
         (attente.length
-          ? '<div class="vgroup vgroup--attente"><span class="vgroup__t">' + svg("history") +
-              "En attente<i>" + attente.length + "</i></span>" +
-              attente.map(ligne).join("") +
-            "</div>"
+          ? bloc("__attente", svg("history") + "En attente<i>" + attente.length + "</i>",
+              attente.map(ligne).join(""), "vgroup--attente")
           : "") +
         (groupes.length
           ? groupes.map(g =>
-              '<div class="vgroup"><span class="vgroup__t">' + mnIcon(g.c.icon) +
-                esc(g.c.name) + '<i>' + g.vs.length + "</i></span>" +
-                g.vs.map(ligne).join("") +
-              "</div>").join("")
+              bloc(g.c.id, mnIcon(g.c.icon) + esc(g.c.name) + "<i>" + g.vs.length + "</i>",
+                g.vs.map(ligne).join(""))).join("")
           : (attente.length ? "" : '<p class="hint" style="padding:12px">' +
             (P().vehicles.length ? "Aucun véhicule ne correspond." : "Aucun véhicule enregistré.") +
             "</p>")) +
@@ -182,6 +234,36 @@
       const pos = s.selectionStart;
       renderList();
       const ns = $("#v-search"); ns.focus(); ns.setSelectionRange(pos, pos);
+    });
+
+    $("#v-tri").addEventListener("change", e => {
+      tri = e.target.value;
+      try { localStorage.setItem(K_TRI, tri); } catch (_) { /* quota */ }
+      renderList();
+    });
+    $("#v-carb").addEventListener("change", e => { fCarb = e.target.value; renderList(); });
+    $("#v-cat").addEventListener("change", e => { fCat = e.target.value; renderList(); });
+
+    const clear = $("#v-clear");
+    if (clear) clear.addEventListener("click", () => {
+      filter = ""; fCarb = ""; fCat = "";
+      renderList();
+    });
+
+    /* On bascule la classe plutôt que de tout reconstruire : le champ de
+       recherche garde son focus et la liste ne saute pas. */
+    host.querySelectorAll("[data-fold]").forEach(h => {
+      const bascule = () => {
+        const ferme = plis.toggle(h.dataset.fold);
+        h.parentElement.classList.toggle("is-folded", ferme);
+        h.setAttribute("aria-expanded", ferme ? "false" : "true");
+      };
+      h.addEventListener("click", bascule);
+      h.addEventListener("keydown", e => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        bascule();
+      });
     });
 
     host.querySelectorAll("[data-v]").forEach(b =>

@@ -794,3 +794,24 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
 .staffrow.is-attente { box-shadow: inset 2px 0 0 var(--amber); }
 .staffrow.is-attente .staffrow__txt i { color: var(--amber); opacity: .85; }
 .staffrow.is-attente.is-active { background: rgba(255, 169, 46, .12); }
+
+/* Filtres de la liste des véhicules : trois listes déroulantes compactes,
+   sur deux rangées pour ne pas rétrécir la colonne. */
+.vfilters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 6px;
+}
+.vfilters .select {
+  padding: 7px 26px 7px 10px;
+  font-size: 12.5px;
+  background-position: right 8px center;
+}
+.vfilters .select:first-child { grid-column: 1 / -1; }
+
+/* En-tête de groupe repliable : le chevron pivote, le contenu se cache. */
+.vgroup__t.fold { width: 100%; }
+.vgroup .fold__chev { width: 13px; height: 13px; flex: none; opacity: .6; transition: transform .15s; }
+.vgroup.is-folded .fold__chev { transform: rotate(-90deg); }
+.vgroup.is-folded .fold__body { display: none; }
