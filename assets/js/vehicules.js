@@ -26,6 +26,7 @@
   let tri = localStorage.getItem(K_TRI) || "az";
   let fCarb = "";           // "", "Essence" ou "Diesel"
   let fCat = "";            // "" = toutes
+  let fEtoile = "";         // "" = toutes, "oui" = incomplètes, "non" = complètes
 
   MNUI.start({ page: "vehicules", title: "Véhicules", onReady: init });
 
@@ -101,7 +102,7 @@
   }
 
   /** Un filtre est-il en cours ? Sert à tout déplier et à proposer un retour. */
-  const filtre = () => !!(filter.trim() || fCarb || fCat);
+  const filtre = () => !!(filter.trim() || fCarb || fCat || fEtoile);
 
   /** Les véhicules retenus par la recherche et les filtres, triés. */
   function liste() {
@@ -109,6 +110,7 @@
     const out = P().vehicles.filter(v => {
       if (fCarb && v.carburant !== fCarb) return false;
       if (fCat && v.category !== fCat) return false;
+      if (fEtoile && (manques(v).length > 0) !== (fEtoile === "oui")) return false;
       if (!f) return true;
       return v.name.toLowerCase().indexOf(f) !== -1 ||
         catOf(v).name.toLowerCase().indexOf(f) !== -1;
@@ -256,6 +258,13 @@
             '<option value="az"' + (tri === "az" ? " selected" : "") + ">A → Z</option>" +
             '<option value="za"' + (tri === "za" ? " selected" : "") + ">Z → A</option>" +
           "</select>" +
+          /* Pendant qu'on complète le parc, ne voir que les fiches à finir
+             évite de faire défiler celles qui sont déjà bonnes. */
+          '<select class="select" id="v-etoile" title="Fiches complètes ou non">' +
+            '<option value="">Toutes fiches</option>' +
+            '<option value="oui"' + (fEtoile === "oui" ? " selected" : "") + ">Avec étoile</option>" +
+            '<option value="non"' + (fEtoile === "non" ? " selected" : "") + ">Sans étoile</option>" +
+          "</select>" +
           '<select class="select" id="v-carb" title="Carburant">' +
             '<option value="">Tout carburant</option>' +
             ["Essence", "Diesel"].map(c =>
@@ -325,11 +334,12 @@
        recherche. */
     const filtrer = fn => e => { fn(e.target.value); scrollListe = 0; renderList(); };
     $("#v-carb").addEventListener("change", filtrer(v => { fCarb = v; }));
+    $("#v-etoile").addEventListener("change", filtrer(v => { fEtoile = v; }));
     $("#v-cat").addEventListener("change", filtrer(v => { fCat = v; }));
 
     const clear = $("#v-clear");
     if (clear) clear.addEventListener("click", () => {
-      filter = ""; fCarb = ""; fCat = "";
+      filter = ""; fCarb = ""; fCat = ""; fEtoile = "";
       scrollListe = 0;
       renderList();
     });

@@ -808,7 +808,8 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
   font-size: 12.5px;
   background-position: right 8px center;
 }
-.vfilters .select:first-child { grid-column: 1 / -1; }
+/* Quatre listes sur deux rangées : ordre et etoiles en haut, carburant et
+   categorie en dessous. */
 
 /* En-tête de groupe repliable : le chevron pivote, le contenu se cache. */
 .vgroup__t.fold { width: 100%; }
