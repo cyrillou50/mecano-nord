@@ -17,6 +17,10 @@ window.MNParc = (function () {
   let _parc = null;
   let _souci = "";
   let _distant = false;      // les données viennent-elles du serveur ?
+  /* Un serveur antérieur au parc ne connaît pas /vehicules. On le constate une
+     fois, puis on écrit dans le catalogue au lieu de perdre chaque
+     enregistrement — c'est le même repli que pour les images. */
+  let _supporte = null;      // null = pas encore su
 
   const vide = () => ({ updatedAt: new Date(0).toISOString(), cats: [], vehicles: [] });
 
@@ -59,8 +63,21 @@ window.MNParc = (function () {
 
     try {
       const r = await fetchDelai(url() + "?t=" + Date.now(), { cache: "no-store" });
+
+      /* 404 : le serveur tourne, mais sa version ignore le parc. Ce n'est pas
+         une panne, c'est un fichier à recopier — on le dit comme tel. */
+      if (r.status === 404 || r.status === 405) {
+        _supporte = false;
+        _distant = false;
+        _souci = "Ton serveur est trop ancien pour héberger le parc : recopie " +
+          "serveur.js sur le VPS, puis redémarre-le.";
+        _parc = duCatalogue();
+        return _parc;
+      }
+
       if (r.ok) {
         const j = await r.json();
+        _supporte = true;
         _distant = true;
         /* Serveur encore vide : on affiche ce que porte le catalogue, il
            servira de point de départ au premier enregistrement. */
@@ -89,17 +106,19 @@ window.MNParc = (function () {
    * Sans serveur, applique la même chose au catalogue et laisse la
    * publication faire le reste.
    */
+  /** Écrit le parc dans le catalogue. Il faudra publier pour le partager. */
+  function versCatalogue() {
+    const c = MNStore.clone(MNStore.catalog());
+    c.vehicleCats = MNStore.clone(parc().cats);
+    c.vehicles = MNStore.clone(parc().vehicles);
+    MNStore.saveDraft(c);
+    return { ok: true, local: true };
+  }
+
   async function envoyer(op) {
-    if (!surServeur()) {
-      /* Pas de serveur : le parc retombe dans le catalogue, comme avant. Il
-         faudra donc publier pour que les autres le voient — c'est justement
-         ce que le serveur évite. */
-      const c = MNStore.clone(MNStore.catalog());
-      c.vehicleCats = MNStore.clone(parc().cats);
-      c.vehicles = MNStore.clone(parc().vehicles);
-      MNStore.saveDraft(c);
-      return { ok: true, local: true };
-    }
+    /* Pas de serveur, ou serveur trop ancien : le parc retombe dans le
+       catalogue plutôt que de perdre l'enregistrement. */
+    if (!surServeur() || _supporte === false) return versCatalogue();
 
     try {
       /* `depart` n'est lu que si le serveur n'a encore rien : il évite de
@@ -110,6 +129,14 @@ window.MNParc = (function () {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(corps)
       });
+      /* Même constat qu'à la lecture : un refus de route veut dire que ce
+         serveur ne connaît pas le parc. On bascule au lieu d'échouer. */
+      if (r.status === 404 || r.status === 405) {
+        _supporte = false;
+        _distant = false;
+        return versCatalogue();
+      }
+
       const j = await r.json().catch(() => ({}));
       if (!r.ok) return { ok: false, error: j.error || "Le serveur a répondu " + r.status };
       if (j.parc) { _parc = j.parc; _distant = true; }

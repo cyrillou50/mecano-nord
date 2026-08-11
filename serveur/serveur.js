@@ -304,7 +304,12 @@ function nettoyerVehicule(v, catIds) {
     status: v.status === "attente" ? "attente" : "valide",
     proposePar: texte(v.proposePar, 60),
     proposeLe: dateIso(v.proposeLe),
-    carburant: texte(v.carburant, 40),
+    /* Liste fermée, comme côté site : Essence, Diesel, ou rien. */
+    carburant: (function (c) {
+      const s = texte(c, 40).trim().toLowerCase();
+      return s.startsWith("diesel") || s.startsWith("gazole") ? "Diesel"
+        : s.startsWith("essence") ? "Essence" : "";
+    })(v.carburant),
     places: nombre(v.places, 0, 99),
     coffre: texte(v.coffre, 40),
     litres: nombre(v.litres, 0, 9999),

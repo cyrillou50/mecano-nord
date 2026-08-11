@@ -200,7 +200,13 @@ window.MNStore = (function () {
         status: v.status === "attente" ? "attente" : "valide",
         proposePar: String(v.proposePar || ""),
         proposeLe: v.proposeLe || null,
-        carburant: String(v.carburant || ""),
+        /* Liste fermée : deux carburants, saisis au clic. Une valeur venue
+           d'ailleurs est rapprochée de l'une des deux, sinon vidée. */
+        carburant: (function (c) {
+          const s = String(c || "").trim().toLowerCase();
+          return s.indexOf("diesel") === 0 || s.indexOf("gazole") === 0 ? "Diesel"
+            : s.indexOf("essence") === 0 ? "Essence" : "";
+        })(v.carburant),
         places: Math.max(0, Math.min(99, Math.round(Number(v.places) || 0))),
         coffre: String(v.coffre || ""),
         /* Contenance du réservoir. `type` était un texte libre (moto, berline) ;

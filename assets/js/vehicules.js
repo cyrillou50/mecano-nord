@@ -319,8 +319,11 @@
 
       '<div class="editor__grid editor__grid--3">' +
         '<div class="field"><label class="label" for="e-vf">Carburant</label>' +
-          '<input class="input" id="e-vf" maxlength="24" value="' + esc(cur.carburant) +
-            '" placeholder="Essence"></div>' +
+          '<select class="select" id="e-vf">' +
+            ['', 'Essence', 'Diesel'].map(c =>
+              '<option value="' + esc(c) + '"' + (c === cur.carburant ? " selected" : "") + ">" +
+              (c || "— non précisé") + "</option>").join("") +
+          "</select></div>" +
         '<div class="field"><label class="label" for="e-vp">Places</label>' +
           '<input class="input input--num" id="e-vp" type="number" min="0" max="99" value="' +
             Number(cur.places || 0) + '"></div>' +
