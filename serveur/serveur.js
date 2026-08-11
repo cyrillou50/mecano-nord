@@ -313,7 +313,27 @@ function nettoyerVehicule(v, catIds) {
     places: nombre(v.places, 0, 99),
     coffre: texte(v.coffre, 40),
     litres: nombre(v.litres, 0, 9999),
-    note: texte(v.note, 300)
+    note: texte(v.note, 300),
+    /* Modification en attente d'approbation, rangée à côté du véhicule sans
+       le changer. Même bornage que les champs qu'elle remplacera. */
+    propose: (function (p) {
+      if (!p || typeof p !== "object" || !p.champs) return null;
+      const c = p.champs;
+      return {
+        par: texte(p.par, 60),
+        le: dateIso(p.le),
+        champs: {
+          name: texte(c.name, 60),
+          category: texte(c.category, 60),
+          image: texte(c.image, 300),
+          carburant: texte(c.carburant, 40),
+          places: nombre(c.places, 0, 99),
+          coffre: texte(c.coffre, 40),
+          litres: nombre(c.litres, 0, 9999),
+          note: texte(c.note, 300)
+        }
+      };
+    })(v.propose)
   };
 }
 

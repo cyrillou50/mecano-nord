@@ -832,3 +832,13 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
 
 /* Une caractéristique non renseignée se voit, sans crier. */
 .vbox--vide b { color: var(--dim); }
+
+/* Crayon « correction proposée », à côté de l'étoile d'incomplétude. */
+.vstar--modif svg { fill: none; stroke-width: 2; }
+
+/* Le détail d'une correction : ancien → nouveau, une ligne par champ. */
+.vdiff { margin: 8px 0 0; display: flex; flex-direction: column; gap: 3px; }
+.vdiff li { font-size: 13px; }
+.vdiff i { font-style: normal; color: var(--dim); margin-right: 6px; }
+.vdiff b { color: var(--amber); margin: 0 4px; }
+.vmodif { align-items: flex-start; }

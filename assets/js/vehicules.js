@@ -72,6 +72,34 @@
     return l.slice(0, -1).join(", ") + " et " + l[l.length - 1];
   }
 
+  /* ---- Modifications proposées ------------------------------------------------
+     Tout le monde peut corriger une fiche, mais sans droit d'écriture la
+     correction attend à côté du véhicule : la fiche affichée reste celle qui a
+     été validée, et un valideur tranche. */
+
+  const MODIFS = [
+    { k: "name", nom: "nom" },
+    { k: "category", nom: "catégorie", lisible: v => (P().cats.find(c => c.id === v) || {}).name || v },
+    { k: "image", nom: "photo", lisible: v => (v ? "définie" : "aucune") },
+    { k: "carburant", nom: "carburant" },
+    { k: "places", nom: "places" },
+    { k: "coffre", nom: "coffre" },
+    { k: "litres", nom: "réservoir", lisible: v => (v ? v + " L" : "") },
+    { k: "note", nom: "note" }
+  ];
+
+  /** Ce que la proposition changerait, champ par champ. */
+  function ecarts(v) {
+    if (!v.propose) return [];
+    return MODIFS
+      .filter(m => String(v[m.k] || "") !== String(v.propose.champs[m.k] || ""))
+      .map(m => ({
+        nom: m.nom,
+        avant: (m.lisible ? m.lisible(v[m.k]) : v[m.k]) || "—",
+        apres: (m.lisible ? m.lisible(v.propose.champs[m.k]) : v.propose.champs[m.k]) || "—"
+      }));
+  }
+
   /** Un filtre est-il en cours ? Sert à tout déplier et à proposer un retour. */
   const filtre = () => !!(filter.trim() || fCarb || fCat);
 
@@ -195,6 +223,11 @@
           "<i>" + esc(enAttente(v)
             ? "proposé par " + (v.proposePar || "?")
             : catOf(v).name) + "</i></span>" +
+        (v.propose
+          ? '<span class="vstar vstar--modif" title="Correction proposée par ' +
+            esc(v.propose.par || "?") + '" aria-label="Correction proposée">' +
+            svg("edit") + "</span>"
+          : "") +
         (m.length
           ? '<span class="vstar" title="Fiche incomplète : il manque ' + esc(enumerer(m)) +
             '" aria-label="Fiche incomplète">' + svg("star") + "</span>"
@@ -376,10 +409,11 @@
               svg("star") + "</span>"
             : "") +
           '<span class="spacer"></span>' +
-          (canEdit || monBrouillon
-            ? '<button class="btn btn--ghost btn--sm" id="v-edit">' + svg("edit") +
-                "<span>Modifier</span></button>"
-            : "") +
+          /* Corriger une fiche est ouvert à tous ; c'est la validation qui
+             filtre, comme pour l'ajout. */
+          '<button class="btn btn--ghost btn--sm" id="v-edit">' + svg("edit") +
+            "<span>" + (canEdit || monBrouillon ? "Modifier" : "Proposer une correction") +
+            "</span></button>" +
           (canEdit || monBrouillon
             ? '<button class="btn btn--icon" id="v-del" title="Supprimer">' + svg("trash") + "</button>"
             : "") +
@@ -399,6 +433,30 @@
                   '<button class="btn btn--danger" id="v-no">' + svg("x") +
                     "<span>Refuser</span></button></div>"
                 : "")
+            : "") +
+          /* Correction en attente : on montre ce qu'elle changerait, sans
+             toucher à la fiche tant qu'elle n'est pas approuvée. */
+          (v.propose
+            ? (function () {
+                const e = ecarts(v);
+                return '<div class="alert alert--warn vmodif" style="margin-bottom:16px">' +
+                  svg("edit") + "<span><b>Correction proposée par " +
+                  esc(v.propose.par || "?") +
+                  (v.propose.le ? " " + MNUI.ago(new Date(v.propose.le).getTime()) : "") + ".</b>" +
+                  (e.length
+                    ? "<ul class=\"vdiff\">" + e.map(x =>
+                        "<li><i>" + esc(x.nom) + "</i> " + esc(String(x.avant)) +
+                        " <b>→</b> " + esc(String(x.apres)) + "</li>").join("") + "</ul>"
+                    : " Aucun changement réel.") +
+                  "</span></div>" +
+                  (canValid
+                    ? '<div class="row" style="margin-bottom:18px">' +
+                      '<button class="btn btn--solid" id="v-mok">' + svg("check") +
+                        "<span>Appliquer</span></button>" +
+                      '<button class="btn btn--danger" id="v-mno">' + svg("x") +
+                        "<span>Écarter</span></button></div>"
+                    : "");
+              })()
             : "") +
           '<div class="vshot">' + mnIcon(v.image || "i-wheels-car") + "</div>" +
 
@@ -426,6 +484,27 @@
     if (ok) ok.addEventListener("click", () => valider(v));
     const no = $("#v-no");
     if (no) no.addEventListener("click", () => refuser(v));
+    const mok = $("#v-mok");
+    if (mok) mok.addEventListener("click", () => appliquerCorrection(v));
+    const mno = $("#v-mno");
+    if (mno) mno.addEventListener("click", () => ecarterCorrection(v));
+  }
+
+  /** Approuve une correction : ses valeurs deviennent celles du véhicule. */
+  async function appliquerCorrection(v) {
+    const maj = Object.assign({}, v, v.propose.champs, { propose: null });
+    rendu(await MNParc.setVehicle(maj), "Correction appliquée");
+  }
+
+  async function ecarterCorrection(v) {
+    const ok = await MNUI.confirm({
+      title: "Écarter la correction",
+      message: "La correction proposée par " + (v.propose.par || "?") +
+        " sera supprimée. Le véhicule reste tel qu'il est.",
+      confirmLabel: "Écarter", danger: true
+    });
+    if (!ok) return;
+    rendu(await MNParc.setVehicle(Object.assign({}, v, { propose: null })), "Correction écartée");
   }
 
   /* ---- Validation ---------------------------------------------------------- */
@@ -451,10 +530,14 @@
 
   function editVehicle(v) {
     const isNew = !v;
-    const cur = v ? MNStore.clone(v) : {
-      name: "", category: P().cats[0].id, image: "",
-      carburant: "", places: 0, coffre: "", litres: 0, note: ""
-    };
+    /* Une correction déjà proposée sert de point de départ : on l'affine
+       plutôt que de repartir des valeurs validées. */
+    const cur = v
+      ? Object.assign(MNStore.clone(v), v.propose ? v.propose.champs : {})
+      : {
+          name: "", category: P().cats[0].id, image: "",
+          carburant: "", places: 0, coffre: "", litres: 0, note: ""
+        };
 
     const body = document.createElement("div");
     body.className = "editor";
@@ -543,6 +626,8 @@
               note: g("#e-vnote")
             };
 
+            let aEnvoyer, message;
+
             if (isNew) {
               data.id = MNStore.uniqueId(nom, P().vehicles.map(x => x.id));
               /* Qui peut gérer le parc y écrit directement ; les autres
@@ -550,20 +635,35 @@
               data.status = canEdit ? "valide" : "attente";
               data.proposePar = me.pseudo;
               data.proposeLe = new Date().toISOString();
+              data.propose = null;
               sel = data.id;
+              aEnvoyer = data;
+              message = canEdit ? "Véhicule ajouté"
+                : "Proposition envoyée — elle attend une validation";
+
             } else {
               const cible = P().vehicles.find(x => x.id === v.id);
-              /* Modifier sa propre proposition ne la fait pas passer : elle
-                 reste en attente, avec son auteur. */
-              Object.assign(data, {
-                id: cible.id, status: cible.status,
-                proposePar: cible.proposePar, proposeLe: cible.proposeLe
-              });
+
+              if (canEdit || (enAttente(cible) && cible.proposePar === me.pseudo)) {
+                /* Écriture directe. Une correction en attente serait sans objet
+                   après coup : on l'écarte, en le disant. */
+                aEnvoyer = Object.assign({}, cible, data, { propose: null });
+                message = cible.propose
+                  ? "Véhicule mis à jour — la correction de " + (cible.propose.par || "?") +
+                    " a été remplacée"
+                  : "Véhicule mis à jour";
+              } else {
+                /* Sans droit d'écriture : la correction attend à côté du
+                   véhicule, qui reste tel qu'il est affiché. */
+                aEnvoyer = Object.assign({}, cible, {
+                  propose: { par: me.pseudo, le: new Date().toISOString(), champs: data }
+                });
+                message = "Correction proposée — elle attend une validation";
+              }
             }
+
             close();
-            rendu(await MNParc.setVehicle(data), isNew
-              ? (canEdit ? "Véhicule ajouté" : "Proposition envoyée — elle attend une validation")
-              : "Véhicule mis à jour");
+            rendu(await MNParc.setVehicle(aEnvoyer), message);
           }
         }
       ]
