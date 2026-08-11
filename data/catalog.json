@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-10T20:33:39.109Z",
+  "updatedAt": "2026-08-11T02:55:14.248Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -65,7 +65,8 @@
         "staff",
         "users",
         "promote",
-        "duty_manage"
+        "duty_manage",
+        "vehicles_validate"
       ]
     },
     {
