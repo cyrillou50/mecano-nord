@@ -249,7 +249,7 @@
           '<div class="vboxes">' +
             boite("Carburant", v.carburant) +
             boite("Places", v.places || "") +
-            boite("Coffre (KG)", v.coffre) +
+            boite("Coffre", v.coffre + " KG") +
             boite("Réservoir", v.litres ? v.litres + " L" : "") +
           "</div>" +
         "</div>" +
