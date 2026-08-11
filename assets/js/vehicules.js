@@ -108,7 +108,18 @@
 
   /* ---- Rendu ------------------------------------------------------------- */
 
+  /* Position de défilement de la liste, conservée entre deux rendus. Elle est
+     relevée avant chaque destruction : `render()` remplace tout le contenu, il
+     est donc trop tard pour la lire depuis `renderList()`. */
+  let scrollListe = 0;
+
+  function memoriserScroll() {
+    const b = document.querySelector("#v-list .stafflist__body");
+    if (b) scrollListe = b.scrollTop;
+  }
+
   function render() {
+    memoriserScroll();
     $("#veh-root").innerHTML =
       '<div class="wrap admin admin--staff">' +
         '<aside class="stafflist" id="v-list"></aside>' +
@@ -158,6 +169,9 @@
   function renderList() {
     const host = $("#v-list");
     const items = liste();
+    /* Reconstruire la liste efface le défilement. On le remet où il était :
+       après un enregistrement, on veut rester devant la ligne qu'on éditait. */
+    memoriserScroll();
 
     /* Les propositions restent hors du parc jusqu'à validation, mais tout le
        monde les voit : celui qui propose doit pouvoir suivre où en est sa
@@ -254,11 +268,18 @@
         "</span>" +
       "</div>";
 
+    const corps = host.querySelector(".stafflist__body");
+    if (corps && scrollListe) corps.scrollTop = scrollListe;
+
     const s = $("#v-search");
     s.addEventListener("input", () => {
       filter = s.value;
       const pos = s.selectionStart;
+      /* Une recherche change ce qu'on voit : là, repartir du haut est juste. */
+      scrollListe = 0;
       renderList();
+      const nc = $("#v-list").querySelector(".stafflist__body");
+      if (nc) nc.scrollTop = 0;
       const ns = $("#v-search"); ns.focus(); ns.setSelectionRange(pos, pos);
     });
 
@@ -267,12 +288,16 @@
       try { localStorage.setItem(K_TRI, tri); } catch (_) { /* quota */ }
       renderList();
     });
-    $("#v-carb").addEventListener("change", e => { fCarb = e.target.value; renderList(); });
-    $("#v-cat").addEventListener("change", e => { fCat = e.target.value; renderList(); });
+    /* Changer de filtre change la liste : on repart du haut, comme pour une
+       recherche. */
+    const filtrer = fn => e => { fn(e.target.value); scrollListe = 0; renderList(); };
+    $("#v-carb").addEventListener("change", filtrer(v => { fCarb = v; }));
+    $("#v-cat").addEventListener("change", filtrer(v => { fCat = v; }));
 
     const clear = $("#v-clear");
     if (clear) clear.addEventListener("click", () => {
       filter = ""; fCarb = ""; fCat = "";
+      scrollListe = 0;
       renderList();
     });
 
@@ -292,8 +317,15 @@
       });
     });
 
+    /* Choisir un véhicule ne change que la ligne active : on bascule la
+       classe au lieu de reconstruire la liste, qui repartait sinon en haut à
+       chaque clic — pénible avec quarante véhicules. */
     host.querySelectorAll("[data-v]").forEach(b =>
-      b.addEventListener("click", () => { sel = b.dataset.v; renderList(); renderCard(); }));
+      b.addEventListener("click", () => {
+        sel = b.dataset.v;
+        host.querySelectorAll("[data-v]").forEach(x => x.classList.toggle("is-active", x === b));
+        renderCard();
+      }));
 
     const add = $("#v-add");
     if (add) add.addEventListener("click", () => editVehicle(null));
@@ -304,6 +336,19 @@
   const boite = (label, valeur) =>
     '<div class="vbox' + (valeur ? "" : " vbox--vide") + '"><span class="vbox__l">' +
       esc(label) + "</span><b>" + (valeur ? esc(valeur) : "—") + "</b></div>";
+
+  /**
+   * Contenance du coffre, avec son unité.
+   * Rien saisi → chaîne vide, pour que la case affiche son tiret au lieu d'un
+   * « KG » orphelin. Et une valeur qui porte déjà son unité — il en existe,
+   * saisies avant que l'unité soit ajoutée à l'affichage — n'en reçoit pas
+   * une seconde.
+   */
+  function poids(v) {
+    const s = String(v || "").trim();
+    if (!s) return "";
+    return /kgs?\s*$/i.test(s) ? s : s + " KG";
+  }
 
   function renderCard() {
     const pane = $("#v-card");
@@ -362,7 +407,7 @@
           '<div class="vboxes">' +
             boite("Carburant", v.carburant) +
             boite("Places", v.places || "") +
-            boite("Coffre", v.coffre + " KG") +
+            boite("Coffre", poids(v.coffre)) +
             boite("Réservoir", v.litres ? v.litres + " L" : "") +
           "</div>" +
 
@@ -445,9 +490,11 @@
         '<div class="field"><label class="label" for="e-vp">Places</label>' +
           '<input class="input input--num" id="e-vp" type="number" min="0" max="99" value="' +
             Number(cur.places || 0) + '"></div>' +
-        '<div class="field"><label class="label" for="e-vk">Coffre</label>' +
+        /* L'unité est ajoutée à l'affichage : le repère ne la montre plus,
+           sinon on la saisirait une deuxième fois. */
+        '<div class="field"><label class="label" for="e-vk">Coffre (kg)</label>' +
           '<input class="input" id="e-vk" maxlength="24" value="' + esc(cur.coffre) +
-            '" placeholder="5 kg"></div>' +
+            '" placeholder="100"></div>' +
       "</div>" +
 
       '<div class="editor__grid">' +
