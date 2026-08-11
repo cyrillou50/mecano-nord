@@ -815,3 +815,20 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
 .vgroup .fold__chev { width: 13px; height: 13px; flex: none; opacity: .6; transition: transform .15s; }
 .vgroup.is-folded .fold__chev { transform: rotate(-90deg); }
 .vgroup.is-folded .fold__body { display: none; }
+
+/* Étoile « fiche incomplète ». Ambre comme tout ce qui est en suspens sur le
+   site : le bandeau des modifications non publiées, les propositions en
+   attente. Discrète — c'est un rappel, pas une alerte. */
+.vstar { flex: none; display: grid; place-items: center; color: var(--amber); }
+.vstar svg { width: 13px; height: 13px; fill: currentColor; stroke-width: 0; }
+.vcard__head .vstar svg { width: 15px; height: 15px; }
+
+.vmanque {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 14px;
+  color: var(--amber);
+}
+.vmanque svg { width: 13px; height: 13px; flex: none; fill: currentColor; stroke-width: 0; }
+
+/* Une caractéristique non renseignée se voit, sans crier. */
+.vbox--vide b { color: var(--dim); }

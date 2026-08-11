@@ -52,6 +52,26 @@
 
   const enAttente = v => v.status === "attente";
 
+  /* Ce qu'on attend d'une fiche renseignée. La note reste facultative, elle
+     est marquée comme telle dans le formulaire. Un zéro vaut « pas saisi » :
+     aucun véhicule n'a zéro place ni un réservoir de zéro litre. */
+  const CHAMPS = [
+    { nom: "photo", vide: v => !v.image },
+    { nom: "carburant", vide: v => !v.carburant },
+    { nom: "places", vide: v => !v.places },
+    { nom: "coffre", vide: v => !String(v.coffre || "").trim() },
+    { nom: "réservoir", vide: v => !v.litres }
+  ];
+
+  /** La liste de ce qui manque, vide si la fiche est complète. */
+  const manques = v => CHAMPS.filter(c => c.vide(v)).map(c => c.nom);
+
+  /** « photo, carburant et réservoir » — lisible dans une phrase. */
+  function enumerer(l) {
+    if (l.length < 2) return l[0] || "";
+    return l.slice(0, -1).join(", ") + " et " + l[l.length - 1];
+  }
+
   /** Un filtre est-il en cours ? Sert à tout déplier et à proposer un retour. */
   const filtre = () => !!(filter.trim() || fCarb || fCat);
 
@@ -151,8 +171,9 @@
       .map(c => ({ c, vs: valides.filter(v => v.category === c.id) }))
       .filter(g => g.vs.length);
 
-    const ligne = v =>
-      '<button class="staffrow' + (v.id === sel ? " is-active" : "") +
+    const ligne = v => {
+      const m = manques(v);
+      return '<button class="staffrow' + (v.id === sel ? " is-active" : "") +
         (enAttente(v) ? " is-attente" : "") +
         '" data-v="' + esc(v.id) + '" type="button">' +
         '<span class="vthumb">' + mnIcon(v.image || "i-wheels-car") + "</span>" +
@@ -160,7 +181,12 @@
           "<i>" + esc(enAttente(v)
             ? "proposé par " + (v.proposePar || "?")
             : catOf(v).name) + "</i></span>" +
+        (m.length
+          ? '<span class="vstar" title="Fiche incomplète : il manque ' + esc(enumerer(m)) +
+            '" aria-label="Fiche incomplète">' + svg("star") + "</span>"
+          : "") +
       "</button>";
+    };
 
     /* Un filtre en cours déplie tout : masquer un résultat trouvé n'aurait
        aucun sens. L'état enregistré n'est pas touché pour autant. */
@@ -276,8 +302,8 @@
   }
 
   const boite = (label, valeur) =>
-    '<div class="vbox"><span class="vbox__l">' + esc(label) + "</span>" +
-      "<b>" + (valeur ? esc(valeur) : "—") + "</b></div>";
+    '<div class="vbox' + (valeur ? "" : " vbox--vide") + '"><span class="vbox__l">' +
+      esc(label) + "</span><b>" + (valeur ? esc(valeur) : "—") + "</b></div>";
 
   function renderCard() {
     const pane = $("#v-card");
@@ -290,6 +316,7 @@
     }
     const c = catOf(v);
     const attente = enAttente(v);
+    const manque = manques(v);
     /* Celui qui a proposé peut corriger sa demande tant qu'elle attend. */
     const monBrouillon = attente && v.proposePar === me.pseudo;
 
@@ -299,6 +326,10 @@
           "<h2>" + esc(v.name) + "</h2>" +
           '<span class="permtag' + (attente ? " permtag--none" : "") + '">' +
             esc(attente ? "proposition" : c.name) + "</span>" +
+          (manque.length
+            ? '<span class="vstar" title="Il manque ' + esc(enumerer(manque)) + '">' +
+              svg("star") + "</span>"
+            : "") +
           '<span class="spacer"></span>' +
           (canEdit || monBrouillon
             ? '<button class="btn btn--ghost btn--sm" id="v-edit">' + svg("edit") +
@@ -334,6 +365,11 @@
             boite("Coffre", v.coffre + " KG") +
             boite("Réservoir", v.litres ? v.litres + " L" : "") +
           "</div>" +
+
+          (manque.length
+            ? '<p class="hint vmanque">' + svg("star") + "<span>Fiche incomplète : il manque " +
+              esc(enumerer(manque)) + ".</span></p>"
+            : "") +
         "</div>" +
       "</div>";
 
