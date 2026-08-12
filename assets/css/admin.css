@@ -745,11 +745,14 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
    de l'image ne se résolvait pas et une photo large débordait sous le cadre,
    par-dessus les caractéristiques. `overflow: hidden` verrouille le tout, quoi
    qu'on lui donne à afficher. */
+/* Le cadre est bien plus large que haut, et les rendus de véhicules sont
+   presque carrés : c'est donc la hauteur qui décide de la taille affichée.
+   Un cadre bas rapetissait la voiture quoi qu'on fasse. */
 .vshot {
   display: flex; align-items: center; justify-content: center;
-  height: clamp(170px, 26vh, 260px);
+  height: clamp(200px, 34vh, 340px);
   margin-bottom: 22px;
-  padding: 14px;
+  padding: 10px;
   overflow: hidden;
   background: var(--sunk);
   border: 1px solid var(--line);
@@ -788,7 +791,7 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
 .vbox b { font-size: 15px; font-weight: 600; }
 
 @media (max-width: 900px) {
-  .vshot { height: 160px; }
+  .vshot { height: 200px; }
 }
 
 /* Propositions en attente : ambrées, comme le bandeau des modifications non

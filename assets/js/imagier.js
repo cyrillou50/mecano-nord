@@ -119,6 +119,16 @@ window.MNImagier = (function () {
     return cv.toDataURL("image/png");
   }
 
+  /** Dimensions d'une image en `data:`, pour prévenir quand elle est petite. */
+  function taille(dataUri) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+      img.onerror = () => resolve({ w: 0, h: 0 });
+      img.src = dataUri;
+    });
+  }
+
   /** Fichier choisi → image réduite, en `data:`. */
   function depuisFichier(file, max) {
     return new Promise((resolve, reject) => {
@@ -248,7 +258,15 @@ window.MNImagier = (function () {
           sel = await deposer(data, file.name);
           champ.value = sel;
           await peindre(true);
-          MNUI.toast("Photo déposée", "ok");
+          /* On n'invente pas de pixels à l'agrandissement : une source trop
+             petite restera floue une fois affichée en grand, autant le dire
+             tout de suite plutôt que de laisser chercher. */
+          const t = await taille(data);
+          const petit = Math.max(t.w, t.h);
+          MNUI.toast(petit && petit < 360
+            ? "Photo déposée — mais elle ne fait que " + t.w + "×" + t.h +
+              " px : elle sera floue en grand, cherche une image plus grande"
+            : "Photo déposée", petit && petit < 360 ? "info" : "ok");
         }
       } catch (err) {
         MNUI.toast("Dépôt impossible : " + err.message, "err");
@@ -270,5 +288,5 @@ window.MNImagier = (function () {
     });
   }
 
-  return { lister, vider, src, deposer, depuisFichier, choisir };
+  return { lister, vider, src, taille, deposer, depuisFichier, choisir };
 })();
