@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-11T15:15:13.647Z",
+  "updatedAt": "2026-08-11T15:28:01.656Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -206,7 +206,7 @@
       "id": "lexa-storm",
       "pseudo": "Lexa Storm",
       "roleId": "garagiste",
-      "pin": null,
+      "pin": "6b0b16688c27d1a9c1b2f032aea16b5340257178b93f9ab90aa5ed01b5d9f07e",
       "active": true,
       "hidden": false,
       "createdAt": "2026-08-09T11:20:20.159Z",
