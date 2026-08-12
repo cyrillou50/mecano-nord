@@ -59,6 +59,7 @@ const WEBHOOKS = {
 };
 
 const MAX_CORPS = 512 * 1024;      // 512 ko suffisent largement
+const MAX_IMAGE = 8 * 1024 * 1024; // sauf pour une photo, forcément plus lourde
 const SAUVEGARDES = 20;            // versions conservées du tableau
 
 /* ---- Limitation de débit --------------------------------------------------- */
@@ -695,16 +696,37 @@ function repondre(res, code, data, req) {
   res.end(corps);
 }
 
-function corpsJson(req) {
+/**
+ * Lit un corps JSON, borné.
+ *
+ * Le dépassement se répond, il ne se coupe pas : fermer la connexion en plein
+ * envoi laissait le navigateur sur un « Failed to fetch » qui n'explique rien.
+ * On cesse d'accumuler, on laisse le client finir, puis on renvoie un 413
+ * lisible. Au-delà de quatre fois la limite on coupe quand même — inutile de
+ * lire un flux qui n'en finit pas.
+ */
+function corpsJson(req, max) {
+  const plafond = max || MAX_CORPS;
   return new Promise((resolve, reject) => {
-    let taille = 0;
+    let taille = 0, trop = false;
     const morceaux = [];
+    const refus = () => {
+      const e = new Error("Corps trop volumineux : " + Math.round(plafond / 1024) + " ko au maximum");
+      e.tropGros = true;
+      return e;
+    };
     req.on("data", c => {
       taille += c.length;
-      if (taille > MAX_CORPS) { reject(new Error("Corps trop volumineux")); req.destroy(); return; }
+      if (taille > plafond) {
+        trop = true;
+        morceaux.length = 0;                 // rien à garder, autant libérer
+        if (taille > plafond * 4) { reject(refus()); req.destroy(); }
+        return;
+      }
       morceaux.push(c);
     });
     req.on("end", () => {
+      if (trop) return reject(refus());
       try { resolve(JSON.parse(Buffer.concat(morceaux).toString("utf8") || "{}")); }
       catch (_) { reject(new Error("JSON illisible")); }
     });
@@ -793,7 +815,12 @@ const serveur = http.createServer(async (req, res) => {
     }
 
     if (chemin === "/images" && req.method === "POST") {
-      const c = await corpsJson(req);
+      /* Une photo est cent fois plus grosse qu'un pointage : 512 ko suffisent
+         pour tout le reste, pas pour une image. Le site la réduit déjà avant
+         l'envoi, ceci n'est que le garde-fou.
+         Si un 413 persiste, c'est nginx qu'il faut regarder :
+         « client_max_body_size 8m; » dans le bloc du site. */
+      const c = await corpsJson(req, MAX_IMAGE);
 
       if (c.op === "delete") {
         const nom = nomImage(c.name);
@@ -950,6 +977,7 @@ const serveur = http.createServer(async (req, res) => {
 
     return repondre(res, 404, { error: "Chemin inconnu : " + chemin }, req);
   } catch (e) {
+    if (e.tropGros) return repondre(res, 413, { error: e.message }, req);
     console.error(new Date().toISOString(), "erreur :", e.message);
     return repondre(res, 500, { error: e.message }, req);
   }

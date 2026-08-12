@@ -25,10 +25,23 @@ window.MNImagier = (function () {
   async function api(corps) {
     const base = MNStore.api("images");
     if (!base) throw new Error("Aucun serveur configuré.");
-    const r = await fetch(base + (corps ? "" : "?t=" + Date.now()), corps
-      ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) }
-      : { cache: "no-store" });
+
+    let r;
+    try {
+      r = await fetch(base + (corps ? "" : "?t=" + Date.now()), corps
+        ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) }
+        : { cache: "no-store" });
+    } catch (_) {
+      /* « Failed to fetch » n'apprend rien à personne. C'est presque toujours
+         l'un de ces trois cas. */
+      throw new Error("le serveur n'a pas répondu — il est peut-être arrêté, " +
+        "ou l'image est trop lourde pour lui");
+    }
+
     const j = await r.json().catch(() => ({}));
+    if (r.status === 413) {
+      throw new Error(j.error || "image trop lourde pour le serveur");
+    }
     if (!r.ok) throw new Error(j.error || "Le serveur a répondu " + r.status);
     return j;
   }
@@ -124,8 +137,6 @@ window.MNImagier = (function () {
     };
   }
 
-  const redimensionner = (img, max) => traiter(img, max).data;
-
   /* ---- Recadrage des images déjà en place ------------------------------------
      Une photo peut arriver de trois côtés : déposée ici, collée en adresse, ou
      déjà enregistrée avant que le dépôt ne sache recadrer. Dans tous les cas
@@ -202,6 +213,23 @@ window.MNImagier = (function () {
     });
   }
 
+  /* Le serveur refuse un envoi de plus de 512 ko et coupe la connexion, ce que
+     le navigateur ne sait annoncer que par un « Failed to fetch ». Une photo
+     réencodée en PNG dépasse vite ce seuil : un rendu de véhicule en 900 px
+     pèse jusqu'à 680 ko. On réduit donc jusqu'à tenir dans l'enveloppe, plutôt
+     que d'envoyer quelque chose qui sera rejeté. */
+  const BUDGET = 460 * 1024;
+  const PLANCHER = 240;             // en dessous, autant garder de la netteté
+
+  function sousBudget(img, max) {
+    let m = max;
+    for (;;) {
+      const data = traiter(img, m).data;
+      if (data.length <= BUDGET || m <= PLANCHER) return data;
+      m = Math.max(PLANCHER, Math.round(m * 0.75));
+    }
+  }
+
   /** Fichier choisi → image réduite, en `data:`. */
   function depuisFichier(file, max) {
     return new Promise((resolve, reject) => {
@@ -210,7 +238,7 @@ window.MNImagier = (function () {
       const img = new Image();
       img.onload = () => {
         URL.revokeObjectURL(url);
-        try { resolve(redimensionner(img, max || 640)); }
+        try { resolve(sousBudget(img, max || 640)); }
         catch (e) { reject(new Error("Image impossible à convertir.")); }
       };
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image illisible.")); };
