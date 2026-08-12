@@ -76,11 +76,46 @@ window.MNImagier = (function () {
     const h = img.naturalHeight || img.height;
     if (!w || !h) throw new Error("dimensions inconnues");
 
-    const k = Math.min(max / w, max / h, 1);
+    /* Copie de travail plafonnée, pour analyser les pixels sans manipuler une
+       image de plusieurs millions de points. */
+    const cap = 1400;
+    const k0 = Math.min(cap / w, cap / h, 1);
+    const tw = Math.max(1, Math.round(w * k0));
+    const th = Math.max(1, Math.round(h * k0));
+    const src = document.createElement("canvas");
+    src.width = tw; src.height = th;
+    const sctx = src.getContext("2d");
+    sctx.drawImage(img, 0, 0, tw, th);
+
+    /* Marges transparentes : les rendus de véhicules en ont beaucoup, et sans
+       les retirer la voiture s'affiche minuscule au milieu d'un grand vide —
+       `object-fit: contain` met à l'échelle le canevas, pas le motif. */
+    let x0 = 0, y0 = 0, x1 = tw - 1, y1 = th - 1;
+    try {
+      const d = sctx.getImageData(0, 0, tw, th).data;
+      let minX = tw, minY = th, maxX = -1, maxY = -1;
+      for (let y = 0; y < th; y++) {
+        for (let x = 0; x < tw; x++) {
+          if (d[(y * tw + x) * 4 + 3] > 8) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX >= minX && maxY >= minY) { x0 = minX; y0 = minY; x1 = maxX; y1 = maxY; }
+    } catch (_) {
+      /* Canvas protégé : on garde l'image entière plutôt que d'échouer. */
+    }
+
+    const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
+    const k = Math.min(max / cw, max / ch, 1);
+
     const cv = document.createElement("canvas");
-    cv.width = Math.max(1, Math.round(w * k));
-    cv.height = Math.max(1, Math.round(h * k));
-    cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+    cv.width = Math.max(1, Math.round(cw * k));
+    cv.height = Math.max(1, Math.round(ch * k));
+    cv.getContext("2d").drawImage(src, x0, y0, cw, ch, 0, 0, cv.width, cv.height);
     return cv.toDataURL("image/png");
   }
 
