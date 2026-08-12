@@ -17,6 +17,8 @@
      GET  /images      → la liste des images hébergées ici
      GET  /images/x.png→ l'image elle-même
      POST /images      → en déposer une, la renommer ou la supprimer
+     GET  /images/distant?u= → relaie une image d'un autre domaine, pour que
+                         le site puisse la recadrer
      GET  /sante       → « ok », pratique pour vérifier que tout tourne
 
    Le guide d'installation complet est dans serveur/README.md
@@ -457,6 +459,67 @@ async function listerImages() {
   }
 }
 
+/* ---- Relais d'images distantes ------------------------------------------------
+   Le site recadre les photos de véhicules sur la voiture, sinon elle s'affiche
+   minuscule au milieu d'un grand vide transparent. Pour mesurer ces marges il
+   faut lire les pixels, et un navigateur le refuse sur une image venue d'un
+   autre domaine sans en-tête CORS — ce qui est le cas des rendus du serveur de
+   jeu. On les fait donc transiter par ici, ce qui leur donne nos en-têtes.
+
+   C'est un relais, donc une porte : on la tient étroite. HTTPS uniquement, pas
+   d'adresse interne (sinon on servirait de sonde vers le réseau du VPS), rien
+   qui ne soit une image, et un plafond de taille. */
+
+const RELAIS_MAX = 8 * 1024 * 1024;
+const RELAIS_PRIVE = /^(localhost$|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|0\.)/i;
+
+async function relayerImage(res, brut, req) {
+  let u;
+  try { u = new URL(String(brut || "")); } catch (_) { u = null; }
+  if (!u || u.protocol !== "https:") {
+    return repondre(res, 400, { error: "Adresse d'image invalide (https attendu)" }, req);
+  }
+  if (RELAIS_PRIVE.test(u.hostname)) {
+    return repondre(res, 403, { error: "Adresse interne refusée" }, req);
+  }
+
+  const stop = AbortSignal.timeout(12000);
+  let amont;
+  try {
+    amont = await fetch(u.href, { signal: stop, redirect: "follow" });
+  } catch (_) {
+    return repondre(res, 502, { error: "Image distante injoignable" }, req);
+  }
+  if (!amont.ok) {
+    return repondre(res, 502, { error: "L'hôte a répondu " + amont.status }, req);
+  }
+
+  const type = String(amont.headers.get("content-type") || "").split(";")[0].trim();
+  if (!/^image\//.test(type)) {
+    return repondre(res, 415, { error: "Ce n'est pas une image : " + (type || "type inconnu") }, req);
+  }
+  const annonce = Number(amont.headers.get("content-length") || 0);
+  if (annonce > RELAIS_MAX) {
+    return repondre(res, 413, { error: "Image trop lourde" }, req);
+  }
+
+  let octets;
+  try { octets = Buffer.from(await amont.arrayBuffer()); }
+  catch (_) { return repondre(res, 502, { error: "Lecture de l'image interrompue" }, req); }
+  if (octets.length > RELAIS_MAX) {
+    return repondre(res, 413, { error: "Image trop lourde" }, req);
+  }
+
+  /* Une heure de cache : ces rendus ne bougent jamais, et le site les
+     redemande à chaque fiche ouverte. */
+  res.writeHead(200, Object.assign(entetes(req), {
+    "Content-Type": type,
+    "Content-Length": octets.length,
+    "Cache-Control": "public, max-age=3600"
+  }));
+  res.end(octets);
+}
+
 /** Envoie le fichier au navigateur. Renvoie false s'il n'existe pas. */
 async function servirImage(res, nom, req) {
   const f = path.join(DOSSIER_IMG, nom);
@@ -675,9 +738,10 @@ const serveur = http.createServer(async (req, res) => {
     if (chemin === "/sante" && req.method === "GET") {
       /* « ops: true » indique au site qu'il peut envoyer des opérations
          plutôt que tout le tableau : c'est ce qui évite les écrasements.
-         « images: true » qu'il peut héberger les images ici. */
+         « images: true » qu'il peut héberger les images ici, « relais »
+         qu'il sait aller chercher une image sur un autre domaine. */
       return repondre(res, 200, {
-        ok: true, ops: true, images: true, vehicules: true,
+        ok: true, ops: true, images: true, vehicules: true, relais: true,
         depuis: Math.round(process.uptime()) + " s"
       }, req);
     }
@@ -715,6 +779,10 @@ const serveur = http.createServer(async (req, res) => {
     /* --- images --- */
     if (chemin === "/images" && req.method === "GET") {
       return repondre(res, 200, { ok: true, images: await listerImages() }, req);
+    }
+
+    if (chemin === "/images/distant" && req.method === "GET") {
+      return relayerImage(res, url.searchParams.get("u"), req);
     }
 
     if (lectureImage) {

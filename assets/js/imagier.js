@@ -71,7 +71,7 @@ window.MNImagier = (function () {
      immédiat. On garde les proportions — contrairement aux icônes, une voiture
      ne se met pas dans un carré. */
 
-  function redimensionner(img, max) {
+  function traiter(img, max) {
     const w = img.naturalWidth || img.width;
     const h = img.naturalHeight || img.height;
     if (!w || !h) throw new Error("dimensions inconnues");
@@ -116,7 +116,80 @@ window.MNImagier = (function () {
     cv.width = Math.max(1, Math.round(cw * k));
     cv.height = Math.max(1, Math.round(ch * k));
     cv.getContext("2d").drawImage(src, x0, y0, cw, ch, 0, 0, cv.width, cv.height);
-    return cv.toDataURL("image/png");
+    /* « rogne » dit s'il y avait vraiment du vide à retirer : quelques pixels
+       ne justifient pas de remplacer une image déjà affichée. */
+    return {
+      data: cv.toDataURL("image/png"),
+      rogne: cw < tw * 0.96 || ch < th * 0.96
+    };
+  }
+
+  const redimensionner = (img, max) => traiter(img, max).data;
+
+  /* ---- Recadrage des images déjà en place ------------------------------------
+     Une photo peut arriver de trois côtés : déposée ici, collée en adresse, ou
+     déjà enregistrée avant que le dépôt ne sache recadrer. Dans tous les cas
+     elle doit bien s'afficher, donc on la recadre au moment de la montrer.
+
+     Il faut pour cela lire ses pixels, ce que le navigateur interdit sur une
+     image venue d'un autre domaine sans en-tête CORS. On la fait alors passer
+     par le relais du serveur. Sans serveur, ou avec un serveur trop ancien,
+     l'image reste affichée telle quelle : moins belle, jamais cassée. */
+
+  const cadres = new Map();
+  const CADRE_MAX = 12;             // au-delà, on oublie les plus anciennes
+
+  /** Adresse à laquelle on peut lire les pixels, ou "" si c'est impossible. */
+  function urlLisible(ref) {
+    const brut = src(ref);
+    if (!brut) return "";
+    if (/^data:/i.test(brut)) return brut;
+
+    let abs;
+    try { abs = new URL(brut, location.href); } catch (_) { return ""; }
+
+    const base = MNStore.api("images");
+    let servi = "";
+    try { servi = base ? new URL(base, location.href).origin : ""; } catch (_) { /* mal réglé */ }
+
+    if (abs.origin === location.origin || (servi && abs.origin === servi)) return abs.href;
+    return base ? base + "/distant?u=" + encodeURIComponent(abs.href) : "";
+  }
+
+  function charger(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      /* Sans ceci le canevas serait « teinté » et illisible. En contrepartie,
+         une image sans en-tête CORS échoue au chargement — d'où le `catch`
+         chez l'appelant, qui garde alors l'original. */
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("illisible"));
+      img.src = url;
+    });
+  }
+
+  /**
+   * Version recadrée sur le motif visible, ou null s'il n'y a rien à gagner
+   * (image déjà serrée, illisible, pas de relais disponible).
+   */
+  function cadrer(ref, max) {
+    const cle = String(ref || "") + "@" + (max || 900);
+    if (cadres.has(cle)) return cadres.get(cle);
+
+    const p = (async () => {
+      const url = urlLisible(ref);
+      if (!url) return null;
+      const img = await charger(url);
+      const r = traiter(img, max || 900);
+      return r.rogne ? r.data : null;
+    })().catch(() => null);
+
+    cadres.set(cle, p);
+    /* Une image de 900 px en `data:` pèse quelques centaines de kilooctets :
+       on n'en garde qu'une poignée. */
+    if (cadres.size > CADRE_MAX) cadres.delete(cadres.keys().next().value);
+    return p;
   }
 
   /** Dimensions d'une image en `data:`, pour prévenir quand elle est petite. */
@@ -288,5 +361,5 @@ window.MNImagier = (function () {
     });
   }
 
-  return { lister, vider, src, taille, deposer, depuisFichier, choisir };
+  return { lister, vider, src, taille, cadrer, deposer, depuisFichier, choisir };
 })();

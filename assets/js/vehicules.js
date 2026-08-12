@@ -498,6 +498,28 @@
     if (mok) mok.addEventListener("click", () => appliquerCorrection(v));
     const mno = $("#v-mno");
     if (mno) mno.addEventListener("click", () => ecarterCorrection(v));
+
+    embellirPhoto(v);
+  }
+
+  /**
+   * Les rendus de véhicules arrivent avec de larges marges transparentes : la
+   * voiture n'occupe souvent qu'un tiers de l'image, et s'affiche donc perdue
+   * au milieu du cadre. On la recadre après coup, sur la photo déjà visible —
+   * si ça échoue, il ne se passe simplement rien.
+   */
+  async function embellirPhoto(v) {
+    if (!v.image) return;
+    const avant = $(".vshot img");
+    if (!avant) return;
+
+    const data = await MNImagier.cadrer(v.image);
+    if (!data) return;
+
+    /* Le temps de lire les pixels, l'utilisateur a pu changer de fiche. */
+    if (sel !== v.id) return;
+    const apres = $(".vshot img");
+    if (apres) apres.src = data;
   }
 
   /** Approuve une correction : ses valeurs deviennent celles du véhicule. */
