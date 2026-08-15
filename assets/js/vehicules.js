@@ -54,14 +54,18 @@
   const enAttente = v => v.status === "attente";
 
   /* Ce qu'on attend d'une fiche renseignée. La note reste facultative, elle
-     est marquée comme telle dans le formulaire. Un zéro vaut « pas saisi » :
-     aucun véhicule n'a zéro place ni un réservoir de zéro litre. */
+     est marquée comme telle dans le formulaire.
+
+     « N/A » compte comme renseigné : c'est une réponse, pas un oubli. Un
+     bateau n'a pas de coffre et un vélo pas de réservoir — sans ça leur fiche
+     porterait l'étoile à vie, et l'étoile ne voudrait plus rien dire. */
+  const rempli = x => !!String(x == null ? "" : x).trim();
   const CHAMPS = [
     { nom: "photo", vide: v => !v.image },
-    { nom: "carburant", vide: v => !v.carburant },
-    { nom: "places", vide: v => !v.places },
-    { nom: "coffre", vide: v => !String(v.coffre || "").trim() },
-    { nom: "réservoir", vide: v => !v.litres }
+    { nom: "carburant", vide: v => !rempli(v.carburant) },
+    { nom: "places", vide: v => !rempli(v.places) },
+    { nom: "coffre", vide: v => !rempli(v.coffre) },
+    { nom: "réservoir", vide: v => !rempli(v.litres) }
   ];
 
   /** La liste de ce qui manque, vide si la fiche est complète. */
@@ -85,7 +89,7 @@
     { k: "carburant", nom: "carburant" },
     { k: "places", nom: "places" },
     { k: "coffre", nom: "coffre" },
-    { k: "litres", nom: "réservoir", lisible: v => (v ? v + " L" : "") },
+    { k: "litres", nom: "réservoir", lisible: v => volume(v) },
     { k: "note", nom: "note" }
   ];
 
@@ -267,8 +271,9 @@
           "</select>" +
           '<select class="select" id="v-carb" title="Carburant">' +
             '<option value="">Tout carburant</option>' +
-            ["Essence", "Diesel"].map(c =>
-              '<option value="' + c + '"' + (fCarb === c ? " selected" : "") + ">" + c + "</option>").join("") +
+            ["Essence", "Diesel", MNStore.NA].map(c =>
+              '<option value="' + esc(c) + '"' + (fCarb === c ? " selected" : "") + ">" +
+              (c === MNStore.NA ? "N/A" : c) + "</option>").join("") +
           "</select>" +
           '<select class="select" id="v-cat" title="Catégorie">' +
             '<option value="">Toutes catégories</option>' +
@@ -381,17 +386,22 @@
       esc(label) + "</span><b>" + (valeur ? esc(valeur) : "—") + "</b></div>";
 
   /**
-   * Contenance du coffre, avec son unité.
+   * Une valeur avec son unité.
+   *
    * Rien saisi → chaîne vide, pour que la case affiche son tiret au lieu d'un
-   * « KG » orphelin. Et une valeur qui porte déjà son unité — il en existe,
-   * saisies avant que l'unité soit ajoutée à l'affichage — n'en reçoit pas
-   * une seconde.
+   * « KG » orphelin. « N/A » ressort tel quel : « N/A KG » n'aurait aucun
+   * sens. Et une valeur qui porte déjà son unité — il en existe, saisies
+   * avant que l'unité soit ajoutée à l'affichage — n'en reçoit pas une
+   * seconde.
    */
-  function poids(v) {
+  function avecUnite(v, unite, dejaLa) {
     const s = String(v || "").trim();
-    if (!s) return "";
-    return /kgs?\s*$/i.test(s) ? s : s + " KG";
+    if (!s || MNStore.estNA(s)) return s;
+    return dejaLa.test(s) ? s : s + " " + unite;
   }
+
+  const poids = v => avecUnite(v, "KG", /kgs?\s*$/i);
+  const volume = v => avecUnite(v, "L", /(l|litres?)\s*$/i);
 
   function renderCard() {
     const pane = $("#v-card");
@@ -474,9 +484,9 @@
 
           '<div class="vboxes">' +
             boite("Carburant", v.carburant) +
-            boite("Places", v.places || "") +
+            boite("Places", v.places) +
             boite("Coffre", poids(v.coffre)) +
-            boite("Réservoir", v.litres ? v.litres + " L" : "") +
+            boite("Réservoir", volume(v.litres)) +
           "</div>" +
 
           (manque.length
@@ -595,30 +605,37 @@
               "Choisir dans la bibliothèque</button>" +
           "</div></div></div>" +
 
+      /* Champs texte plutôt que `number` : « N/A » doit pouvoir s'y écrire,
+         et un sélecteur numérique le refuserait. Le clavier reste numérique
+         sur téléphone grâce à `inputmode`. */
       '<div class="editor__grid editor__grid--3">' +
         '<div class="field"><label class="label" for="e-vf">Carburant</label>' +
           '<select class="select" id="e-vf">' +
-            ['', 'Essence', 'Diesel'].map(c =>
+            ["", "Essence", "Diesel", MNStore.NA].map(c =>
               '<option value="' + esc(c) + '"' + (c === cur.carburant ? " selected" : "") + ">" +
-              (c || "— non précisé") + "</option>").join("") +
+              (c === MNStore.NA ? "N/A — sans objet" : c || "— non précisé") + "</option>").join("") +
           "</select></div>" +
         '<div class="field"><label class="label" for="e-vp">Places</label>' +
-          '<input class="input input--num" id="e-vp" type="number" min="0" max="99" value="' +
-            Number(cur.places || 0) + '"></div>' +
+          '<input class="input input--num" id="e-vp" inputmode="numeric" maxlength="5" value="' +
+            esc(cur.places) + '" placeholder="4 ou N/A"></div>' +
         /* L'unité est ajoutée à l'affichage : le repère ne la montre plus,
            sinon on la saisirait une deuxième fois. */
         '<div class="field"><label class="label" for="e-vk">Coffre (kg)</label>' +
           '<input class="input" id="e-vk" maxlength="24" value="' + esc(cur.coffre) +
-            '" placeholder="100"></div>' +
+            '" placeholder="100 ou N/A"></div>' +
       "</div>" +
 
       '<div class="editor__grid">' +
         '<div class="field"><label class="label" for="e-vt">Réservoir (litres)</label>' +
-          '<input class="input input--num" id="e-vt" type="number" min="0" max="9999" value="' +
-            Number(cur.litres || 0) + '"></div>' +
+          '<input class="input input--num" id="e-vt" inputmode="numeric" maxlength="6" value="' +
+            esc(cur.litres) + '" placeholder="60 ou N/A"></div>' +
         '<div class="field"><label class="label" for="e-vnote">Note (facultatif)</label>' +
           '<input class="input" id="e-vnote" maxlength="120" value="' + esc(cur.note) + '"></div>' +
-      "</div>";
+      "</div>" +
+
+      '<p class="hint" style="margin-top:12px">Écris <b>N/A</b> dans une case ' +
+        "qui ne s'applique pas — un bateau sans coffre, un vélo sans réservoir. " +
+        "La fiche compte alors comme complète et perd son étoile.</p>";
 
     const prev = body.querySelector("#e-vi-prev");
     const img = body.querySelector("#e-vi");
@@ -646,17 +663,21 @@
             const nom = body.querySelector("#e-vn").value.trim();
             if (!nom) return MNUI.toast("Le nom est obligatoire", "err");
 
+            /* Les caractéristiques passent par le magasin plutôt que d'être
+               bornées ici : « n/a », « N.A. » et « 4 » y prennent leur forme
+               définitive, et l'écran montre tout de suite ce que le serveur
+               enregistrera. */
             const g = s => body.querySelector(s).value.trim();
-            const data = {
+            const data = MNStore.statsVehicule({
               name: nom,
               category: body.querySelector("#e-vc").value,
               image: g("#e-vi"),
               carburant: g("#e-vf"),
-              places: Math.max(0, Math.min(99, Math.round(Number(g("#e-vp")) || 0))),
+              places: g("#e-vp"),
               coffre: g("#e-vk"),
-              litres: Math.max(0, Math.min(9999, Math.round(Number(g("#e-vt")) || 0))),
+              litres: g("#e-vt"),
               note: g("#e-vnote")
-            };
+            });
 
             let aEnvoyer, message;
 

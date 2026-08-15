@@ -335,6 +335,33 @@ async function ecrire(board) {
 
 const PARC_VIDE = { updatedAt: new Date(0).toISOString(), cats: [], vehicles: [] };
 
+/* « Sans objet » : un bateau n'a pas de coffre, un vélo pas de réservoir. Il
+   faut le distinguer d'une case pas encore remplie, sinon leur fiche reste
+   marquée à compléter pour toujours. D'où du texte plutôt qu'un nombre :
+   « » = à remplir, « N/A » = sans objet, sinon la valeur.
+   Les mêmes règles que le site, pour qu'un aller-retour ne change rien. */
+const NA = "N/A";
+const SANS_OBJET = /^(n\s*[./]?\s*a\.?|s\s*[./]?\s*o\.?|néant|neant|aucun|—|-{1,2})$/i;
+
+const stat = (val, max) => {
+  const s = texte(val == null ? "" : String(val), 40).trim();
+  if (!s) return "";
+  if (SANS_OBJET.test(s)) return NA;
+  const n = Math.round(Number(s.replace(",", ".")));
+  return isFinite(n) && n > 0 ? String(Math.min(max, n)) : "";
+};
+const libre = (val, max) => {
+  const s = texte(val, max).trim();
+  return SANS_OBJET.test(s) ? NA : s;
+};
+const carbu = c => {
+  const s = texte(c, 40).trim();
+  if (SANS_OBJET.test(s)) return NA;
+  const b = s.toLowerCase();
+  return b.startsWith("diesel") || b.startsWith("gazole") ? "Diesel"
+    : b.startsWith("essence") ? "Essence" : "";
+};
+
 function nettoyerVehicule(v, catIds) {
   const id = texte(v && v.id, 60);
   if (!id) return null;
@@ -347,15 +374,11 @@ function nettoyerVehicule(v, catIds) {
     status: v.status === "attente" ? "attente" : "valide",
     proposePar: texte(v.proposePar, 60),
     proposeLe: dateIso(v.proposeLe),
-    /* Liste fermée, comme côté site : Essence, Diesel, ou rien. */
-    carburant: (function (c) {
-      const s = texte(c, 40).trim().toLowerCase();
-      return s.startsWith("diesel") || s.startsWith("gazole") ? "Diesel"
-        : s.startsWith("essence") ? "Essence" : "";
-    })(v.carburant),
-    places: nombre(v.places, 0, 99),
-    coffre: texte(v.coffre, 40),
-    litres: nombre(v.litres, 0, 9999),
+    /* Liste fermée, comme côté site : Essence, Diesel, sans objet, ou rien. */
+    carburant: carbu(v.carburant),
+    places: stat(v.places, 99),
+    coffre: libre(v.coffre, 40),
+    litres: stat(v.litres, 9999),
     note: texte(v.note, 300),
     /* Modification en attente d'approbation, rangée à côté du véhicule sans
        le changer. Même bornage que les champs qu'elle remplacera. */
@@ -369,10 +392,10 @@ function nettoyerVehicule(v, catIds) {
           name: texte(c.name, 60),
           category: texte(c.category, 60),
           image: texte(c.image, 300),
-          carburant: texte(c.carburant, 40),
-          places: nombre(c.places, 0, 99),
-          coffre: texte(c.coffre, 40),
-          litres: nombre(c.litres, 0, 9999),
+          carburant: carbu(c.carburant),
+          places: stat(c.places, 99),
+          coffre: libre(c.coffre, 40),
+          litres: stat(c.litres, 9999),
           note: texte(c.note, 300)
         }
       };

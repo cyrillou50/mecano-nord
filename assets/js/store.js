@@ -16,6 +16,48 @@ window.MNStore = (function () {
   const K_CART = "mn.cart";
   const K_BTS = "mn.bts";
 
+  /* ---- Caractéristiques de véhicule ------------------------------------------
+     Elles connaissent trois états, pas deux : pas encore renseignée, sans
+     objet, ou chiffrée. Un bateau n'a pas de coffre et un vélo pas de
+     réservoir — sans « N/A » leur fiche resterait éternellement marquée à
+     compléter, et l'étoile ne voudrait plus rien dire.
+
+     D'où du texte plutôt qu'un nombre : « » = à remplir, « N/A » = sans
+     objet, sinon la valeur. On accepte les formes qu'on écrit vraiment — n/a,
+     N.A., s.o., « — » — pour n'en garder qu'une. */
+
+  const NA = "N/A";
+  const SANS_OBJET = /^(n\s*[./]?\s*a\.?|s\s*[./]?\s*o\.?|néant|neant|aucun|—|-{1,2})$/i;
+
+  const stat = (val, max) => {
+    const s = String(val == null ? "" : val).trim();
+    if (!s) return "";
+    if (SANS_OBJET.test(s)) return NA;
+    const n = Math.round(Number(s.replace(",", ".")));
+    return isFinite(n) && n > 0 ? String(Math.min(max, n)) : "";
+  };
+
+  /* Le coffre reste du texte libre : certains sont notés « 1,2 t ». */
+  const libre = (val, max) => {
+    const s = String(val == null ? "" : val).trim().slice(0, max);
+    return SANS_OBJET.test(s) ? NA : s;
+  };
+
+  const carbu = c => {
+    const s = String(c || "").trim().toLowerCase();
+    if (SANS_OBJET.test(s)) return NA;
+    return s.indexOf("diesel") === 0 || s.indexOf("gazole") === 0 ? "Diesel"
+      : s.indexOf("essence") === 0 ? "Essence" : "";
+  };
+
+  /** Nettoie les caractéristiques d'un véhicule, sans toucher au reste. */
+  const statsVehicule = v => Object.assign({}, v, {
+    carburant: carbu(v.carburant),
+    places: stat(v.places, 99),
+    coffre: libre(v.coffre, 40),
+    litres: stat(v.litres, 9999)
+  });
+
   let _published = null;   // version réellement en ligne
   let _catalog = null;     // version affichée (brouillon si présent)
   let _origin = "seed";    // "remote" | "seed"
@@ -200,18 +242,14 @@ window.MNStore = (function () {
         status: v.status === "attente" ? "attente" : "valide",
         proposePar: String(v.proposePar || ""),
         proposeLe: v.proposeLe || null,
-        /* Liste fermée : deux carburants, saisis au clic. Une valeur venue
-           d'ailleurs est rapprochée de l'une des deux, sinon vidée. */
-        carburant: (function (c) {
-          const s = String(c || "").trim().toLowerCase();
-          return s.indexOf("diesel") === 0 || s.indexOf("gazole") === 0 ? "Diesel"
-            : s.indexOf("essence") === 0 ? "Essence" : "";
-        })(v.carburant),
-        places: Math.max(0, Math.min(99, Math.round(Number(v.places) || 0))),
-        coffre: String(v.coffre || ""),
+        /* Liste fermée : deux carburants, saisis au clic, plus « sans objet ».
+           Une valeur venue d'ailleurs est rapprochée de l'une, sinon vidée. */
+        carburant: carbu(v.carburant),
+        places: stat(v.places, 99),
+        coffre: libre(v.coffre, 40),
         /* Contenance du réservoir. `type` était un texte libre (moto, berline) ;
            il a laissé la place à cette valeur, plus utile à l'atelier. */
-        litres: Math.max(0, Math.min(9999, Math.round(Number(v.litres) || 0))),
+        litres: stat(v.litres, 9999),
         note: String(v.note || "").slice(0, 300),
         /* Modification proposée par quelqu'un qui n'a pas le droit d'écrire
            dans le parc. Elle attend à côté du véhicule sans le changer : la
@@ -226,10 +264,10 @@ window.MNStore = (function () {
               name: String(ch.name || ""),
               category: String(ch.category || ""),
               image: String(ch.image || ""),
-              carburant: String(ch.carburant || ""),
-              places: Math.max(0, Math.min(99, Math.round(Number(ch.places) || 0))),
-              coffre: String(ch.coffre || ""),
-              litres: Math.max(0, Math.min(9999, Math.round(Number(ch.litres) || 0))),
+              carburant: carbu(ch.carburant),
+              places: stat(ch.places, 99),
+              coffre: libre(ch.coffre, 40),
+              litres: stat(ch.litres, 9999),
               note: String(ch.note || "").slice(0, 300)
             }
           };
@@ -541,6 +579,7 @@ window.MNStore = (function () {
     topCategories, subCategories, categoryScope, itemLabel, totals,
     vehicleById, vehicleCatById,
     IMG_TAG, imageName, imageUrl, imagesHebergees,
+    NA, statsVehicule, estNA: v => String(v || "").trim().toUpperCase() === NA,
     getCart, setCart, getBTs, addBT, removeBT, clearBTs
   };
 })();
