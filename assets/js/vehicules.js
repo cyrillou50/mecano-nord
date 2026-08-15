@@ -613,7 +613,7 @@
           '<select class="select" id="e-vf">' +
             ["", "Essence", "Diesel", MNStore.NA].map(c =>
               '<option value="' + esc(c) + '"' + (c === cur.carburant ? " selected" : "") + ">" +
-              (c === MNStore.NA ? "N/A — sans objet" : c || "— non précisé") + "</option>").join("") +
+              (c === MNStore.NA ? "N/A" : c || "— non précisé") + "</option>").join("") +
           "</select></div>" +
         '<div class="field"><label class="label" for="e-vp">Places</label>' +
           '<input class="input input--num" id="e-vp" inputmode="numeric" maxlength="5" value="' +
