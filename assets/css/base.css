@@ -241,8 +241,8 @@ ul { margin: 0; padding: 0; list-style: none; }
 
 /* jeton employé connecté */
 .userchip {
-  display: flex; align-items: center; gap: 10px;
-  padding: 5px 6px 5px 12px;
+  display: flex; align-items: center; gap: 9px;
+  padding: 5px 8px 5px 14px;
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -258,6 +258,30 @@ ul { margin: 0; padding: 0; list-style: none; }
   color: var(--on-accent);
   background: linear-gradient(150deg, var(--pink-soft), var(--pink));
 }
+
+/* Le bouton de déconnexion vit à l'intérieur du jeton. Carré, bordé et du même
+   fond que lui, il ressemblait à une boîte coincée dans l'arrondi. Rond et
+   sans cadre, il devient le jumeau de l'avatar — et ne se colore qu'au
+   survol, là où le geste compte. */
+.userchip .btn--icon {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+/* `--danger` plutôt qu'un rouge figé : les thèmes clairs l'assombrissent pour
+   qu'il reste lisible sur fond pâle. */
+.userchip .btn--icon:hover {
+  color: var(--danger);
+  background: rgba(255, 59, 92, .15);
+  border-color: transparent;
+}
+.userchip .btn--icon svg { width: 16px; height: 16px; }
+
+/* Même logique pour la palette, posée juste à côté : ronde, elle accompagne
+   le jeton au lieu de le contredire. */
+.topbar > .btn--icon { border-radius: 50%; }
 
 /* ---- Boutons ------------------------------------------------------------ */
 
