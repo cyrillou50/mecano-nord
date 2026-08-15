@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-11T15:28:01.656Z",
+  "updatedAt": "2026-08-15T06:52:44.066Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -67,6 +67,23 @@
         "promote",
         "duty_manage",
         "vehicles_validate"
+      ]
+    },
+    {
+      "id": "directeur-general",
+      "name": "Directeur général",
+      "color": "#b8c4d4",
+      "icon": "i-badge",
+      "perms": [
+        "bt",
+        "duty",
+        "duty_view",
+        "duty_manage",
+        "staff",
+        "promote",
+        "vehicles",
+        "vehicles_validate",
+        "users"
       ]
     },
     {
@@ -330,6 +347,27 @@
           "roleName": "Apprenti",
           "at": "2026-08-02T22:54:21.786Z",
           "by": "",
+          "note": "Entrée dans l'entreprise"
+        }
+      ]
+    },
+    {
+      "id": "emilio-rodriguez",
+      "pseudo": "Emilio Rodriguez",
+      "roleId": "directeur-general",
+      "pin": "2f74acaf23a80762d677b535b5de47ae73d95dcb9a83b56a50a5f169ed5d3131",
+      "active": true,
+      "hidden": false,
+      "createdAt": "2026-08-15T06:52:44.063Z",
+      "hiredAt": "2026-08-15",
+      "trainings": [],
+      "note": "",
+      "history": [
+        {
+          "roleId": "directeur-general",
+          "roleName": "Directeur général",
+          "at": "2026-08-15T06:52:44.063Z",
+          "by": "Écuméria Sereinécaille",
           "note": "Entrée dans l'entreprise"
         }
       ]
