@@ -140,6 +140,14 @@
 
     document.querySelectorAll("[data-rmlog]").forEach(b =>
       b.addEventListener("click", () => removeLog(Number(b.dataset.rmlog), b.dataset.pseudo)));
+
+    document.querySelectorAll("[data-editlog]").forEach(b =>
+      b.addEventListener("click", () => {
+        const coupe = b.dataset.editlog.indexOf("|");
+        const id = b.dataset.editlog.slice(0, coupe), debut = b.dataset.editlog.slice(coupe + 1);
+        const e = MNDuty.board().log.find(x => x.id === id && x.in === debut);
+        if (e) editLog(e); else MNUI.toast("Ce pointage n'existe plus", "err");
+      }));
   }
 
   function myCard(mine) {
@@ -414,10 +422,16 @@
                     new Date(e.in).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) +
                     " → " + new Date(e.out).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) +
                     "</i>" + (e.forced ? '<span class="permtag">sorti par un gérant</span>' : "") +
+                    (e.corrigePar
+                      ? '<span class="permtag" title="Heures rattrapées à la main">horaires corrigés par ' +
+                        esc(e.corrigePar) + "</span>"
+                      : "") +
                   "</div></div>" +
                   '<span class="trow__price tnum">' + MNDuty.dur(e.seconds) + "</span>" +
                   (canManage
-                    ? '<button class="btn btn--icon" data-rmlog="' + i + '" data-pseudo="' + esc(e.pseudo) +
+                    ? '<button class="btn btn--icon" data-editlog="' + esc(e.id + "|" + e.in) +
+                      '" title="Corriger les heures">' + svg("edit") + "</button>" +
+                      '<button class="btn btn--icon" data-rmlog="' + i + '" data-pseudo="' + esc(e.pseudo) +
                       '" title="Retirer cette ligne">' + svg("trash") + "</button>"
                     : "") +
                 "</div>"
@@ -685,16 +699,162 @@
     MNUI.toast("Pointage retiré", "ok");
   }
 
-  async function kick(uid, pseudo) {
-    const ok = await MNUI.confirm({
-      title: "Mettre fin au service",
-      message: "Le service de « " + pseudo + " » sera clôturé maintenant et enregistré à son nom.",
-      confirmLabel: "Clôturer", danger: true
+  /* ---- Correction des horaires -----------------------------------------------
+     Le cas courant : quelqu'un est parti sans dépointer. Clôturer « maintenant »
+     lui compterait la nuit entière, alors on laisse choisir l'heure réelle. */
+
+  /** ISO → valeur d'un champ `datetime-local`, en heure locale. */
+  function versChamp(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    const p = n => String(n).padStart(2, "0");
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) +
+      "T" + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+
+  /** Valeur d'un champ `datetime-local` → ISO, ou "" si elle ne veut rien dire. */
+  function depuisChamp(v) {
+    const d = new Date(v);
+    return isNaN(d) ? "" : d.toISOString();
+  }
+
+  const champHeure = (id, label, valeur, max) =>
+    '<div class="field"><label class="label" for="' + id + '">' + label + "</label>" +
+      '<input class="input" type="datetime-local" id="' + id + '" value="' + esc(valeur) +
+      '" max="' + esc(max) + '"></div>';
+
+  /**
+   * Affiche la durée qui résultera des heures saisies, et signale ce qui ne
+   * tient pas debout avant l'envoi plutôt qu'après.
+   * @returns {string} l'erreur, ou "" si tout va bien
+   */
+  function apercuDuree(body, debutId, finId) {
+    const d = depuisChamp(body.querySelector("#" + debutId).value);
+    const f = depuisChamp(body.querySelector("#" + finId).value);
+    const zone = body.querySelector("#dd-apercu");
+    let souci = "";
+
+    if (!d || !f) souci = "Renseigne les deux heures.";
+    else if (f < d) souci = "La fin précède le début.";
+    else if (f > new Date().toISOString()) souci = "On ne pointe pas dans le futur.";
+
+    zone.className = souci ? "alert alert--warn" : "hint";
+    zone.innerHTML = souci
+      ? svg("alert") + "<span>" + esc(souci) + "</span>"
+      : "Durée enregistrée : <b>" + MNDuty.dur(MNDuty.secBetween(d, f)) + "</b>";
+    return souci;
+  }
+
+  function brancherApercu(body, debutId, finId) {
+    const maj = () => apercuDuree(body, debutId, finId);
+    [debutId, finId].forEach(x => {
+      const n = body.querySelector("#" + x);
+      if (n) n.addEventListener("input", maj);
     });
-    if (!ok) return;
-    const r = await MNDuty.forceOut(uid, me.pseudo);
-    render();
-    MNUI.toast(r.already ? "Cette personne n'était plus en service"
-      : "Service de " + pseudo + " clôturé (" + MNDuty.dur(r.seconds) + ")", "ok");
+    maj();
+  }
+
+  /** Clôturer le service de quelqu'un, à l'heure qu'il a réellement quittée. */
+  function kick(uid, pseudo) {
+    const e = MNDuty.entryOf(uid);
+    if (!e) return MNUI.toast("Cette personne n'est plus en service", "info");
+
+    const maintenant = versChamp(new Date().toISOString());
+    const body = document.createElement("div");
+    body.innerHTML =
+      '<p class="hint" style="margin-bottom:14px">Le service de <b>' + esc(pseudo) +
+        "</b> a commencé le " +
+        new Date(e.since).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) +
+        ". S'il a oublié de dépointer, mets l'heure à laquelle il est vraiment parti.</p>" +
+      champHeure("dd-fin", "Fin du service", maintenant, maintenant) +
+      '<p class="hint" id="dd-apercu" style="margin-top:12px"></p>';
+
+    MNUI.modal({
+      title: "Mettre fin au service", body,
+      actions: [
+        { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
+        {
+          label: "Clôturer", variant: "btn--danger", icon: "logout",
+          onClick: async (close, b, btn) => {
+            const fin = depuisChamp(body.querySelector("#dd-fin").value);
+            if (!fin) return MNUI.toast("Heure de fin illisible", "err");
+            if (fin < e.since) return MNUI.toast("La fin précède le début du service", "err");
+            if (fin > new Date().toISOString()) return MNUI.toast("On ne pointe pas dans le futur", "err");
+
+            btn.disabled = true;
+            btn.innerHTML = svg("refresh") + "<span>Un instant…</span>";
+            const r = await MNDuty.forceOut(uid, me.pseudo, fin);
+            close(); render();
+            if (r.ignore) {
+              return MNUI.toast("Service clôturé, mais à l'heure actuelle : ton serveur est trop " +
+                "ancien pour choisir l'heure. Corrige la ligne dans l'historique.", "err");
+            }
+            MNUI.toast(r.already ? "Cette personne n'était plus en service"
+              : "Service de " + pseudo + " clôturé (" + MNDuty.dur(r.seconds) + ")", "ok");
+          }
+        }
+      ]
+    });
+
+    /* Une seule heure à saisir : le début est déjà connu, l'aperçu s'appuie
+       dessus pour montrer la durée qui sera comptée. */
+    const zone = body.querySelector("#dd-apercu");
+    const apercu = () => {
+      const fin = depuisChamp(body.querySelector("#dd-fin").value);
+      const souci = !fin ? "Heure illisible."
+        : fin < e.since ? "La fin précède le début du service."
+        : fin > new Date().toISOString() ? "On ne pointe pas dans le futur." : "";
+      zone.className = souci ? "alert alert--warn" : "hint";
+      zone.innerHTML = souci
+        ? svg("alert") + "<span>" + esc(souci) + "</span>"
+        : "Durée enregistrée : <b>" + MNDuty.dur(MNDuty.secBetween(e.since, fin)) + "</b>";
+    };
+    body.querySelector("#dd-fin").addEventListener("input", apercu);
+    apercu();
+  }
+
+  /** Corriger les heures d'un pointage déjà dans l'historique. */
+  function editLog(e) {
+    const maintenant = versChamp(new Date().toISOString());
+    const body = document.createElement("div");
+    body.innerHTML =
+      '<p class="hint" style="margin-bottom:14px">Pointage de <b>' + esc(e.pseudo) +
+        "</b>, actuellement compté <b>" + MNDuty.dur(e.seconds) + "</b>.</p>" +
+      champHeure("dd-deb", "Arrivée", versChamp(e.in), maintenant) +
+      champHeure("dd-fin", "Départ", versChamp(e.out), maintenant) +
+      '<p class="hint" id="dd-apercu" style="margin-top:12px"></p>' +
+      '<p class="hint" style="margin-top:10px">La correction est visible de tous : ' +
+        "la ligne portera ton nom.</p>";
+
+    MNUI.modal({
+      title: "Corriger les heures", body,
+      actions: [
+        { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
+        {
+          label: "Enregistrer", variant: "btn--primary", icon: "save",
+          onClick: async (close, b, btn) => {
+            const souci = apercuDuree(body, "dd-deb", "dd-fin");
+            if (souci) return MNUI.toast(souci, "err");
+
+            btn.disabled = true;
+            btn.innerHTML = svg("refresh") + "<span>Un instant…</span>";
+            const r = await MNDuty.editLog(e,
+              depuisChamp(body.querySelector("#dd-deb").value),
+              depuisChamp(body.querySelector("#dd-fin").value),
+              me.pseudo);
+
+            if (!r.ok) {
+              btn.disabled = false;
+              btn.innerHTML = svg("save") + "<span>Enregistrer</span>";
+              return MNUI.toast(r.error || "Correction impossible", "err");
+            }
+            close(); render();
+            MNUI.toast("Horaires corrigés (" + MNDuty.dur(r.seconds) + ")", "ok");
+          }
+        }
+      ]
+    });
+
+    brancherApercu(body, "dd-deb", "dd-fin");
   }
 })();

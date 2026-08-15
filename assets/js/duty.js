@@ -91,7 +91,10 @@ window.MNDuty = (function () {
           seconds: sec,
           minutes: Math.round(sec / 60),
           /* conservé : c'est ce qui distingue un oubli clôturé par un gérant */
-          forced: e.forced === true
+          forced: e.forced === true,
+          /* et ceci, un horaire rattrapé à la main */
+          corrigePar: String(e.corrigePar || ""),
+          corrigeLe: e.corrigeLe || null
         };
       }),
       conges: (Array.isArray(b.conges) ? b.conges : []).map(e => {
@@ -400,15 +403,30 @@ window.MNDuty = (function () {
     return { shared: shared.ok, shareError: shared.error, discord, seconds };
   }
 
-  /** Sortir quelqu'un de force (gérant). */
-  async function forceOut(uid, byPseudo) {
+  /**
+   * Sortir quelqu'un de force (gérant).
+   * @param {string} [at] heure de fin réelle, quand la personne a oublié de
+   *   dépointer. Sans elle, le service se clôt maintenant.
+   */
+  async function forceOut(uid, byPseudo, at) {
     const cible = entryOf(uid);
-    const op = await envoyerOp({ op: "out", id: uid, force: true });
+    const op = await envoyerOp({ op: "out", id: uid, force: true, at: at || "", par: byPseudo });
     if (op) {
       if (op.deja) return { already: true };
       const nom = cible ? cible.pseudo : uid;
+
+      /* Un serveur d'avant cette version accepte l'opération mais ignore
+         l'heure demandée : il clôture à l'instant. Ça se voit dans la ligne
+         qu'il vient d'écrire, et il vaut mieux le dire que laisser croire à
+         une correction qui n'a pas eu lieu. */
+      let ignore = false;
+      if (at) {
+        const ecrite = board().log.find(e => e.id === uid);
+        ignore = !ecrite || ecrite.out !== new Date(at).toISOString();
+      }
+
       await MNWebhook.sendDuty(nom + " (sorti par " + byPseudo + ")", "", "out", op.seconds);
-      return { shared: op.ok, shareError: op.error, seconds: op.seconds, pseudo: nom };
+      return { shared: op.ok, shareError: op.error, seconds: op.seconds, pseudo: nom, ignore };
     }
 
     await load(true);
@@ -417,11 +435,15 @@ window.MNDuty = (function () {
     if (i === -1) return { already: true };
 
     const e = b.onDuty.splice(i, 1)[0];
-    const out = new Date().toISOString();
+    const maintenant = new Date().toISOString();
+    const choisie = at && !isNaN(new Date(at)) ? new Date(at).toISOString() : "";
+    const out = (choisie && choisie >= e.since && choisie <= maintenant) ? choisie : maintenant;
     const seconds = secBetween(e.since, out);
     b.log.unshift({
       id: e.id, pseudo: e.pseudo, roleId: e.roleId,
-      in: e.since, out, seconds, minutes: Math.round(seconds / 60), forced: true
+      in: e.since, out, seconds, minutes: Math.round(seconds / 60), forced: true,
+      corrigePar: out === maintenant ? "" : byPseudo,
+      corrigeLe: out === maintenant ? null : maintenant
     });
     b.log = b.log.slice(0, MAX_LOG);
     b.updatedAt = out;
@@ -587,6 +609,52 @@ window.MNDuty = (function () {
     return { shared: shared.ok, shareError: shared.error, pseudo: e.pseudo };
   }
 
+  /**
+   * Corrige les heures d'un pointage déjà enregistré (gérant).
+   *
+   * La ligne se désigne par la personne et son heure d'arrivée d'origine, pas
+   * par sa position : l'historique se décale dès que quelqu'un dépointe.
+   *
+   * @param {object} entree ligne telle qu'affichée
+   * @param {string} debut  nouvelle arrivée, en ISO
+   * @param {string} fin    nouveau départ, en ISO
+   */
+  async function editLog(entree, debut, fin, byPseudo) {
+    if (!entree) return { ok: false, error: "Pointage introuvable." };
+    if (!debut || !fin || isNaN(new Date(debut)) || isNaN(new Date(fin))) {
+      return { ok: false, error: "Heures illisibles." };
+    }
+    const dIso = new Date(debut).toISOString(), fIso = new Date(fin).toISOString();
+    if (fIso < dIso) return { ok: false, error: "La fin précède le début." };
+    if (fIso > new Date().toISOString()) return { ok: false, error: "On ne pointe pas dans le futur." };
+
+    const op = await envoyerOp({
+      op: "log-set", id: entree.id, cle: entree.in,
+      in: dIso, out: fIso, par: byPseudo
+    });
+    if (op) {
+      if (!op.ok) return op;
+      return { ok: true, seconds: op.seconds };
+    }
+
+    /* Serveur trop ancien : on réécrit le tableau entier. */
+    await load(true);
+    const b = board();
+    const j = b.log.findIndex(e => e.id === entree.id && e.in === entree.in);
+    if (j === -1) return { ok: false, error: "Ce pointage n'existe plus." };
+
+    const seconds = secBetween(dIso, fIso);
+    b.log[j] = Object.assign({}, b.log[j], {
+      in: dIso, out: fIso, seconds, minutes: Math.round(seconds / 60),
+      corrigePar: byPseudo, corrigeLe: new Date().toISOString()
+    });
+    b.updatedAt = new Date().toISOString();
+    saveLocal(b);
+
+    const shared = await push(b, "Pointage de " + b.log[j].pseudo + " corrigé par " + byPseudo);
+    return { ok: shared.ok, error: shared.error, seconds };
+  }
+
   /* ---- Statistiques --------------------------------------------------------- */
 
   /** Tous les services terminés d'une personne, du plus récent au plus ancien. */
@@ -670,7 +738,7 @@ window.MNDuty = (function () {
   return {
     load, board, isOn, entryOf, canShare, isAuto, relayUrl, baseUrl,
     souci: () => _souci,
-    clockIn, clockOut, forceOut, forceIn, clearLog, removeLog,
+    clockIn, clockOut, forceOut, forceIn, clearLog, removeLog, editLog,
     conges, congesOf, congeOf, congeById, enConge, chevauche,
     setConge, clearConge, jourLocal, nbJours,
     logOf, secondsFor, weekStart,

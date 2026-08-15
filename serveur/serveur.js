@@ -144,7 +144,11 @@ function nettoyer(b) {
       out: dateIso(e.out),
       seconds: nombre(e.seconds, 0, 31_536_000),
       minutes: nombre(e.minutes, 0, 525_600),
-      forced: e.forced === true
+      forced: e.forced === true,
+      /* Une heure corrigée à la main reste signalée : sans ça, plus personne
+         ne sait si un service de dix heures est réel ou rattrapé. */
+      corrigePar: texte(e.corrigePar, 60),
+      corrigeLe: dateIso(e.corrigeLe)
     })).filter(e => e.id && e.in && e.out),
     conges: conges.map(nettoyerConge).filter(Boolean)
   };
@@ -172,14 +176,26 @@ function appliquer(board, op) {
   const id = texte(op.id, 60);
   const i = b.onDuty.findIndex(e => e.id === id);
 
-  const cloturer = (indice, force) => {
+  /**
+   * Ferme un service. `fin` permet de le clore à l'heure réelle plutôt qu'à
+   * l'instant du clic : quelqu'un qui a oublié de dépointer hier soir ne doit
+   * pas se voir compter la nuit.
+   */
+  const cloturer = (indice, force, fin, par) => {
     const e = b.onDuty.splice(indice, 1)[0];
-    const sec = secondes(e.since, maintenant);
+    /* Une fin ne peut ni précéder le début ni être dans le futur. */
+    let out = maintenant;
+    const choisie = dateIso(fin);
+    if (choisie && choisie >= e.since && choisie <= maintenant) out = choisie;
+
+    const sec = secondes(e.since, out);
     b.log.unshift({
       id: e.id, pseudo: e.pseudo, roleId: e.roleId,
-      in: e.since, out: maintenant,
+      in: e.since, out,
       seconds: sec, minutes: Math.round(sec / 60),
-      forced: !!force
+      forced: !!force,
+      corrigePar: out === maintenant ? "" : texte(par, 60),
+      corrigeLe: out === maintenant ? null : maintenant
     });
     b.log = b.log.slice(0, MAX_LOG);
     return sec;
@@ -199,7 +215,31 @@ function appliquer(board, op) {
 
     case "out":
       if (i === -1) return { board: b, deja: true };
-      return { board: b, seconds: cloturer(i, op.force === true) };
+      return { board: b, seconds: cloturer(i, op.force === true, op.at, op.par) };
+
+    /* Corriger les heures d'un pointage déjà enregistré. On repère la ligne
+       par la personne et son heure d'arrivée d'origine plutôt que par sa
+       position : l'historique bouge dès que quelqu'un dépointe, et un index
+       lu il y a dix secondes désignerait alors la mauvaise ligne. */
+    case "log-set": {
+      const cle = dateIso(op.cle);
+      const j = b.log.findIndex(e => e.id === id && e.in === cle);
+      if (j === -1) return { erreur: "ce pointage n'existe plus" };
+
+      const debut = dateIso(op.in), fin = dateIso(op.out);
+      if (!debut || !fin) return { erreur: "heures illisibles" };
+      if (fin < debut) return { erreur: "la fin précède le début" };
+      if (debut > maintenant || fin > maintenant) return { erreur: "on ne pointe pas dans le futur" };
+
+      const sec = secondes(debut, fin);
+      b.log[j] = Object.assign({}, b.log[j], {
+        in: debut, out: fin,
+        seconds: sec, minutes: Math.round(sec / 60),
+        corrigePar: texte(op.par, 60) || "?",
+        corrigeLe: maintenant
+      });
+      return { board: b, seconds: sec };
+    }
 
     case "clear-log":
       b.log = [];
