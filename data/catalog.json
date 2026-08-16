@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-16T10:52:57.910Z",
+  "updatedAt": "2026-08-16T17:49:10.443Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -961,6 +961,20 @@
       "pack": 0,
       "excludes": [],
       "cost": {}
+    },
+    {
+      "id": "stationnement-genant",
+      "name": "Stationnement gênant",
+      "category": "service",
+      "icon": "srv:interditstationner.png",
+      "enabled": true,
+      "note": "",
+      "max": 0,
+      "pack": 0,
+      "excludes": [],
+      "cost": {
+        "ressource": 30
+      }
     }
   ],
   "vehicleCats": [
