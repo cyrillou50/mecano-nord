@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-16T18:32:45.284Z",
+  "updatedAt": "2026-08-16T18:41:13.234Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -320,6 +320,27 @@
           "at": "2026-07-25T11:18:00.000Z",
           "by": "Écuméria Sereinécaille",
           "note": ""
+        }
+      ]
+    },
+    {
+      "id": "toma-garcia",
+      "pseudo": "Toma Garcia",
+      "roleId": "apprenti",
+      "pin": "142780ff6d414591fd23db85f4f401156f3e85f1c7163a561bbeebe9de8e0e1f",
+      "active": true,
+      "hidden": false,
+      "createdAt": "2026-08-16T18:41:13.232Z",
+      "hiredAt": "2026-08-16",
+      "trainings": [],
+      "note": "",
+      "history": [
+        {
+          "roleId": "apprenti",
+          "roleName": "Apprenti",
+          "at": "2026-08-16T18:41:13.232Z",
+          "by": "Écuméria Sereinécaille",
+          "note": "Entrée dans l'entreprise"
         }
       ]
     }
