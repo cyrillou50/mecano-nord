@@ -354,12 +354,21 @@ const libre = (val, max) => {
   const s = texte(val, max).trim();
   return SANS_OBJET.test(s) ? NA : s;
 };
+/* Même table que le site : une valeur venue d'ailleurs est rapprochée de l'un
+   des carburants connus, sinon vidée. */
+const ALIAS = [
+  { nom: "Diesel", re: /^(diesel|gazole|gasoil|go\b)/ },
+  { nom: "Essence", re: /^(essence|sp\s?9[58]|super|petrol)/ },
+  { nom: "Kérosène", re: /^(k[ée]ros|jet\s?a|avgas|aviation)/ }
+];
+
 const carbu = c => {
   const s = texte(c, 40).trim();
+  if (!s) return "";
   if (SANS_OBJET.test(s)) return NA;
   const b = s.toLowerCase();
-  return b.startsWith("diesel") || b.startsWith("gazole") ? "Diesel"
-    : b.startsWith("essence") ? "Essence" : "";
+  const t = ALIAS.find(a => a.re.test(b));
+  return t ? t.nom : "";
 };
 
 function nettoyerVehicule(v, catIds) {

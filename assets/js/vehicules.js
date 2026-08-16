@@ -271,9 +271,9 @@
           "</select>" +
           '<select class="select" id="v-carb" title="Carburant">' +
             '<option value="">Tout carburant</option>' +
-            ["Essence", "Diesel", MNStore.NA].map(c =>
+            MNStore.CARBURANTS.concat(MNStore.NA).map(c =>
               '<option value="' + esc(c) + '"' + (fCarb === c ? " selected" : "") + ">" +
-              (c === MNStore.NA ? "N/A" : c) + "</option>").join("") +
+              esc(c) + "</option>").join("") +
           "</select>" +
           '<select class="select" id="v-cat" title="Catégorie">' +
             '<option value="">Toutes catégories</option>' +
@@ -611,7 +611,7 @@
       '<div class="editor__grid editor__grid--3">' +
         '<div class="field"><label class="label" for="e-vf">Carburant</label>' +
           '<select class="select" id="e-vf">' +
-            ["", "Essence", "Diesel", MNStore.NA].map(c =>
+            [""].concat(MNStore.CARBURANTS, MNStore.NA).map(c =>
               '<option value="' + esc(c) + '"' + (c === cur.carburant ? " selected" : "") + ">" +
               (c === MNStore.NA ? "N/A" : c || "— non précisé") + "</option>").join("") +
           "</select></div>" +

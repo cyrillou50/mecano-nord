@@ -43,11 +43,23 @@ window.MNStore = (function () {
     return SANS_OBJET.test(s) ? NA : s;
   };
 
+  /* Liste fermée : on saisit au clic, mais une valeur peut arriver d'ailleurs
+     — d'un ancien enregistrement, d'un import — alors on la rapproche. Une
+     seule table, d'où sortent aussi bien le menu déroulant que le filtre :
+     ajouter un carburant se fait ici et nulle part ailleurs. */
+  const CARBURANTS = ["Essence", "Diesel", "Kérosène"];
+  const ALIAS = [
+    { nom: "Diesel", re: /^(diesel|gazole|gasoil|go\b)/ },
+    { nom: "Essence", re: /^(essence|sp\s?9[58]|super|petrol)/ },
+    { nom: "Kérosène", re: /^(k[ée]ros|jet\s?a|avgas|aviation)/ }
+  ];
+
   const carbu = c => {
     const s = String(c || "").trim().toLowerCase();
+    if (!s) return "";
     if (SANS_OBJET.test(s)) return NA;
-    return s.indexOf("diesel") === 0 || s.indexOf("gazole") === 0 ? "Diesel"
-      : s.indexOf("essence") === 0 ? "Essence" : "";
+    const t = ALIAS.find(a => a.re.test(s));
+    return t ? t.nom : "";
   };
 
   /** Nettoie les caractéristiques d'un véhicule, sans toucher au reste. */
@@ -579,7 +591,8 @@ window.MNStore = (function () {
     topCategories, subCategories, categoryScope, itemLabel, totals,
     vehicleById, vehicleCatById,
     IMG_TAG, imageName, imageUrl, imagesHebergees,
-    NA, statsVehicule, estNA: v => String(v || "").trim().toUpperCase() === NA,
+    NA, CARBURANTS, statsVehicule,
+    estNA: v => String(v || "").trim().toUpperCase() === NA,
     getCart, setCart, getBTs, addBT, removeBT, clearBTs
   };
 })();
