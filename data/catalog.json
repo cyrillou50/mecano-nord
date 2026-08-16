@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-16T18:41:13.234Z",
+  "updatedAt": "2026-08-16T18:44:27.274Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -331,7 +331,7 @@
       "active": true,
       "hidden": false,
       "createdAt": "2026-08-16T18:41:13.232Z",
-      "hiredAt": "2026-08-16",
+      "hiredAt": "2026-07-27",
       "trainings": [],
       "note": "",
       "history": [
