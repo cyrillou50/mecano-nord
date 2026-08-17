@@ -496,13 +496,13 @@
     /* Temps de fabrication cumulé. Il ne s'affiche que si au moins un objet
        du panier en porte un : une pastille à zéro n'apprendrait rien. */
     const temps = $("#dock-temps");
-    temps.hidden = !t.minutes;
-    temps.textContent = MNStore.duree(t.minutes) + " de fabrication";
+    temps.hidden = !t.secondes;
+    temps.textContent = MNStore.duree(t.secondes) + " de fabrication";
 
     $("#dock-mini-txt").textContent = t.count
       ? t.count + (t.count > 1 ? " objets" : " objet") +
         " · " + t.resources.length + " ressource" + (t.resources.length > 1 ? "s" : "") +
-        (t.minutes ? " · " + MNStore.duree(t.minutes) : "")
+        (t.secondes ? " · " + MNStore.duree(t.secondes) : "")
       : "Panier vide";
 
     if (!t.resources.length) {
@@ -573,9 +573,9 @@
         '<div class="recap__total">Ressources' +
           "<span>" + t.resources.map(r => esc(r.resource.name) + " ×" + num(r.qty)).join("  ·  ") + "</span>" +
         "</div>" +
-        (t.minutes
+        (t.secondes
           ? '<div class="recap__total">Temps de fabrication<span>' +
-            esc(MNStore.duree(t.minutes)) + "</span></div>"
+            esc(MNStore.duree(t.secondes)) + "</span></div>"
           : "") +
       "</div>";
 
@@ -610,7 +610,7 @@
         count: t.count,
         /* Figé au moment de l'enregistrement : si le temps d'un objet change
            plus tard, un bon déjà signé ne doit pas se réécrire tout seul. */
-        minutes: t.minutes
+        secondes: t.secondes
       };
       MNStore.addBT(bt);
       cart = MNStore.setCart({});
@@ -646,7 +646,7 @@
       L.push("__Ressources nécessaires__");
       bt.resources.forEach(r => L.push("• " + r.name + " ×" + num(r.qty)));
     }
-    if (bt.minutes) L.push("\nTemps de fabrication : **" + MNStore.duree(bt.minutes) + "**");
+    if (bt.secondes) L.push("\nTemps de fabrication : **" + MNStore.duree(bt.secondes) + "**");
     if (bt.note) { L.push(""); L.push("> " + bt.note.replace(/\n/g, "\n> ")); }
     return L.join("\n");
   }
@@ -682,8 +682,8 @@
               "<span>" + esc(bt.ref) + " · " + new Date(bt.at).toLocaleString("fr-FR") +
                 " · " + esc(bt.by) + "</span>" +
             "</div>" +
-            (bt.minutes ? '<span class="bt__amount bt__amount--time">' +
-              esc(MNStore.duree(bt.minutes)) + "</span>" : "") +
+            (bt.secondes ? '<span class="bt__amount bt__amount--time">' +
+              esc(MNStore.duree(bt.secondes)) + "</span>" : "") +
             '<span class="bt__amount">' + (bt.count || bt.lines.length) + " obj.</span>" +
             '<button class="btn btn--icon" data-h="view" title="Voir">' + svg("file") + "</button>" +
             '<button class="btn btn--icon" data-h="copy" title="Copier">' + svg("copy") + "</button>" +

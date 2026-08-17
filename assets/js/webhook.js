@@ -184,8 +184,8 @@ window.MNWebhook = (function () {
   function sendBT(bt, lines, resources) {
     const fields = [];
     if (bt.client) fields.push({ name: "Client", value: bt.client, inline: true });
-    if (bt.minutes) {
-      fields.push({ name: "Temps de fabrication", value: MNStore.duree(bt.minutes), inline: true });
+    if (bt.secondes) {
+      fields.push({ name: "Temps de fabrication", value: MNStore.duree(bt.secondes), inline: true });
     }
 
     if (lines.length) {

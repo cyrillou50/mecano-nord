@@ -401,8 +401,8 @@
             "<i>Pièces détachées</i> l'affiche « 10 Pièces détachées », puis « 20 » quand on en " +
             "prend deux. Le nom ne doit alors <b>pas</b> contenir le nombre. Le coût en ressources " +
             "reste celui d'un lot.</p></div>" +
-        '<div class="field"><label class="label" for="e-temps">Temps de fabrication (minutes)</label>' +
-          '<input class="input input--num" id="e-temps" type="number" min="0" max="9999" value="' +
+        '<div class="field"><label class="label" for="e-temps">Temps de fabrication (secondes)</label>' +
+          '<input class="input input--num" id="e-temps" type="number" min="0" max="86400" value="' +
             Number(cur.temps || 0) + '">' +
           '<p class="hint"><b>Facultatif — 0 = non renseigné.</b> Le temps se cumule sur le bon de ' +
             "travail : deux fois l'objet, deux fois le temps. Le total s'affiche à côté du panier " +
@@ -518,7 +518,7 @@
               note: body.querySelector("#e-note").value.trim(),
               max: Math.max(0, Math.min(999, Math.round(Number(body.querySelector("#e-max").value) || 0))),
               pack: Math.max(0, Math.min(9999, Math.round(Number(body.querySelector("#e-pack").value) || 0))),
-              temps: Math.max(0, Math.min(9999, Math.round(Number(body.querySelector("#e-temps").value) || 0))),
+              temps: Math.max(0, Math.min(86400, Math.round(Number(body.querySelector("#e-temps").value) || 0))),
               enabled: body.querySelector("#e-on").checked,
               excludes: excl,
               cost

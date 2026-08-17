@@ -212,9 +212,9 @@ window.MNStore = (function () {
            « 10 Pièces détachées », et « 20 » quand on en prend deux. Le coût
            en ressources, lui, reste celui d'un lot. 0 ou 1 = pas de lot. */
         pack: Math.max(0, Math.min(9999, Math.round(Number(it.pack) || 0))),
-        /* Temps de fabrication, en minutes. Facultatif : 0 = non renseigné,
+        /* Temps de fabrication, en secondes. Facultatif : 0 = non renseigné,
            et l'objet n'ajoute alors rien au total du bon de travail. */
-        temps: Math.max(0, Math.min(9999, Math.round(Number(it.temps) || 0))),
+        temps: Math.max(0, Math.min(86400, Math.round(Number(it.temps) || 0))),
         /* Objets incompatibles : en choisir un bloque les autres. */
         excludes: (Array.isArray(it.excludes) ? it.excludes : [])
           .map(String).filter(x => x && x !== id),
@@ -542,7 +542,7 @@ window.MNStore = (function () {
   function totals(cart, cat) {
     const c = cat || _catalog;
     const lines = [], byRes = {};
-    let count = 0, minutes = 0;
+    let count = 0, secondes = 0;
 
     (c.items || []).forEach(it => {
       const q = Math.max(0, Math.round(Number(cart[it.id]) || 0));
@@ -551,7 +551,7 @@ window.MNStore = (function () {
       /* Le temps de fabrication se cumule comme les ressources : deux
          pare-chocs, c'est deux fois la fabrication. Un objet sans temps
          renseigné n'ajoute rien. */
-      minutes += (it.temps || 0) * q;
+      secondes += (it.temps || 0) * q;
       lines.push({ item: it, qty: q, cost: it.cost });
       Object.keys(it.cost || {}).forEach(rid => { byRes[rid] = (byRes[rid] || 0) + it.cost[rid] * q; });
     });
@@ -560,19 +560,23 @@ window.MNStore = (function () {
       .filter(r => byRes[r.id] > 0)
       .map(r => ({ resource: r, qty: byRes[r.id] }));
 
-    return { lines, resources, count, minutes };
+    return { lines, resources, count, secondes };
   }
 
   /**
-   * Une durée en minutes, écrite comme on la dit : « 45 min », « 1 h »,
-   * « 2 h 30 ». Zéro renvoie une chaîne vide — rien à afficher.
+   * Une durée en secondes, écrite comme on la dit : « 45 s », « 1 min 30 s »,
+   * « 3 min », « 2 h 05 min ». Les tranches à zéro sautent, et zéro renvoie
+   * une chaîne vide — il n'y a rien à afficher.
    */
-  function duree(min) {
-    const m = Math.max(0, Math.round(Number(min) || 0));
-    if (!m) return "";
-    const h = Math.floor(m / 60), r = m % 60;
-    if (!h) return m + " min";
-    return h + " h" + (r ? " " + String(r).padStart(2, "0") : "");
+  function duree(sec) {
+    const t = Math.max(0, Math.round(Number(sec) || 0));
+    if (!t) return "";
+    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+    const p = [];
+    if (h) p.push(h + " h");
+    if (m) p.push((h ? String(m).padStart(2, "0") : m) + " min");
+    if (s) p.push((h || m ? String(s).padStart(2, "0") : s) + " s");
+    return p.join(" ");
   }
 
   /* ---- Panier ----------------------------------------------------------- */
