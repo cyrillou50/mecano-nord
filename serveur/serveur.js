@@ -13,6 +13,8 @@
      POST /publier     → écrit le catalogue sur GitHub, sans que personne
                          n'ait de jeton
      GET  /vehicules   → le parc automobile (categories + vehicules)
+     GET  /contrats    → le registre des contrats
+     POST /contrats    → en creer, en modifier ou en supprimer
      POST /vehicules   → y ajouter, valider ou retirer un vehicule
      GET  /images      → la liste des images hébergées ici
      GET  /images/x.png→ l'image elle-même
@@ -46,6 +48,9 @@ const DOSSIER_IMG = path.join(DOSSIER, "images");
    véhicule sans avoir le droit de publier, et le catalogue GitHub reste
    réservé à ce qui touche au site lui-même. */
 const FICHIER_VEH = path.join(DOSSIER, "vehicules.json");
+/* Les contrats aussi : les droits qui les régissent n'ont rien à voir avec le
+   droit de publier le site. */
+const FICHIER_CT = path.join(DOSSIER, "contrats.json");
 
 /* Origines autorisées, séparées par des virgules. « * » = tout le monde. */
 const ORIGINES = String(process.env.ORIGINE || "*")
@@ -502,6 +507,104 @@ async function ecrireParc(parc) {
   await fsp.rename(tmp, FICHIER_VEH);
 }
 
+/* ---- Contrats -----------------------------------------------------------------
+   Même raison d'être ici que le parc : les droits sur les contrats n'ont rien
+   à voir avec le droit de publier le site. Quelqu'un qui gère les contrats
+   doit pouvoir en écrire un sans jeton GitHub, et toute l'équipe doit le voir
+   aussitôt.
+
+   Le serveur ne juge pas des permissions — c'est le site qui les applique. Il
+   borne les données et sérialise les écritures, rien de plus. */
+
+const REGISTRE_VIDE = { updatedAt: new Date(0).toISOString(), contrats: [] };
+const ETATS = ["brouillon", "actif", "termine", "annule"];
+
+function nettoyerLigne(l) {
+  if (!l || typeof l !== "object") return null;
+  const nom = texte(l.name, 120).trim();
+  const itemId = texte(l.itemId, 60);
+  if (!nom && !itemId) return null;
+  return {
+    itemId,
+    name: nom,
+    qty: nombre(l.qty, 1, 9999),
+    /* Au centime : un prix négocié n'est pas forcément rond. */
+    prix: Math.max(0, Math.min(99999999, Math.round((Number(l.prix) || 0) * 100) / 100))
+  };
+}
+
+function nettoyerContrat(k) {
+  const id = texte(k && k.id, 60);
+  if (!id) return null;
+  const lignes = (Array.isArray(k.lignes) ? k.lignes : []).slice(0, 200)
+    .map(nettoyerLigne).filter(Boolean);
+  return {
+    id,
+    ref: texte(k.ref, 40),
+    titre: texte(k.titre, 120),
+    client: texte(k.client, 80),
+    note: texte(k.note, 2000),
+    etat: ETATS.indexOf(k.etat) !== -1 ? k.etat : "brouillon",
+    lignes,
+    creePar: texte(k.creePar, 60),
+    creeLe: dateIso(k.creeLe),
+    majPar: texte(k.majPar, 60),
+    majLe: dateIso(k.majLe)
+  };
+}
+
+function nettoyerRegistre(r) {
+  if (!r || typeof r !== "object") return null;
+  const contrats = Array.isArray(r.contrats) ? r.contrats : [];
+  if (contrats.length > 500) return null;
+  return {
+    updatedAt: dateIso(r.updatedAt) || new Date().toISOString(),
+    contrats: contrats.map(nettoyerContrat).filter(Boolean)
+  };
+}
+
+function appliquerRegistre(reg, op) {
+  const r = { updatedAt: new Date().toISOString(), contrats: reg.contrats.slice() };
+
+  switch (op.op) {
+    /* Le site envoie le contrat entier : le volume reste minuscule et il n'y
+       a pas de fusion à arbitrer champ par champ. */
+    case "set": {
+      const k = nettoyerContrat(op.contrat);
+      if (!k) return { erreur: "contrat invalide" };
+      const i = r.contrats.findIndex(x => x.id === k.id);
+      if (i === -1) r.contrats.unshift(k); else r.contrats[i] = k;
+      return { registre: r };
+    }
+
+    case "remove": {
+      const id = texte(op.id, 60);
+      const i = r.contrats.findIndex(x => x.id === id);
+      if (i === -1) return { registre: r, deja: true };
+      r.contrats.splice(i, 1);
+      return { registre: r };
+    }
+
+    default:
+      return { erreur: "opération inconnue : " + op.op };
+  }
+}
+
+async function lireRegistre() {
+  try {
+    return nettoyerRegistre(JSON.parse(await fsp.readFile(FICHIER_CT, "utf8"))) || REGISTRE_VIDE;
+  } catch (_) {
+    return REGISTRE_VIDE;
+  }
+}
+
+async function ecrireRegistre(reg) {
+  await fsp.mkdir(DOSSIER, { recursive: true });
+  const tmp = FICHIER_CT + ".tmp";
+  await fsp.writeFile(tmp, JSON.stringify(reg, null, 2) + "\n", "utf8");
+  await fsp.rename(tmp, FICHIER_CT);
+}
+
 /* ---- Images -------------------------------------------------------------------
    Hébergées ici, elles s'affichent dès le dépôt : ni commit, ni attente d'une
    reconstruction GitHub Pages. Le site les référence par « srv:nom.png ». */
@@ -835,12 +938,42 @@ const serveur = http.createServer(async (req, res) => {
          « images: true » qu'il peut héberger les images ici, « relais »
          qu'il sait aller chercher une image sur un autre domaine. */
       return repondre(res, 200, {
-        ok: true, ops: true, images: true, vehicules: true, relais: true,
+        ok: true, ops: true, images: true, vehicules: true, relais: true, contrats: true,
         depuis: Math.round(process.uptime()) + " s"
       }, req);
     }
 
     /* --- parc automobile --- */
+    /* --- contrats --- */
+    if (chemin === "/contrats") {
+      if (req.method === "GET") return repondre(res, 200, await lireRegistre(), req);
+
+      if (req.method === "POST") {
+        const op = await corpsJson(req);
+        if (!op || !op.op) return repondre(res, 400, { error: "Opération manquante" }, req);
+
+        const r = await enFile(async () => {
+          const actuel = await lireRegistre();
+          /* Première écriture : le site peut joindre ce qu'il avait déjà dans
+             le catalogue, pour ne pas repartir d'un registre vide. */
+          if (!actuel.contrats.length && op.depart) {
+            const d = nettoyerRegistre(op.depart);
+            if (d) actuel.contrats = d.contrats;
+          }
+          const res2 = appliquerRegistre(actuel, op);
+          if (res2.erreur) return res2;
+          await ecrireRegistre(res2.registre);
+          return res2;
+        });
+
+        if (r.erreur) return repondre(res, 400, { error: r.erreur }, req);
+        console.log(new Date().toISOString(), "contrats :", op.op, "—",
+          r.registre.contrats.length, "contrats");
+        return repondre(res, 200, { ok: true, registre: r.registre, deja: !!r.deja }, req);
+      }
+      return repondre(res, 405, { error: "Méthode non autorisée" }, req);
+    }
+
     if (chemin === "/vehicules") {
       if (req.method === "GET") return repondre(res, 200, await lireParc(), req);
 

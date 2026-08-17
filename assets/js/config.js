@@ -41,6 +41,11 @@ window.MN_PERMS = [
   { key: "items",     name: "Gérer le catalogue",  desc: "Créer / modifier objets, catégories, ressources et coûts." },
   { key: "vehicles",  name: "Gérer les véhicules", desc: "Modifier et supprimer les véhicules et leurs catégories. Tout le monde peut en proposer et les consulter." },
   { key: "vehicles_validate", name: "Valider les véhicules", desc: "Approuver ou refuser les véhicules proposés par l'équipe. Sans validation, une proposition n'apparaît pas dans le parc." },
+  /* Trois droits distincts sur les contrats : lire n'est pas écrire, et
+     supprimer un contrat signé n'est pas le corriger. */
+  { key: "contracts_view",   name: "Lire les contrats",  desc: "Consulter les contrats et les sortir en PDF. Lecture seule : aucune modification possible." },
+  { key: "contracts",        name: "Gérer les contrats", desc: "Créer et modifier les contrats, leurs lignes, prix et quantités. Inclut la lecture." },
+  { key: "contracts_delete", name: "Supprimer un contrat", desc: "Retirer définitivement un contrat. À réserver : rien ne le récupère." },
   { key: "users",     name: "Gérer l'équipe",      desc: "Ajouter des employés, créer des rôles et régler leurs droits." },
   { key: "publish",   name: "Publier en ligne",    desc: "Envoyer les modifications sur le site public." },
   { key: "theme",     name: "Gérer l'apparence",   desc: "Choisir le thème et les couleurs de tout le site, et décider si chacun peut se faire les siennes." },

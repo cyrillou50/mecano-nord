@@ -62,6 +62,95 @@ window.MNStore = (function () {
     return t ? t.nom : "";
   };
 
+  /* ---- Contrats ----------------------------------------------------------------
+     Un contrat fige ce qui a été convenu : le nom, le prix et la quantité de
+     chaque ligne lui appartiennent. Le catalogue peut ensuite changer de prix
+     ou renommer un objet, un contrat déjà signé ne bouge pas. Seul `itemId`
+     le relie encore au catalogue, pour additionner les ressources à sortir. */
+
+  const ETATS = ["brouillon", "actif", "termine", "annule"];
+
+  const entier = (v, min, max) =>
+    Math.max(min, Math.min(max, Math.round(Number(v) || 0)));
+
+  /** Un montant, en centimes près, jamais négatif. */
+  const montant = v => Math.max(0, Math.min(99999999, Math.round((Number(v) || 0) * 100) / 100));
+
+  function normLigne(l) {
+    const t = l && typeof l === "object" ? l : {};
+    return {
+      itemId: String(t.itemId || ""),
+      /* Recopié du catalogue à l'ajout, puis libre : une ligne peut aussi
+         n'exister que dans le contrat (main d'œuvre, remise…). */
+      name: String(t.name || "").slice(0, 120),
+      qty: entier(t.qty, 1, 9999),
+      prix: montant(t.prix)
+    };
+  }
+
+  function normContrat(k) {
+    const t = k && typeof k === "object" ? k : {};
+    return {
+      id: String(t.id || ""),
+      ref: String(t.ref || "").slice(0, 40),
+      titre: String(t.titre || "").slice(0, 120),
+      client: String(t.client || "").slice(0, 80),
+      note: String(t.note || "").slice(0, 2000),
+      etat: ETATS.indexOf(t.etat) !== -1 ? t.etat : "brouillon",
+      lignes: (Array.isArray(t.lignes) ? t.lignes : []).slice(0, 200).map(normLigne),
+      creePar: String(t.creePar || "").slice(0, 60),
+      creeLe: t.creeLe || null,
+      majPar: String(t.majPar || "").slice(0, 60),
+      majLe: t.majLe || null
+    };
+  }
+
+  /**
+   * Ce que coûte un contrat : total en argent, ressources à sortir du stock,
+   * temps de fabrication cumulé.
+   *
+   * Les ressources et le temps viennent du catalogue — ce sont des faits
+   * d'atelier d'aujourd'hui, pas des termes négociés — tandis que le prix
+   * vient de la ligne, où il a été convenu.
+   */
+  function contratTotaux(contrat, cat) {
+    const c = cat || _catalog;
+    const byRes = {};
+    let argent = 0, secondes = 0, pieces = 0;
+
+    (contrat.lignes || []).forEach(l => {
+      const q = Math.max(0, Math.round(Number(l.qty) || 0));
+      argent += (Number(l.prix) || 0) * q;
+      pieces += q;
+      const it = (c.items || []).find(i => i.id === l.itemId);
+      if (!it) return;                       // ligne libre : rien à sortir
+      secondes += (it.temps || 0) * q;
+      Object.keys(it.cost || {}).forEach(rid => {
+        byRes[rid] = (byRes[rid] || 0) + it.cost[rid] * q;
+      });
+    });
+
+    const resources = (c.resources || [])
+      .filter(r => byRes[r.id] > 0)
+      .map(r => ({ resource: r, qty: byRes[r.id] }));
+
+    return { argent: Math.round(argent * 100) / 100, resources, secondes, pieces };
+  }
+
+  /**
+   * « 12 500 $ » — décimales seulement si elles existent.
+   *
+   * Le séparateur de milliers est une espace fine insécable, écrite en
+   * échappement pour rester visible dans le code : c'est ce que prescrit la
+   * typographie française, et surtout un montant ne se coupe jamais en fin
+   * de ligne.
+   */
+  function argent(v) {
+    const n = Math.round((Number(v) || 0) * 100) / 100;
+    const [e, d] = n.toFixed(2).split(".");
+    return e.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + (d === "00" ? "" : "," + d) + " $";
+  }
+
   /** Nettoie les caractéristiques d'un véhicule, sans toucher au reste. */
   const statsVehicule = v => Object.assign({}, v, {
     carburant: carbu(v.carburant),
@@ -289,6 +378,14 @@ window.MNStore = (function () {
         })(v.propose)
       };
     });
+
+    /* --- contrats ---
+       Ils vivent normalement sur le serveur ; ceci n'est que le repli quand
+       il n'y en a pas. Le prix et la quantité sont propres à la ligne : un
+       contrat garde ce qui a été convenu, même si le catalogue change après.
+       Le nom aussi est recopié — un objet renommé ne doit pas réécrire un
+       contrat déjà signé. */
+    c.contracts = (Array.isArray(c.contracts) ? c.contracts : []).map(k => normContrat(k));
 
     /* --- rôles ---
        Les droits sont portés par le rôle, plus par l'employé. Les anciens
@@ -612,6 +709,7 @@ window.MNStore = (function () {
     catalog, published, hasDraft, origin, settings, brand, api,
     roleById, roleOf, itemById, resourceById, categoryById,
     topCategories, subCategories, categoryScope, itemLabel, totals, duree,
+    normContrat, contratTotaux, argent, ETATS_CONTRAT: ETATS,
     vehicleById, vehicleCatById,
     IMG_TAG, imageName, imageUrl, imagesHebergees,
     NA, CARBURANTS, statsVehicule,

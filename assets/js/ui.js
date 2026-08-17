@@ -281,6 +281,11 @@ window.MNUI = (function () {
         /* Les véhicules sont un catalogue de consultation : ouvert à tous. */
         '<a class="navlink' + (active === "vehicules" ? " is-active" : "") +
           '" href="vehicules.html">Véhicules</a>' +
+        /* Les contrats, non : il faut au minimum le droit de les lire. */
+        (MNAuth.canAny("contracts_view", "contracts", "contracts_delete")
+          ? '<a class="navlink' + (active === "contrats" ? " is-active" : "") +
+            '" href="contrats.html">Contrats</a>'
+          : "") +
         (canAdmin ? '<a class="navlink' + (active === "admin" ? " is-active" : "") + '" href="admin.html">Admin</a>' : "") +
       "</nav>" +
       '<div class="topbar__spacer"></div>' +
