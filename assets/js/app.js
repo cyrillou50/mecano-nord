@@ -317,6 +317,12 @@
       (blocker
         ? '<p class="item__note item__note--block">Incompatible avec ' + esc(blocker.name) + "</p>"
         : it.note ? '<p class="item__note">' + esc(it.note) + "</p>" : "") +
+      /* Dans le flux, sous le nom : les deux coins hauts sont déjà pris par le
+         plafond et le compteur, et le bas par les ressources. */
+      (it.temps > 0
+        ? '<p class="item__temps" title="Temps de fabrication, cumulé sur le bon de travail">' +
+          svg("history") + "<span>" + esc(MNStore.duree(it.temps)) + "</span></p>"
+        : "") +
       '<div class="stepper">' +
         '<button data-act="dec" aria-label="Retirer"' + (qty ? "" : " disabled") + ">" + svg("minus") + "</button>" +
         '<input class="stepper__val" type="text" inputmode="numeric" value="' + qty + '"' +
@@ -487,8 +493,16 @@
     kinds.hidden = !t.resources.length;
     kinds.textContent = t.resources.length + (t.resources.length > 1 ? " ressources" : " ressource");
 
+    /* Temps de fabrication cumulé. Il ne s'affiche que si au moins un objet
+       du panier en porte un : une pastille à zéro n'apprendrait rien. */
+    const temps = $("#dock-temps");
+    temps.hidden = !t.minutes;
+    temps.textContent = MNStore.duree(t.minutes) + " de fabrication";
+
     $("#dock-mini-txt").textContent = t.count
-      ? t.count + (t.count > 1 ? " objets" : " objet") + " · " + t.resources.length + " ressource" + (t.resources.length > 1 ? "s" : "")
+      ? t.count + (t.count > 1 ? " objets" : " objet") +
+        " · " + t.resources.length + " ressource" + (t.resources.length > 1 ? "s" : "") +
+        (t.minutes ? " · " + MNStore.duree(t.minutes) : "")
       : "Panier vide";
 
     if (!t.resources.length) {
@@ -559,6 +573,10 @@
         '<div class="recap__total">Ressources' +
           "<span>" + t.resources.map(r => esc(r.resource.name) + " ×" + num(r.qty)).join("  ·  ") + "</span>" +
         "</div>" +
+        (t.minutes
+          ? '<div class="recap__total">Temps de fabrication<span>' +
+            esc(MNStore.duree(t.minutes)) + "</span></div>"
+          : "") +
       "</div>";
 
     const form =
@@ -589,7 +607,10 @@
            l'objet est renommé ou sa taille de lot changée plus tard. */
         lines: t.lines.map(l => ({ id: l.item.id, name: MNStore.itemLabel(l.item, l.qty), qty: l.qty })),
         resources: t.resources.map(r => ({ id: r.resource.id, name: r.resource.name, qty: r.qty })),
-        count: t.count
+        count: t.count,
+        /* Figé au moment de l'enregistrement : si le temps d'un objet change
+           plus tard, un bon déjà signé ne doit pas se réécrire tout seul. */
+        minutes: t.minutes
       };
       MNStore.addBT(bt);
       cart = MNStore.setCart({});
@@ -625,6 +646,7 @@
       L.push("__Ressources nécessaires__");
       bt.resources.forEach(r => L.push("• " + r.name + " ×" + num(r.qty)));
     }
+    if (bt.minutes) L.push("\nTemps de fabrication : **" + MNStore.duree(bt.minutes) + "**");
     if (bt.note) { L.push(""); L.push("> " + bt.note.replace(/\n/g, "\n> ")); }
     return L.join("\n");
   }
@@ -660,6 +682,8 @@
               "<span>" + esc(bt.ref) + " · " + new Date(bt.at).toLocaleString("fr-FR") +
                 " · " + esc(bt.by) + "</span>" +
             "</div>" +
+            (bt.minutes ? '<span class="bt__amount bt__amount--time">' +
+              esc(MNStore.duree(bt.minutes)) + "</span>" : "") +
             '<span class="bt__amount">' + (bt.count || bt.lines.length) + " obj.</span>" +
             '<button class="btn btn--icon" data-h="view" title="Voir">' + svg("file") + "</button>" +
             '<button class="btn btn--icon" data-h="copy" title="Copier">' + svg("copy") + "</button>" +

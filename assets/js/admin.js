@@ -306,6 +306,7 @@
         '<div class="trow__meta"><i>' + esc(cat ? cat.name : "?") + "</i>" +
           (it.max > 0 ? '<span class="permtag">max ' + it.max + " / BT</span>" : "") +
           (it.pack > 1 ? '<span class="permtag">lot de ' + it.pack + "</span>" : "") +
+          (it.temps > 0 ? '<span class="permtag">' + esc(MNStore.duree(it.temps)) + "</span>" : "") +
           (it.excludes.length
             ? '<span class="permtag">✕ ' + it.excludes.length + " incompatibilité" +
               (it.excludes.length > 1 ? "s" : "") + "</span>"
@@ -393,12 +394,20 @@
           '<p class="hint"><b>0 = illimité.</b> Mettre 2 empêche d\'en prendre plus de 2 sur un même bon de travail.</p></div>' +
       "</div>" +
 
-      '<div class="field"><label class="label" for="e-pack">Quantité par lot</label>' +
-        '<input class="input input--num" id="e-pack" type="number" min="0" max="9999" value="' + Number(cur.pack || 0) + '">' +
-        '<p class="hint"><b>0 = pas de lot</b>, l\'objet s\'affiche sous son nom. Mettre 10 sur ' +
-          "<i>Pièces détachées</i> l'affiche « 10 Pièces détachées », puis « 20 » quand on en " +
-          "prend deux. Le nom ne doit alors <b>pas</b> contenir le nombre. Le coût en ressources " +
-          "reste celui d'un lot.</p></div>" +
+      '<div class="editor__grid">' +
+        '<div class="field"><label class="label" for="e-pack">Quantité par lot</label>' +
+          '<input class="input input--num" id="e-pack" type="number" min="0" max="9999" value="' + Number(cur.pack || 0) + '">' +
+          '<p class="hint"><b>0 = pas de lot</b>, l\'objet s\'affiche sous son nom. Mettre 10 sur ' +
+            "<i>Pièces détachées</i> l'affiche « 10 Pièces détachées », puis « 20 » quand on en " +
+            "prend deux. Le nom ne doit alors <b>pas</b> contenir le nombre. Le coût en ressources " +
+            "reste celui d'un lot.</p></div>" +
+        '<div class="field"><label class="label" for="e-temps">Temps de fabrication (minutes)</label>' +
+          '<input class="input input--num" id="e-temps" type="number" min="0" max="9999" value="' +
+            Number(cur.temps || 0) + '">' +
+          '<p class="hint"><b>Facultatif — 0 = non renseigné.</b> Le temps se cumule sur le bon de ' +
+            "travail : deux fois l'objet, deux fois le temps. Le total s'affiche à côté du panier " +
+            "et sur le bon enregistré.</p></div>" +
+      "</div>" +
 
       '<div class="fieldset"><span class="label">Objets incompatibles</span>' +
         '<p class="hint" style="margin-bottom:10px">Coche les objets qui ne peuvent pas figurer sur le ' +
@@ -509,6 +518,7 @@
               note: body.querySelector("#e-note").value.trim(),
               max: Math.max(0, Math.min(999, Math.round(Number(body.querySelector("#e-max").value) || 0))),
               pack: Math.max(0, Math.min(9999, Math.round(Number(body.querySelector("#e-pack").value) || 0))),
+              temps: Math.max(0, Math.min(9999, Math.round(Number(body.querySelector("#e-temps").value) || 0))),
               enabled: body.querySelector("#e-on").checked,
               excludes: excl,
               cost

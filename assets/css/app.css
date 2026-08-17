@@ -275,6 +275,18 @@
 }
 .item.is-full .stepper { box-shadow: inset 0 0 0 1px rgba(255, 169, 46, .3); }
 
+/* Temps de fabrication, sous le nom. Dans le flux : les coins de la carte sont
+   déjà pris, et un badge en absolu recouvrirait les ressources. */
+.item__temps {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  margin: 4px auto 0;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dim);
+}
+.item__temps svg { width: 12px; height: 12px; flex: none; }
+.item.is-picked .item__temps { color: var(--amber); }
+
 /* Objet rendu indisponible par un autre déjà choisi */
 .item.is-blocked {
   cursor: not-allowed;
@@ -440,6 +452,7 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.bt__amount--time { font-size: 13px; color: var(--amber); }
 
 .bt-preview {
   margin: 0;
