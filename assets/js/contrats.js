@@ -6,9 +6,11 @@
      contracts         créer et modifier
      contracts_delete  supprimer
 
-   Chaque ligne porte son propre prix et sa propre quantité : un contrat fige
-   ce qui a été convenu. Les ressources à sortir, elles, sont recalculées
-   depuis le catalogue du jour — c'est un fait d'atelier, pas un terme négocié.
+   Il n'y a pas d'argent ici : on troque. Chaque ligne dit ce que l'atelier
+   fournit et ce que le client apporte en échange, et le contrat additionne
+   les deux versants. Ce qui a été convenu est figé dans la ligne ; ce que
+   l'atelier sortira du stock, lui, est recalculé depuis le catalogue du
+   jour — c'est un fait d'atelier, pas un terme négocié.
    ========================================================================== */
 
 (function () {
@@ -185,7 +187,7 @@
       '<span class="ctdot ctdot--' + k.etat + '" title="' + esc(ETIQUETTES[k.etat]) + '"></span>' +
       '<span class="staffrow__txt"><b>' + esc(k.titre || "Sans titre") + "</b>" +
         "<i>" + esc(k.client || "Client non renseigné") + "</i></span>" +
-      '<span class="ctsum">' + esc(S().argent(t.argent)) + "</span>" +
+      '<span class="ctsum">' + t.pieces + (t.pieces > 1 ? " pièces" : " pièce") + "</span>" +
     "</button>";
   }
 
@@ -227,40 +229,33 @@
           (k.lignes.length
             ? '<table class="cttable"><thead><tr>' +
                 "<th>Prestation</th><th class=\"num\">Qté</th>" +
-                "<th class=\"num\">Prix unitaire</th><th class=\"num\">Total</th>" +
+                "<th class=\"num\">Demandé / unité</th><th class=\"num\">Total demandé</th>" +
               "</tr></thead><tbody>" +
               k.lignes.map(l =>
                 "<tr><td>" + esc(l.name || "—") +
                   (l.itemId ? "" : ' <span class="permtag">ligne libre</span>') + "</td>" +
                   '<td class="num">' + l.qty + "</td>" +
-                  '<td class="num">' + esc(S().argent(l.prix)) + "</td>" +
-                  '<td class="num"><b>' + esc(S().argent(l.prix * l.qty)) + "</b></td></tr>").join("") +
+                  '<td class="num">' + esc(troc(l)) + "</td>" +
+                  '<td class="num"><b>' + esc(troc(l, l.qty)) + "</b></td></tr>").join("") +
               "</tbody></table>"
             : '<p class="hint">Aucune ligne. ' +
               (canEdit ? "Clique sur « Modifier » pour en ajouter." : "") + "</p>") +
 
           '<div class="cttotaux">' +
-            '<div class="cttotal"><span>Total</span><b>' + esc(S().argent(t.argent)) + "</b></div>" +
+            '<div class="cttotal"><span>Pièces</span><b>' + t.pieces + "</b></div>" +
             (t.secondes
               ? '<div class="cttotal"><span>Fabrication</span><b>' +
                 esc(S().duree(t.secondes)) + "</b></div>"
               : "") +
-            '<div class="cttotal"><span>Pièces</span><b>' + t.pieces + "</b></div>" +
           "</div>" +
 
-          /* Le vrai intérêt du contrat : ce qu'il faudra sortir du stock. */
-          '<div class="fieldset" style="margin-top:18px">' +
-            '<span class="label">Ressources nécessaires en tout</span>' +
-            (t.resources.length
-              ? '<div class="reslist" style="margin-top:10px">' + t.resources.map(r =>
-                  '<div class="res">' +
-                    '<div class="res__ico" style="color:' + esc(r.resource.color) + '">' +
-                      mnIcon(r.resource.icon) + "</div>" +
-                    '<div class="res__txt"><b>' + esc(r.resource.name) + "</b><span>×" +
-                      r.qty + "</span></div>" +
-                  "</div>").join("") + "</div>"
-              : '<p class="hint" style="margin-top:8px">Aucune : ce contrat ne contient que ' +
-                "des lignes libres, sans objet du catalogue.</p>") +
+          /* Les deux versants du troc, côte à côte : c'est ce qu'on vient
+             lire sur un contrat. */
+          '<div class="ctpaires">' +
+            versant("Le client apporte", t.demande,
+              "Aucune contrepartie n'a été convenue sur ce contrat.") +
+            versant("L'atelier sort du stock", t.resources,
+              "Rien : ce contrat ne porte que des lignes libres.") +
           "</div>" +
 
           (k.note
@@ -286,6 +281,27 @@
     '<div class="vbox' + (valeur ? "" : " vbox--vide") + '"><span class="vbox__l">' +
       esc(label) + "</span><b>" + (valeur ? esc(valeur) : "—") + "</b></div>";
 
+  /** La contrepartie d'une ligne, « Métal ×20 ». `fois` la multiplie. */
+  function troc(l, fois) {
+    if (!l.resId || !l.resQty) return "—";
+    const r = S().resourceById(l.resId);
+    return (r ? r.name : l.resId) + " ×" + S().nombre(l.resQty * (fois || 1));
+  }
+
+  /** Un versant du troc : son intitulé et la liste des ressources. */
+  const versant = (titre, liste, vide) =>
+    '<div class="ctversant"><span class="label">' + esc(titre) + "</span>" +
+      (liste.length
+        ? '<div class="reslist">' + liste.map(r =>
+            '<div class="res">' +
+              '<div class="res__ico" style="color:' + esc(r.resource.color) + '">' +
+                mnIcon(r.resource.icon) + "</div>" +
+              '<div class="res__txt"><b>' + esc(r.resource.name) + "</b><span>×" +
+                S().nombre(r.qty) + "</span></div>" +
+            "</div>").join("") + "</div>"
+        : '<p class="hint">' + esc(vide) + "</p>") +
+    "</div>";
+
   /* ---- Édition -------------------------------------------------------------- */
 
   function nouvelleRef() {
@@ -304,6 +320,7 @@
     let lignes = cur.lignes.map(l => Object.assign({}, l));
 
     const items = S().catalog().items.filter(i => i.enabled);
+    const ressources = S().catalog().resources;
 
     const body = document.createElement("div");
     body.className = "editor";
@@ -326,8 +343,10 @@
       "</div>" +
 
       '<div class="fieldset"><span class="label">Lignes du contrat</span>' +
-        '<p class="hint" style="margin-bottom:10px">Le prix et la quantité appartiennent au ' +
-          "contrat : changer le catalogue plus tard ne réécrira pas ce qui a été convenu.</p>" +
+        '<p class="hint" style="margin-bottom:10px">Pour chaque ligne : ce que l\'atelier ' +
+          "fournit, et ce que le client apporte en échange — une ressource, par unité. " +
+          "Ce troc appartient au contrat : changer le catalogue plus tard ne réécrira pas " +
+          "ce qui a été convenu.</p>" +
         '<div id="k-lignes"></div>' +
         '<div class="row" style="margin-top:10px">' +
           '<button class="btn btn--ghost btn--sm" id="k-add" type="button">' + svg("plus") +
@@ -356,10 +375,15 @@
                 : '<input class="input" data-f="name" maxlength="120" value="' + esc(l.name) +
                   '" placeholder="Intitulé libre">') +
               '<input class="input input--num" data-f="qty" inputmode="numeric" ' +
-                'title="Quantité" value="' + l.qty + '">' +
-              '<input class="input input--num" data-f="prix" inputmode="decimal" ' +
-                'title="Prix unitaire" value="' + l.prix + '">' +
-              '<span class="ctrow__tot">' + esc(S().argent(l.prix * l.qty)) + "</span>" +
+                'title="Quantité fournie" value="' + l.qty + '">' +
+              '<select class="select" data-f="res" title="Ressource demandée en échange">' +
+                '<option value="">— rien</option>' +
+                ressources.map(r => '<option value="' + esc(r.id) + '"' +
+                  (r.id === l.resId ? " selected" : "") + ">" + esc(r.name) + "</option>").join("") +
+              "</select>" +
+              '<input class="input input--num" data-f="resqty" inputmode="numeric" ' +
+                'title="Quantité demandée, par unité fournie" value="' + l.resQty + '">' +
+              '<span class="ctrow__tot">' + esc(troc(l, l.qty)) + "</span>" +
               '<button class="btn btn--icon" data-f="rm" type="button" title="Retirer">' +
                 svg("x") + "</button>" +
             "</div>").join("")
@@ -369,14 +393,16 @@
         const i = Number(row.dataset.i);
         const maj = () => {
           const q = row.querySelector('[data-f="qty"]');
-          const p = row.querySelector('[data-f="prix"]');
+          const rq = row.querySelector('[data-f="resqty"]');
           lignes[i].qty = Math.max(1, Math.min(9999, Math.round(Number(q.value) || 1)));
-          lignes[i].prix = Math.max(0, Math.round((Number(String(p.value).replace(",", ".")) || 0) * 100) / 100);
-          row.querySelector(".ctrow__tot").textContent = S().argent(lignes[i].prix * lignes[i].qty);
+          lignes[i].resQty = Math.max(0, Math.min(99999, Math.round(Number(rq.value) || 0)));
+          lignes[i].resId = row.querySelector('[data-f="res"]').value;
+          row.querySelector(".ctrow__tot").textContent = troc(lignes[i], lignes[i].qty);
           majApercu();
         };
-        row.querySelectorAll('[data-f="qty"],[data-f="prix"]').forEach(n =>
+        row.querySelectorAll('[data-f="qty"],[data-f="resqty"]').forEach(n =>
           n.addEventListener("input", maj));
+        row.querySelector('[data-f="res"]').addEventListener("change", maj);
 
         const it = row.querySelector('[data-f="item"]');
         if (it) it.addEventListener("change", () => {
@@ -396,28 +422,30 @@
       majApercu();
     }
 
-    /* Le total et les ressources suivent la saisie : c'est ce qu'on vient
-       vérifier en montant un contrat. */
+    /* Les deux versants suivent la saisie : c'est ce qu'on vient vérifier en
+       montant un contrat — ce qu'on reçoit contre ce qu'on sort. */
     function majApercu() {
       const t = S().contratTotaux({ lignes });
+      const tas = (titre, liste) => liste.length
+        ? '<div class="ctres"><i>' + titre + "</i>" + liste.map(r =>
+            "<span>" + esc(r.resource.name) + " ×" + S().nombre(r.qty) + "</span>").join("") + "</div>"
+        : "";
       apercu.innerHTML =
-        '<div class="cttotal"><span>Total</span><b>' + esc(S().argent(t.argent)) + "</b></div>" +
+        '<div class="cttotal"><span>Pièces</span><b>' + t.pieces + "</b></div>" +
         (t.secondes ? '<div class="cttotal"><span>Fabrication</span><b>' +
           esc(S().duree(t.secondes)) + "</b></div>" : "") +
-        (t.resources.length
-          ? '<div class="ctres">' + t.resources.map(r =>
-              "<span>" + esc(r.resource.name) + " ×" + r.qty + "</span>").join("") + "</div>"
-          : "");
+        tas("On reçoit", t.demande) +
+        tas("On sort", t.resources);
     }
 
     body.querySelector("#k-add").addEventListener("click", () => {
       if (!items.length) return MNUI.toast("Aucun objet dans le catalogue", "err");
       const it = items[0];
-      lignes.push({ itemId: it.id, name: it.name, qty: 1, prix: 0 });
+      lignes.push({ itemId: it.id, name: it.name, qty: 1, resId: "", resQty: 0 });
       peindre();
     });
     body.querySelector("#k-add-libre").addEventListener("click", () => {
-      lignes.push({ itemId: "", name: "", qty: 1, prix: 0 });
+      lignes.push({ itemId: "", name: "", qty: 1, resId: "", resQty: 0 });
       peindre();
     });
     peindre();
@@ -497,12 +525,11 @@
     const lignes = k.lignes.map(l =>
       "<tr><td>" + esc(l.name || "—") + "</td>" +
         '<td class="n">' + l.qty + "</td>" +
-        '<td class="n">' + esc(S().argent(l.prix)) + "</td>" +
-        '<td class="n">' + esc(S().argent(l.prix * l.qty)) + "</td></tr>").join("");
+        '<td class="n">' + esc(troc(l, l.qty)) + "</td></tr>").join("");
 
-    const res = t.resources.length
-      ? t.resources.map(r => esc(r.resource.name) + " ×" + r.qty).join(" · ")
-      : "aucune";
+    const tas = liste => liste.length
+      ? liste.map(r => esc(r.resource.name) + " ×" + S().nombre(r.qty)).join(" · ")
+      : "rien";
 
     const doc =
       "<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"utf-8\">" +
@@ -531,18 +558,20 @@
         "</div>" +
 
         (k.lignes.length
-          ? "<table><thead><tr><th>Prestation</th><th class=\"n\">Qté</th>" +
-            "<th class=\"n\">P.U.</th><th class=\"n\">Total</th></tr></thead>" +
+          ? "<table><thead><tr><th>Ce que l'atelier fournit</th><th class=\"n\">Qté</th>" +
+            "<th class=\"n\">En échange de</th></tr></thead>" +
             "<tbody>" + lignes + "</tbody></table>"
           : "<p class=\"vide\">Aucune prestation portée à ce contrat.</p>") +
 
-        '<p class="somme">Total convenu <b>' + esc(S().argent(t.argent)) + "</b></p>" +
-
-        '<div class="bloc">' +
-          "<h3>Ce qu'il faudra sortir du stock</h3>" +
-          "<p>" + res + "</p>" +
-          (t.secondes ? "<p>Temps de fabrication cumulé : " + esc(S().duree(t.secondes)) + "</p>" : "") +
+        '<div class="troc">' +
+          '<div><h3>Le client apporte</h3><p>' + tas(t.demande) + "</p></div>" +
+          '<div><h3>L\'atelier sort du stock</h3><p>' + tas(t.resources) + "</p></div>" +
         "</div>" +
+
+        (t.secondes
+          ? '<div class="bloc"><h3>Temps de fabrication</h3><p>' +
+            esc(S().duree(t.secondes)) + "</p></div>"
+          : "") +
 
         (k.note ? '<div class="bloc"><h3>Notes</h3><p>' + esc(k.note) + "</p></div>" : "") +
 
@@ -611,8 +640,13 @@
     "td{padding:7px 8px;border-bottom:1px dashed rgba(74,60,40,.45)}",
     ".n{text-align:right;white-space:nowrap}",
 
-    ".somme{text-align:right;font-size:24px;margin:0 0 26px}",
-    ".somme b{font-size:29px;border-bottom:3px double #4a3c28;padding-bottom:2px;margin-left:10px}",
+    /* Les deux versants du troc, cote a cote : c est le coeur du contrat. */
+    ".troc{display:flex;gap:34px;margin:22px 0 24px;",
+    "border-top:2px solid #4a3c28;border-bottom:2px solid #4a3c28;padding:14px 0}",
+    ".troc>div{flex:1}",
+    ".troc p{margin:0;font-size:21px}",
+    ".troc h3{font-family:'Special Elite',monospace;font-size:11px;letter-spacing:.14em;",
+    "text-transform:uppercase;margin:0 0 5px;opacity:.7}",
 
     ".bloc{margin-bottom:20px}",
     ".bloc h3{font-family:'Special Elite',monospace;font-size:11px;letter-spacing:.14em;",

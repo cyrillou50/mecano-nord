@@ -528,8 +528,10 @@ function nettoyerLigne(l) {
     itemId,
     name: nom,
     qty: nombre(l.qty, 1, 9999),
-    /* Au centime : un prix négocié n'est pas forcément rond. */
-    prix: Math.max(0, Math.min(99999999, Math.round((Number(l.prix) || 0) * 100) / 100))
+    /* La contrepartie : on troque, il n'y a pas d'argent. Une ressource
+       demandée au client, et combien par unité de prestation. */
+    resId: texte(l.resId, 60),
+    resQty: nombre(l.resQty, 0, 99999)
   };
 }
 

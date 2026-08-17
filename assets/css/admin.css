@@ -918,7 +918,7 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
 /* Une ligne en cours d'édition : intitulé souple, chiffres serrés à droite. */
 .ctrow {
   display: grid;
-  grid-template-columns: 1fr 78px 108px auto 34px;
+  grid-template-columns: 1fr 70px 1fr 84px auto 34px;
   gap: 8px; align-items: center;
   margin-bottom: 8px;
 }
@@ -936,6 +936,27 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
   border-top: 1px dashed var(--line);
 }
 .ctapercu .cttotal { flex: 0 1 auto; min-width: 120px; }
+.ctres i {
+  font-style: normal;
+  font-family: var(--font-display);
+  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--dim);
+  align-self: center;
+}
+
+/* Les deux versants du troc, cote a cote. */
+.ctpaires {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  margin-top: 18px;
+}
+.ctversant {
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: rgba(255, 255, 255, .018);
+}
+.ctversant > .label { display: block; margin-bottom: 10px; }
 .ctres {
   display: flex; flex-wrap: wrap; gap: 6px;
   flex: 1 1 100%;
@@ -950,6 +971,7 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
 }
 
 @media (max-width: 700px) {
-  .ctrow { grid-template-columns: 1fr 66px 92px; }
+  .ctrow { grid-template-columns: 1fr 60px; }
+  .ctrow [data-f="res"] { grid-column: 1 / -1; }
   .ctrow__tot { grid-column: 1 / -2; text-align: left; }
 }

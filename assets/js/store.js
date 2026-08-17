@@ -73,18 +73,18 @@ window.MNStore = (function () {
   const entier = (v, min, max) =>
     Math.max(min, Math.min(max, Math.round(Number(v) || 0)));
 
-  /** Un montant, en centimes près, jamais négatif. */
-  const montant = v => Math.max(0, Math.min(99999999, Math.round((Number(v) || 0) * 100) / 100));
-
   function normLigne(l) {
     const t = l && typeof l === "object" ? l : {};
     return {
       itemId: String(t.itemId || ""),
       /* Recopié du catalogue à l'ajout, puis libre : une ligne peut aussi
-         n'exister que dans le contrat (main d'œuvre, remise…). */
+         n'exister que dans le contrat (main d'œuvre, convoyage…). */
       name: String(t.name || "").slice(0, 120),
       qty: entier(t.qty, 1, 9999),
-      prix: montant(t.prix)
+      /* La contrepartie : plus d'argent ici, on troque. Une ressource
+         demandée au client, et combien par unité de prestation. */
+      resId: String(t.resId || ""),
+      resQty: entier(t.resQty, 0, 99999)
     };
   }
 
@@ -106,50 +106,48 @@ window.MNStore = (function () {
   }
 
   /**
-   * Ce que coûte un contrat : total en argent, ressources à sortir du stock,
-   * temps de fabrication cumulé.
+   * Les deux versants d'un contrat.
    *
-   * Les ressources et le temps viennent du catalogue — ce sont des faits
-   * d'atelier d'aujourd'hui, pas des termes négociés — tandis que le prix
-   * vient de la ligne, où il a été convenu.
+   *   resources  ce que l'atelier devra sortir de son stock, et le temps qu'il
+   *              y passera. Calculé depuis le catalogue du jour : c'est un
+   *              fait d'atelier, pas un terme négocié.
+   *   demande    ce que le client apporte en échange. Vient de la ligne, où
+   *              il a été convenu, et ne bouge plus.
    */
   function contratTotaux(contrat, cat) {
     const c = cat || _catalog;
-    const byRes = {};
-    let argent = 0, secondes = 0, pieces = 0;
+    const sort = {}, recu = {};
+    let secondes = 0, pieces = 0;
 
     (contrat.lignes || []).forEach(l => {
       const q = Math.max(0, Math.round(Number(l.qty) || 0));
-      argent += (Number(l.prix) || 0) * q;
       pieces += q;
+
+      /* La contrepartie se compte par unité, comme le faisait un prix. */
+      if (l.resId && l.resQty > 0) recu[l.resId] = (recu[l.resId] || 0) + l.resQty * q;
+
       const it = (c.items || []).find(i => i.id === l.itemId);
       if (!it) return;                       // ligne libre : rien à sortir
       secondes += (it.temps || 0) * q;
       Object.keys(it.cost || {}).forEach(rid => {
-        byRes[rid] = (byRes[rid] || 0) + it.cost[rid] * q;
+        sort[rid] = (sort[rid] || 0) + it.cost[rid] * q;
       });
     });
 
-    const resources = (c.resources || [])
-      .filter(r => byRes[r.id] > 0)
-      .map(r => ({ resource: r, qty: byRes[r.id] }));
+    const lister = tas => (c.resources || [])
+      .filter(r => tas[r.id] > 0)
+      .map(r => ({ resource: r, qty: tas[r.id] }));
 
-    return { argent: Math.round(argent * 100) / 100, resources, secondes, pieces };
+    return { resources: lister(sort), demande: lister(recu), secondes, pieces };
   }
 
   /**
-   * « 12 500 $ » — décimales seulement si elles existent.
-   *
-   * Le séparateur de milliers est une espace fine insécable, écrite en
-   * échappement pour rester visible dans le code : c'est ce que prescrit la
-   * typographie française, et surtout un montant ne se coupe jamais en fin
-   * de ligne.
+   * « 1 250 » — le séparateur de milliers est une espace fine insécable :
+   * c’est ce que prescrit la typographie française, et surtout un nombre ne
+   * se coupe jamais en fin de ligne.
    */
-  function argent(v) {
-    const n = Math.round((Number(v) || 0) * 100) / 100;
-    const [e, d] = n.toFixed(2).split(".");
-    return e.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + (d === "00" ? "" : "," + d) + " $";
-  }
+  const nombre = v => String(Math.round(Number(v) || 0))
+    .replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
   /** Nettoie les caractéristiques d'un véhicule, sans toucher au reste. */
   const statsVehicule = v => Object.assign({}, v, {
@@ -709,7 +707,7 @@ window.MNStore = (function () {
     catalog, published, hasDraft, origin, settings, brand, api,
     roleById, roleOf, itemById, resourceById, categoryById,
     topCategories, subCategories, categoryScope, itemLabel, totals, duree,
-    normContrat, contratTotaux, argent, ETATS_CONTRAT: ETATS,
+    normContrat, contratTotaux, nombre, ETATS_CONTRAT: ETATS,
     vehicleById, vehicleCatById,
     IMG_TAG, imageName, imageUrl, imagesHebergees,
     NA, CARBURANTS, statsVehicule,
