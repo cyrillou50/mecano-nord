@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-17T16:58:57.902Z",
+  "updatedAt": "2026-08-17T17:02:50.391Z",
   "settings": {
     "webhook": {
       "bt": "enc:JREXER1VYUAWDVwnDgsrSCcKDk4YPQxMFgsNJgAdD1xrUEx8VXxRVlRPfVxTWV1eeFZAUAA1Axp6FAoBCQYKPxUgCR0hPhsTHWsuV0wkMjIkAQk7Cz0PDR0tLwYzUUoTDU8DFhBRBSZJfjMZJ1wJHyArCmMRAzE4Aw==",
@@ -720,7 +720,7 @@
       "note": "",
       "max": 1,
       "pack": 0,
-      "temps": 10,
+      "temps": 0,
       "excludes": [],
       "cost": {
         "ressource": 50
@@ -780,7 +780,7 @@
       "note": "",
       "max": 10,
       "pack": 0,
-      "temps": 0,
+      "temps": 10,
       "excludes": [],
       "cost": {
         "ferraille": 30,
