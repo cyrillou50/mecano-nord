@@ -272,6 +272,9 @@ window.MNUI = (function () {
       '<nav class="topnav">' +
         '<a class="navlink' + (active === "fact" ? " is-active" : "") + '" href="index.html">Facturation</a>' +
         (active === "fact" ? '<button class="navlink" id="nav-history">Historique</button>' : "") +
+        /* Le calendrier est ouvert : savoir ce qui est prévu n'est pas une faveur. */
+        '<a class="navlink' + (active === "calendrier" ? " is-active" : "") +
+          '" href="calendrier.html">Calendrier</a>' +
         /* Les contrats demandent au minimum le droit de les lire. */
         (MNAuth.canAny("contracts_view", "contracts", "contracts_delete")
           ? '<a class="navlink' + (active === "contrats" ? " is-active" : "") +

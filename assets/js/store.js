@@ -457,6 +457,11 @@ window.MNStore = (function () {
        contrat déjà signé. */
     c.contracts = (Array.isArray(c.contracts) ? c.contracts : []).map(k => normContrat(k));
 
+    /* --- agenda ---
+       Comme les contrats : il vit sur le serveur, ceci n'est que le repli.
+       MNAgenda le nettoie lui-même, on se contente ici de garder le tableau. */
+    c.events = Array.isArray(c.events) ? c.events.slice(0, 2000) : [];
+
     /* --- rôles ---
        Les droits sont portés par le rôle, plus par l'employé. Les anciens
        comptes (texte libre + permissions individuelles) sont convertis

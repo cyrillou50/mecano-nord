@@ -46,6 +46,9 @@ window.MN_PERMS = [
   { key: "contracts_view",   name: "Lire les contrats",  desc: "Consulter les contrats et les sortir en PDF. Lecture seule : aucune modification possible." },
   { key: "contracts",        name: "Gérer les contrats", desc: "Créer et modifier les contrats, leurs lignes, prix et quantités. Inclut la lecture." },
   { key: "contracts_delete", name: "Supprimer un contrat", desc: "Retirer définitivement un contrat. À réserver : rien ne le récupère." },
+  /* Le calendrier se lit sans droit particulier : savoir ce qui est prévu
+     n'est pas une faveur. Y écrire, si. */
+  { key: "calendar",  name: "Gérer le calendrier", desc: "Poser, modifier et supprimer des évènements. Tout le monde peut les consulter." },
   { key: "users",     name: "Gérer l'équipe",      desc: "Ajouter des employés, créer des rôles et régler leurs droits." },
   { key: "publish",   name: "Publier en ligne",    desc: "Envoyer les modifications sur le site public." },
   { key: "theme",     name: "Gérer l'apparence",   desc: "Choisir le thème et les couleurs de tout le site, et décider si chacun peut se faire les siennes." },

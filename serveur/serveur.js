@@ -21,6 +21,8 @@
      POST /images      → en déposer une, la renommer ou la supprimer
      GET  /images/distant?u= → relaie une image d'un autre domaine, pour que
                          le site puisse la recadrer
+     GET  /calendrier  → l'agenda de l'atelier
+     POST /calendrier  → y poser, modifier ou retirer un evenement
      GET  /recap       → ce que dira le récapitulatif hebdomadaire
      POST /recap       → l'envoyer tout de suite, sans attendre dimanche
      GET  /sante       → « ok », pratique pour vérifier que tout tourne
@@ -53,6 +55,8 @@ const FICHIER_VEH = path.join(DOSSIER, "vehicules.json");
 /* Les contrats aussi : les droits qui les régissent n'ont rien à voir avec le
    droit de publier le site. */
 const FICHIER_CT = path.join(DOSSIER, "contrats.json");
+/* Et l'agenda de l'atelier, pour la même raison. */
+const FICHIER_AG = path.join(DOSSIER, "agenda.json");
 
 /* Origines autorisées, séparées par des virgules. « * » = tout le monde. */
 const ORIGINES = String(process.env.ORIGINE || "*")
@@ -957,6 +961,7 @@ const serveur = http.createServer(async (req, res) => {
          qu'il sait aller chercher une image sur un autre domaine. */
       return repondre(res, 200, {
         ok: true, ops: true, images: true, vehicules: true, relais: true, contrats: true,
+        calendrier: true,
         recap: RECAP_ACTIF,
         depuis: Math.round(process.uptime()) + " s"
       }, req);
@@ -982,6 +987,36 @@ const serveur = http.createServer(async (req, res) => {
         const c = await corpsJson(req).catch(() => ({}));
         const r = await envoyerRecap(c.marquer === true);
         return repondre(res, r.ok ? 200 : 502, r, req);
+      }
+      return repondre(res, 405, { error: "Méthode non autorisée" }, req);
+    }
+
+    /* --- agenda --- */
+    if (chemin === "/calendrier") {
+      if (req.method === "GET") return repondre(res, 200, await lireAgenda(), req);
+
+      if (req.method === "POST") {
+        const op = await corpsJson(req);
+        if (!op || !op.op) return repondre(res, 400, { error: "Opération manquante" }, req);
+
+        const r = await enFile(async () => {
+          const actuel = await lireAgenda();
+          /* Première écriture : le site peut joindre ce qu'il avait déjà dans
+             le catalogue, pour ne pas repartir d'un agenda vide. */
+          if (!actuel.events.length && op.depart) {
+            const d = nettoyerAgenda(op.depart);
+            if (d) actuel.events = d.events;
+          }
+          const res2 = appliquerAgenda(actuel, op);
+          if (res2.erreur) return res2;
+          await ecrireAgenda(res2.agenda);
+          return res2;
+        });
+
+        if (r.erreur) return repondre(res, 400, { error: r.erreur }, req);
+        console.log(new Date().toISOString(), "agenda :", op.op, "—",
+          r.agenda.events.length, "évènements");
+        return repondre(res, 200, { ok: true, agenda: r.agenda, deja: !!r.deja }, req);
       }
       return repondre(res, 405, { error: "Méthode non autorisée" }, req);
     }
@@ -1229,6 +1264,92 @@ const serveur = http.createServer(async (req, res) => {
     return repondre(res, 500, { error: e.message }, req);
   }
 });
+
+/* ---- Agenda -------------------------------------------------------------------
+   Les évènements de l'atelier. Ici pour la même raison que le parc et les
+   contrats : chacun doit pouvoir en poser un sans droit de publier, et
+   l'équipe le voir aussitôt. */
+
+const AGENDA_VIDE = { updatedAt: new Date(0).toISOString(), events: [] };
+
+/* Palette fermée : une couleur libre finirait en illisible sur fond sombre. */
+const TEINTES = ["rose", "ambre", "vert", "bleu", "gris"];
+
+function nettoyerEvent(e) {
+  const id = texte(e && e.id, 60);
+  const debut = jour(e && e.jour);
+  if (!id || !debut) return null;
+
+  /* Une fin avant le début n'a pas de sens : on la ramène au début plutôt que
+     de refuser l'évènement entier. */
+  let fin = jour(e.fin);
+  if (fin && fin < debut) fin = debut;
+
+  const h = texte(e.heure, 5);
+  return {
+    id,
+    jour: debut,
+    fin: fin && fin !== debut ? fin : null,
+    heure: /^([01]\d|2[0-3]):[0-5]\d$/.test(h) ? h : "",
+    titre: texte(e.titre, 120),
+    note: texte(e.note, 1000),
+    teinte: TEINTES.indexOf(e.teinte) !== -1 ? e.teinte : "rose",
+    creePar: texte(e.creePar, 60),
+    creeLe: dateIso(e.creeLe),
+    majPar: texte(e.majPar, 60),
+    majLe: dateIso(e.majLe)
+  };
+}
+
+function nettoyerAgenda(a) {
+  if (!a || typeof a !== "object") return null;
+  const events = Array.isArray(a.events) ? a.events : [];
+  if (events.length > 2000) return null;
+  return {
+    updatedAt: dateIso(a.updatedAt) || new Date().toISOString(),
+    events: events.map(nettoyerEvent).filter(Boolean)
+  };
+}
+
+function appliquerAgenda(ag, op) {
+  const a = { updatedAt: new Date().toISOString(), events: ag.events.slice() };
+
+  switch (op.op) {
+    case "set": {
+      const e = nettoyerEvent(op.event);
+      if (!e) return { erreur: "évènement invalide" };
+      const i = a.events.findIndex(x => x.id === e.id);
+      if (i === -1) a.events.push(e); else a.events[i] = e;
+      return { agenda: a };
+    }
+
+    case "remove": {
+      const id = texte(op.id, 60);
+      const i = a.events.findIndex(x => x.id === id);
+      if (i === -1) return { agenda: a, deja: true };
+      a.events.splice(i, 1);
+      return { agenda: a };
+    }
+
+    default:
+      return { erreur: "opération inconnue : " + op.op };
+  }
+}
+
+async function lireAgenda() {
+  try {
+    return nettoyerAgenda(JSON.parse(await fsp.readFile(FICHIER_AG, "utf8"))) || AGENDA_VIDE;
+  } catch (_) {
+    return AGENDA_VIDE;
+  }
+}
+
+async function ecrireAgenda(ag) {
+  await fsp.mkdir(DOSSIER, { recursive: true });
+  const tmp = FICHIER_AG + ".tmp";
+  await fsp.writeFile(tmp, JSON.stringify(ag, null, 2) + "\n", "utf8");
+  await fsp.rename(tmp, FICHIER_AG);
+}
 
 /* ---- Récapitulatif hebdomadaire ------------------------------------------------
    Chaque fin de semaine, le serveur poste dans le salon des services le temps
