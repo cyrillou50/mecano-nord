@@ -51,6 +51,7 @@
     { id: "items",   name: "Objets",     icon: "box",      perm: "items", n: () => draft.items.length },
     { id: "cats",    name: "Catégories", icon: "layers",   perm: "items", n: () => draft.categories.length },
     { id: "res",     name: "Ressources", icon: "cube",     perm: "items", n: () => draft.resources.length },
+    { id: "ctypes",  name: "Types de contrat", icon: "file", perm: "contracts", n: () => (draft.contractTypes || []).length },
     { id: "images",  name: "Images",     icon: "file",     perm: "items" },
     { id: "users",   name: "Employés",   icon: "users",    perm: "users", n: () => draft.users.length },
     { id: "roles",   name: "Rôles",      icon: "tag",      perm: "users", n: () => draft.roles.length },
@@ -105,7 +106,7 @@
       b.addEventListener("click", () => { tab = b.dataset.tab; filter = ""; render(); }));
 
     ({
-      items: paneItems, cats: paneCats, res: paneRes, images: paneImages,
+      items: paneItems, cats: paneCats, res: paneRes, ctypes: paneCtypes, images: paneImages,
       users: paneUsers, roles: paneRoles, discord: paneDiscord,
       theme: paneTheme, site: paneSite, publish: panePublish
     }[tab] || paneItems)($("#pane"));
@@ -1130,6 +1131,94 @@
     draft.resources = draft.resources.filter(x => x.id !== r.id);
     commit();
     MNUI.toast("Ressource supprimée", "ok");
+  }
+
+  /* ---- Types de contrat --------------------------------------------------------
+     La liste vit dans le catalogue et se publie avec le reste : c'est un
+     réglage d'atelier. Les contrats, eux, restent sur le serveur — seul
+     l'identifiant du type les relie ici. */
+
+  function paneCtypes(host) {
+    const types = draft.contractTypes || [];
+    host.innerHTML =
+      '<div class="toolbar">' +
+        '<span class="subtitle">Les natures de contrat proposées à la rédaction</span>' +
+        '<span class="spacer"></span>' +
+        '<button class="btn btn--primary" id="add">' + svg("plus") + "<span>Nouveau type</span></button>" +
+      "</div>" +
+      (types.length
+        ? '<div class="rows">' + types.map((t, i) =>
+            '<div class="trow" data-row="' + esc(t.id) + '">' +
+              '<div class="ord">' +
+                '<button data-a="up"' + (i === 0 ? " disabled" : "") + ">" + svg("chevUp") + "</button>" +
+                '<button data-a="down"' + (i === types.length - 1 ? " disabled" : "") + ">" +
+                  svg("chevDown") + "</button>" +
+              "</div>" +
+              '<div class="trow__ico">' + mnIcon(t.icon) + "</div>" +
+              '<div class="trow__main"><b>' + esc(t.name) + "</b>" +
+                '<div class="trow__meta"><i class="mono">' + esc(t.id) + "</i>" +
+                (t.jours
+                  ? '<span class="permtag">valable ' + t.jours + " jour" +
+                    (t.jours > 1 ? "s" : "") + "</span>"
+                  : '<em>sans durée proposée</em>') +
+                "</div></div>" +
+              '<div class="trow__acts">' +
+                '<button class="btn btn--icon" data-a="edit" title="Modifier">' + svg("edit") + "</button>" +
+                '<button class="btn btn--icon" data-a="del" title="Supprimer">' + svg("trash") + "</button>" +
+              "</div></div>").join("") + "</div>"
+        : '<div class="empty">' + svg("file") + "<b>Aucun type</b>" +
+          "<p>Réparation, Convoi, Fourniture… Ils servent à ranger et à filtrer les contrats.</p></div>") +
+      '<p class="hint" style="margin-top:14px">La durée proposée remplit la date ' +
+        "d'expiration à la création d'un contrat de ce type. Elle reste modifiable, " +
+        "et <b>0</b> ne propose rien.</p>";
+
+    $("#add").addEventListener("click", () => editCtype(null));
+    bindRows(host, draft.contractTypes, { edit: t => editCtype(t), del: t => deleteCtype(t) });
+  }
+
+  function editCtype(t) {
+    const isNew = !t;
+    const cur = t || { name: "", icon: "i-box", jours: 0 };
+
+    simpleEditor({
+      title: isNew ? "Nouveau type de contrat" : "Modifier le type",
+      name: cur.name, icon: cur.icon,
+      placeholder: "Ex. Convoi",
+      extra:
+        '<div class="field"><label class="label" for="t-jours">' +
+          "Durée de validité proposée (jours)</label>" +
+        '<input class="input input--num" id="t-jours" type="number" min="0" max="3650" value="' +
+          Number(cur.jours || 0) + '">' +
+        '<p class="hint"><b>0 = aucune.</b> Sinon, choisir ce type à la création ' +
+          "remplit la date d'expiration du contrat.</p></div>",
+      onSave: (name, icon, close, couleur, body) => {
+        const jours = Math.max(0, Math.min(3650,
+          Math.round(Number(body.querySelector("#t-jours").value) || 0)));
+        if (!draft.contractTypes) draft.contractTypes = [];
+        if (isNew) {
+          draft.contractTypes.push({
+            id: MNStore.uniqueId(name, draft.contractTypes.map(x => x.id)), name, icon, jours
+          });
+        } else { t.name = name; t.icon = icon; t.jours = jours; }
+        commit(); close();
+        MNUI.toast(isNew ? "Type créé" : "Type mis à jour", "ok");
+      }
+    });
+  }
+
+  async function deleteCtype(t) {
+    /* Les contrats vivent sur le serveur : on ne peut pas savoir d'ici combien
+       portent ce type. On le dit plutôt que de laisser croire à un décompte. */
+    const ok = await MNUI.confirm({
+      title: "Supprimer le type",
+      message: "« " + t.name + " » disparaîtra de la liste. Les contrats déjà rédigés " +
+        "gardent la trace de leur type, mais il s'affichera sans son nom.",
+      confirmLabel: "Supprimer", danger: true
+    });
+    if (!ok) return;
+    draft.contractTypes = (draft.contractTypes || []).filter(x => x.id !== t.id);
+    commit();
+    MNUI.toast("Type supprimé", "ok");
   }
 
   /* ---- Petit éditeur nom + icône (+ couleur) --------------------------------- */

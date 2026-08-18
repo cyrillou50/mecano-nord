@@ -526,15 +526,23 @@ function nettoyerLigne(l) {
   const nom = texte(l.name, 120).trim();
   const itemId = texte(l.itemId, 60);
   if (!nom && !itemId) return null;
-  return {
-    itemId,
-    name: nom,
-    qty: nombre(l.qty, 1, 9999),
-    /* La contrepartie : on troque, il n'y a pas d'argent. Une ressource
-       demandée au client, et combien par unité de prestation. */
-    resId: texte(l.resId, 60),
-    resQty: nombre(l.resQty, 0, 99999)
-  };
+
+  /* La contrepartie est une liste : un même travail peut se payer en métal ET
+     en essence. Les contrats écrits avant portaient resId/resQty — on les
+     reprend plutôt que de perdre ce qui a été convenu. */
+  let demande = (Array.isArray(l.demande) ? l.demande : [])
+    .map(d => ({ resId: texte(d && d.resId, 60), qty: nombre(d && d.qty, 0, 99999) }))
+    .filter(d => d.resId && d.qty > 0);
+  if (!demande.length && l.resId && Number(l.resQty) > 0) {
+    demande = [{ resId: texte(l.resId, 60), qty: nombre(l.resQty, 0, 99999) }];
+  }
+  /* Une même ressource deux fois se cumule : deux entrées « métal »
+     afficheraient deux totaux à additionner de tête. */
+  const vu = {};
+  demande.forEach(d => { vu[d.resId] = (vu[d.resId] || 0) + d.qty; });
+  demande = Object.keys(vu).slice(0, 8).map(k => ({ resId: k, qty: vu[k] }));
+
+  return { itemId, name: nom, qty: nombre(l.qty, 1, 9999), demande };
 }
 
 function nettoyerContrat(k) {
@@ -547,8 +555,14 @@ function nettoyerContrat(k) {
     ref: texte(k.ref, 40),
     titre: texte(k.titre, 120),
     client: texte(k.client, 80),
+    /* Identifiant d'un type réglé dans le catalogue du site. Le serveur ne
+       connaît pas cette liste et n'a pas à la connaître : il borne, c'est
+       tout. Un type supprimé depuis reste écrit sur le contrat signé. */
+    type: texte(k.type, 60),
     note: texte(k.note, 2000),
     etat: ETATS.indexOf(k.etat) !== -1 ? k.etat : "brouillon",
+    /* Expiration facultative, en jours pleins comme les congés. */
+    expire: jour(k.expire),
     lignes,
     creePar: texte(k.creePar, 60),
     creeLe: dateIso(k.creeLe),

@@ -70,21 +70,48 @@ window.MNStore = (function () {
 
   const ETATS = ["brouillon", "actif", "termine", "annule"];
 
+  /** Un jour, « AAAA-MM-JJ », ou null. Même règle que les congés. */
+  const jour = v => {
+    const s = typeof v === "string" ? v.slice(0, 10) : "";
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s)) ? s : null;
+  };
+
+  /** Aujourd'hui à l'heure locale, au même format. */
+  function jourLocal(d) {
+    const x = d ? new Date(d) : new Date();
+    const p = n => String(n).padStart(2, "0");
+    return x.getFullYear() + "-" + p(x.getMonth() + 1) + "-" + p(x.getDate());
+  }
+
   const entier = (v, min, max) =>
     Math.max(min, Math.min(max, Math.round(Number(v) || 0)));
 
   function normLigne(l) {
     const t = l && typeof l === "object" ? l : {};
+
+    /* La contrepartie est une liste : un même travail peut se payer en métal
+       ET en essence. Les contrats écrits avant portaient une seule ressource
+       en resId/resQty — on les reprend telle quelle plutôt que de perdre ce
+       qui a été convenu. */
+    let demande = (Array.isArray(t.demande) ? t.demande : [])
+      .map(d => ({ resId: String((d && d.resId) || ""), qty: entier(d && d.qty, 0, 99999) }))
+      .filter(d => d.resId && d.qty > 0);
+    if (!demande.length && t.resId && Number(t.resQty) > 0) {
+      demande = [{ resId: String(t.resId), qty: entier(t.resQty, 0, 99999) }];
+    }
+    /* Une même ressource deux fois sur la ligne se cumule : deux entrées
+       « métal » afficheraient deux totaux qu'il faudrait additionner de tête. */
+    const vu = {};
+    demande.forEach(d => { vu[d.resId] = (vu[d.resId] || 0) + d.qty; });
+    demande = Object.keys(vu).slice(0, 8).map(k => ({ resId: k, qty: vu[k] }));
+
     return {
       itemId: String(t.itemId || ""),
       /* Recopié du catalogue à l'ajout, puis libre : une ligne peut aussi
          n'exister que dans le contrat (main d'œuvre, convoyage…). */
       name: String(t.name || "").slice(0, 120),
       qty: entier(t.qty, 1, 9999),
-      /* La contrepartie : plus d'argent ici, on troque. Une ressource
-         demandée au client, et combien par unité de prestation. */
-      resId: String(t.resId || ""),
-      resQty: entier(t.resQty, 0, 99999)
+      demande
     };
   }
 
@@ -95,14 +122,32 @@ window.MNStore = (function () {
       ref: String(t.ref || "").slice(0, 40),
       titre: String(t.titre || "").slice(0, 120),
       client: String(t.client || "").slice(0, 80),
+      /* Le type est un identifiant de la liste réglée dans l'admin. Il peut
+         désigner un type supprimé depuis : on garde la valeur telle quelle,
+         l'affichage se débrouillera plutôt que de réécrire un contrat signé. */
+      type: String(t.type || "").slice(0, 60),
       note: String(t.note || "").slice(0, 2000),
       etat: ETATS.indexOf(t.etat) !== -1 ? t.etat : "brouillon",
+      /* Date d'expiration, facultative. Passée, le contrat n'est pas modifié
+         pour autant : c'est un fait à signaler, pas un état à lui imposer. */
+      expire: jour(t.expire),
       lignes: (Array.isArray(t.lignes) ? t.lignes : []).slice(0, 200).map(normLigne),
       creePar: String(t.creePar || "").slice(0, 60),
       creeLe: t.creeLe || null,
       majPar: String(t.majPar || "").slice(0, 60),
       majLe: t.majLe || null
     };
+  }
+
+  /** Un contrat dont la date est dépassée. Sans date, jamais expiré. */
+  const contratExpire = k => !!(k && k.expire && k.expire < jourLocal());
+
+  /** Le nombre de jours avant expiration, négatif si c'est passé. */
+  function joursAvant(expire) {
+    if (!expire) return null;
+    const a = new Date(jourLocal() + "T12:00:00");
+    const b = new Date(expire + "T12:00:00");
+    return Math.round((b - a) / 86400000);
   }
 
   /**
@@ -124,7 +169,9 @@ window.MNStore = (function () {
       pieces += q;
 
       /* La contrepartie se compte par unité, comme le faisait un prix. */
-      if (l.resId && l.resQty > 0) recu[l.resId] = (recu[l.resId] || 0) + l.resQty * q;
+      (l.demande || []).forEach(d => {
+        if (d.resId && d.qty > 0) recu[d.resId] = (recu[d.resId] || 0) + d.qty * q;
+      });
 
       const it = (c.items || []).find(i => i.id === l.itemId);
       if (!it) return;                       // ligne libre : rien à sortir
@@ -376,6 +423,31 @@ window.MNStore = (function () {
         })(v.propose)
       };
     });
+
+    /* --- types de contrat ---
+       La liste vit dans le catalogue et non sur le serveur : c'est un réglage
+       de l'atelier, au même titre que les catégories, et il se publie avec le
+       reste. Les contrats, eux, restent côté serveur — seul l'identifiant du
+       type les relie ici. */
+    const seenT = [];
+    c.contractTypes = (Array.isArray(c.contractTypes) ? c.contractTypes : []).map(t => {
+      const id = uniqueId(t.id || t.name, seenT); seenT.push(id);
+      return {
+        id,
+        name: String(t.name || id).slice(0, 60),
+        icon: t.icon || "i-box",
+        /* Durée de validité proposée à la création, en jours. 0 = aucune. */
+        jours: Math.max(0, Math.min(3650, Math.round(Number(t.jours) || 0)))
+      };
+    });
+    if (!c.contractTypes.length) {
+      c.contractTypes = [
+        { id: "reparation", name: "Réparation", icon: "i-wrench", jours: 0 },
+        { id: "convoi", name: "Convoi", icon: "i-wheels-truck", jours: 7 },
+        { id: "fourniture", name: "Fourniture", icon: "i-box", jours: 30 },
+        { id: "entretien", name: "Entretien", icon: "i-engine", jours: 90 }
+      ];
+    }
 
     /* --- contrats ---
        Ils vivent normalement sur le serveur ; ceci n'est que le repli quand
@@ -708,6 +780,9 @@ window.MNStore = (function () {
     roleById, roleOf, itemById, resourceById, categoryById,
     topCategories, subCategories, categoryScope, itemLabel, totals, duree,
     normContrat, contratTotaux, nombre, ETATS_CONTRAT: ETATS,
+    contratExpire, joursAvant, jour, jourLocal,
+    contractTypes: () => (_catalog.contractTypes || []).slice(),
+    contractTypeById: id => (_catalog.contractTypes || []).find(t => t.id === id) || null,
     vehicleById, vehicleCatById,
     IMG_TAG, imageName, imageUrl, imagesHebergees,
     NA, CARBURANTS, statsVehicule,

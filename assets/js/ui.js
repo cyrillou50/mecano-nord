@@ -261,7 +261,7 @@ window.MNUI = (function () {
     if (!el) return;
     const b = MNStore.brand();
     const s = MNAuth.session();
-    const canAdmin = MNAuth.canAny("items", "users", "publish", "theme", "admin");
+    const canAdmin = MNAuth.canAny("items", "users", "publish", "theme", "contracts", "admin");
     const mark = brandMark();
 
     el.innerHTML =

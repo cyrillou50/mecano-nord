@@ -24,6 +24,8 @@
   let sel = null;
   let filter = "";
   let fEtat = "";
+  let fType = "";
+  let fExpire = "";
   let canEdit = false;
   let canDel = false;
 
@@ -72,14 +74,26 @@
 
   const totaux = k => S().contratTotaux(k);
 
+  /* Un filtre par type s'ajoute à celui d'état : deux listes courtes valent
+     mieux qu'une seule qui mélangerait deux notions. */
   function liste() {
     const f = filter.trim().toLowerCase();
     return R().filter(k => {
       if (fEtat && k.etat !== fEtat) return false;
+      if (fType && k.type !== fType) return false;
+      if (fExpire === "oui" && !S().contratExpire(k)) return false;
+      if (fExpire === "non" && S().contratExpire(k)) return false;
       if (!f) return true;
       return (k.titre + " " + k.client + " " + k.ref).toLowerCase().indexOf(f) !== -1;
     });
   }
+  /* « 23 août 2026 » — un jour seul, sans heure : une expiration se lit en
+     jours pleins. */
+  const dateJour = j => {
+    const d = new Date(String(j) + "T12:00:00");
+    return isNaN(d) ? String(j) : d.toLocaleDateString("fr-FR",
+      { day: "numeric", month: "long", year: "numeric" });
+  };
 
   const dateCourte = iso => {
     const d = new Date(iso);
@@ -132,12 +146,25 @@
     host.innerHTML =
       '<div class="stafflist__top">' +
         '<input class="input" id="c-q" placeholder="Rechercher un contrat…" value="' + esc(filter) + '">' +
-        '<select class="select" id="c-etat" title="État" style="margin-top:6px">' +
-          '<option value="">Tous les états</option>' +
-          S().ETATS_CONTRAT.map(e =>
-            '<option value="' + e + '"' + (fEtat === e ? " selected" : "") + ">" +
-            esc(ETIQUETTES[e]) + "</option>").join("") +
-        "</select>" +
+        '<div class="vfilters">' +
+          '<select class="select" id="c-etat" title="État">' +
+            '<option value="">Tous les états</option>' +
+            S().ETATS_CONTRAT.map(e =>
+              '<option value="' + e + '"' + (fEtat === e ? " selected" : "") + ">" +
+              esc(ETIQUETTES[e]) + "</option>").join("") +
+          "</select>" +
+          '<select class="select" id="c-type" title="Type de contrat">' +
+            '<option value="">Tous les types</option>' +
+            S().contractTypes().map(t =>
+              '<option value="' + esc(t.id) + '"' + (fType === t.id ? " selected" : "") + ">" +
+              esc(t.name) + "</option>").join("") +
+          "</select>" +
+          '<select class="select" id="c-exp" title="Expiration" style="grid-column:1/-1">' +
+            '<option value="">Expirés ou non</option>' +
+            '<option value="non"' + (fExpire === "non" ? " selected" : "") + ">Encore valables</option>" +
+            '<option value="oui"' + (fExpire === "oui" ? " selected" : "") + ">Expirés</option>" +
+          "</select>" +
+        "</div>" +
       "</div>" +
 
       '<div class="stafflist__body">' +
@@ -164,9 +191,11 @@
       n.focus();
       n.setSelectionRange(pos, pos);
     });
-    host.querySelector("#c-etat").addEventListener("change", e => {
-      fEtat = e.target.value;
-      renderList();
+    /* Les trois filtres se comportent pareil : on les branche d'un coup. */
+    [["#c-etat", v => { fEtat = v; }], ["#c-type", v => { fType = v; }],
+     ["#c-exp", v => { fExpire = v; }]].forEach(function (p) {
+      const n = host.querySelector(p[0]);
+      if (n) n.addEventListener("change", e => { p[1](e.target.value); renderList(); });
     });
 
     host.querySelectorAll("[data-c]").forEach(b => b.addEventListener("click", () => {
@@ -182,11 +211,15 @@
 
   function ligne(k) {
     const t = totaux(k);
+    const type = S().contractTypeById(k.type);
+    const expire = S().contratExpire(k);
     return '<button class="staffrow' + (k.id === sel ? " is-active" : "") +
       '" data-c="' + esc(k.id) + '" type="button">' +
       '<span class="ctdot ctdot--' + k.etat + '" title="' + esc(ETIQUETTES[k.etat]) + '"></span>' +
-      '<span class="staffrow__txt"><b>' + esc(k.titre || "Sans titre") + "</b>" +
-        "<i>" + esc(k.client || "Client non renseigné") + "</i></span>" +
+      '<span class="staffrow__txt"><b>' + esc(k.titre || "Sans titre") +
+        (expire ? ' <span class="ctperime">expiré</span>' : "") + "</b>" +
+        "<i>" + esc([type ? type.name : "", k.client || "Client non renseigné"]
+          .filter(Boolean).join(" · ")) + "</i></span>" +
       '<span class="ctsum">' + t.pieces + (t.pieces > 1 ? " pièces" : " pièce") + "</span>" +
     "</button>";
   }
@@ -202,12 +235,16 @@
     }
 
     const t = totaux(k);
+    const type = S().contractTypeById(k.type);
+    const expire = S().contratExpire(k);
+    const reste = S().joursAvant(k.expire);
 
     pane.innerHTML =
       '<div class="panel vcard">' +
         '<div class="panel__head">' +
           "<h2>" + esc(k.titre || "Sans titre") + "</h2>" +
           '<span class="permtag ct-' + k.etat + '">' + esc(ETIQUETTES[k.etat]) + "</span>" +
+          (type ? '<span class="permtag">' + esc(type.name) + "</span>" : "") +
           '<span class="spacer"></span>' +
           '<button class="btn btn--ghost btn--sm" id="c-pdf">' + svg("file") + "<span>PDF</span></button>" +
           (canEdit
@@ -219,10 +256,21 @@
         "</div>" +
 
         '<div class="panel__body">' +
+          /* Une expiration passée se dit en clair, en haut : c'est ce qui
+             change la conduite a tenir sur le contrat. */
+          (expire
+            ? '<div class="alert alert--warn" style="margin-bottom:16px">' + svg("alert") +
+              "<span><b>Contrat expiré</b> — la date du " + esc(dateJour(k.expire)) +
+              " est passée depuis " + Math.abs(reste) + " jour" +
+              (Math.abs(reste) > 1 ? "s" : "") + ".</span></div>"
+            : "") +
+
           '<div class="ctmeta">' +
             boite("Client", k.client) +
+            boite("Type", type ? type.name : (k.type || "")) +
             boite("Référence", k.ref) +
             boite("Établi le", dateCourte(k.creeLe)) +
+            boite("Expire le", k.expire ? dateJour(k.expire) : "") +
             boite("Par", k.creePar) +
           "</div>" +
 
@@ -281,13 +329,20 @@
     '<div class="vbox' + (valeur ? "" : " vbox--vide") + '"><span class="vbox__l">' +
       esc(label) + "</span><b>" + (valeur ? esc(valeur) : "—") + "</b></div>";
 
-  /** La contrepartie d'une ligne, « Métal ×20 ». `fois` la multiplie. */
+  /**
+   * La contrepartie d'une ligne, « Métal ×20 · Essence ×5 ».
+   * `fois` multiplie par la quantité fournie : la demande est convenue à
+   * l'unité, comme l'était un prix unitaire.
+   */
   function troc(l, fois) {
-    if (!l.resId || !l.resQty) return "—";
-    const r = S().resourceById(l.resId);
-    return (r ? r.name : l.resId) + " ×" + S().nombre(l.resQty * (fois || 1));
-  }
+    const d = l.demande || [];
+    if (!d.length) return "—";
+    return d.map(x => {
+      const r = S().resourceById(x.resId);
+      return (r ? r.name : x.resId) + " ×" + S().nombre(x.qty * (fois || 1));
+    }).join(" · ");
 
+  }
   /** Un versant du troc : son intitulé et la liste des ressources. */
   const versant = (titre, liste, vide) =>
     '<div class="ctversant"><span class="label">' + esc(titre) + "</span>" +
@@ -314,10 +369,13 @@
     const isNew = !k;
     const cur = k ? S().clone(k) : {
       id: "", ref: nouvelleRef(), titre: "", client: "", note: "",
-      etat: "brouillon", lignes: []
+      type: "", expire: null, etat: "brouillon", lignes: []
     };
     /* Copie de travail : on ne touche au contrat qu'à l'enregistrement. */
-    let lignes = cur.lignes.map(l => Object.assign({}, l));
+    /* Copie profonde : la liste des ressources demandées est un tableau, un
+       Object.assign le partagerait avec le contrat d'origine. */
+    let lignes = S().clone(cur.lignes).map(l =>
+      Object.assign({ demande: [] }, l, { demande: (l.demande || []).slice() }));
 
     const items = S().catalog().items.filter(i => i.enabled);
     const ressources = S().catalog().resources;
@@ -333,13 +391,29 @@
           '<input class="input" id="k-client" maxlength="80" value="' + esc(cur.client) + '"></div>' +
       "</div>" +
 
-      '<div class="editor__grid">' +
+      '<div class="editor__grid editor__grid--3">' +
         '<div class="field"><label class="label" for="k-ref">Référence</label>' +
           '<input class="input mono" id="k-ref" maxlength="40" value="' + esc(cur.ref) + '"></div>' +
+        '<div class="field"><label class="label" for="k-type">Type</label>' +
+          '<select class="select" id="k-type">' +
+            '<option value="">— non précisé</option>' +
+            S().contractTypes().map(t =>
+              '<option value="' + esc(t.id) + '"' + (t.id === cur.type ? " selected" : "") +
+              ' data-jours="' + t.jours + '">' + esc(t.name) + "</option>").join("") +
+          "</select></div>" +
         '<div class="field"><label class="label" for="k-etat">État</label>' +
           '<select class="select" id="k-etat">' + S().ETATS_CONTRAT.map(e =>
             '<option value="' + e + '"' + (e === cur.etat ? " selected" : "") + ">" +
             esc(ETIQUETTES[e]) + "</option>").join("") + "</select></div>" +
+      "</div>" +
+
+      '<div class="editor__grid">' +
+        '<div class="field"><label class="label" for="k-expire">Expire le (facultatif)</label>' +
+          '<input class="input" type="date" id="k-expire" value="' + esc(cur.expire || "") + '">' +
+          '<p class="hint" id="k-expire-aide"></p></div>' +
+        '<div class="field"><label class="label" for="k-client2">&nbsp;</label>' +
+          '<p class="hint">Un type peut proposer une durée : la choisir remplit la date, ' +
+            "qui reste modifiable.</p></div>" +
       "</div>" +
 
       '<div class="fieldset"><span class="label">Lignes du contrat</span>' +
@@ -364,45 +438,66 @@
     const host = body.querySelector("#k-lignes");
     const apercu = body.querySelector("#k-apercu");
 
+    /* Une ligne tient sur deux étages : la prestation en haut, la contrepartie
+       en dessous. Tout mettre sur une rangée marchait tant qu'on ne demandait
+       qu'une ressource ; à trois, les colonnes devenaient illisibles. */
     function peindre() {
       host.innerHTML = lignes.length
         ? lignes.map((l, i) =>
-            '<div class="ctrow" data-i="' + i + '">' +
-              (l.itemId
-                ? '<select class="select" data-f="item">' + items.map(it =>
-                    '<option value="' + esc(it.id) + '"' + (it.id === l.itemId ? " selected" : "") +
-                    ">" + esc(it.name) + "</option>").join("") + "</select>"
-                : '<input class="input" data-f="name" maxlength="120" value="' + esc(l.name) +
-                  '" placeholder="Intitulé libre">') +
-              '<input class="input input--num" data-f="qty" inputmode="numeric" ' +
-                'title="Quantité fournie" value="' + l.qty + '">' +
-              '<select class="select" data-f="res" title="Ressource demandée en échange">' +
-                '<option value="">— rien</option>' +
-                ressources.map(r => '<option value="' + esc(r.id) + '"' +
-                  (r.id === l.resId ? " selected" : "") + ">" + esc(r.name) + "</option>").join("") +
-              "</select>" +
-              '<input class="input input--num" data-f="resqty" inputmode="numeric" ' +
-                'title="Quantité demandée, par unité fournie" value="' + l.resQty + '">' +
-              '<span class="ctrow__tot">' + esc(troc(l, l.qty)) + "</span>" +
-              '<button class="btn btn--icon" data-f="rm" type="button" title="Retirer">' +
-                svg("x") + "</button>" +
+            '<div class="ctligne" data-i="' + i + '">' +
+              '<div class="ctligne__haut">' +
+                (l.itemId
+                  ? '<select class="select" data-f="item">' + items.map(it =>
+                      '<option value="' + esc(it.id) + '"' + (it.id === l.itemId ? " selected" : "") +
+                      ">" + esc(it.name) + "</option>").join("") + "</select>"
+                  : '<input class="input" data-f="name" maxlength="120" value="' + esc(l.name) +
+                    '" placeholder="Intitulé libre">') +
+                '<input class="input input--num" data-f="qty" inputmode="numeric" ' +
+                  'title="Quantité fournie" value="' + l.qty + '">' +
+                '<button class="btn btn--icon" data-f="rm" type="button" title="Retirer la ligne">' +
+                  svg("x") + "</button>" +
+              "</div>" +
+
+              '<div class="ctligne__troc">' +
+                '<span class="ctligne__lbl">En échange</span>' +
+                '<div class="ctdemandes">' +
+                  (l.demande.length
+                    ? l.demande.map((d, j) =>
+                        '<div class="ctdemande" data-j="' + j + '">' +
+                          '<select class="select" data-f="res">' +
+                            ressources.map(r => '<option value="' + esc(r.id) + '"' +
+                              (r.id === d.resId ? " selected" : "") + ">" + esc(r.name) +
+                              "</option>").join("") +
+                          "</select>" +
+                          '<input class="input input--num" data-f="resqty" inputmode="numeric" ' +
+                            'title="Par unité fournie" value="' + d.qty + '">' +
+                          '<button class="btn btn--icon" data-f="rmres" type="button" ' +
+                            'title="Retirer cette ressource">' + svg("x") + "</button>" +
+                        "</div>").join("")
+                    : '<p class="hint">Rien de demandé sur cette ligne.</p>') +
+                "</div>" +
+                '<div class="ctligne__pied">' +
+                  '<button class="btn btn--ghost btn--sm" data-f="addres" type="button">' +
+                    svg("plus") + "<span>Ressource</span></button>" +
+                  '<span class="ctrow__tot">' + esc(troc(l, l.qty)) + "</span>" +
+                "</div>" +
+              "</div>" +
             "</div>").join("")
         : '<p class="hint">Aucune ligne pour l\'instant.</p>';
 
-      host.querySelectorAll(".ctrow").forEach(row => {
+      host.querySelectorAll(".ctligne").forEach(row => {
         const i = Number(row.dataset.i);
-        const maj = () => {
-          const q = row.querySelector('[data-f="qty"]');
-          const rq = row.querySelector('[data-f="resqty"]');
-          lignes[i].qty = Math.max(1, Math.min(9999, Math.round(Number(q.value) || 1)));
-          lignes[i].resQty = Math.max(0, Math.min(99999, Math.round(Number(rq.value) || 0)));
-          lignes[i].resId = row.querySelector('[data-f="res"]').value;
+
+        const majTotal = () => {
           row.querySelector(".ctrow__tot").textContent = troc(lignes[i], lignes[i].qty);
           majApercu();
         };
-        row.querySelectorAll('[data-f="qty"],[data-f="resqty"]').forEach(n =>
-          n.addEventListener("input", maj));
-        row.querySelector('[data-f="res"]').addEventListener("change", maj);
+
+        const q = row.querySelector('[data-f="qty"]');
+        q.addEventListener("input", () => {
+          lignes[i].qty = Math.max(1, Math.min(9999, Math.round(Number(q.value) || 1)));
+          majTotal();
+        });
 
         const it = row.querySelector('[data-f="item"]');
         if (it) it.addEventListener("change", () => {
@@ -417,6 +512,36 @@
         row.querySelector('[data-f="rm"]').addEventListener("click", () => {
           lignes.splice(i, 1);
           peindre();
+        });
+
+        row.querySelector('[data-f="addres"]').addEventListener("click", () => {
+          if (!ressources.length) return MNUI.toast("Aucune ressource au catalogue", "err");
+          /* On propose une ressource encore libre : deux fois la même sur une
+             ligne se cumulerait à l'enregistrement, ce qui surprendrait. */
+          const pris = lignes[i].demande.map(d => d.resId);
+          const libre = ressources.find(r => pris.indexOf(r.id) === -1);
+          if (!libre) return MNUI.toast("Toutes les ressources sont déjà demandées", "info");
+          lignes[i].demande.push({ resId: libre.id, qty: 1 });
+          peindre();
+        });
+
+        row.querySelectorAll(".ctdemande").forEach(bloc => {
+          const j = Number(bloc.dataset.j);
+          const res = bloc.querySelector('[data-f="res"]');
+          const rq = bloc.querySelector('[data-f="resqty"]');
+          const maj = () => {
+            lignes[i].demande[j] = {
+              resId: res.value,
+              qty: Math.max(0, Math.min(99999, Math.round(Number(rq.value) || 0)))
+            };
+            majTotal();
+          };
+          res.addEventListener("change", maj);
+          rq.addEventListener("input", maj);
+          bloc.querySelector('[data-f="rmres"]').addEventListener("click", () => {
+            lignes[i].demande.splice(j, 1);
+            peindre();
+          });
         });
       });
       majApercu();
@@ -441,14 +566,43 @@
     body.querySelector("#k-add").addEventListener("click", () => {
       if (!items.length) return MNUI.toast("Aucun objet dans le catalogue", "err");
       const it = items[0];
-      lignes.push({ itemId: it.id, name: it.name, qty: 1, resId: "", resQty: 0 });
+      lignes.push({ itemId: it.id, name: it.name, qty: 1, demande: [] });
       peindre();
     });
     body.querySelector("#k-add-libre").addEventListener("click", () => {
-      lignes.push({ itemId: "", name: "", qty: 1, resId: "", resQty: 0 });
+      lignes.push({ itemId: "", name: "", qty: 1, demande: [] });
       peindre();
     });
     peindre();
+
+    /* Choisir un type qui porte une durée remplit la date d'expiration, tant
+       qu'on n'y a pas touché soi-même : la proposition aide, elle ne décide
+       pas à la place. */
+    const champExpire = body.querySelector("#k-expire");
+    const aide = body.querySelector("#k-expire-aide");
+    let dateTouchee = !!cur.expire;
+
+    function majAide() {
+      const v = champExpire.value;
+      if (!v) { aide.textContent = "Sans date, le contrat ne périme jamais."; return; }
+      const n = S().joursAvant(v);
+      aide.textContent = n < 0
+        ? "Déjà passée depuis " + Math.abs(n) + " jour" + (Math.abs(n) > 1 ? "s" : "") + "."
+        : n === 0 ? "Expire aujourd'hui."
+        : "Dans " + n + " jour" + (n > 1 ? "s" : "") + ".";
+    }
+    champExpire.addEventListener("input", () => { dateTouchee = true; majAide(); });
+
+    body.querySelector("#k-type").addEventListener("change", e => {
+      const opt = e.target.selectedOptions[0];
+      const jours = Number(opt && opt.dataset.jours) || 0;
+      if (!jours || dateTouchee) return;
+      const d = new Date();
+      d.setDate(d.getDate() + jours);
+      champExpire.value = S().jourLocal(d);
+      majAide();
+    });
+    majAide();
 
     MNUI.modal({
       title: isNew ? "Nouveau contrat" : "Modifier le contrat",
@@ -471,6 +625,8 @@
               titre,
               client: g("#k-client"),
               note: g("#k-note"),
+              type: body.querySelector("#k-type").value,
+              expire: body.querySelector("#k-expire").value || null,
               etat: body.querySelector("#k-etat").value,
               lignes: propres,
               creePar: cur.creePar || me.pseudo,
@@ -521,6 +677,7 @@
   function imprimer(k) {
     const t = totaux(k);
     const b = S().brand();
+    const type = S().contractTypeById(k.type);
 
     const lignes = k.lignes.map(l =>
       "<tr><td>" + esc(l.name || "—") + "</td>" +
@@ -555,6 +712,9 @@
           "<p><span>Client</span> " + esc(k.client || "—") + "</p>" +
           "<p><span>Établi par</span> " + esc(k.creePar || "—") + "</p>" +
           "<p><span>Le</span> " + esc(dateCourte(k.creeLe) || dateCourte(new Date().toISOString())) + "</p>" +
+          (type ? "<p><span>Type</span> " + esc(type.name) + "</p>" : "") +
+          (k.expire ? "<p><span>Expire le</span> " + esc(dateJour(k.expire)) +
+            (S().contratExpire(k) ? " (dépassée)" : "") + "</p>" : "") +
         "</div>" +
 
         (k.lignes.length
