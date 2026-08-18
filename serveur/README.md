@@ -110,6 +110,7 @@ Environment=GH_TOKEN=github_pat_…
 Environment=GH_OWNER=cyrillou50
 Environment=GH_REPO=mecano-nord
 Environment=GH_BRANCH=main
+Environment=TZ=Europe/Paris
 
 [Install]
 WantedBy=multi-user.target
@@ -501,3 +502,42 @@ mecano-nord.fr {
 Les adresses deviennent alors `https://mecano-nord.fr/api/duty.json` et
 `https://mecano-nord.fr/api/relais`. Tout est sur le même domaine : plus aucun
 souci d'origine.
+
+---
+
+## Récapitulatif hebdomadaire des services
+
+Chaque dimanche soir, le serveur poste dans le salon des services le temps
+passé par chacun pendant la semaine. C'est lui qui s'en charge et pas le
+site : personne ne garantit qu'un navigateur sera ouvert au bon moment.
+
+Il n'y a rien à installer — pas de `cron`, pas de dépendance. Il suffit que
+`WEBHOOK_DUTY` soit renseigné.
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `RECAP` | `on` | `off` pour ne rien envoyer |
+| `RECAP_JOUR` | `0` | jour de l'envoi — 0 = dimanche, 6 = samedi |
+| `RECAP_HEURE` | `20` | heure locale de l'envoi |
+| `TZ` | heure système | fuseau, par exemple `Europe/Paris` |
+
+**Mets `TZ`** dans le service : sans lui, beaucoup de VPS sont en UTC et le
+message partirait deux heures trop tôt l'été.
+
+La semaine déjà envoyée est retenue dans `donnees/recap.json`. Sans ce
+repère, un serveur redémarré trois fois dans la soirée enverrait trois fois
+le même message.
+
+### Le tester sans attendre dimanche
+
+```bash
+# Ce que le message dira, sans rien envoyer
+curl -s https://ton-serveur/recap | jq
+
+# L'envoyer tout de suite — un essai, la semaine reste due
+curl -s -X POST https://ton-serveur/recap
+
+# L'envoyer et considérer la semaine comme faite
+curl -s -X POST https://ton-serveur/recap \
+  -H 'Content-Type: application/json' -d '{"marquer":true}'
+```

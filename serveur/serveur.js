@@ -21,6 +21,8 @@
      POST /images      → en déposer une, la renommer ou la supprimer
      GET  /images/distant?u= → relaie une image d'un autre domaine, pour que
                          le site puisse la recadrer
+     GET  /recap       → ce que dira le récapitulatif hebdomadaire
+     POST /recap       → l'envoyer tout de suite, sans attendre dimanche
      GET  /sante       → « ok », pratique pour vérifier que tout tourne
 
    Le guide d'installation complet est dans serveur/README.md
@@ -941,11 +943,35 @@ const serveur = http.createServer(async (req, res) => {
          qu'il sait aller chercher une image sur un autre domaine. */
       return repondre(res, 200, {
         ok: true, ops: true, images: true, vehicules: true, relais: true, contrats: true,
+        recap: RECAP_ACTIF,
         depuis: Math.round(process.uptime()) + " s"
       }, req);
     }
 
     /* --- parc automobile --- */
+    /* --- récapitulatif hebdomadaire ---
+       GET pour voir ce qui partira, POST pour l'envoyer tout de suite. Le
+       POST ne marque la semaine que si on le lui demande : un essai du
+       vendredi ne doit pas faire sauter l'envoi du dimanche. */
+    if (chemin === "/recap") {
+      if (req.method === "GET") {
+        const p = await prepareRecap();
+        const etat = await lireRecap();
+        return repondre(res, 200, {
+          ok: true, actif: RECAP_ACTIF, jour: RECAP_JOUR, heure: RECAP_HEURE,
+          salonConfigure: !!WEBHOOKS.duty, dejaEnvoyee: etat.derniere === p.semaine,
+          semaine: p.semaine, debut: p.debut, fin: p.fin,
+          total: p.recap.total, services: p.recap.services, lignes: p.recap.lignes
+        }, req);
+      }
+      if (req.method === "POST") {
+        const c = await corpsJson(req).catch(() => ({}));
+        const r = await envoyerRecap(c.marquer === true);
+        return repondre(res, r.ok ? 200 : 502, r, req);
+      }
+      return repondre(res, 405, { error: "Méthode non autorisée" }, req);
+    }
+
     /* --- contrats --- */
     if (chemin === "/contrats") {
       if (req.method === "GET") return repondre(res, 200, await lireRegistre(), req);
@@ -1189,6 +1215,178 @@ const serveur = http.createServer(async (req, res) => {
     return repondre(res, 500, { error: e.message }, req);
   }
 });
+
+/* ---- Récapitulatif hebdomadaire ------------------------------------------------
+   Chaque fin de semaine, le serveur poste dans le salon des services le temps
+   passé par chacun. C'est lui qui s'en charge et pas le site : personne ne
+   garantit qu'un navigateur sera ouvert dimanche soir.
+
+   Le repère est la semaine ISO, retenue sur disque. Sans elle, un serveur
+   redémarré trois fois dans la soirée enverrait trois fois le même message.
+
+   Réglages (variables d'environnement) :
+     RECAP=off          n'envoie rien
+     RECAP_JOUR=0       jour de l'envoi, 0 = dimanche … 6 = samedi
+     RECAP_HEURE=20     heure locale de l'envoi
+   L'heure est celle de la machine : mets TZ=Europe/Paris dans le service. */
+
+const FICHIER_RECAP = path.join(DOSSIER, "recap.json");
+const RECAP_ACTIF = String(process.env.RECAP || "on").toLowerCase() !== "off";
+const RECAP_JOUR = nombre(process.env.RECAP_JOUR === undefined ? 0 : process.env.RECAP_JOUR, 0, 6);
+const RECAP_HEURE = nombre(process.env.RECAP_HEURE === undefined ? 20 : process.env.RECAP_HEURE, 0, 23);
+
+/** Lundi 00:00 de la semaine où tombe `d`. */
+function debutSemaine(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  /* getDay() met dimanche à 0 ; on le ramène en fin de semaine. */
+  const depuisLundi = (x.getDay() + 6) % 7;
+  x.setDate(x.getDate() - depuisLundi);
+  return x;
+}
+
+/** « 2026-W33 » — identifie une semaine sans ambiguïté d'une année sur l'autre. */
+function cleSemaine(d) {
+  const j = new Date(d);
+  j.setHours(0, 0, 0, 0);
+  /* Norme ISO : on se place sur le jeudi de la semaine, c'est lui qui décide
+     de l'année à laquelle elle appartient. */
+  j.setDate(j.getDate() + 3 - ((j.getDay() + 6) % 7));
+  const premier = new Date(j.getFullYear(), 0, 4);
+  const n = 1 + Math.round(
+    ((j - premier) / 86400000 - 3 + ((premier.getDay() + 6) % 7)) / 7);
+  return j.getFullYear() + "-W" + String(n).padStart(2, "0");
+}
+
+/** « 12 h 30 » — le serveur n'a pas de formateur, en voici un. */
+function dureeCourte(sec) {
+  const t = Math.max(0, Math.round(sec));
+  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60);
+  if (!h) return m + " min";
+  return h + " h" + (m ? " " + String(m).padStart(2, "0") : "");
+}
+
+/**
+ * Le temps de chacun sur une période, du plus présent au moins présent.
+ * Même découpage que le site (MNDuty.totals), pour que les deux disent la
+ * même chose.
+ */
+function recapSemaine(board, depuis, jusqua) {
+  const par = {};
+  (board.log || []).forEach(e => {
+    if (!e.out) return;
+    const t = new Date(e.out).getTime();
+    if (t < depuis || t > jusqua) return;
+    if (!par[e.id]) par[e.id] = { pseudo: e.pseudo, seconds: 0, sessions: 0 };
+    par[e.id].seconds += e.seconds;
+    par[e.id].sessions++;
+  });
+  const lignes = Object.keys(par).map(k => par[k])
+    .sort((a, b) => b.seconds - a.seconds);
+  return {
+    lignes,
+    total: lignes.reduce((n, l) => n + l.seconds, 0),
+    services: lignes.reduce((n, l) => n + l.sessions, 0)
+  };
+}
+
+function embedRecap(r, debut, fin) {
+  const jour = d => new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+  return {
+    title: "Semaine du " + jour(debut) + " au " + jour(fin),
+    description: r.lignes.length
+      ? "**" + dureeCourte(r.total) + "** en tout, sur " + r.services +
+        " service" + (r.services > 1 ? "s" : "") + "."
+      : "Personne n'a pointé cette semaine.",
+    color: 0xffa92e,
+    fields: r.lignes.length
+      ? [{
+          name: "Temps par personne",
+          /* Discord coupe un champ à 1024 caractères : on borne la liste
+             plutôt que de laisser le message partir tronqué n'importe où. */
+          value: r.lignes.slice(0, 25)
+            .map((l, i) => (i + 1) + ". **" + l.pseudo + "** — " + dureeCourte(l.seconds) +
+              "  (" + l.sessions + " service" + (l.sessions > 1 ? "s" : "") + ")")
+            .join("\n").slice(0, 1024)
+        }]
+      : []
+  };
+}
+
+async function lireRecap() {
+  try { return JSON.parse(await fsp.readFile(FICHIER_RECAP, "utf8")); }
+  catch (_) { return { derniere: "" }; }
+}
+
+async function ecrireRecap(v) {
+  await fsp.mkdir(DOSSIER, { recursive: true });
+  const tmp = FICHIER_RECAP + ".tmp";
+  await fsp.writeFile(tmp, JSON.stringify(v, null, 2) + "\n", "utf8");
+  await fsp.rename(tmp, FICHIER_RECAP);
+}
+
+/** Construit le récapitulatif de la semaine en cours. */
+async function prepareRecap(maintenant) {
+  const fin = maintenant || new Date();
+  const debut = debutSemaine(fin);
+  const board = nettoyer(await lire()) || VIDE;
+  return {
+    semaine: cleSemaine(fin),
+    debut: debut.toISOString(),
+    fin: fin.toISOString(),
+    recap: recapSemaine(board, debut.getTime(), fin.getTime())
+  };
+}
+
+/**
+ * Envoie le récapitulatif sur Discord.
+ * @param {boolean} marquer faux pour un essai : on n'écrit pas la semaine,
+ *   sinon un test du vendredi ferait sauter l'envoi du dimanche.
+ */
+async function envoyerRecap(marquer) {
+  const cible = WEBHOOKS.duty;
+  if (!cible) return { ok: false, error: "Aucun webhook de service configuré" };
+
+  const p = await prepareRecap();
+  const r = await fetch(cible, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      content: "**Récapitulatif de la semaine**",
+      embeds: [embedRecap(p.recap, p.debut, p.fin)],
+      allowed_mentions: { parse: [] }
+    })
+  }).catch(e => ({ ok: false, status: 0, _e: e.message }));
+
+  if (!(r.ok || r.status === 204)) {
+    return { ok: false, error: "Discord a répondu " + (r.status || r._e) };
+  }
+  if (marquer) await ecrireRecap({ derniere: p.semaine, envoyeLe: new Date().toISOString() });
+  console.log(new Date().toISOString(), "récapitulatif envoyé :", p.semaine,
+    "—", p.recap.lignes.length, "personnes");
+  return { ok: true, semaine: p.semaine, personnes: p.recap.lignes.length };
+}
+
+/* L'heure est vérifiée souvent plutôt que calculée une fois : un serveur qui
+   dort, une machine dont l'horloge saute ou un changement d'heure ne doivent
+   pas faire manquer la semaine. Le repère sur disque empêche le doublon. */
+async function verifierRecap() {
+  if (!RECAP_ACTIF || !WEBHOOKS.duty) return;
+  const maintenant = new Date();
+  if (maintenant.getDay() !== RECAP_JOUR || maintenant.getHours() < RECAP_HEURE) return;
+
+  const etat = await lireRecap();
+  if (etat.derniere === cleSemaine(maintenant)) return;   // déjà fait
+
+  const r = await envoyerRecap(true);
+  if (!r.ok) console.error(new Date().toISOString(), "récapitulatif :", r.error);
+}
+
+setInterval(() => { verifierRecap().catch(e => console.error("récapitulatif :", e.message)); },
+  10 * 60 * 1000).unref();
+/* Un premier passage au démarrage : si le serveur a été relancé dimanche soir
+   après l'heure, la semaine part quand même. */
+setTimeout(() => { verifierRecap().catch(() => {}); }, 20 * 1000).unref();
 
 serveur.listen(PORT, HOTE, () => {
   console.log("Mécano Nord — serveur démarré");
