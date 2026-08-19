@@ -647,3 +647,247 @@
   /* De la place sous le catalogue pour que la barre ne masque rien. */
   .contenu { padding-bottom: calc(var(--e-8) + 40px); }
 }
+/* ==========================================================================
+   GABARIT « LISTE + FICHE »
+   Une liste étroite à gauche, le détail à droite. Sur téléphone la fiche
+   passe dessous : la comprimer la rendait illisible.
+   ========================================================================== */
+
+.duo {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: var(--e-4);
+  align-items: start;
+}
+
+.duo__liste {
+  position: sticky;
+  top: calc(var(--l-topbar) + var(--e-4));
+  display: flex; flex-direction: column;
+  max-height: calc(100vh - var(--l-topbar) - var(--e-7));
+  background: var(--c-carte-2);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-3);
+  overflow: hidden;
+}
+.duo__filtres {
+  display: flex; flex-direction: column; gap: var(--e-2);
+  padding: var(--e-3);
+  border-bottom: 1px solid var(--c-bord);
+}
+.duo__selects { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-2); }
+.duo__selects .liste:last-child { grid-column: 1 / -1; }
+.duo__selects .liste, .duo__filtres .saisie { padding: 7px var(--e-3); font-size: var(--t-sm); }
+.duo__selects .liste { padding-right: var(--e-6); }
+
+.duo__corps { flex: 1; overflow-y: auto; padding: var(--e-2); }
+.duo__pied {
+  display: flex; align-items: center; gap: var(--e-2);
+  padding: var(--e-2) var(--e-3);
+  border-top: 1px solid var(--c-bord);
+}
+
+.duo__item {
+  display: flex; align-items: center; gap: var(--e-2);
+  width: 100%;
+  padding: var(--e-2);
+  border-radius: var(--r-2);
+  text-align: left;
+  transition: background var(--m-vif);
+}
+.duo__item:hover { background: rgba(255, 255, 255, .05); }
+.duo__item.is-actif { background: var(--c-action-fond); box-shadow: inset 2px 0 0 var(--c-action); }
+
+.duo__vign {
+  width: 34px; height: 34px; flex: none;
+  display: grid; place-items: center;
+  overflow: hidden;
+  border-radius: var(--r-1);
+  background: var(--c-creux);
+  color: var(--c-second);
+}
+.duo__vign svg { width: 20px; height: 20px; }
+.duo__vign img { width: 100%; height: 100%; object-fit: contain; padding: 2px; }
+
+.duo__txt { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.25; }
+.duo__txt b { font-size: var(--t-md); font-weight: 600; }
+.duo__txt span { font-size: var(--t-xs); color: var(--c-faible); }
+
+.duo__marque { flex: none; color: var(--c-faible); display: grid; place-items: center; }
+.duo__marque svg { width: 14px; height: 14px; }
+.duo__marque--etoile { color: var(--c-alerte); }
+
+@media (max-width: 1024px) {
+  .duo { grid-template-columns: minmax(0, 1fr); }
+  .duo__liste { position: static; max-height: 420px; }
+}
+
+/* ---- Fiche véhicule --------------------------------------------------------- */
+
+.v-photo {
+  display: flex; align-items: center; justify-content: center;
+  height: clamp(180px, 30vh, 320px);
+  padding: var(--e-3);
+  background: var(--c-creux);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-2);
+  color: var(--c-faible);
+  overflow: hidden;
+}
+/* `contain` sur toute la surface : borner sans étirer laissait un rendu de
+   240 px affiché en 240 px au milieu d'un cadre deux fois plus grand. */
+.v-photo img { width: 100%; height: 100%; object-fit: contain; }
+.v-photo svg { width: 76px; height: 76px; stroke-width: 1.2; }
+
+.v-rem { display: inline-flex; align-items: center; gap: var(--e-2); font-size: var(--t-lg); }
+.v-rem svg { width: 17px; height: 17px; }
+.v-rem--oui { color: var(--c-succes); }
+.v-rem--non { color: var(--c-faible); }
+
+.v-manque {
+  display: flex; align-items: center; gap: var(--e-2);
+  margin-top: var(--e-4);
+  font-size: var(--t-md);
+  color: var(--c-alerte);
+}
+.v-manque svg { width: 15px; height: 15px; flex: none; }
+
+.v-apercu {
+  width: 56px; height: 56px; flex: none;
+  display: grid; place-items: center;
+  overflow: hidden;
+  border-radius: var(--r-2);
+  background: var(--c-creux);
+  border: 1px solid var(--c-bord);
+  color: var(--c-action-doux);
+}
+.v-apercu svg { width: 30px; height: 30px; }
+.v-apercu img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
+/* ==========================================================================
+   CALENDRIER
+   ========================================================================== */
+
+.cal__barre {
+  display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap;
+  margin-bottom: var(--e-4);
+}
+.cal__mois {
+  min-width: 200px;
+  font-size: var(--t-xl);
+  letter-spacing: .03em; text-transform: uppercase;
+}
+/* Les chevrons servent de flèches : un quart de tour dans le même sens pour
+   les deux, sinon ils finiraient tous deux pointés du même côté. */
+[data-a="prec"] svg { transform: rotate(90deg); }
+[data-a="suiv"] svg { transform: rotate(-90deg); }
+
+.cal__grille {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+.cal__tete {
+  padding: var(--e-1) var(--e-2);
+  text-align: center;
+  font-family: var(--f-titre);
+  font-size: var(--t-xs); letter-spacing: .16em; text-transform: uppercase;
+  color: var(--c-faible);
+}
+
+.cal__jour {
+  display: flex; flex-direction: column; gap: 4px;
+  min-height: 104px;
+  padding: var(--e-2);
+  background: var(--c-carte-2);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-2);
+  cursor: pointer;
+  transition: border-color var(--m-vif), background var(--m-vif);
+}
+.cal__jour:hover { border-color: var(--c-bord-net); background: var(--raise); }
+.cal__jour:focus-visible { outline: 2px solid var(--c-action); outline-offset: -2px; }
+.cal__jour.est-hors { opacity: .38; }
+.cal__jour.est-auj { border-color: rgb(var(--accent-rgb) / .55); }
+
+.cal__num {
+  display: flex; align-items: center; gap: 4px;
+  min-height: 18px;
+  font-family: var(--f-titre);
+  font-size: var(--t-sm); font-weight: 700;
+  color: var(--c-second);
+  font-variant-numeric: tabular-nums;
+}
+.cal__jour.est-auj .cal__num { color: var(--c-action-doux); }
+
+.cal__conges { display: flex; gap: 3px; margin-left: auto; }
+.cal__ini {
+  display: inline-grid; place-items: center;
+  min-width: 18px; height: 18px; padding: 0 4px;
+  border: 1px dashed var(--c-bord-net);
+  border-radius: var(--r-plein);
+  color: var(--c-faible);
+  font-family: var(--f-titre);
+  font-size: 9.5px; font-weight: 700;
+  cursor: help;
+}
+.cal__ini--plus { border-style: solid; }
+
+.cal__evs { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cal__ev {
+  display: block; width: 100%;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font-size: var(--t-xs);
+  text-align: left;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cal__ev:hover { filter: brightness(1.25); }
+.cal__ev b { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+.cal__ev--rose  { background: rgb(var(--accent-rgb) / .18); color: var(--c-action-doux); border-color: rgb(var(--accent-rgb) / .35); }
+.cal__ev--ambre { background: rgba(255, 169, 46, .16); color: var(--c-alerte); border-color: rgba(255, 169, 46, .34); }
+.cal__ev--vert  { background: rgba(168, 255, 82, .14); color: var(--c-succes); border-color: rgba(168, 255, 82, .32); }
+.cal__ev--bleu  { background: rgba(127, 215, 232, .16); color: var(--c-info); border-color: rgba(127, 215, 232, .34); }
+.cal__ev--gris  { background: rgba(255, 255, 255, .07); color: var(--c-second); border-color: var(--c-bord-net); }
+
+.cal__teintes { display: flex; gap: var(--e-2); }
+.cal__teinte { width: 34px; height: 34px; border-radius: 50%; border-width: 2px; border-style: solid; }
+.cal__teinte.est-choisi { box-shadow: 0 0 0 2px var(--c-fond), 0 0 0 4px currentColor; }
+
+.cal__quand {
+  margin-bottom: var(--e-3);
+  font-family: var(--f-titre);
+  font-size: var(--t-sm); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--c-action-doux);
+}
+
+/* ---- Vue liste, sur téléphone ------------------------------------------------
+   Sept colonnes sur 390 px donnent des cases de 50 px où plus rien ne tient.
+   La grille cède la place aux seuls jours qui portent quelque chose. */
+
+.cal__agenda { display: none; }
+
+@media (max-width: 720px) {
+  .cal__grille { display: none; }
+  .cal__agenda { display: flex; flex-direction: column; gap: var(--e-2); }
+
+  .cal__ligne {
+    padding: var(--e-3);
+    background: var(--c-carte-2);
+    border: 1px solid var(--c-bord);
+    border-radius: var(--r-2);
+  }
+  .cal__ligne.est-auj { border-color: rgb(var(--accent-rgb) / .55); }
+  .cal__ligne-j {
+    display: flex; align-items: center; gap: var(--e-2);
+    margin-bottom: var(--e-2);
+    font-family: var(--f-titre);
+    font-size: var(--t-sm); font-weight: 700;
+    text-transform: capitalize;
+    color: var(--c-second);
+  }
+  .cal__ligne.est-auj .cal__ligne-j { color: var(--c-action-doux); }
+  .cal__ev { white-space: normal; font-size: var(--t-sm); padding: var(--e-2); }
+  .cal__mois { min-width: 0; font-size: var(--t-lg); }
+}

@@ -320,8 +320,16 @@ window.V2UI = (function () {
 
     document.body.appendChild(el);
 
+    /* Le menu se pose sous son ancre, sauf s'il n'y a pas la place — le jeton
+       employé est au ras du bas de la barre latérale, et un menu qui déborde
+       sous l'écran est inatteignable. Dans ce cas il se retourne au-dessus. */
     const r = ancre.getBoundingClientRect();
-    el.style.top = (r.bottom + 6) + "px";
+    const h = el.offsetHeight;
+    const placeDessous = window.innerHeight - r.bottom - 8;
+
+    el.style.top = (h + 8 > placeDessous && r.top > h + 8
+      ? r.top - h - 6
+      : r.bottom + 6) + "px";
     el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - el.offsetWidth - 8)) + "px";
 
     el.querySelectorAll("[data-i]").forEach(b => b.addEventListener("click", () => {

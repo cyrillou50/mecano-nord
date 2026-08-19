@@ -199,11 +199,11 @@ deux versions coexistent.
 |---|---|
 | Tableau de bord | ✅ fait — page nouvelle, absente de la V1 |
 | Facturation | ✅ fait — catalogue, panier, bons, historique |
+| Véhicules | ✅ fait — parc, fiches, propositions, validation |
+| Calendrier | ✅ fait — grille, évènements, congés ; liste sur téléphone |
 | Contrats | ⏳ cadre en place, contenu à reprendre |
-| Calendrier | ⏳ idem |
 | Service | ⏳ idem |
 | Fiches équipe | ⏳ idem |
-| Véhicules | ⏳ idem |
 | Administration | ⏳ la plus grande — à reprendre onglet par onglet |
 
 Les pages en attente affichent leur état et renvoient vers la V1, qui reste
