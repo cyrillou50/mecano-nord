@@ -645,7 +645,7 @@
 
       '<label class="switch"><input type="checkbox" id="e-vrem"' +
         (cur.remorquable ? " checked" : "") + ">" +
-        '<span class="switch__box"></span><span>Remorquable — il peut être tracté</span></label>' +
+        '<span class="switch__box"></span><span>Remorquable</span></label>' +
 
       '<p class="hint" style="margin-top:12px">Écris <b>N/A</b> dans une case ' +
         "qui ne s'applique pas — un bateau sans coffre, un vélo sans réservoir. " +
