@@ -97,6 +97,7 @@ window.V2Shell = (function () {
 
       "<div>" +
         bandeauBeta() +
+        '<div id="v2-brouillon"></div>' +
         '<header class="topbar">' +
           U().bouton("", { icone: "menu", variante: "fantome", titre: "Ouvrir le menu",
                            action: "burger" }) +
@@ -127,6 +128,55 @@ window.V2Shell = (function () {
         { separateur: true },
         { nom: "Se déconnecter", icone: "sortie", onClick: deconnexion }
       ]);
+    });
+  }
+
+  /* ---- Modifications non publiées ------------------------------------------
+     Le catalogue ne s'écrit pas en direct : on travaille sur un brouillon
+     gardé dans le navigateur, qu'un responsable publie ensuite. Le bandeau
+     vit dans le squelette et non dans chaque page — toutes celles qui
+     touchent au catalogue en ont besoin, et il doit rester au même endroit
+     quand on passe de l'une à l'autre.
+
+     @param {Function} [apres] rappelé après une publication réussie, pour
+                               que la page se redessine. */
+
+  function brouillon(apres) {
+    const z = document.getElementById("v2-brouillon");
+    if (!z) return;
+    if (!MNStore.hasDraft()) { z.innerHTML = ""; return; }
+
+    const peut = MNAuth.can("publish") && MNGitHub.canPublish();
+    z.innerHTML =
+      '<div class="brouillon" role="status">' +
+        '<span class="brouillon__point"></span>' +
+        '<div class="brouillon__txt"><b>Modifications non publiées.</b> ' +
+          "<span>" + (peut
+            ? "Publie-les pour que l'équipe les voie."
+            : "Un responsable devra les publier.") + "</span></div>" +
+        (peut
+          ? U().bouton("Publier", { variante: "principal", taille: "sm",
+                                    icone: "nuage", action: "pub" })
+          : "") +
+      "</div>";
+
+    const b = z.querySelector('[data-a="pub"]');
+    if (!b) return;
+    b.addEventListener("click", async () => {
+      b.disabled = true;
+      b.innerHTML = U().icone("rafraichir") + "<span>Publication…</span>";
+      const cat = MNStore.catalog();
+      try {
+        await MNGitHub.publish(MNStore.toJSON(cat),
+          "Catalogue mis à jour par " + _session.pseudo);
+        /* Le repère sert à la V1 pour savoir que ce brouillon est parti. */
+        localStorage.setItem("mn.gh.stamp", cat.updatedAt);
+        U().toast("Publié — en ligne dans une minute environ", "ok");
+      } catch (e) {
+        U().toast("Publication impossible : " + (e && e.message || e), "err");
+      }
+      brouillon(apres);
+      if (apres) apres();
     });
   }
 
@@ -299,7 +349,7 @@ window.V2Shell = (function () {
   }
 
   return {
-    demarrer, actions, refuser, basculerTiroir,
+    demarrer, actions, refuser, basculerTiroir, brouillon,
     session: () => _session,
     peut: function () { return MNAuth.canAny.apply(null, arguments); }
   };

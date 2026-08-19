@@ -1048,3 +1048,190 @@
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 @media (prefers-reduced-motion: reduce) { .s-point { animation: none; } }
+
+/* ---- Bandeau « non publié » ------------------------------------------------
+   Il se glisse entre le bandeau bêta et la barre du haut, et ne disparaît
+   qu'une fois la publication faite : un brouillon oublié ne se voit nulle
+   part ailleurs. */
+
+.brouillon {
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+  padding: var(--e-2) var(--e-5);
+  background: color-mix(in srgb, var(--c-alerte) 12%, var(--c-carte));
+  border-bottom: 1px solid color-mix(in srgb, var(--c-alerte) 35%, transparent);
+  font-size: var(--t-sm);
+}
+.brouillon__point {
+  flex: none;
+  width: 7px; height: 7px;
+  border-radius: var(--r-plein);
+  background: var(--c-alerte);
+}
+.brouillon__txt { min-width: 0; flex: 1; }
+.brouillon__txt b    { color: var(--c-texte); }
+.brouillon__txt span { color: var(--c-second); }
+
+/* ---- Équipe ---------------------------------------------------------------- */
+
+.duo__item.est-eteint { opacity: .5; }
+
+/* Les flèches de réorganisation, à gauche de la ligne. */
+.eq-ordre { display: flex; flex-direction: column; flex: none; }
+.eq-ordre button {
+  width: 18px; height: 14px;
+  border: 0; background: none;
+  color: var(--c-faible);
+  font-size: 8px; line-height: 1;
+  cursor: pointer;
+}
+.eq-ordre button:hover:not(:disabled) { color: var(--c-action-doux); }
+.eq-ordre button:disabled { opacity: .25; cursor: not-allowed; }
+
+/* Vert en service, rouge en congés : les deux s'excluent. */
+.eq-point {
+  flex: none;
+  width: 8px; height: 8px;
+  border-radius: var(--r-plein);
+  background: var(--c-succes);
+  cursor: help;
+}
+.eq-point--conge { background: var(--c-erreur); }
+
+/* En-tête de fiche : la couleur du grade court le long du bord. */
+.eq-tete {
+  display: flex; align-items: center; gap: var(--e-4); flex-wrap: wrap;
+  padding: var(--e-5);
+  background: linear-gradient(120deg,
+    color-mix(in srgb, var(--grade) 12%, var(--c-carte)), var(--c-carte) 60%);
+  border: 1px solid var(--c-bord);
+  border-left: 3px solid var(--grade);
+  border-radius: var(--r-3);
+}
+.eq-tete__av {
+  flex: none;
+  width: 60px; height: 60px;
+  display: grid; place-items: center;
+  border-radius: var(--r-3);
+  font-family: var(--f-titre);
+  font-size: var(--t-xl); font-weight: 800;
+  color: var(--on-accent, #0b0910);
+}
+.eq-tete__id { display: flex; flex-direction: column; gap: var(--e-2); min-width: 0; flex: 1; }
+.eq-tete__id h2 { font-size: var(--t-2xl); line-height: 1.1; }
+
+.eq-grade {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  font-family: var(--f-titre);
+  font-size: var(--t-sm); font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--grade);
+}
+.eq-grade svg { width: 15px; height: 15px; }
+
+.eq-corps { display: flex; flex-direction: column; gap: var(--e-5); margin-top: var(--e-4); }
+
+.eq-bloc h3 {
+  display: flex; align-items: center; gap: var(--e-2);
+  margin-bottom: var(--e-3);
+  font-size: var(--t-md);
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--c-faible);
+}
+.eq-bloc__n {
+  padding: 1px 7px;
+  border-radius: var(--r-plein);
+  background: var(--c-creux);
+  font-size: var(--t-xs);
+  color: var(--c-second);
+}
+
+/* ---- Carrière -------------------------------------------------------------
+   Une frise verticale : le trait relie les étapes, le point porte la couleur
+   du grade obtenu ce jour-là. */
+
+.frise { display: flex; flex-direction: column; }
+.frise__pas {
+  position: relative;
+  display: flex; gap: var(--e-3);
+  padding: 0 0 var(--e-4) var(--e-4);
+  border-left: 1px solid var(--c-bord-net);
+  margin-left: 4px;
+}
+.frise__pas:last-child { border-left-color: transparent; padding-bottom: 0; }
+.frise__point {
+  position: absolute; left: -5px; top: 3px;
+  width: 9px; height: 9px;
+  border-radius: var(--r-plein);
+  background: var(--c-fond);
+  border: 2px solid var(--grade);
+}
+.frise__pas.est-actuel .frise__point { background: var(--grade); box-shadow: 0 0 0 3px color-mix(in srgb, var(--grade) 22%, transparent); }
+.frise__pas b { font-size: var(--t-md); }
+.frise__quand { font-size: var(--t-sm); color: var(--c-second); margin-top: 2px; }
+
+/* ---- Historique de service ------------------------------------------------- */
+
+.eq-sem {
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-2);
+  background: var(--c-carte-2);
+  margin-bottom: var(--e-2);
+  overflow: hidden;
+}
+.eq-sem__tete {
+  display: flex; align-items: center; gap: var(--e-3);
+  padding: var(--e-3);
+  cursor: pointer;
+  list-style: none;
+  transition: background var(--m-vif);
+}
+.eq-sem__tete::-webkit-details-marker { display: none; }
+.eq-sem__tete:hover { background: var(--raise); }
+.eq-sem__tete::before {
+  content: "›";
+  flex: none;
+  color: var(--c-faible);
+  font-size: var(--t-lg);
+  transition: transform var(--m-vif);
+}
+.eq-sem[open] > .eq-sem__tete::before { transform: rotate(90deg); }
+.eq-sem__nom  { flex: 1; min-width: 0; font-weight: 600; font-size: var(--t-md); }
+.eq-sem__meta { font-size: var(--t-xs); color: var(--c-faible); white-space: nowrap; }
+.eq-sem__tete > b { font-family: var(--f-titre); color: var(--c-action-doux); }
+
+.eq-sem__corps { padding: 0 var(--e-3) var(--e-3); }
+
+.eq-jour {
+  display: flex; align-items: baseline; gap: var(--e-3); flex-wrap: wrap;
+  padding: var(--e-2) 0;
+  border-top: 1px solid var(--c-bord);
+  font-size: var(--t-sm);
+}
+.eq-jour__date { width: 130px; flex: none; color: var(--c-second); text-transform: capitalize; }
+.eq-jour__creneaux { display: flex; gap: var(--e-2); flex-wrap: wrap; flex: 1; min-width: 0; }
+.eq-jour__tot { font-weight: 700; margin-left: auto; }
+
+.eq-creneau {
+  padding: 1px 7px;
+  border-radius: var(--r-1);
+  background: var(--c-creux);
+  color: var(--c-second);
+  font-size: var(--t-xs);
+}
+
+.eq-sem__moy {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: var(--e-2);
+  padding-top: var(--e-2);
+  border-top: 1px dashed var(--c-bord-net);
+  font-size: var(--t-sm);
+  color: var(--c-second);
+}
+
+@media (max-width: 640px) {
+  .eq-tete { padding: var(--e-4); }
+  .eq-tete__av { width: 48px; height: 48px; font-size: var(--t-lg); }
+  .eq-jour__date { width: 100%; }
+}

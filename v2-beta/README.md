@@ -167,6 +167,20 @@ tiroir mobile, connexion.
 V2Shell.actions(V2UI.bouton("Historique", { variante: "fantome", action: "hist" }));
 ```
 
+### Pages qui modifient le catalogue
+
+Le catalogue ne s'écrit pas en direct : on modifie une copie
+(`MNStore.clone`), on l'enregistre (`MNStore.saveDraft`), et un responsable
+publie. La page appelle simplement :
+
+```js
+V2Shell.brouillon(dessiner);   // dessiner() sera rappelé après publication
+```
+
+Le bandeau « modifications non publiées » apparaît alors sous la barre du
+haut, avec le bouton *Publier* si la personne en a le droit. À rappeler après
+chaque enregistrement, pour qu'il s'allume et s'éteigne au bon moment.
+
 ---
 
 ## Ajouter une fonctionnalité
@@ -203,7 +217,7 @@ deux versions coexistent.
 | Calendrier | ✅ fait — grille, évènements, congés ; liste sur téléphone |
 | Contrats | ✅ fait — registre, troc à plusieurs ressources, contrat PDF |
 | Service | ✅ fait — pointage, congés, corrections d’horaires |
-| Fiches équipe | ⏳ idem |
+| Fiches équipe | ✅ fait — ancienneté, carrière, formations, historique |
 | Administration | ⏳ la plus grande — à reprendre onglet par onglet |
 
 Les pages en attente affichent leur état et renvoient vers la V1, qui reste
