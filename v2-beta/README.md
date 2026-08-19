@@ -201,8 +201,8 @@ deux versions coexistent.
 | Facturation | ✅ fait — catalogue, panier, bons, historique |
 | Véhicules | ✅ fait — parc, fiches, propositions, validation |
 | Calendrier | ✅ fait — grille, évènements, congés ; liste sur téléphone |
-| Contrats | ⏳ cadre en place, contenu à reprendre |
-| Service | ⏳ idem |
+| Contrats | ✅ fait — registre, troc à plusieurs ressources, contrat PDF |
+| Service | ✅ fait — pointage, congés, corrections d’horaires |
 | Fiches équipe | ⏳ idem |
 | Administration | ⏳ la plus grande — à reprendre onglet par onglet |
 

@@ -121,16 +121,30 @@
   /**
    * Les absents en initiales, à droite du numéro. Écrits en entier ils
    * mangeaient la case ; le nom complet revient au survol.
+   *
+   * Chaque pastille prend la couleur du grade : dans une grille de trente
+   * cases, deux lettres grises ne disent rien, alors qu'une couleur connue
+   * se reconnaît sans lire — et le grade s'ajoute à l'infobulle.
    */
   function pastilles(cg) {
     if (!cg.length) return "";
     const vus = cg.slice(0, 3), reste = cg.slice(3);
+    const nomEtGrade = c => {
+      const r = MNStore.roleById(c.roleId);
+      return c.pseudo + (r ? " (" + r.name + ")" : "");
+    };
+
     return '<span class="cal__conges">' +
-      vus.map(c => '<span class="cal__ini" title="' + U.esc(c.pseudo + " est en congés") + '">' +
-        U.esc(U.initiales(c.pseudo)) + "</span>").join("") +
+      vus.map(c => {
+        const r = MNStore.roleById(c.roleId);
+        return '<span class="cal__ini"' +
+          (r ? ' style="--ini:' + U.esc(r.color) + '"' : "") +
+          ' title="' + U.esc(nomEtGrade(c) + " est en congés") + '">' +
+          U.esc(U.initiales(c.pseudo)) + "</span>";
+      }).join("") +
       (reste.length
         ? '<span class="cal__ini cal__ini--plus" title="' +
-          U.esc(reste.map(c => c.pseudo).join(", ") +
+          U.esc(reste.map(nomEtGrade).join(", ") +
             (reste.length > 1 ? " sont aussi en congés" : " est aussi en congés")) +
           '">+' + reste.length + "</span>"
         : "") +

@@ -1,0 +1,604 @@
+/* ==========================================================================
+   Service — pointage, congés, historique.
+
+   Reprise fidèle de la V1 : prise et fin de service, congés à plusieurs
+   périodes, pointage à la place de quelqu'un, clôture d'un oubli à l'heure
+   réelle, correction des horaires enregistrés.
+
+   Ce qui change : la page était une pile de quatre panneaux qu'il fallait
+   parcourir. Elle se range en onglets — on pointe cent fois par jour, on
+   consulte l'historique une fois par semaine.
+   ========================================================================== */
+
+(function () {
+  "use strict";
+
+  const U = V2UI;
+  const $ = s => document.querySelector(s);
+
+  let hote = null, moi = null;
+  let peutPointer = false, peutVoir = false, peutGerer = false;
+  let onglet = "atelier";
+
+  V2Shell.demarrer({
+    page: "service",
+    titre: "Service",
+    pret: async function (session, h) {
+      hote = h; moi = session;
+      if (!V2Shell.peut("duty", "duty_view", "duty_manage", "admin")) {
+        return V2Shell.refuser(hote, "le service");
+      }
+      peutPointer = !!moi.uid && V2Shell.peut("duty", "admin");
+      peutGerer = V2Shell.peut("duty_manage", "admin");
+      peutVoir = V2Shell.peut("duty_view", "admin") || peutGerer;
+
+      hote.innerHTML = U.squelette(4);
+      await MNDuty.load(true).catch(e => console.error(e));
+      dessiner();
+
+      relireSouvent();
+    }
+  });
+
+  /* Le tableau est partagé : on le relit tout seul. Vite tant que la page est
+     regardée, au ralenti quand l'onglet passe à l'arrière-plan — inutile de
+     réveiller le VPS pour un écran que personne ne lit. Au retour on relit
+     immédiatement, pour ne pas laisser un tableau périmé sous les yeux. */
+  function relireSouvent() {
+    let t = null;
+    const relire = async () => {
+      if (document.querySelector(".modale-fond")) return;   // pas au milieu d'une saisie
+      await MNDuty.load(true).catch(() => {});
+      dessiner();
+    };
+    const cadencer = () => {
+      clearInterval(t);
+      t = setInterval(relire, document.hidden ? 180000 : 25000);
+    };
+    document.addEventListener("visibilitychange", () => {
+      cadencer();
+      if (!document.hidden) relire();
+    });
+    cadencer();
+  }
+
+  /* ---- Rendu ------------------------------------------------------------------ */
+
+  function dessiner() {
+    const onglets = [["atelier", "L'atelier"], ["moi", "Mes congés"]]
+      .concat(peutVoir ? [["equipe", "Congés de l'équipe"], ["histo", "Historique"]] : []);
+
+    hote.innerHTML =
+      monEtat() +
+      '<div class="onglets" style="margin:var(--e-4) 0">' + onglets.map(o =>
+        '<button class="onglet' + (onglet === o[0] ? " is-actif" : "") +
+          '" data-o="' + o[0] + '">' + U.esc(o[1]) + "</button>").join("") + "</div>" +
+      '<div id="s-vue"></div>';
+
+    hote.querySelectorAll("[data-o]").forEach(b => b.addEventListener("click", () => {
+      onglet = b.dataset.o; dessiner();
+    }));
+
+    vue();
+    brancherEtat();
+
+    const s = MNDuty.souci();
+    if (s) hote.insertAdjacentHTML("afterbegin",
+      '<div style="margin-bottom:var(--e-4)">' +
+        U.alerte({ ton: "erreur", titre: s,
+          texte: "Le tableau affiché peut être incomplet." }) + "</div>");
+  }
+
+  /** La carte du haut : suis-je en service, et le bouton qui va avec. */
+  function monEtat() {
+    if (!peutPointer) return "";
+    const mien = MNDuty.entryOf(moi.uid);
+    const enConge = MNDuty.enConge(moi.uid);
+
+    return '<div class="s-etat' + (mien ? " est-actif" : "") + '">' +
+      '<div class="s-etat__ico">' + U.icone(mien ? "check" : "horloge") + "</div>" +
+      '<div class="s-etat__txt">' +
+        "<b>" + (mien ? "Tu es en service" : "Tu n'es pas en service") + "</b>" +
+        "<span>" + (mien
+          ? "Depuis " + new Date(mien.since).toLocaleTimeString("fr-FR",
+              { hour: "2-digit", minute: "2-digit" }) +
+            ' — <b class="nombre" id="s-duree">' + MNDuty.sinceDur(mien.since, true) + "</b>"
+          : "Pointe en arrivant à l'atelier, l'équipe est prévenue sur Discord.") + "</span>" +
+      "</div>" +
+      (enConge ? U.etiquette("En congés", "info") : "") +
+      U.bouton(mien ? "Quitter le service" : "Prendre mon service",
+        { variante: mien ? "danger" : "principal", icone: mien ? "sortie" : "check",
+          action: "pointer" }) +
+    "</div>";
+  }
+
+  function brancherEtat() {
+    const b = hote.querySelector('[data-a="pointer"]');
+    if (b) b.addEventListener("click", pointer);
+
+    /* La durée avance : on la remplace sans redessiner la page. */
+    clearInterval(brancherEtat._t);
+    brancherEtat._t = setInterval(() => {
+      const n = document.getElementById("s-duree");
+      const mien = MNDuty.entryOf(moi.uid);
+      if (n && mien) n.textContent = MNDuty.sinceDur(mien.since, true);
+    }, 30000);
+  }
+
+  async function pointer(e) {
+    const btn = e.currentTarget;
+    const mien = MNDuty.entryOf(moi.uid);
+    btn.disabled = true;
+
+    const r = mien
+      ? await MNDuty.clockOut({ uid: moi.uid, pseudo: moi.pseudo, role: moi.role })
+      : await MNDuty.clockIn({ uid: moi.uid, pseudo: moi.pseudo, role: moi.role,
+                               roleId: moi.roleId });
+    dessiner();
+
+    if (r.already) return U.toast(mien ? "Tu n'étais plus en service" : "Déjà en service", "info");
+    if (r.shareError) return U.toast("Enregistré ici, mais pas partagé : " + r.shareError, "err");
+    U.toast(mien ? "Service terminé (" + MNDuty.dur(r.seconds, true) + ")" : "Bon service", "ok");
+  }
+
+  /* ---- Onglets --------------------------------------------------------------------- */
+
+  function vue() {
+    const z = $("#s-vue");
+    if (onglet === "atelier") return atelier(z);
+    if (onglet === "moi") return mesConges(z);
+    if (onglet === "equipe") return congesEquipe(z);
+    return historique(z);
+  }
+
+  function atelier(z) {
+    const l = MNDuty.board().onDuty.slice()
+      .sort((a, b) => new Date(a.since) - new Date(b.since));
+
+    z.innerHTML = U.carte({
+      titre: "En service",
+      actions:
+        U.etiquette(l.length + (l.length > 1 ? " personnes" : " personne"),
+          l.length ? "succes" : "") +
+        (peutGerer ? U.bouton("Pointer quelqu'un",
+          { variante: "fantome", taille: "sm", icone: "equipe", action: "autre" }) : "") +
+        U.bouton("", { icone: "rafraichir", variante: "fantome", taille: "sm",
+                       titre: "Actualiser", action: "maj" }),
+      corps: l.length
+        ? '<div class="pile pile--sm">' + l.map(e => {
+            const role = MNStore.roleById(e.roleId);
+            return '<div class="rang s-rang">' +
+              '<span class="s-point"></span>' +
+              '<span class="avatar avatar--sm"' +
+                (role ? ' style="background:' + U.esc(role.color) + '"' : "") + ">" +
+                U.esc(U.initiales(e.pseudo)) + "</span>" +
+              "<b>" + U.esc(e.pseudo) + "</b>" +
+              (role ? U.etiquette(role.name) : "") +
+              '<span class="pousse nombre muet" data-depuis="' + U.esc(e.since) + '">' +
+                U.esc(MNDuty.sinceDur(e.since, true)) + "</span>" +
+              (peutGerer ? U.bouton("", { icone: "sortie", variante: "fantome", taille: "sm",
+                titre: "Mettre fin à son service", action: "out-" + e.id }) : "") +
+            "</div>";
+          }).join("") + "</div>"
+        : U.vide({ icone: "horloge", titre: "Atelier vide",
+                   texte: "Personne n'a pointé pour le moment." })
+    });
+
+    z.querySelector('[data-a="maj"]').addEventListener("click", async () => {
+      await MNDuty.load(true); dessiner(); U.toast("Tableau actualisé", "ok");
+    });
+    const au = z.querySelector('[data-a="autre"]');
+    if (au) au.addEventListener("click", pointerQuelquun);
+    z.querySelectorAll("[data-a^='out-']").forEach(b =>
+      b.addEventListener("click", () => cloturer(b.dataset.a.slice(4))));
+  }
+
+  /* ---- Congés ------------------------------------------------------------------------ */
+
+  const jourCourt = j => {
+    const d = new Date(String(j) + "T12:00:00");
+    if (isNaN(d)) return String(j);
+    const o = { day: "numeric", month: "long" };
+    if (d.getFullYear() !== new Date().getFullYear()) o.year = "numeric";
+    return d.toLocaleDateString("fr-FR", o);
+  };
+  const periode = c => "du " + jourCourt(c.from) + " au " + jourCourt(c.to) +
+    " · " + MNDuty.nbJours(c.from, c.to) + " jour" + (MNDuty.nbJours(c.from, c.to) > 1 ? "s" : "");
+
+  function mesConges(z) {
+    const l = MNDuty.congesOf(moi.uid);
+    const auj = MNDuty.jourLocal();
+
+    z.innerHTML = U.carte({
+      titre: "Mes congés",
+      actions:
+        (MNDuty.enConge(moi.uid) ? U.etiquette("En congés", "info") : "") +
+        U.bouton(l.length ? "Ajouter une période" : "Poser des congés",
+          { variante: "principal", taille: "sm", icone: "calendrier", action: "poser" }),
+      corps: l.length
+        ? '<div class="pile pile--sm">' + l.map(c => {
+            const enCours = c.from <= auj && auj <= c.to;
+            return '<div class="rang s-rang">' +
+              "<b>" + U.esc(periode(c)) + "</b>" +
+              U.etiquette(enCours ? "en cours" : "à venir", enCours ? "info" : "") +
+              (c.note ? '<span class="muet txt-sm">' + U.esc(c.note) + "</span>" : "") +
+              '<span class="pousse"></span>' +
+              U.bouton("", { icone: "crayon", variante: "fantome", taille: "sm",
+                titre: "Modifier", action: "ed-" + c.cid }) +
+              U.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
+                titre: "Annuler", action: "rm-" + c.cid }) +
+            "</div>";
+          }).join("") + "</div>"
+        : U.vide({ icone: "calendrier", titre: "Aucune absence prévue",
+                   texte: "Préviens l'équipe de tes dates, elles partent sur Discord." })
+    });
+    brancherConges(z);
+  }
+
+  function congesEquipe(z) {
+    const l = MNDuty.conges();
+    const auj = MNDuty.jourLocal();
+
+    z.innerHTML = U.carte({
+      titre: "Congés de l'équipe",
+      actions: peutGerer
+        ? U.bouton("Poser pour quelqu'un", { variante: "fantome", taille: "sm",
+            icone: "calendrier", action: "pour" })
+        : "",
+      corps: l.length
+        ? U.tableau(
+            [{ nom: "Employé", rendu: c => '<span class="rang">' +
+                '<span class="avatar avatar--sm">' + U.esc(U.initiales(c.pseudo)) + "</span>" +
+                U.esc(c.pseudo) + "</span>" },
+             { nom: "Période", rendu: c => U.esc(periode(c)) },
+             { nom: "État", rendu: c => c.from <= auj && auj <= c.to
+                 ? U.etiquette("en cours", "info") : U.etiquette("à venir") },
+             { nom: "Note", rendu: c => U.esc(c.note || "—") },
+             { nom: "", rendu: c => peutGerer
+                 ? U.bouton("", { icone: "crayon", variante: "fantome", taille: "sm",
+                     titre: "Modifier", action: "ed-" + c.cid }) +
+                   U.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
+                     titre: "Annuler", action: "rm-" + c.cid })
+                 : "" }],
+            l)
+        : U.vide({ icone: "calendrier", titre: "Personne en congés",
+                   texte: "Aucune absence n'est posée." })
+    });
+    brancherConges(z);
+  }
+
+  function brancherConges(z) {
+    z.querySelectorAll("[data-a^='ed-']").forEach(b => b.addEventListener("click", () => {
+      const c = MNDuty.congeById(b.dataset.a.slice(3));
+      if (c) poserConge(c.id, c.pseudo, c.roleId, c.cid);
+    }));
+    z.querySelectorAll("[data-a^='rm-']").forEach(b => b.addEventListener("click", () =>
+      retirerConge(b.dataset.a.slice(3))));
+    const p = z.querySelector('[data-a="poser"]');
+    if (p) p.addEventListener("click", () =>
+      poserConge(moi.uid, moi.pseudo, moi.roleId, ""));
+    const q = z.querySelector('[data-a="pour"]');
+    if (q) q.addEventListener("click", congeAutrui);
+  }
+
+  function poserConge(uid, pseudo, roleId, remplace) {
+    const c = remplace ? MNDuty.congeById(remplace) : null;
+    const auj = MNDuty.jourLocal();
+
+    const corps = document.createElement("div");
+    corps.className = "pile";
+    corps.innerHTML =
+      '<div class="cols-2">' +
+        U.champ({ id: "g-du", label: "Du", type: "date", valeur: c ? c.from : auj }) +
+        U.champ({ id: "g-au", label: "Au", type: "date", valeur: c ? c.to : auj }) +
+      "</div>" +
+      U.champ({ id: "g-n", label: "Note (facultatif)", valeur: c ? c.note : "", max: 300,
+                repere: "Motif, précision…" }) +
+      '<p class="champ__aide" id="g-aide"></p>';
+
+    const aide = corps.querySelector("#g-aide");
+    const majAide = () => {
+      const du = corps.querySelector("#g-du").value, au = corps.querySelector("#g-au").value;
+      if (!du || !au) { aide.textContent = "Renseigne les deux dates."; return; }
+      if (au < du) { aide.textContent = "La fin précède le début."; return; }
+      const n = MNDuty.nbJours(du, au);
+      aide.textContent = n + " jour" + (n > 1 ? "s" : "") + " d'absence.";
+    };
+    corps.querySelectorAll("input[type=date]").forEach(n =>
+      n.addEventListener("input", majAide));
+    majAide();
+
+    U.modale({
+      titre: c ? "Modifier la période" : "Poser des congés" +
+        (uid !== moi.uid ? " — " + pseudo : ""),
+      corps,
+      actions: [
+        { label: "Annuler", onClick: f => f() },
+        { label: "Enregistrer", variante: "principal", icone: "check",
+          onClick: async (fermer, k, btn) => {
+            const du = k.querySelector("#g-du").value, au = k.querySelector("#g-au").value;
+            if (!du || !au) return U.toast("Renseigne les deux dates", "err");
+            if (au < du) return U.toast("La fin précède le début", "err");
+
+            btn.disabled = true;
+            const r = await MNDuty.setConge(
+              { id: uid, pseudo, roleId: roleId || "" },
+              du, au, k.querySelector("#g-n").value.trim(), moi.pseudo, remplace);
+
+            if (r && r.error) {
+              btn.disabled = false;
+              return U.toast(r.error, "err");
+            }
+            fermer(); dessiner();
+            U.toast(c ? "Période mise à jour" : "Congés posés", "ok");
+          } }
+      ]
+    });
+  }
+
+  function congeAutrui() {
+    const gens = MNStore.catalog().users.filter(u => u.active);
+    if (!gens.length) return U.toast("Aucun employé", "err");
+
+    const corps = document.createElement("div");
+    corps.innerHTML = U.champ({ id: "g-qui", label: "Employé", type: "liste",
+      options: gens.map(u => ({ valeur: u.id, nom: u.pseudo + " — " + MNStore.roleOf(u).name })) });
+
+    U.modale({
+      titre: "Poser des congés pour quelqu'un", corps,
+      actions: [
+        { label: "Annuler", onClick: f => f() },
+        { label: "Continuer", variante: "principal",
+          onClick: (fermer, k) => {
+            const u = gens.find(x => x.id === k.querySelector("#g-qui").value);
+            fermer();
+            if (u) poserConge(u.id, u.pseudo, u.roleId, "");
+          } }
+      ]
+    });
+  }
+
+  async function retirerConge(cid) {
+    const c = MNDuty.congeById(cid);
+    if (!c) return;
+    const ok = await U.confirmer({
+      titre: "Annuler ces congés",
+      message: "La période " + periode(c) + " de « " + c.pseudo + " » sera supprimée.",
+      confirmer: "Annuler la période", danger: true
+    });
+    if (!ok) return;
+    const r = await MNDuty.clearConge(cid, moi.pseudo);
+    dessiner();
+    if (r && r.already) return U.toast("Cette période n'existait plus", "info");
+    U.toast("Congés annulés", "ok");
+  }
+
+  /* ---- Gérance ------------------------------------------------------------------------ */
+
+  function pointerQuelquun() {
+    const libres = MNStore.catalog().users.filter(u => u.active && !MNDuty.isOn(u.id));
+    if (!libres.length) return U.toast("Tout le monde est déjà en service", "info");
+
+    const corps = document.createElement("div");
+    corps.innerHTML =
+      U.champ({ id: "p-qui", label: "Employé", type: "liste",
+        options: libres.map(u => ({ valeur: u.id, nom: u.pseudo + " — " + MNStore.roleOf(u).name })) }) +
+      '<p class="champ__aide" style="margin-top:var(--e-3)">Le service démarre maintenant, ' +
+        "et Discord précisera que c'est toi qui l'as pointé.</p>";
+
+    U.modale({
+      titre: "Pointer quelqu'un", corps,
+      actions: [
+        { label: "Annuler", onClick: f => f() },
+        { label: "Mettre en service", variante: "principal", icone: "check",
+          onClick: async (fermer, k, btn) => {
+            const u = libres.find(x => x.id === k.querySelector("#p-qui").value);
+            if (!u) return;
+            btn.disabled = true;
+            const r = await MNDuty.forceIn(u, moi.pseudo);
+            fermer(); dessiner();
+            U.toast(r.already ? "Déjà en service" : u.pseudo + " est en service", "ok");
+          } }
+      ]
+    });
+  }
+
+  /** Clôturer un oubli à l'heure réelle plutôt qu'à l'instant du clic. */
+  function cloturer(uid) {
+    const e = MNDuty.entryOf(uid);
+    if (!e) return U.toast("Cette personne n'est plus en service", "info");
+
+    const maintenant = versChamp(new Date().toISOString());
+    const corps = document.createElement("div");
+    corps.innerHTML =
+      '<p class="champ__aide" style="margin-bottom:var(--e-3)">Le service de <b>' +
+        U.esc(e.pseudo) + "</b> a commencé le " +
+        new Date(e.since).toLocaleString("fr-FR",
+          { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) +
+        ". S'il a oublié de dépointer, mets l'heure à laquelle il est vraiment parti.</p>" +
+      U.champ({ id: "o-fin", label: "Fin du service", type: "datetime-local",
+                valeur: maintenant }) +
+      '<p class="champ__aide" id="o-ap" style="margin-top:var(--e-3)"></p>';
+
+    const ap = corps.querySelector("#o-ap");
+    const majAp = () => {
+      const fin = depuisChamp(corps.querySelector("#o-fin").value);
+      const souci = !fin ? "Heure illisible."
+        : fin < e.since ? "La fin précède le début du service."
+        : fin > new Date().toISOString() ? "On ne pointe pas dans le futur." : "";
+      ap.innerHTML = souci ? souci
+        : "Durée enregistrée : <b>" + MNDuty.dur(MNDuty.secBetween(e.since, fin), true) + "</b>";
+    };
+    corps.querySelector("#o-fin").addEventListener("input", majAp);
+    majAp();
+
+    U.modale({
+      titre: "Mettre fin au service", corps,
+      actions: [
+        { label: "Annuler", onClick: f => f() },
+        { label: "Clôturer", variante: "danger", icone: "sortie",
+          onClick: async (fermer, k, btn) => {
+            const fin = depuisChamp(k.querySelector("#o-fin").value);
+            if (!fin) return U.toast("Heure de fin illisible", "err");
+            if (fin < e.since) return U.toast("La fin précède le début", "err");
+            if (fin > new Date().toISOString()) return U.toast("On ne pointe pas dans le futur", "err");
+
+            btn.disabled = true;
+            const r = await MNDuty.forceOut(uid, moi.pseudo, fin);
+            fermer(); dessiner();
+            if (r.ignore) {
+              return U.toast("Service clôturé, mais à l'heure actuelle : ton serveur est " +
+                "trop ancien pour choisir l'heure. Corrige la ligne dans l'historique.", "err");
+            }
+            U.toast(r.already ? "Cette personne n'était plus en service"
+              : "Service de " + e.pseudo + " clôturé (" + MNDuty.dur(r.seconds, true) + ")", "ok");
+          } }
+      ]
+    });
+  }
+
+  /* ---- Historique ---------------------------------------------------------------------- */
+
+  function historique(z) {
+    const t = MNDuty.totals(7);
+    const log = MNDuty.board().log.slice(0, 30);
+
+    z.innerHTML =
+      U.carte({
+        titre: "Temps de service — 7 derniers jours",
+        corps: t.length
+          ? U.tableau(
+              [{ nom: "Employé", rendu: u => '<span class="rang">' +
+                  '<span class="avatar avatar--sm">' + U.esc(U.initiales(u.pseudo)) + "</span>" +
+                  U.esc(u.pseudo) + "</span>" },
+               { nom: "Services", num: true, cle: "sessions" },
+               { nom: "Total", num: true, rendu: u => "<b>" + U.esc(MNDuty.dur(u.seconds, true)) + "</b>" }],
+              t)
+          : U.vide({ icone: "horloge", titre: "Aucun service terminé",
+                     texte: "Rien sur les sept derniers jours." })
+      }) +
+      '<div style="margin-top:var(--e-4)">' +
+      U.carte({
+        titre: "Derniers pointages",
+        actions: peutGerer && log.length
+          ? U.bouton("Tout effacer", { variante: "fantome", taille: "sm",
+              icone: "poubelle", action: "vider" })
+          : "",
+        corps: log.length
+          ? U.tableau(
+              [{ nom: "Employé", cle: "pseudo" },
+               { nom: "Créneau", rendu: e =>
+                   U.esc(new Date(e.in).toLocaleString("fr-FR",
+                     { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) +
+                   " → " + new Date(e.out).toLocaleTimeString("fr-FR",
+                     { hour: "2-digit", minute: "2-digit" })) +
+                   (e.forced ? " " + U.etiquette("sorti par un gérant") : "") +
+                   (e.corrigePar ? " " + U.etiquette("corrigé par " + e.corrigePar, "alerte") : "") },
+               { nom: "Durée", num: true, rendu: e => U.esc(MNDuty.dur(e.seconds, true)) },
+               { nom: "", rendu: (e, i) => peutGerer
+                   ? U.bouton("", { icone: "crayon", variante: "fantome", taille: "sm",
+                       titre: "Corriger les heures", action: "fix-" + e.id + "|" + e.in })
+                   : "" }],
+              log)
+          : U.vide({ icone: "horloge", titre: "Aucun pointage enregistré" })
+      }) + "</div>";
+
+    const v = z.querySelector('[data-a="vider"]');
+    if (v) v.addEventListener("click", viderHisto);
+    z.querySelectorAll("[data-a^='fix-']").forEach(b => b.addEventListener("click", () => {
+      const s = b.dataset.a.slice(4);
+      const coupe = s.indexOf("|");
+      const e = MNDuty.board().log.find(x =>
+        x.id === s.slice(0, coupe) && x.in === s.slice(coupe + 1));
+      if (e) corriger(e); else U.toast("Ce pointage n'existe plus", "err");
+    }));
+  }
+
+  async function viderHisto() {
+    const n = MNDuty.board().log.length;
+    const ok = await U.confirmer({
+      titre: "Effacer l'historique",
+      message: "Les " + n + " pointage" + (n > 1 ? "s" : "") + " terminé" + (n > 1 ? "s" : "") +
+        " seront supprimés pour toute l'équipe. Les personnes en service ne sont pas touchées.",
+      confirmer: "Tout effacer", danger: true
+    });
+    if (!ok) return;
+    const r = await MNDuty.clearLog(moi.pseudo);
+    dessiner();
+    U.toast(r.removed + " pointage(s) effacé(s)", "ok");
+  }
+
+  /** Corriger les heures d'un pointage déjà enregistré. */
+  function corriger(e) {
+    const maintenant = versChamp(new Date().toISOString());
+    const corps = document.createElement("div");
+    corps.innerHTML =
+      '<p class="champ__aide" style="margin-bottom:var(--e-3)">Pointage de <b>' +
+        U.esc(e.pseudo) + "</b>, actuellement compté <b>" +
+        U.esc(MNDuty.dur(e.seconds, true)) + "</b>.</p>" +
+      '<div class="cols-2">' +
+        U.champ({ id: "c-deb", label: "Arrivée", type: "datetime-local",
+                  valeur: versChamp(e.in) }) +
+        U.champ({ id: "c-fin", label: "Départ", type: "datetime-local",
+                  valeur: versChamp(e.out) }) +
+      "</div>" +
+      '<p class="champ__aide" id="c-ap" style="margin-top:var(--e-3)"></p>' +
+      '<p class="champ__aide" style="margin-top:var(--e-2)">La correction est visible ' +
+        "de tous : la ligne portera ton nom.</p>";
+
+    const ap = corps.querySelector("#c-ap");
+    const souci = () => {
+      const d = depuisChamp(corps.querySelector("#c-deb").value);
+      const f = depuisChamp(corps.querySelector("#c-fin").value);
+      if (!d || !f) return "Renseigne les deux heures.";
+      if (f < d) return "La fin précède le début.";
+      if (f > new Date().toISOString()) return "On ne pointe pas dans le futur.";
+      return "";
+    };
+    const majAp = () => {
+      const s = souci();
+      ap.innerHTML = s ? s : "Durée enregistrée : <b>" +
+        MNDuty.dur(MNDuty.secBetween(depuisChamp(corps.querySelector("#c-deb").value),
+          depuisChamp(corps.querySelector("#c-fin").value)), true) + "</b>";
+    };
+    corps.querySelectorAll("input").forEach(n => n.addEventListener("input", majAp));
+    majAp();
+
+    U.modale({
+      titre: "Corriger les heures", corps,
+      actions: [
+        { label: "Annuler", onClick: f => f() },
+        { label: "Enregistrer", variante: "principal", icone: "check",
+          onClick: async (fermer, k, btn) => {
+            const s = souci();
+            if (s) return U.toast(s, "err");
+            btn.disabled = true;
+            const r = await MNDuty.editLog(e,
+              depuisChamp(k.querySelector("#c-deb").value),
+              depuisChamp(k.querySelector("#c-fin").value), moi.pseudo);
+            if (!r.ok) {
+              btn.disabled = false;
+              return U.toast(r.error || "Correction impossible", "err");
+            }
+            fermer(); dessiner();
+            U.toast("Horaires corrigés (" + MNDuty.dur(r.seconds, true) + ")", "ok");
+          } }
+      ]
+    });
+  }
+
+  /* ---- Heures ----------------------------------------------------------------------------
+     Les champs `datetime-local` parlent en heure locale, les données en ISO. */
+
+  function versChamp(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    const p = n => String(n).padStart(2, "0");
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) +
+      "T" + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+  function depuisChamp(v) {
+    const d = new Date(v);
+    return isNaN(d) ? "" : d.toISOString();
+  }
+})();

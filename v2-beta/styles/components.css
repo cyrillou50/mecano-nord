@@ -820,17 +820,26 @@
 .cal__jour.est-auj .cal__num { color: var(--c-action-doux); }
 
 .cal__conges { display: flex; gap: 3px; margin-left: auto; }
+/* `--ini` porte la couleur du grade, posée par la page. Sans elle, la
+   pastille reste grise ; le texte est ramené vers la couleur du texte pour
+   qu'un grade très clair ou très sombre reste lisible dans les deux thèmes. */
 .cal__ini {
+  --ini: var(--c-bord-net);
   display: inline-grid; place-items: center;
   min-width: 18px; height: 18px; padding: 0 4px;
-  border: 1px dashed var(--c-bord-net);
+  border: 1px dashed color-mix(in srgb, var(--ini) 60%, transparent);
   border-radius: var(--r-plein);
-  color: var(--c-faible);
+  background: color-mix(in srgb, var(--ini) 15%, transparent);
+  color: color-mix(in srgb, var(--ini) 75%, var(--c-texte));
   font-family: var(--f-titre);
   font-size: 9.5px; font-weight: 700;
   cursor: help;
 }
-.cal__ini--plus { border-style: solid; }
+.cal__ini--plus {
+  border-style: solid;
+  background: none;
+  color: var(--c-faible);
+}
 
 .cal__evs { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .cal__ev {
@@ -891,3 +900,151 @@
   .cal__ev { white-space: normal; font-size: var(--t-sm); padding: var(--e-2); }
   .cal__mois { min-width: 0; font-size: var(--t-lg); }
 }
+/* ==========================================================================
+   CONTRATS
+   ========================================================================== */
+
+.c-point {
+  width: 9px; height: 9px; flex: none;
+  border-radius: 50%;
+  background: var(--c-faible);
+}
+.c-point--actif   { background: var(--c-succes); }
+.c-point--termine { background: var(--c-action); }
+.c-point--annule  { background: var(--c-erreur); }
+
+.c-perime {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: var(--r-plein);
+  border: 1px solid rgba(255, 59, 92, .35);
+  background: rgba(255, 59, 92, .12);
+  color: var(--c-erreur);
+  font-family: var(--f-titre);
+  font-size: 9px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* Une ligne de contrat tient sur deux étages : la prestation, puis ce qu'on
+   demande en échange. Sur une seule rangée, trois ressources rendaient les
+   colonnes illisibles. */
+.k-ligne {
+  padding: var(--e-3);
+  margin-bottom: var(--e-2);
+  background: var(--c-creux);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-2);
+}
+.k-ligne__haut {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px 32px;
+  gap: var(--e-2); align-items: center;
+}
+.k-ligne__troc {
+  margin-top: var(--e-3);
+  padding-top: var(--e-3);
+  border-top: 1px dashed var(--c-bord);
+}
+.k-demandes { display: flex; flex-direction: column; gap: var(--e-2); margin-top: var(--e-2); }
+.k-demande {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px 32px;
+  gap: var(--e-2); align-items: center;
+}
+.k-ligne .liste, .k-ligne .saisie { padding: 8px var(--e-3); font-size: var(--t-sm); }
+.k-ligne .liste { padding-right: var(--e-6); }
+
+.k-apercu {
+  display: flex; flex-wrap: wrap; gap: var(--e-2);
+  margin-top: var(--e-4);
+  padding-top: var(--e-3);
+  border-top: 1px dashed var(--c-bord);
+}
+.k-tas { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); flex: 1 1 100%; }
+.k-tas i {
+  font-style: normal;
+  font-family: var(--f-titre);
+  font-size: var(--t-xs); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--c-faible);
+}
+.k-tas span {
+  padding: 2px 8px;
+  border-radius: var(--r-plein);
+  background: var(--c-carte-2);
+  border: 1px solid var(--c-bord);
+  font-size: var(--t-xs);
+  color: var(--c-second);
+}
+
+@media (max-width: 560px) {
+  .k-ligne__haut, .k-demande { grid-template-columns: minmax(0, 1fr) 68px 32px; }
+}
+/* ---- Service --------------------------------------------------------------
+   La bande du haut répond à la seule question qu'on se pose en arrivant :
+   suis-je pointé ? Elle vire au vert quand on l'est, pour qu'un coup d'œil
+   suffise sans lire. */
+
+.s-etat {
+  display: flex;
+  align-items: center;
+  gap: var(--e-4);
+  padding: var(--e-4) var(--e-5);
+  background: var(--c-carte);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-3);
+  box-shadow: var(--o-1);
+}
+.s-etat.est-actif {
+  border-color: color-mix(in srgb, var(--c-succes) 45%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--c-succes) 9%, var(--c-carte)), var(--c-carte));
+}
+
+.s-etat__ico {
+  flex: none;
+  width: 42px; height: 42px;
+  display: grid; place-items: center;
+  border-radius: var(--r-plein);
+  background: var(--c-creux);
+  color: var(--c-second);
+}
+.s-etat__ico svg { width: 21px; height: 21px; }
+.s-etat.est-actif .s-etat__ico {
+  background: color-mix(in srgb, var(--c-succes) 18%, transparent);
+  color: var(--c-succes);
+}
+
+.s-etat__txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.s-etat__txt b    { font-size: var(--t-lg); font-weight: 650; }
+.s-etat__txt span { font-size: var(--t-sm); color: var(--c-second); }
+
+@media (max-width: 560px) {
+  .s-etat { flex-wrap: wrap; }
+  .s-etat__txt { flex: 1 1 100%; order: 3; }
+  .s-etat .btn { flex: 1 1 100%; order: 4; justify-content: center; }
+}
+
+/* Une ligne du tableau de service. */
+.s-rang {
+  padding: var(--e-2) var(--e-3);
+  border-radius: var(--r-2);
+  background: var(--c-carte-2);
+  border: 1px solid var(--c-bord);
+}
+.s-rang > b { font-weight: 600; }
+
+/* Le point vert qui bat : quelqu'un est présent maintenant. */
+.s-point {
+  flex: none;
+  width: 8px; height: 8px;
+  border-radius: var(--r-plein);
+  background: var(--c-succes);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-succes) 60%, transparent);
+  animation: s-bat 2.4s ease-out infinite;
+}
+@keyframes s-bat {
+  70%  { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .s-point { animation: none; } }
