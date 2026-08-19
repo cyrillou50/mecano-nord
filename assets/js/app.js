@@ -85,165 +85,89 @@
     return visibleItems().filter(i => scope.indexOf(i.category) !== -1);
   };
 
-  /* Le nom d'une sous-catégorie, pour l'afficher sur l'onglet parent. */
-  function nomSous(id) {
-    if (!id) return "";
-    if (id === "__direct") return "Autres";
-    const c = MNStore.subCategories(activeCat).find(x => x.id === id);
-    return c ? c.name : "";
-  }
-
-  /** Les entrées du menu d'une catégorie, « Tout » compris. */
-  function entreesSous(catId) {
-    const subs = MNStore.subCategories(catId)
-      .map(c => ({ id: c.id, nom: c.name, icon: c.icon,
-        items: visibleItems().filter(i => i.category === c.id) }))
-      .filter(x => x.items.length);
-    if (!subs.length) return [];
-
-    const direct = visibleItems().filter(i => i.category === catId);
-    return [{ id: "", nom: "Tout", icon: null, items: itemsUnder(catId) }]
-      /* Les objets rangés dans la catégorie elle-même méritent leur entrée,
-         sinon ils ne seraient joignables que par « Tout ». */
-      .concat(direct.length ? [{ id: "__direct", nom: "Autres", icon: null, items: direct }] : [])
-      .concat(subs);
-  }
-
   function renderTabs() {
     const host = $("#cattabs");
+    const all = visibleItems();
 
-    const tab = (c, items, sous) => {
+    const tab = (id, name, icon, items) => {
       const picked = items.reduce((n, i) => n + (cart[i.id] || 0), 0);
-      const actif = activeCat === c.id;
-      /* Le nom de la sous-catégorie choisie s'inscrit sur l'onglet : sans lui,
-         le menu refermé, plus rien ne dirait qu'un filtre est en cours. */
-      const precision = actif && activeSub ? nomSous(activeSub) : "";
-      return '<button class="cattab' + (actif ? " is-active" : "") +
-        (sous ? " cattab--menu" : "") + '" data-cat="' + esc(c.id) + '"' +
-        (sous ? ' aria-haspopup="true" aria-expanded="false"' : "") + ">" +
-        (c.icon ? mnIcon(c.icon) : svg("layers")) +
-        "<span>" + esc(c.name) +
-          (precision ? ' <i class="cattab__sub">· ' + esc(precision) + "</i>" : "") + "</span>" +
+      return '<button class="cattab' + (activeCat === id ? " is-active" : "") + '" data-cat="' + esc(id) + '">' +
+        (icon ? mnIcon(icon) : svg("layers")) +
+        "<span>" + esc(name) + "</span>" +
         '<span class="cattab__n">' + items.length + "</span>" +
-        (sous ? '<span class="cattab__chev">' + svg("chevDown") + "</span>" : "") +
         (picked ? '<span class="cattab__dot">' + picked + "</span>" : "") +
       "</button>";
     };
 
-    host.innerHTML = MNStore.topCategories()
-      /* Une catégorie compte pour ce qu'elle contient, directement ou par
-         ses sous-catégories. */
-      .map(c => ({ c, items: itemsUnder(c.id) }))
-      .filter(x => x.items.length)
-      .map(x => tab(x.c, x.items, entreesSous(x.c.id).length > 0))
-      .join("");
+    host.innerHTML =
+      // tab("all", "Customs", null, all) +
+      MNStore.topCategories()
+        /* Une catégorie compte pour ce qu'elle contient, directement ou par
+           ses sous-catégories. */
+        .map(c => ({ c, items: itemsUnder(c.id) }))
+        .filter(x => x.items.length)
+        .map(x => tab(x.c.id, x.c.name, x.c.icon, x.items))
+        .join("");
 
-    host.querySelectorAll("[data-cat]").forEach(b => b.addEventListener("click", e => {
-      e.stopPropagation();
-      const id = b.dataset.cat;
-      const aMenu = entreesSous(id).length > 0;
-
-      if (activeCat !== id) {
-        activeCat = id;
-        activeSub = "";                     // on repart du contenu complet
-        localStorage.setItem("mn.cat", activeCat);
-        localStorage.setItem("mn.sub", "");
-        renderTabs();
-        renderCatalog();
-        /* Changer de catégorie ouvre son menu quand elle se divise : c'est
-           le geste suivant dans neuf cas sur dix. */
-        if (aMenu) ouvrirMenu(id);
-        return;
-      }
-      /* Même catégorie : l'onglet devient le bouton de son propre menu. */
-      if (aMenu) (menuOuvert === id ? fermerMenu() : ouvrirMenu(id));
-    }));
-  }
-
-  /* ---- Menu des sous-catégories ------------------------------------------------
-     Une seule feuille, déplacée sous l'onglet cliqué, plutôt qu'un menu par
-     catégorie : il n'y en a jamais deux d'ouverts, et la barre reste légère.
-     Elle remplace la deuxième rangée d'onglets d'autrefois, qui poussait le
-     catalogue vers le bas dès qu'une catégorie se divisait. */
-
-  let menuOuvert = "";
-
-  function feuilleMenu() {
-    let el = $("#submenu");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "submenu";
-      el.className = "submenu";
-      el.setAttribute("role", "menu");
-      el.hidden = true;
-      document.querySelector(".catbar").appendChild(el);
-    }
-    return el;
-  }
-
-  function ouvrirMenu(catId) {
-    const entrees = entreesSous(catId);
-    if (!entrees.length) return fermerMenu();
-
-    const el = feuilleMenu();
-    el.innerHTML = entrees.map(x => {
-      const picked = x.items.reduce((n, i) => n + (cart[i.id] || 0), 0);
-      return '<button class="subitem' + (activeSub === x.id ? " is-active" : "") +
-        '" data-sub="' + esc(x.id) + '" role="menuitem" type="button">' +
-        (x.icon ? mnIcon(x.icon) : '<span class="subitem__puce"></span>') +
-        '<span class="subitem__nom">' + esc(x.nom) + "</span>" +
-        '<span class="subitem__n">' + x.items.length + "</span>" +
-        (picked ? '<span class="subitem__dot">' + picked + "</span>" : "") +
-      "</button>";
-    }).join("");
-
-    el.hidden = false;
-    menuOuvert = catId;
-
-    const onglet = $("#cattabs").querySelector('[data-cat="' + CSS.escape(catId) + '"]');
-    if (onglet) {
-      onglet.setAttribute("aria-expanded", "true");
-      /* Aligné sous son onglet, puis ramené dans la page s'il déborde. */
-      const barre = document.querySelector(".catbar").getBoundingClientRect();
-      const r = onglet.getBoundingClientRect();
-      el.style.left = "0px";
-      const large = el.offsetWidth;
-      let x = r.left - barre.left;
-      x = Math.min(x, barre.width - large);
-      el.style.left = Math.max(0, x) + "px";
-      el.style.top = (r.bottom - barre.top + 8) + "px";
-    }
-
-    el.querySelectorAll("[data-sub]").forEach(b => b.addEventListener("click", ev => {
-      ev.stopPropagation();
-      activeSub = b.dataset.sub;
-      localStorage.setItem("mn.sub", activeSub);
-      fermerMenu();
-      renderTabs();
+    host.querySelectorAll("[data-cat]").forEach(b => b.addEventListener("click", () => {
+      if (activeCat === b.dataset.cat) return;
+      activeCat = b.dataset.cat;
+      activeSub = "";                       // on repart du contenu complet
+      localStorage.setItem("mn.cat", activeCat);
+      localStorage.setItem("mn.sub", "");
+      host.querySelectorAll("[data-cat]").forEach(x => x.classList.toggle("is-active", x === b));
+      renderSubTabs();
       renderCatalog();
     }));
 
-    const premier = el.querySelector(".subitem.is-active") || el.querySelector(".subitem");
-    if (premier) premier.focus();
+    renderSubTabs();
   }
 
-  function fermerMenu() {
-    const el = $("#submenu");
-    if (el) { el.hidden = true; el.innerHTML = ""; }
-    const onglet = menuOuvert &&
-      $("#cattabs").querySelector('[data-cat="' + CSS.escape(menuOuvert) + '"]');
-    if (onglet) onglet.setAttribute("aria-expanded", "false");
-    menuOuvert = "";
-  }
+  /**
+   * Deuxième rangée, affichée seulement quand la catégorie active se divise.
+   * « Tout » y figure toujours : sans lui, on ne pourrait plus voir d'un coup
+   * ce que contient la catégorie.
+   */
+  function renderSubTabs() {
+    const host = $("#subtabs");
+    const subs = MNStore.subCategories(activeCat)
+      .map(c => ({ c, items: visibleItems().filter(i => i.category === c.id) }))
+      .filter(x => x.items.length);
 
-  /* Un menu se referme quand on regarde ailleurs. */
-  document.addEventListener("click", () => { if (menuOuvert) fermerMenu(); });
-  document.addEventListener("keydown", e => {
-    if (e.key !== "Escape" || !menuOuvert) return;
-    const onglet = $("#cattabs").querySelector('[data-cat="' + CSS.escape(menuOuvert) + '"]');
-    fermerMenu();
-    if (onglet) onglet.focus();
-  });
+    if (!subs.length) {
+      host.hidden = true;
+      host.innerHTML = "";
+      return;
+    }
+    host.hidden = false;
+
+    const direct = visibleItems().filter(i => i.category === activeCat);
+    const onglet = (id, name, icon, items) => {
+      const picked = items.reduce((n, i) => n + (cart[i.id] || 0), 0);
+      return '<button class="subtab' + (activeSub === id ? " is-active" : "") +
+        '" data-sub="' + esc(id) + '">' +
+        (icon ? mnIcon(icon) : "") +
+        "<span>" + esc(name) + "</span>" +
+        '<span class="subtab__n">' + items.length + "</span>" +
+        (picked ? '<span class="subtab__dot">' + picked + "</span>" : "") +
+      "</button>";
+    };
+
+    host.innerHTML =
+      onglet("", "Tout", null, itemsUnder(activeCat)) +
+      /* Les objets rangés dans la catégorie elle-même méritent leur onglet,
+         sinon ils ne seraient joignables que par « Tout ». */
+      (direct.length ? onglet("__direct", "Autres", null, direct) : "") +
+      subs.map(x => onglet(x.c.id, x.c.name, x.c.icon, x.items)).join("");
+
+    host.querySelectorAll("[data-sub]").forEach(b => b.addEventListener("click", () => {
+      if (activeSub === b.dataset.sub) return;
+      activeSub = b.dataset.sub;
+      localStorage.setItem("mn.sub", activeSub);
+      host.querySelectorAll("[data-sub]").forEach(x => x.classList.toggle("is-active", x === b));
+      renderCatalog();
+    }));
+  }
 
   /**
    * Met à jour uniquement les pastilles de quantité des onglets.
@@ -266,21 +190,17 @@
     };
 
     $("#cattabs").querySelectorAll("[data-cat]").forEach(btn => {
-      poser(btn, itemsUnder(btn.dataset.cat), "cattab__dot");
+      const id = btn.dataset.cat;
+      poser(btn, id === "all" ? all : itemsUnder(id), "cattab__dot");
     });
 
-    /* Le menu, quand il est ouvert : ses pastilles doivent suivre le panier
-       comme celles des onglets. */
-    const menu = $("#submenu");
-    if (menu && !menu.hidden) {
-      menu.querySelectorAll("[data-sub]").forEach(btn => {
-        const id = btn.dataset.sub;
-        const items = id === ""
-          ? itemsUnder(activeCat)
-          : all.filter(i => i.category === (id === "__direct" ? activeCat : id));
-        poser(btn, items, "subitem__dot");
-      });
-    }
+    $("#subtabs").querySelectorAll("[data-sub]").forEach(btn => {
+      const id = btn.dataset.sub;
+      const items = id === ""
+        ? itemsUnder(activeCat)
+        : all.filter(i => i.category === (id === "__direct" ? activeCat : id));
+      poser(btn, items, "subtab__dot");
+    });
   }
 
   /* ---- Catalogue ----------------------------------------------------------- */
