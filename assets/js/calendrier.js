@@ -74,6 +74,31 @@
     }
   }
 
+  /**
+   * Les absents du jour, réduits à leurs initiales à côté du numéro.
+   *
+   * Écrire les pseudos en entier mangeait la case : à trois absents il ne
+   * restait plus de place pour les évènements, qui sont pourtant ce qu'on
+   * vient poser ici. Le nom complet revient au survol.
+   */
+  function initialesConges(cg) {
+    const MAX = 3;
+    const vus = cg.slice(0, MAX);
+    const reste = cg.slice(MAX);
+
+    return vus.map(c =>
+      '<span class="calini" title="' + esc(c.pseudo + " est en congés") + '">' +
+        esc(MNUI.initials(c.pseudo)) + "</span>").join("") +
+      /* Au-delà de trois, un compteur : quatre pastilles ne tiendraient pas
+         en face du numéro, et leur liste tient dans son infobulle. */
+      (reste.length
+        ? '<span class="calini calini--plus" title="' +
+          esc(reste.map(c => c.pseudo).join(", ") +
+            (reste.length > 1 ? " sont aussi en congés" : " est aussi en congés")) +
+          '">+' + reste.length + "</span>"
+        : "");
+  }
+
   /* ---- Rendu ---------------------------------------------------------------- */
 
   function render() {
@@ -166,10 +191,11 @@
         '<div class="calday' + (dedans ? "" : " calday--hors") +
           (j === today ? " calday--auj" : "") + '" data-jour="' + j + '"' +
           (canEdit ? ' tabindex="0" role="button" aria-label="Ajouter le ' + esc(j) + '"' : "") + ">" +
-          '<span class="calday__n">' + d.getDate() + "</span>" +
+          '<div class="calday__tete">' +
+            '<span class="calday__n">' + d.getDate() + "</span>" +
+            (cg.length ? '<span class="calconges">' + initialesConges(cg) + "</span>" : "") +
+          "</div>" +
           '<div class="calday__evs">' +
-            cg.map(c => '<span class="calev calev--conge" title="' +
-              esc(c.pseudo + " est en congés") + '">' + esc(c.pseudo) + "</span>").join("") +
             evs.map(e => '<button class="calev calev--' + e.teinte +
               '" data-ev="' + esc(e.id) + '" type="button" title="' +
               esc(e.titre + (e.note ? " — " + e.note : "")) + '">' +
