@@ -1,0 +1,151 @@
+/* ==========================================================================
+   Jetons de design — la seule feuille à ouvrir pour changer l'allure du site.
+
+   Rien d'autre ne doit contenir une couleur, une taille ou une durée écrite
+   en dur. Un composant qui a besoin d'une valeur nouvelle la déclare ici.
+
+   Les jetons d'accent (--accent-rgb, --pink, --surface…) sont ceux que le
+   moteur de thèmes de l'atelier écrit sur <html> au chargement. On les reprend
+   tels quels : la V2 hérite ainsi des sept thèmes existants sans une ligne de
+   plus, et les valeurs ci-dessous ne servent que de repli si le script échoue.
+   ========================================================================== */
+
+:root {
+  /* ---- Couleurs de marque (repli du moteur de thèmes) ------------------- */
+  --accent-rgb: 255 43 209;
+  --pink:        #ff2bd1;
+  --pink-soft:   #ff7ae0;
+  --pink-ink:    rgb(var(--accent-rgb) / .12);
+  --accent-deep: #9e1b82;
+  --on-accent:   #14060f;
+
+  --amber:  #ffa92e;
+  --toxic:  #a8ff52;
+  --danger: #ff3b5c;
+  --info:   #7fd7e8;
+
+  /* ---- Fonds et texte --------------------------------------------------- */
+  --bg:         #06050a;
+  --surface:    #0f0c15;
+  --surface-2:  #15111e;
+  --surface-lo: #100d18;
+  --sunk:       #0a0810;
+  --raise:      #1a1526;
+  --line:       rgba(255, 255, 255, .075);
+  --line-2:     rgba(255, 255, 255, .14);
+
+  --txt:   #ede9f3;
+  --muted: #9a92ac;
+  --dim:   #6a6280;
+
+  /* ---- Rôles sémantiques -------------------------------------------------
+     Les composants ne parlent jamais de « rose » mais de « couleur d'action ».
+     Repeindre le site revient alors à changer ces quelques lignes. */
+  --c-action:      var(--pink);
+  --c-action-doux: var(--pink-soft);
+  --c-action-fond: var(--pink-ink);
+  --c-sur-action:  var(--on-accent);
+
+  --c-fond:     var(--bg);
+  --c-carte:    var(--surface-2);
+  --c-carte-2:  var(--surface-lo);
+  --c-creux:    var(--sunk);
+  --c-bord:     var(--line);
+  --c-bord-net: var(--line-2);
+
+  --c-texte:  var(--txt);
+  --c-second: var(--muted);
+  --c-faible: var(--dim);
+
+  --c-succes: var(--toxic);
+  --c-alerte: var(--amber);
+  --c-erreur: var(--danger);
+  --c-info:   var(--info);
+
+  /* ---- Espacements -------------------------------------------------------
+     Une échelle géométrique : deux valeurs voisines se distinguent à l'œil,
+     ce qu'une suite de 1 px en 1 px ne permet pas. */
+  --e-0:  0;
+  --e-1:  4px;
+  --e-2:  8px;
+  --e-3:  12px;
+  --e-4:  16px;
+  --e-5:  24px;
+  --e-6:  32px;
+  --e-7:  48px;
+  --e-8:  64px;
+
+  /* ---- Formes ----------------------------------------------------------- */
+  --r-1: 6px;
+  --r-2: 10px;
+  --r-3: 14px;
+  --r-4: 20px;
+  --r-plein: 999px;
+
+  /* ---- Ombres ------------------------------------------------------------
+     Trois profondeurs, pas davantage : au-delà on ne les distingue plus et
+     chacun invente la sienne. */
+  --o-1: 0 1px 2px rgba(0, 0, 0, .4);
+  --o-2: 0 8px 24px -12px rgba(0, 0, 0, .7);
+  --o-3: 0 20px 48px -16px rgba(0, 0, 0, .8);
+  --o-action: 0 0 24px -6px rgb(var(--accent-rgb) / .55);
+
+  /* ---- Typographie ------------------------------------------------------- */
+  --f-titre: "Oxanium", "Segoe UI", system-ui, sans-serif;
+  --f-texte: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono:  ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  --t-xs: 11px;
+  --t-sm: 12.5px;
+  --t-md: 14px;
+  --t-lg: 16px;
+  --t-xl: 20px;
+  --t-2xl: 26px;
+  --t-3xl: clamp(28px, 4vw, 40px);
+
+  /* ---- Mouvement ---------------------------------------------------------
+     Court et discret. Une interface d'atelier se consulte cent fois par jour :
+     une animation qu'on remarque est une animation qui agace. */
+  --m-vif:   .12s;
+  --m-doux:  .2s;
+  --m-courbe: cubic-bezier(.2, .7, .3, 1);
+
+  /* ---- Gabarit ----------------------------------------------------------- */
+  --l-sidebar: 248px;
+  --l-sidebar-mince: 72px;
+  --l-topbar: 60px;
+  --l-max: 1440px;
+  --l-lecture: 720px;
+
+  /* ---- Profondeurs -------------------------------------------------------
+     Numérotées une fois pour toutes : deux composants qui inventent leur
+     z-index finissent toujours par se recouvrir au mauvais moment. */
+  --z-fond: 0;
+  --z-sticky: 100;
+  --z-sidebar: 200;
+  --z-topbar: 300;
+  --z-voile: 400;
+  --z-tiroir: 500;
+  --z-modale: 600;
+  --z-menu: 700;
+  --z-toast: 800;
+}
+
+/* ---- Thème clair ----------------------------------------------------------
+   Le moteur de thèmes de l'atelier réécrit déjà les couleurs sur <html>. Ce
+   bloc ne sert qu'aux réglages que lui ne connaît pas : ombres et bordures,
+   qui doivent se comporter à l'inverse sur fond pâle. */
+
+:root[data-clair="1"] {
+  --line:   rgba(0, 0, 0, .1);
+  --line-2: rgba(0, 0, 0, .18);
+  --o-1: 0 1px 2px rgba(0, 0, 0, .08);
+  --o-2: 0 8px 24px -12px rgba(0, 0, 0, .18);
+  --o-3: 0 20px 48px -16px rgba(0, 0, 0, .22);
+}
+
+/* On respecte le réglage système : une animation peut gêner, pas seulement
+   déplaire. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --m-vif: .001s; --m-doux: .001s; }
+}

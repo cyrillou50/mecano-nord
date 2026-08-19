@@ -1,0 +1,243 @@
+/* ==========================================================================
+   Gabarit de l'application : barre latérale, barre du haut, zone de contenu.
+
+   Un seul squelette pour toutes les pages. Sur grand écran la barre latérale
+   est là en permanence ; en dessous elle devient un tiroir qu'on ouvre, et le
+   contenu récupère toute la largeur.
+   ========================================================================== */
+
+.app {
+  display: grid;
+  /* La colonne de contenu est déclarée en `minmax(0, 1fr)` : sans ce zéro, un
+     tableau large pousserait la grille et ferait défiler la page entière. */
+  grid-template-columns: var(--l-sidebar) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+/* ---- Barre latérale ------------------------------------------------------ */
+
+.sidebar {
+  grid-row: 1 / -1;
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sidebar);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--c-carte-2);
+  border-right: 1px solid var(--c-bord);
+}
+
+.sidebar__marque {
+  display: flex; align-items: center; gap: var(--e-3);
+  padding: var(--e-4);
+  min-height: var(--l-topbar);
+  color: inherit;
+}
+.sidebar__marque:hover { text-decoration: none; }
+
+.marque__jeton {
+  width: 40px; height: 40px; flex: none;
+  display: grid; place-items: center;
+  overflow: hidden;
+  border-radius: var(--r-2);
+  background: linear-gradient(150deg, var(--c-action-doux), var(--c-action));
+  color: var(--c-sur-action);
+  font-family: var(--f-titre); font-weight: 800; font-size: var(--t-md);
+}
+.marque__jeton img { width: 100%; height: 100%; object-fit: contain; }
+.marque__jeton svg { width: 24px; height: 24px; }
+
+.marque__txt { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.marque__txt b {
+  font-family: var(--f-titre); font-size: var(--t-md); font-weight: 800;
+  letter-spacing: .06em; text-transform: uppercase;
+}
+.marque__txt span {
+  font-size: var(--t-xs); letter-spacing: .16em; text-transform: uppercase;
+  color: var(--c-action-doux);
+}
+
+.sidebar__nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--e-2) var(--e-3) var(--e-4);
+}
+
+.navgroupe + .navgroupe { margin-top: var(--e-4); }
+.navgroupe__titre {
+  padding: var(--e-2) var(--e-3) var(--e-1);
+  font-family: var(--f-titre);
+  font-size: var(--t-xs); font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--c-faible);
+}
+
+.navlien {
+  position: relative;
+  display: flex; align-items: center; gap: var(--e-3);
+  padding: var(--e-3);
+  border-radius: var(--r-2);
+  color: var(--c-second);
+  font-size: var(--t-md); font-weight: 500;
+  transition: background var(--m-vif), color var(--m-vif);
+}
+.navlien:hover { background: rgba(255, 255, 255, .05); color: var(--c-texte); text-decoration: none; }
+.navlien svg { width: 19px; height: 19px; flex: none; }
+
+.navlien.is-actif {
+  background: var(--c-action-fond);
+  color: var(--c-action-doux);
+  font-weight: 600;
+}
+/* Un repère à gauche plutôt qu'un simple aplat : il reste lisible quel que
+   soit le thème, y compris clair. */
+.navlien.is-actif::before {
+  content: "";
+  position: absolute; left: 0; top: 20%; bottom: 20%;
+  width: 3px;
+  border-radius: var(--r-plein);
+  background: var(--c-action);
+}
+
+.navlien__n {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: var(--r-plein);
+  background: rgba(255, 255, 255, .08);
+  font-size: var(--t-xs);
+  color: var(--c-faible);
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar__pied {
+  padding: var(--e-3);
+  border-top: 1px solid var(--c-bord);
+}
+
+/* ---- Barre du haut ------------------------------------------------------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-topbar);
+  min-height: var(--l-topbar);
+  display: flex; align-items: center; gap: var(--e-3);
+  padding: var(--e-2) var(--e-4);
+  background: color-mix(in srgb, var(--c-fond) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--c-bord);
+}
+/* Les navigateurs sans `color-mix` reçoivent un fond plein : mieux vaut opaque
+   que transparent, où le contenu défilerait à travers la barre. */
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+  .topbar { background: var(--c-fond); }
+}
+
+.topbar__titre {
+  font-family: var(--f-titre);
+  font-size: var(--t-lg); font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+}
+
+.burger { display: none; }
+
+/* ---- Contenu ------------------------------------------------------------- */
+
+.contenu {
+  padding: var(--e-5) var(--e-5) var(--e-8);
+  max-width: var(--l-max);
+  width: 100%;
+}
+
+/* ---- Tablette : barre latérale réduite aux icônes ------------------------- */
+
+@media (max-width: 1180px) and (min-width: 1025px) {
+  .app { grid-template-columns: var(--l-sidebar-mince) minmax(0, 1fr); }
+  .sidebar__marque { justify-content: center; padding: var(--e-4) var(--e-2); }
+  .marque__txt,
+  .navgroupe__titre,
+  .navlien span,
+  .navlien__n { display: none; }
+  .navlien { justify-content: center; padding: var(--e-3) 0; }
+  .sidebar__nav { padding-inline: var(--e-2); }
+  /* Le nom réapparaît au survol : une barre d'icônes seules s'apprend mal. */
+  .navlien::after {
+    content: attr(data-nom);
+    position: absolute; left: calc(100% + 8px);
+    padding: 4px 10px;
+    border-radius: var(--r-1);
+    background: var(--c-carte);
+    border: 1px solid var(--c-bord-net);
+    box-shadow: var(--o-2);
+    font-size: var(--t-sm);
+    white-space: nowrap;
+    opacity: 0; pointer-events: none;
+    transition: opacity var(--m-vif);
+    z-index: var(--z-menu);
+  }
+  .navlien:hover::after { opacity: 1; }
+}
+
+/* ---- Téléphone et petite tablette : la latérale devient un tiroir --------- */
+
+@media (max-width: 1024px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(300px, 84vw);
+    z-index: var(--z-tiroir);
+    transform: translateX(-100%);
+    transition: transform var(--m-doux) var(--m-courbe);
+    box-shadow: var(--o-3);
+  }
+  .sidebar.is-ouvert { transform: none; }
+
+  .burger { display: grid; }
+
+  .voile {
+    position: fixed; inset: 0;
+    z-index: var(--z-voile);
+    background: rgba(0, 0, 0, .6);
+    opacity: 0;
+    transition: opacity var(--m-doux);
+  }
+  .voile.is-ouvert { opacity: 1; }
+
+  .contenu { padding: var(--e-4) var(--e-4) var(--e-8); }
+}
+
+@media (max-width: 560px) {
+  .contenu { padding: var(--e-3) var(--e-3) var(--e-8); }
+  .topbar { padding-inline: var(--e-3); }
+}
+
+/* ---- Bandeau bêta ---------------------------------------------------------
+   Volontairement voyant et non refermable : on doit savoir en permanence que
+   ce qu'on écrit ici part dans les vraies données. */
+
+.betabar {
+  display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
+  padding: var(--e-2) var(--e-4);
+  background: linear-gradient(90deg,
+    rgba(255, 169, 46, .16), rgba(255, 169, 46, .06));
+  border-bottom: 1px solid rgba(255, 169, 46, .35);
+  font-size: var(--t-sm);
+  color: var(--c-alerte);
+}
+.betabar b { font-family: var(--f-titre); letter-spacing: .1em; }
+.betabar span { color: var(--c-second); }
+.betabar a { color: var(--c-alerte); text-decoration: underline; }
+
+.betapuce {
+  padding: 1px 7px;
+  border-radius: var(--r-plein);
+  border: 1px solid rgba(255, 169, 46, .5);
+  background: rgba(255, 169, 46, .14);
+  color: var(--c-alerte);
+  font-family: var(--f-titre);
+  font-size: 9.5px; font-weight: 800;
+  letter-spacing: .14em; text-transform: uppercase;
+}
