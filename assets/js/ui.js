@@ -256,156 +256,6 @@ window.MNUI = (function () {
 
   /* ---- Barre du haut -------------------------------------------------------- */
 
-  /* ---- Barre de navigation -------------------------------------------------
-     Huit onglets à plat poussaient déjà le jeton employé hors de l'écran, et
-     il s'en ajoute à chaque chantier. On les range donc par métier : ce qui
-     touche à l'atelier d'un côté, ce qui touche aux gens de l'autre.
-
-     Un groupe dont l'unique entrée est visible se montre en lien direct : un
-     menu déroulant à un seul choix ne fait perdre qu'un clic. */
-
-  const NAV = [
-    { page: "fact", nom: "Facturation", href: "index.html" },
-    {
-      nom: "Atelier", groupe: [
-        { page: "contrats", nom: "Contrats", href: "contrats.html", icon: "file",
-          voir: () => MNAuth.canAny("contracts_view", "contracts", "contracts_delete") },
-        { page: "calendrier", nom: "Calendrier", href: "calendrier.html", icon: "calendar" }
-      ]
-    },
-    {
-      nom: "Équipe", groupe: [
-        { page: "service", nom: "Service", href: "service.html", icon: "history",
-          voir: () => MNAuth.canAny("duty", "duty_view") },
-        { page: "equipe", nom: "Fiches", href: "equipe.html", icon: "users",
-          voir: () => MNAuth.canAny("staff", "promote", "users") }
-      ]
-    },
-    /* Les véhicules sont un catalogue de consultation : ouvert à tous, et seul
-       de son espèce — le mettre dans un menu à une entrée n'apporterait rien. */
-    { page: "vehicules", nom: "Véhicules", href: "vehicules.html" }
-  ];
-
-  const lien = (e, active) =>
-    '<a class="navlink' + (active === e.page ? " is-active" : "") +
-      '" href="' + e.href + '">' + esc(e.nom) + "</a>";
-
-  function liensNav(active, canAdmin) {
-    let html = "";
-
-    NAV.forEach(e => {
-      if (!e.groupe) {
-        if (e.voir && !e.voir()) return;
-        html += lien(e, active);
-        /* L'historique n'existe que sur la facturation : c'est une fenêtre de
-           cette page, pas une page à elle. */
-        if (e.page === "fact" && active === "fact") {
-          html += '<button class="navlink" id="nav-history">Historique</button>';
-        }
-        return;
-      }
-
-      const vus = e.groupe.filter(x => !x.voir || x.voir());
-      if (!vus.length) return;
-      if (vus.length === 1) { html += lien(vus[0], active); return; }
-
-      const ici = vus.some(x => x.page === active);
-      const cle = MNStore.slugify(e.nom);
-      html +=
-        '<button class="navlink navlink--menu' + (ici ? " is-active" : "") +
-          '" data-nav="' + cle + '" aria-haspopup="true" aria-expanded="false">' +
-          esc(e.nom) +
-          /* Le nom de la page ouverte s'inscrit sur le groupe : sans lui, le
-             menu refermé, on ne saurait plus où l'on est. */
-          (ici ? ' <i class="navlink__ou">· ' +
-            esc(vus.find(x => x.page === active).nom) + "</i>" : "") +
-          '<span class="navlink__chev">' + svg("chevDown") + "</span>" +
-        "</button>";
-    });
-
-    if (canAdmin) {
-      html += '<a class="navlink' + (active === "admin" ? " is-active" : "") +
-        '" href="admin.html">Admin</a>';
-    }
-    return html;
-  }
-
-  /* Une seule feuille, déplacée sous le groupe cliqué : il n'y en a jamais
-     deux d'ouvertes, et la barre reste légère. */
-  let navOuvert = "";
-
-  function feuilleNav() {
-    let el = document.getElementById("navmenu");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "navmenu";
-      el.className = "navmenu";
-      el.setAttribute("role", "menu");
-      el.hidden = true;
-      document.body.appendChild(el);
-    }
-    return el;
-  }
-
-  function fermerNav() {
-    const el = document.getElementById("navmenu");
-    if (el) { el.hidden = true; el.innerHTML = ""; }
-    const b = navOuvert && document.querySelector('[data-nav="' + navOuvert + '"]');
-    if (b) b.setAttribute("aria-expanded", "false");
-    navOuvert = "";
-  }
-
-  function ouvrirNav(cle, active) {
-    /* On referme d'abord : le clic sur un groupe arrête sa propagation, donc
-       le gestionnaire global ne fera pas le ménage à notre place et le groupe
-       précédent resterait annoncé comme ouvert. */
-    fermerNav();
-
-    const e = NAV.find(x => x.groupe && MNStore.slugify(x.nom) === cle);
-    if (!e) return;
-    const vus = e.groupe.filter(x => !x.voir || x.voir());
-
-    const el = feuilleNav();
-    el.innerHTML = vus.map(x =>
-      '<a class="navitem' + (x.page === active ? " is-active" : "") +
-        '" href="' + x.href + '" role="menuitem">' +
-        svg(x.icon || "box") + "<span>" + esc(x.nom) + "</span></a>").join("");
-    el.hidden = false;
-    navOuvert = cle;
-
-    const b = document.querySelector('[data-nav="' + cle + '"]');
-    if (b) {
-      b.setAttribute("aria-expanded", "true");
-      /* Posé sous son bouton, puis ramené dans la page s'il déborde à droite. */
-      const r = b.getBoundingClientRect();
-      el.style.left = "0px";
-      const large = el.offsetWidth;
-      el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - large - 8)) + "px";
-      el.style.top = (r.bottom + 8) + "px";
-    }
-
-    const premier = el.querySelector(".navitem.is-active") || el.querySelector(".navitem");
-    if (premier) premier.focus();
-  }
-
-  function brancherNav(active) {
-    document.querySelectorAll("[data-nav]").forEach(b =>
-      b.addEventListener("click", ev => {
-        ev.stopPropagation();
-        const cle = b.dataset.nav;
-        if (navOuvert === cle) fermerNav(); else ouvrirNav(cle, active);
-      }));
-  }
-
-  /* Un menu se referme quand on regarde ailleurs. */
-  document.addEventListener("click", () => { if (navOuvert) fermerNav(); });
-  document.addEventListener("keydown", e => {
-    if (e.key !== "Escape" || !navOuvert) return;
-    const b = document.querySelector('[data-nav="' + navOuvert + '"]');
-    fermerNav();
-    if (b) b.focus();
-  });
-
   function mountTopbar(active) {
     const el = document.getElementById("topbar");
     if (!el) return;
@@ -419,7 +269,28 @@ window.MNUI = (function () {
         '<span class="brand__mark' + (mark.custom ? " brand__mark--custom" : "") + '">' + mark.html + "</span>" +
         '<span class="brand__txt"><b>' + esc(b.name) + "</b><i>" + esc(b.tagline) + "</i></span>" +
       "</a>" +
-      '<nav class="topnav" id="topnav">' + liensNav(active, canAdmin) + "</nav>" +
+      '<nav class="topnav">' +
+        '<a class="navlink' + (active === "fact" ? " is-active" : "") + '" href="index.html">Facturation</a>' +
+        (active === "fact" ? '<button class="navlink" id="nav-history">Historique</button>' : "") +
+        /* Le calendrier est ouvert : savoir ce qui est prévu n'est pas une faveur. */
+        '<a class="navlink' + (active === "calendrier" ? " is-active" : "") +
+          '" href="calendrier.html">Calendrier</a>' +
+        /* Les contrats demandent au minimum le droit de les lire. */
+        (MNAuth.canAny("contracts_view", "contracts", "contracts_delete")
+          ? '<a class="navlink' + (active === "contrats" ? " is-active" : "") +
+            '" href="contrats.html">Contrats</a>'
+          : "") +
+        (MNAuth.canAny("duty", "duty_view")
+          ? '<a class="navlink' + (active === "service" ? " is-active" : "") + '" href="service.html">Service</a>'
+          : "") +
+        (MNAuth.canAny("staff", "promote", "users")
+          ? '<a class="navlink' + (active === "equipe" ? " is-active" : "") + '" href="equipe.html">Équipe</a>'
+          : "") +
+        /* Les véhicules sont un catalogue de consultation : ouvert à tous. */
+        '<a class="navlink' + (active === "vehicules" ? " is-active" : "") +
+          '" href="vehicules.html">Véhicules</a>' +
+        (canAdmin ? '<a class="navlink' + (active === "admin" ? " is-active" : "") + '" href="admin.html">Admin</a>' : "") +
+      "</nav>" +
       '<div class="topbar__spacer"></div>' +
       /* La palette n'apparaît que si chacun a le droit de se choisir une
          apparence — sinon le bouton ne mènerait nulle part. */
@@ -439,8 +310,6 @@ window.MNUI = (function () {
             "</button>" +
           "</div>"
         : "");
-
-    brancherNav(active);
 
     const th = document.getElementById("btn-theme");
     if (th) th.addEventListener("click", themeModal);
