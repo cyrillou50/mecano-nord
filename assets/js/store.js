@@ -399,6 +399,10 @@ window.MNStore = (function () {
         /* Contenance du réservoir. `type` était un texte libre (moto, berline) ;
            il a laissé la place à cette valeur, plus utile à l'atelier. */
         litres: stat(v.litres, 9999),
+        /* Peut-il être tracté ? Une case cochée ou non, sans troisième état :
+           « je ne sais pas » et « non » se ressemblent trop pour qu'on
+           demande à l'atelier de trancher entre les deux. */
+        remorquable: v.remorquable === true,
         note: String(v.note || "").slice(0, 300),
         /* Modification proposée par quelqu'un qui n'a pas le droit d'écrire
            dans le parc. Elle attend à côté du véhicule sans le changer : la
@@ -417,6 +421,7 @@ window.MNStore = (function () {
               places: stat(ch.places, 99),
               coffre: libre(ch.coffre, 40),
               litres: stat(ch.litres, 9999),
+              remorquable: ch.remorquable === true,
               note: String(ch.note || "").slice(0, 300)
             }
           };

@@ -1153,3 +1153,10 @@ button.calev:hover { filter: brightness(1.25); }
   .calev { font-size: 10.5px; padding: 2px 4px; }
   .calbar__mois { min-width: 0; font-size: 18px; }
 }
+
+/* Remorquable : une réponse, pas une mesure — d'où une pastille lisible d'un
+   coup d'oeil plutôt qu'un nombre dans la case. */
+.vrem { display: inline-flex; align-items: center; gap: 6px; }
+.vrem svg { width: 15px; height: 15px; flex: none; stroke-width: 2.4; }
+.vrem--oui { color: var(--toxic); }
+.vrem--non { color: var(--dim); }
