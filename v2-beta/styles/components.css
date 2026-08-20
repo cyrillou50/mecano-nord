@@ -1448,3 +1448,24 @@
 
 /* Le sélecteur de couleur natif a besoin de moins de rembourrage. */
 .saisie[type="color"] { height: 44px; padding: 4px; cursor: pointer; }
+
+/* Liste de permissions : plus haute, chaque ligne portant sa description. */
+.ad-coches--hautes { max-height: 300px; }
+
+/* Étiquette d'absence : dite, mais sans insister. */
+.ad-etiq--vide { border-style: dashed; opacity: .7; }
+
+/* Nuancier des couleurs de rôle. */
+.ad-nuancier { display: flex; gap: var(--e-2); flex-wrap: wrap; }
+.ad-nuance {
+  width: 30px; height: 30px;
+  border: 2px solid transparent;
+  border-radius: var(--r-plein);
+  cursor: pointer;
+  transition: transform var(--m-vif), box-shadow var(--m-vif);
+}
+.ad-nuance:hover { transform: scale(1.12); }
+.ad-nuance.est-choisie {
+  border-color: var(--c-texte);
+  box-shadow: 0 0 0 2px var(--c-fond) inset;
+}

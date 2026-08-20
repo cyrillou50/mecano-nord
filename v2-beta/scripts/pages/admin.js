@@ -137,7 +137,8 @@
     }));
 
     ({
-      objets: vueObjets, cats: vueCats, res: vueRes, ctypes: vueCtypes
+      objets: vueObjets, cats: vueCats, res: vueRes, ctypes: vueCtypes,
+      users: vueUsers, roles: vueRoles
     }[onglet] || aVenir)($("#a-vue"));
   }
 
@@ -858,6 +859,369 @@
     brouillon.contractTypes = (brouillon.contractTypes || []).filter(x => x.id !== t.id);
     valider();
     U.toast("Type supprimé", "ok");
+  }
+
+  /* ---- Employés -------------------------------------------------------------------
+     Ici on règle qui entre et avec quels droits. Les fiches détaillées
+     (ancienneté, formations, carrière) vivent sur la page Équipe : ce sont
+     deux questions différentes, et les mélanger rendait l'onglet illisible. */
+
+  /** Les droits d'un rôle, en étiquettes. « admin » les résume toutes. */
+  function pastillesDroits(role) {
+    const p = role.perms.indexOf("admin") !== -1 ? ["admin"] : role.perms;
+    if (!p.length) return '<span class="etiq ad-etiq--vide">aucun droit</span>';
+    if (p[0] === "admin") return U.etiquette("tous les droits", "action");
+    return p.map(k => {
+      const d = MN_PERMS.find(x => x.key === k);
+      return U.etiquette(d ? d.name : k);
+    }).join("");
+  }
+
+  function vueUsers(z) {
+    z.innerHTML =
+      outils("Qui peut se connecter, et avec quels droits — les flèches réordonnent la liste",
+        U.bouton("Nouvel employé", { variante: "principal", icone: "plus", action: "add" })) +
+      (brouillon.users.length
+        ? '<div class="pile pile--sm">' + brouillon.users.map(ligneUser).join("") + "</div>"
+        : U.vide({ icone: "equipe", titre: "Aucun employé",
+                   texte: "Ajoute les pseudos de ton équipe pour qu'ils puissent se connecter." })) +
+      '<div style="margin-top:var(--e-4)">' + U.alerte({
+        ton: "info",
+        texte: "Le pseudo est la seule chose à retenir. Le code d'accès est facultatif : " +
+               "utile pour les comptes qui gèrent le catalogue ou l'équipe. Les fiches " +
+               "détaillées se tiennent sur la page Équipe."
+      }) + "</div>";
+
+    z.querySelector('[data-a="add"]').addEventListener("click", () => editerUser(null));
+    brancherLignes(z, brouillon.users, {
+      edit: u => editerUser(u),
+      del: u => supprimerUser(u),
+      bascule: u => {
+        if (moi.uid === u.id) {
+          return U.toast("Tu ne peux pas désactiver ton propre compte", "err");
+        }
+        u.active = !u.active; valider();
+      }
+    });
+  }
+
+  function ligneUser(u) {
+    const role = brouillon.roles.find(r => r.id === u.roleId) ||
+      { name: "Sans rôle", color: "#6a6280", perms: [] };
+    const i = brouillon.users.indexOf(u);
+
+    return '<div class="ad-ligne' + (u.active ? "" : " est-eteint") +
+      '" data-ligne="' + U.esc(u.id) + '">' +
+      fleches(i, brouillon.users.length) +
+      '<span class="avatar" style="background:' + U.esc(role.color) + '">' +
+        U.esc(U.initiales(u.pseudo)) + "</span>" +
+      '<div class="ad-corps">' +
+        "<b>" + U.esc(u.pseudo) +
+          (moi.uid === u.id ? " " + U.etiquette("toi", "action") : "") +
+          (u.pin ? " " + U.etiquette("code") : "") +
+          (u.active ? "" : " " + U.etiquette("désactivé")) + "</b>" +
+        '<div class="ad-meta"><span style="color:' + U.esc(role.color) + '">' +
+          U.esc(role.name) + "</span></div>" +
+        '<div class="ad-meta">' + pastillesDroits(role) + "</div>" +
+      "</div>" +
+      '<div class="ad-actes">' +
+        U.bouton("", { icone: u.active ? "check" : "croix", variante: "fantome", taille: "sm",
+                       titre: u.active ? "Désactiver" : "Réactiver", action: "bascule" }) +
+        U.bouton("", { icone: "crayon", variante: "fantome", taille: "sm",
+                       titre: "Modifier", action: "edit" }) +
+        U.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
+                       titre: "Retirer", action: "del" }) +
+      "</div>" +
+    "</div>";
+  }
+
+  function editerUser(u) {
+    const neuf = !u;
+    const cestMoi = !neuf && moi.uid === u.id;
+    if (!brouillon.roles.length) return U.toast("Crée d'abord un rôle", "err");
+
+    /* Un nouvel employé arrive sur le rôle le MOINS doté : on ne crée jamais
+       un administrateur par inadvertance. */
+    const plusBas = brouillon.roles.slice().sort((a, b) => {
+      const poids = r => (r.perms.indexOf("admin") !== -1 ? 99 : r.perms.length);
+      return poids(a) - poids(b);
+    })[0];
+    const cur = u || { pseudo: "", roleId: plusBas.id, pin: null, active: true };
+
+    const corps = document.createElement("div");
+    corps.className = "pile";
+    corps.innerHTML =
+      '<div class="cols-2">' +
+        U.champ({ id: "u-pseudo", label: "Pseudo (sert à se connecter)", valeur: cur.pseudo,
+                  max: 32, repere: "Ex. Rico" }) +
+        U.champ({ id: "u-role", label: "Rôle", type: "liste", valeur: cur.roleId,
+                  options: brouillon.roles.map(r => ({ valeur: r.id, nom: r.name })),
+                  aide: "Les droits viennent du rôle. Onglet « Rôles » pour les modifier." }) +
+      "</div>" +
+
+      '<div class="champ"><span class="champ__label">Droits de ce rôle</span>' +
+        '<div class="ad-meta" id="u-droits"></div></div>' +
+
+      '<div class="champ"><span class="champ__label">Code d\'accès (facultatif)</span>' +
+        '<div class="cols-2">' +
+          '<input class="saisie" id="u-pin" type="password" inputmode="numeric" maxlength="24" ' +
+            'placeholder="' + (cur.pin ? "Laisser vide = code inchangé" : "Aucun code") + '">' +
+          (cur.pin
+            ? U.bouton("Retirer le code", { variante: "fantome", icone: "croix",
+                                            action: "vider-pin", type: "button" })
+            : '<p class="champ__aide">Sans code, il suffit de taper le pseudo pour entrer.</p>') +
+        "</div></div>" +
+
+      U.champ({ id: "u-actif", type: "bascule", label: "Compte actif", valeur: cur.active }) +
+      (cestMoi
+        ? '<p class="champ__aide">Tu modifies ton propre compte : tu ne peux ni le désactiver, ' +
+          "ni prendre un rôle qui te retirerait la gestion de l'équipe.</p>"
+        : "");
+
+    if (cestMoi) corps.querySelector("#u-actif").disabled = true;
+
+    let viderPin = false;
+    const bVider = corps.querySelector('[data-a="vider-pin"]');
+    if (bVider) bVider.addEventListener("click", () => {
+      viderPin = true;
+      bVider.disabled = true;
+      bVider.innerHTML = U.icone("check") + "<span>Code retiré à l'enregistrement</span>";
+    });
+
+    /* Aperçu en lecture seule des droits qu'apporte le rôle choisi. */
+    const zDroits = corps.querySelector("#u-droits");
+    const selRole = corps.querySelector("#u-role");
+    const peindreDroits = () => {
+      const r = brouillon.roles.find(x => x.id === selRole.value);
+      zDroits.innerHTML = r ? pastillesDroits(r) : "";
+    };
+    selRole.addEventListener("change", peindreDroits);
+    peindreDroits();
+
+    U.modale({
+      titre: neuf ? "Nouvel employé" : "Modifier " + cur.pseudo, corps,
+      actions: [
+        { label: "Annuler", onClick: f => f() },
+        { label: neuf ? "Ajouter" : "Enregistrer", variante: "principal", icone: "check",
+          onClick: (fermer, k) => {
+            const pseudo = k.querySelector("#u-pseudo").value.trim();
+            if (pseudo.length < 2) return U.toast("Pseudo trop court", "err");
+            if (brouillon.users.some(x =>
+                x.pseudo.toLowerCase() === pseudo.toLowerCase() && (neuf || x.id !== u.id))) {
+              return U.toast("Ce pseudo est déjà pris", "err");
+            }
+
+            const roleId = k.querySelector("#u-role").value;
+            const pin = k.querySelector("#u-pin").value.trim();
+            const actif = k.querySelector("#u-actif").checked;
+
+            /* Sécurité anti-blocage : ne pas se priver soi-même de la gestion. */
+            if (cestMoi) {
+              const p = (brouillon.roles.find(x => x.id === roleId) || {}).perms || [];
+              if (p.indexOf("admin") === -1 && p.indexOf("users") === -1) {
+                return U.toast("Ce rôle te retirerait la gestion de l'équipe", "err");
+              }
+            }
+
+            if (neuf) {
+              const id = MNStore.uniqueId(pseudo, brouillon.users.map(x => x.id));
+              const r = brouillon.roles.find(x => x.id === roleId);
+              const maintenant = new Date().toISOString();
+              brouillon.users.push({
+                id, pseudo, roleId, active: actif,
+                pin: pin ? MNAuth.hashPin(id, pin) : null,
+                createdAt: maintenant,
+                hiredAt: maintenant.slice(0, 10),
+                trainings: [], note: "",
+                history: [{
+                  roleId, roleName: r ? r.name : roleId, at: maintenant,
+                  by: moi.pseudo, note: "Entrée dans l'entreprise"
+                }]
+              });
+            } else {
+              u.pseudo = pseudo;
+              /* Un changement de grade laisse une trace dans sa carrière. */
+              if (roleId !== u.roleId) {
+                MNStore.recordPromotion(u, roleId, brouillon.roles, moi.pseudo, "");
+              }
+              u.active = cestMoi ? true : actif;
+              if (viderPin) u.pin = null;
+              else if (pin) u.pin = MNAuth.hashPin(u.id, pin);
+            }
+            valider(); fermer();
+            U.toast(neuf ? "Employé ajouté" : "Employé mis à jour", "ok");
+          } }
+      ]
+    });
+  }
+
+  async function supprimerUser(u) {
+    if (moi.uid === u.id) return U.toast("Tu ne peux pas te retirer toi-même", "err");
+    /* Ne pas se retrouver sans personne pour gérer l'équipe. */
+    const gerants = brouillon.users.filter(x =>
+      x.active && MNAuth.effectivePerms(x).indexOf("users") !== -1);
+    if (gerants.length <= 1 && gerants[0] && gerants[0].id === u.id) {
+      return U.toast("C'est le dernier compte capable de gérer l'équipe", "err");
+    }
+    const ok = await U.confirmer({
+      titre: "Retirer l'employé",
+      message: "« " + u.pseudo + " » ne pourra plus se connecter au site.",
+      confirmer: "Retirer", danger: true
+    });
+    if (!ok) return;
+    brouillon.users = brouillon.users.filter(x => x.id !== u.id);
+    valider();
+    U.toast("Employé retiré", "ok");
+  }
+
+  /* ---- Rôles -------------------------------------------------------------------- */
+
+  function vueRoles(z) {
+    z.innerHTML =
+      outils("Les droits sont portés par le rôle, pas par la personne",
+        U.bouton("Nouveau rôle", { variante: "principal", icone: "plus", action: "add" })) +
+      '<div class="pile pile--sm">' + brouillon.roles.map((r, i) => {
+        const n = brouillon.users.filter(u => u.roleId === r.id).length;
+        return '<div class="ad-ligne" data-ligne="' + U.esc(r.id) + '">' +
+          fleches(i, brouillon.roles.length) +
+          '<span class="ad-ico" style="border:1px solid ' + U.esc(r.color) +
+            ';color:' + U.esc(r.color) + '">' + mnIcon(r.icon) + "</span>" +
+          '<div class="ad-corps">' +
+            '<b style="color:' + U.esc(r.color) + '">' + U.esc(r.name) + "</b>" +
+            '<div class="ad-meta"><i>' + n + " employé" + (n > 1 ? "s" : "") + "</i></div>" +
+            '<div class="ad-meta">' + pastillesDroits(r) + "</div>" +
+          "</div>" +
+          '<div class="ad-actes">' +
+            U.bouton("", { icone: "crayon", variante: "fantome", taille: "sm",
+                           titre: "Modifier", action: "edit" }) +
+            U.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
+                           titre: "Supprimer", action: "del" }) +
+          "</div></div>";
+      }).join("") + "</div>";
+
+    z.querySelector('[data-a="add"]').addEventListener("click", () => editerRole(null));
+    brancherLignes(z, brouillon.roles, { edit: r => editerRole(r), del: r => supprimerRole(r) });
+  }
+
+  function editerRole(r) {
+    const neuf = !r;
+    const cur = r || {
+      name: "", color: MN_ROLE_COLORS[brouillon.roles.length % MN_ROLE_COLORS.length],
+      icon: "i-badge", perms: ["bt", "duty"]
+    };
+    let droits = cur.perms.slice();
+    let couleur = cur.color;
+    let icone = cur.icon || "i-badge";
+
+    const corps = document.createElement("div");
+    corps.className = "pile";
+    corps.innerHTML =
+      U.champ({ id: "r-nom", label: "Nom du rôle", valeur: cur.name, max: 28,
+                repere: "Ex. Chef d'atelier" }) +
+
+      '<div class="champ"><span class="champ__label">Écusson du grade</span>' +
+        '<div class="ad-icochoix">' +
+          '<div class="ad-icochoix__vue" id="r-vue" style="color:' + U.esc(couleur) + '">' +
+            mnIcon(icone) + "</div>" +
+          '<div class="pile pile--sm" style="flex:1;min-width:0">' +
+            U.bouton("Choisir un écusson", { variante: "fantome", taille: "sm",
+                                             action: "r-pick", type: "button" }) +
+            '<p class="champ__aide">Icône, image ou emoji — il apparaît dans la liste des ' +
+              "rôles et sur les fiches équipe.</p>" +
+          "</div>" +
+        "</div></div>" +
+
+      '<div class="champ"><span class="champ__label">Couleur</span>' +
+        '<div class="ad-nuancier" id="r-couleurs">' + MN_ROLE_COLORS.map(c =>
+          '<button type="button" class="ad-nuance' + (c === couleur ? " est-choisie" : "") +
+          '" data-c="' + c + '" style="background:' + c + '" aria-label="' + c +
+          '"></button>').join("") + "</div></div>" +
+
+      '<div class="champ"><span class="champ__label">Permissions du rôle</span>' +
+        '<div class="ad-coches ad-coches--hautes" id="r-droits"></div></div>';
+
+    const vue = corps.querySelector("#r-vue");
+    corps.querySelector('[data-a="r-pick"]').addEventListener("click", () =>
+      choisirIcone(icone, v => { icone = v; vue.innerHTML = mnIcon(v); }));
+
+    corps.querySelectorAll("[data-c]").forEach(b => b.addEventListener("click", () => {
+      couleur = b.dataset.c;
+      vue.style.color = couleur;
+      corps.querySelectorAll("[data-c]").forEach(x => x.classList.toggle("est-choisie", x === b));
+    }));
+
+    const zDroits = corps.querySelector("#r-droits");
+    function peindre() {
+      /* « Tous les droits » avale les autres : on les montre cochés et
+         verrouillés, plutôt que de laisser croire qu'on peut en retirer un. */
+      const total = droits.indexOf("admin") !== -1;
+      zDroits.innerHTML = MN_PERMS.map(p => {
+        const on = total || droits.indexOf(p.key) !== -1;
+        const bloque = total && p.key !== "admin";
+        return '<button type="button" class="ad-coche' + (on ? " est-cochee" : "") +
+          (bloque ? " est-bloquee" : "") + '" data-p="' + U.esc(p.key) + '">' +
+          '<span class="ad-coche__case">' + U.icone("check") + "</span>" +
+          "<span><b>" + U.esc(p.name) + "</b><i>" + U.esc(p.desc) + "</i></span></button>";
+      }).join("");
+
+      zDroits.querySelectorAll("[data-p]").forEach(b => b.addEventListener("click", () => {
+        if (b.classList.contains("est-bloquee")) return;
+        const i = droits.indexOf(b.dataset.p);
+        if (i === -1) droits.push(b.dataset.p); else droits.splice(i, 1);
+        peindre();
+      }));
+    }
+    peindre();
+
+    U.modale({
+      titre: neuf ? "Nouveau rôle" : "Modifier le rôle", corps,
+      actions: [
+        { label: "Annuler", onClick: f => f() },
+        { label: neuf ? "Créer" : "Enregistrer", variante: "principal", icone: "check",
+          onClick: (fermer, k) => {
+            const nom = k.querySelector("#r-nom").value.trim();
+            if (!nom) return U.toast("Donne un nom au rôle", "err");
+
+            /* On ne se coupe pas soi-même l'accès à la gestion de l'équipe. */
+            if (!neuf && moi.roleId === r.id &&
+                droits.indexOf("admin") === -1 && droits.indexOf("users") === -1) {
+              return U.toast("C'est ton propre rôle : garde « Gérer l'équipe »", "err");
+            }
+
+            if (neuf) {
+              brouillon.roles.push({
+                id: MNStore.uniqueId(nom, brouillon.roles.map(x => x.id)),
+                name: nom, color: couleur, icon: icone, perms: droits
+              });
+            } else {
+              r.name = nom; r.color = couleur; r.icon = icone; r.perms = droits;
+            }
+            valider(); fermer();
+            U.toast(neuf ? "Rôle créé" : "Rôle mis à jour", "ok");
+          } }
+      ]
+    });
+  }
+
+  async function supprimerRole(r) {
+    if (brouillon.roles.length <= 1) return U.toast("Il faut garder au moins un rôle", "err");
+    const porteurs = brouillon.users.filter(u => u.roleId === r.id);
+    if (porteurs.some(u => u.id === moi.uid)) return U.toast("C'est ton propre rôle", "err");
+
+    const repli = brouillon.roles.find(x => x.id !== r.id);
+    const ok = await U.confirmer({
+      titre: "Supprimer le rôle",
+      message: porteurs.length
+        ? "« " + r.name + " » est porté par " + porteurs.length + " employé" +
+          (porteurs.length > 1 ? "s" : "") + ". Ils basculeront sur « " + repli.name + " »."
+        : "« " + r.name + " » sera supprimé.",
+      confirmer: "Supprimer", danger: true
+    });
+    if (!ok) return;
+    brouillon.users.forEach(u => { if (u.roleId === r.id) u.roleId = repli.id; });
+    brouillon.roles = brouillon.roles.filter(x => x.id !== r.id);
+    valider();
+    U.toast("Rôle supprimé", "ok");
   }
 
   /* ---- Petit éditeur : nom + icône (+ couleur) ---------------------------------- */
