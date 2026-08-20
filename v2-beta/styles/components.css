@@ -1469,3 +1469,126 @@
   border-color: var(--c-texte);
   box-shadow: 0 0 0 2px var(--c-fond) inset;
 }
+
+/* ---- Administration : réglages ---------------------------------------------- */
+
+/* Marche à suivre numérotée. */
+.ad-etapes { counter-reset: pas; display: flex; flex-direction: column; gap: var(--e-3); }
+.ad-etapes li {
+  position: relative;
+  padding-left: var(--e-7);
+  font-size: var(--t-sm);
+  color: var(--c-second);
+  line-height: 1.55;
+}
+.ad-etapes li::before {
+  counter-increment: pas;
+  content: counter(pas);
+  position: absolute; left: 0; top: -1px;
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  border-radius: var(--r-plein);
+  background: var(--c-action-fond);
+  border: 1px solid rgb(var(--accent-rgb) / .4);
+  color: var(--c-action-doux);
+  font-family: var(--f-titre);
+  font-size: var(--t-xs); font-weight: 800;
+}
+.ad-etapes b, .ad-etapes code { color: var(--c-texte); }
+
+/* Champ collé à son bouton : « Tester », « Vérifier »… */
+.ad-copie { display: flex; gap: var(--e-2); align-items: stretch; }
+.ad-copie .saisie { flex: 1; min-width: 0; }
+
+/* Contenu brut du fichier de données. */
+.ad-json {
+  max-height: 320px; overflow: auto;
+  padding: var(--e-3);
+  background: var(--c-creux);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--t-xs);
+  line-height: 1.5;
+  white-space: pre;
+  color: var(--c-second);
+}
+
+/* ---- Thèmes ----------------------------------------------------------------- */
+
+.ad-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--e-3);
+}
+.ad-theme {
+  display: flex; flex-direction: column; gap: var(--e-2);
+  padding: var(--e-2);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-2);
+  background: none;
+  color: var(--c-second);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  transition: border-color var(--m-vif), color var(--m-vif);
+}
+.ad-theme:hover { border-color: var(--c-bord-net); color: var(--c-texte); }
+.ad-theme.est-choisie {
+  border-color: var(--c-action);
+  color: var(--c-action-doux);
+  box-shadow: 0 0 0 1px var(--c-action) inset;
+}
+.ad-theme__vue {
+  display: flex; align-items: flex-end; gap: 4px;
+  height: 54px;
+  padding: 8px;
+  border-radius: var(--r-1);
+}
+.ad-theme__vue span:first-child { flex: 1; height: 100%; border-radius: 4px; }
+.ad-theme__vue span:not(:first-child) {
+  width: 10px; height: 10px; border-radius: var(--r-plein); flex: none;
+}
+
+.ad-apercu {
+  margin-top: var(--e-3);
+  padding: var(--e-4);
+  border: 1px solid;
+  border-radius: var(--r-3);
+}
+
+/* ---- État de publication ----------------------------------------------------- */
+
+.ad-etatpub {
+  display: flex; align-items: center; gap: var(--e-4); flex-wrap: wrap;
+  padding: var(--e-4) var(--e-5);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-3);
+  background: var(--c-carte);
+}
+.ad-etatpub--ok {
+  border-color: color-mix(in srgb, var(--c-succes) 40%, transparent);
+  background: color-mix(in srgb, var(--c-succes) 7%, var(--c-carte));
+}
+.ad-etatpub--attente {
+  border-color: color-mix(in srgb, var(--c-alerte) 40%, transparent);
+  background: color-mix(in srgb, var(--c-alerte) 8%, var(--c-carte));
+}
+.ad-etatpub__ico {
+  flex: none;
+  width: 42px; height: 42px;
+  display: grid; place-items: center;
+  border-radius: var(--r-plein);
+  background: var(--c-creux);
+  color: var(--c-second);
+}
+.ad-etatpub--ok .ad-etatpub__ico { color: var(--c-succes); }
+.ad-etatpub--attente .ad-etatpub__ico { color: var(--c-alerte); }
+.ad-etatpub__ico svg { width: 21px; height: 21px; }
+.ad-etatpub__txt { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 2px; }
+.ad-etatpub__txt b { font-size: var(--t-lg); font-weight: 650; }
+.ad-etatpub__txt span { font-size: var(--t-sm); color: var(--c-second); }
+
+@media (max-width: 640px) {
+  .ad-copie { flex-direction: column; }
+  .ad-etatpub .btn { width: 100%; }
+}

@@ -131,6 +131,13 @@ window.V2Shell = (function () {
     });
   }
 
+  /** Le nom ou le logo de l'atelier a changé : on repeint la marque plutôt
+      que de remonter toute la page, qui perdrait la saisie en cours. */
+  function rafraichirMarque() {
+    const a = document.querySelector(".sidebar__marque");
+    if (a) a.outerHTML = marque();
+  }
+
   /* ---- Modifications non publiées ------------------------------------------
      Le catalogue ne s'écrit pas en direct : on travaille sur un brouillon
      gardé dans le navigateur, qu'un responsable publie ensuite. Le bandeau
@@ -349,7 +356,7 @@ window.V2Shell = (function () {
   }
 
   return {
-    demarrer, actions, refuser, basculerTiroir, brouillon,
+    demarrer, actions, refuser, basculerTiroir, brouillon, rafraichirMarque,
     session: () => _session,
     peut: function () { return MNAuth.canAny.apply(null, arguments); }
   };

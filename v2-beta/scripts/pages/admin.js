@@ -79,20 +79,7 @@
   function programmerEnvoi() {
     clearTimeout(minuterie);
     if (!autoPret()) return;
-    minuterie = setTimeout(envoyer, DELAI_AUTO);
-  }
-
-  async function envoyer() {
-    if (!MNStore.hasDraft()) return;
-    const cat = MNStore.catalog();
-    try {
-      await MNGitHub.publish(MNStore.toJSON(cat), "Catalogue mis à jour par " + moi.pseudo);
-      localStorage.setItem("mn.gh.stamp", cat.updatedAt);
-      U.toast("Publié automatiquement", "ok");
-    } catch (e) {
-      U.toast("Publication automatique impossible : " + (e && e.message || e), "err");
-    }
-    V2Shell.brouillon(dessiner);
+    minuterie = setTimeout(() => publier(true), DELAI_AUTO);
   }
 
   /* ---- Replis mémorisés ----------------------------------------------------
@@ -138,7 +125,8 @@
 
     ({
       objets: vueObjets, cats: vueCats, res: vueRes, ctypes: vueCtypes,
-      users: vueUsers, roles: vueRoles
+      users: vueUsers, roles: vueRoles, images: vueImages,
+      theme: vueTheme, discord: vueDiscord, site: vueSite, publier: vuePublier
     }[onglet] || aVenir)($("#a-vue"));
   }
 
@@ -1222,6 +1210,1275 @@
     brouillon.roles = brouillon.roles.filter(x => x.id !== r.id);
     valider();
     U.toast("Rôle supprimé", "ok");
+  }
+
+  /* ---- Images ---------------------------------------------------------------------
+     Le dossier d'images, vu de l'atelier : ce qui s'y trouve, ce qui s'en
+     sert, et de quoi renommer ou faire le ménage. */
+
+  /** Où une image est-elle utilisée dans le catalogue ? */
+  function usagesDe(chemin) {
+    const l = [];
+    brouillon.items.forEach(i => { if (i.icon === chemin) l.push({ quoi: "objet", nom: i.name }); });
+    brouillon.resources.forEach(r => { if (r.icon === chemin) l.push({ quoi: "ressource", nom: r.name }); });
+    brouillon.categories.forEach(c => { if (c.icon === chemin) l.push({ quoi: "catégorie", nom: c.name }); });
+    brouillon.roles.forEach(r => { if (r.icon === chemin) l.push({ quoi: "rôle", nom: r.name }); });
+    if (brouillon.settings.brand.logo === chemin) l.push({ quoi: "logo", nom: "logo de l'atelier" });
+    return l;
+  }
+
+  /** Reporte un changement de chemin partout dans le brouillon. */
+  function remplacerChemin(de, vers) {
+    let n = 0;
+    brouillon.items.forEach(i => { if (i.icon === de) { i.icon = vers; n++; } });
+    brouillon.resources.forEach(r => { if (r.icon === de) { r.icon = vers; n++; } });
+    brouillon.categories.forEach(c => { if (c.icon === de) { c.icon = vers; n++; } });
+    brouillon.roles.forEach(r => { if (r.icon === de) { r.icon = vers; n++; } });
+    if (brouillon.settings.brand.logo === de) { brouillon.settings.brand.logo = vers; n++; }
+    return n;
+  }
+
+  async function vueImages(z) {
+    const peutDeposer = MNGitHub.canPublish() || surServeur();
+    /* Sur le serveur, tout se fait sans jeton. Dans le dépôt, renommer et
+       supprimer en exigent un. */
+    const jeton = MNGitHub.hasToken() && MNGitHub.isConfigured();
+
+    z.innerHTML =
+      outils(surServeur()
+          ? "Sur le serveur de l'atelier — en ligne aussitôt"
+          : "Le dossier " + IMG_DIR + "/ du dépôt",
+        U.bouton("Actualiser", { variante: "fantome", taille: "sm", icone: "rafraichir",
+                                 action: "maj" }) +
+        (surServeur()
+          ? U.bouton("Transférer vers le serveur", { variante: "fantome", taille: "sm",
+                                                     icone: "nuage", action: "migrer" })
+          : "") +
+        U.bouton("Ajouter une image", { variante: "principal", icone: "plus", action: "add" }) +
+        '<input type="file" id="i-fichier" accept="image/*" hidden>') +
+      (jeton || surServeur() ? "" : U.alerte({
+        ton: "alerte",
+        texte: "Sans jeton GitHub sur cet appareil, tu peux consulter les images mais " +
+               "pas les renommer ni les supprimer. Configure-le dans l'onglet « Publier »."
+      })) +
+      '<div id="i-liste" style="margin-top:var(--e-3)">' +
+        '<p class="champ__aide">Lecture du dossier…</p></div>';
+
+    z.querySelector('[data-a="maj"]').addEventListener("click", () => {
+      cacheImages = null; vueImages(z);
+    });
+    const mig = z.querySelector('[data-a="migrer"]');
+    if (mig) mig.addEventListener("click", () => migrerImages(z));
+
+    z.querySelector('[data-a="add"]').addEventListener("click", () =>
+      z.querySelector("#i-fichier").click());
+    z.querySelector("#i-fichier").addEventListener("change", e => {
+      const f = e.target.files[0];
+      e.target.value = "";
+      if (!f) return;
+      fichierVersIcone(f, async data => {
+        if (!peutDeposer) {
+          return U.toast("Serveur ou jeton GitHub requis pour déposer une image", "err");
+        }
+        try {
+          const chemin = await deposer(data, f.name);
+          if (!chemin) return;
+          cacheImages = null;
+          vueImages(z);
+          U.toast("Image déposée : " + chemin, "ok");
+        } catch (err) { U.toast("Dépôt impossible : " + err.message, "err"); }
+      });
+    });
+
+    const liste = z.querySelector("#i-liste");
+    const { refs, serveur, source } = await listerImages(false);
+    /* La page a pu changer d'onglet pendant la lecture. */
+    if (!liste.isConnected) return;
+
+    if (!refs.length) {
+      liste.innerHTML = U.vide({ icone: "recu", titre: "Aucune image",
+                                 texte: "Clique sur « Ajouter une image » pour commencer." });
+      return;
+    }
+
+    liste.innerHTML =
+      '<div class="pile pile--sm">' + refs.map(x => {
+        const usages = usagesDe(x.ref);
+        const src = x.serveur ? MNStore.imageUrl(x.nom) : x.ref;
+        /* Une image du dépôt reste intouchable sans jeton ; celles du
+           serveur ne demandent rien. */
+        const modifiable = x.serveur || jeton;
+        return '<div class="ad-ligne" data-img="' + U.esc(x.nom) + '" data-srv="' +
+          (x.serveur ? "1" : "") + '">' +
+          '<span class="ad-ico"><img src="' + U.esc(src) +
+            '" alt="" loading="lazy" decoding="async"></span>' +
+          '<div class="ad-corps"><b>' + U.esc(x.nom) + "</b>" +
+            '<div class="ad-meta">' +
+              U.etiquette(x.serveur ? "serveur" : "dépôt", x.serveur ? "action" : "") +
+              (usages.length
+                ? usages.map(u => U.etiquette(u.quoi + " : " + u.nom)).join("")
+                : '<i style="color:var(--c-alerte)">non utilisée</i>') +
+            "</div></div>" +
+          '<div class="ad-actes">' +
+            U.bouton("", { icone: "crayon", variante: "fantome", taille: "sm",
+                           titre: "Renommer", action: "ren", desactive: !modifiable }) +
+            U.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
+                           titre: "Supprimer", action: "del", desactive: !modifiable }) +
+          "</div></div>";
+      }).join("") + "</div>" +
+      '<p class="champ__aide" style="margin-top:var(--e-3)">' +
+        (serveur.length ? serveur.length + " sur le serveur" : "") +
+        (serveur.length && refs.length - serveur.length ? " · " : "") +
+        (refs.length - serveur.length
+          ? (refs.length - serveur.length) + " dans le dépôt" +
+            (source === "github" ? " (lues directement)" : " (d'après le manifeste)")
+          : "") + "</p>";
+
+    liste.querySelectorAll("[data-img]").forEach(l => {
+      const nom = l.dataset.img;
+      const srv = l.dataset.srv === "1";
+      l.querySelectorAll("[data-a]").forEach(b => b.addEventListener("click", () => {
+        if (b.disabled) return;
+        if (b.dataset.a === "ren") renommerImage(nom, srv, z);
+        else supprimerImage(nom, srv, z);
+      }));
+    });
+  }
+
+  /**
+   * Copie les images du dépôt vers le serveur et fait suivre les références.
+   *
+   * Les fichiers du dépôt ne sont pas supprimés : ils ne gênent personne, et
+   * les garder laisse un filet si le serveur devait être réinstallé.
+   */
+  async function migrerImages(z) {
+    const { refs, serveur } = await listerImages(true);
+    const aFaire = refs.filter(x => !x.serveur && serveur.indexOf(x.nom) === -1);
+
+    if (!aFaire.length) {
+      return U.toast(refs.length === serveur.length
+        ? "Toutes les images sont déjà sur le serveur"
+        : "Rien à transférer", "info");
+    }
+
+    const ok = await U.confirmer({
+      titre: "Transférer vers le serveur",
+      message: aFaire.length + " image" + (aFaire.length > 1 ? "s" : "") + " du dépôt " +
+        (aFaire.length > 1 ? "seront copiées" : "sera copiée") + " sur le serveur, et le " +
+        "catalogue mis à jour pour les y chercher. Les fichiers restent dans le dépôt, " +
+        "en réserve — tu pourras les y supprimer plus tard.",
+      confirmer: "Transférer"
+    });
+    if (!ok) return;
+
+    const liste = z.querySelector("#i-liste");
+    let faites = 0, ratees = 0, refaites = 0;
+
+    for (const x of aFaire) {
+      if (liste) {
+        liste.innerHTML = '<p class="champ__aide">Transfert… ' + (faites + ratees + 1) +
+          " / " + aFaire.length + " — " + U.esc(x.nom) + "</p>";
+      }
+      try {
+        /* L'image est déjà servie par le site : on la relit là où elle est
+           plutôt que de repasser par l'API GitHub. */
+        const r = await fetch(x.ref + "?v=" + Date.now(), { cache: "no-store" });
+        if (!r.ok) throw new Error("lecture " + r.status);
+        const base64 = await new Promise((res, rej) => {
+          const fr = new FileReader();
+          fr.onerror = () => rej(new Error("lecture impossible"));
+          fr.onload = () => res(String(fr.result).split(",")[1] || "");
+          r.blob().then(b => fr.readAsDataURL(b), rej);
+        });
+
+        await apiImages({ name: x.nom, base64 });
+        refaites += remplacerChemin(x.ref, MNStore.IMG_TAG + x.nom);
+        faites++;
+      } catch (e) {
+        console.error(x.nom, e);
+        ratees++;
+      }
+    }
+
+    cacheImages = null;
+    if (refaites) valider();
+    vueImages(z);
+    U.toast(faites + " image(s) transférée(s)" +
+      (refaites ? " — " + refaites + " référence(s) mise(s) à jour" : "") +
+      (ratees ? " · " + ratees + " en échec" : ""), ratees ? "info" : "ok");
+  }
+
+  function renommerImage(nom, srv, z) {
+    const de = srv ? MNStore.IMG_TAG + nom : IMG_DIR + "/" + nom;
+    const ext = (nom.match(/\.[a-z0-9]+$/i) || [".png"])[0];
+    const usages = usagesDe(de);
+
+    const corps = document.createElement("div");
+    corps.innerHTML =
+      U.champ({ id: "rn", label: "Nouveau nom", max: 48,
+                valeur: nom.replace(/\.[a-z0-9]+$/i, "") }) +
+      '<p class="champ__aide" style="margin-top:var(--e-3)">L\'extension <code>' +
+        U.esc(ext) + "</code> est conservée. " +
+        (usages.length
+          ? "Les <b>" + usages.length + " référence" + (usages.length > 1 ? "s" : "") +
+            "</b> dans le catalogue seront mises à jour automatiquement."
+          : "Cette image n'est utilisée nulle part.") + "</p>";
+
+    U.modale({
+      titre: "Renommer l'image", corps,
+      actions: [
+        { label: "Annuler", onClick: f => f() },
+        { label: "Renommer", variante: "principal", icone: "check",
+          onClick: async (fermer, k, btn) => {
+            const nom2 = MNStore.slugify(k.querySelector("#rn").value) + ext;
+            const vers = srv ? MNStore.IMG_TAG + nom2 : IMG_DIR + "/" + nom2;
+            if (vers === de) return fermer();
+
+            btn.disabled = true;
+            btn.innerHTML = U.icone("rafraichir") + "<span>Renommage…</span>";
+            try {
+              if (srv) {
+                await apiImages({ op: "rename", from: nom, to: nom2 });
+              } else {
+                /* Le manifeste voyage avec le renommage : un seul envoi. */
+                let manifeste = [];
+                try {
+                  const noms = (await listerImages(true)).noms
+                    .filter(x => x !== nom).concat(nom2).sort();
+                  manifeste = [{ path: IMG_DIR + "/index.json",
+                                 content: JSON.stringify(noms, null, 2) + "\n" }];
+                } catch (_) { /* manifeste : simple confort */ }
+                await MNGitHub.renameFile(de, vers, "Renommage de l'image " + nom, manifeste);
+              }
+              const n = remplacerChemin(de, vers);
+              cacheImages = null;
+              if (n) valider();
+              fermer();
+              U.toast("Renommée" + (n ? " — " + n + " référence(s) mise(s) à jour" : ""), "ok");
+              if (onglet === "images") vueImages($("#a-vue"));
+            } catch (e) {
+              btn.disabled = false;
+              btn.innerHTML = U.icone("check") + "<span>Renommer</span>";
+              U.toast("Échec : " + e.message, "err");
+            }
+          } }
+      ]
+    });
+  }
+
+  async function supprimerImage(nom, srv, z) {
+    const chemin = srv ? MNStore.IMG_TAG + nom : IMG_DIR + "/" + nom;
+    const usages = usagesDe(chemin);
+
+    const ok = await U.confirmer({
+      titre: "Supprimer l'image",
+      message: usages.length
+        ? "« " + nom + " » est utilisée par " + usages.length + " élément" +
+          (usages.length > 1 ? "s" : "") + " (" + usages.map(u => u.nom).join(", ") +
+          "). Ils repasseront sur une icône par défaut."
+        : "« " + nom + " » sera supprimée " + (srv ? "du serveur" : "du dépôt") +
+          ". C'est définitif.",
+      confirmer: "Supprimer", danger: true
+    });
+    if (!ok) return;
+
+    try {
+      if (srv) {
+        await apiImages({ op: "delete", name: nom });
+      } else {
+        /* Suppression et manifeste dans le même envoi : une seule
+           reconstruction du site au lieu de deux. */
+        const fichiers = [{ path: chemin, remove: true }];
+        try {
+          const noms = (await listerImages(true)).noms.filter(x => x !== nom);
+          fichiers.push({ path: IMG_DIR + "/index.json",
+                          content: JSON.stringify(noms, null, 2) + "\n" });
+        } catch (_) { /* manifeste : simple confort */ }
+        await MNGitHub.putFiles(fichiers, "Suppression de l'image " + nom);
+      }
+      const n = remplacerChemin(chemin, "i-box");
+      cacheImages = null;
+      if (n) valider();
+      U.toast("Image supprimée" +
+        (n ? " — " + n + " élément(s) remis sur l'icône par défaut" : ""), "ok");
+      if (onglet === "images") vueImages($("#a-vue"));
+    } catch (e) {
+      U.toast("Suppression impossible : " + e.message, "err");
+    }
+  }
+
+  /* ---- Apparence ------------------------------------------------------------------
+     Ce qu'on règle ici est le thème de départ de toute l'équipe. Chacun peut
+     ensuite en choisir un autre pour lui depuis la palette de la barre du
+     haut — ce choix personnel n'entre pas dans le catalogue. */
+
+  function vueTheme(z) {
+    const t = MNTheme.normalize(brouillon.settings.theme);
+    const perso = MNTheme.aUnChoixPerso();
+
+    const vignette = x => {
+      const p = MNTheme.palette(x);
+      return '<button type="button" class="ad-theme' + (x.id === t.id ? " est-choisie" : "") +
+        '" data-th="' + U.esc(x.id) + '" title="' + U.esc(x.note || x.nom) + '">' +
+        '<span class="ad-theme__vue" style="background:' + U.esc(p["--bg"]) + '">' +
+          '<span style="background:linear-gradient(180deg,' + U.esc(p["--surface-2"]) + "," +
+            U.esc(p["--surface-lo"]) + ');border:1px solid ' + U.esc(p["--line"]) + '"></span>' +
+          '<span style="background:' + U.esc(p["--pink"]) + '"></span>' +
+          '<span style="background:' + U.esc(p["--pink-soft"]) + '"></span>' +
+        "</span><b>" + U.esc(x.nom) + "</b></button>";
+    };
+
+    z.innerHTML =
+      outils("Le thème de départ de toute l'équipe", "") +
+
+      (perso
+        ? '<div style="margin-bottom:var(--e-4)">' + U.alerte({
+            ton: "alerte", titre: "Tu vois ton thème personnel",
+            texte: "Tu as choisi une apparence personnelle depuis la palette de la barre du " +
+                   "haut : c'est elle que tu vois, pas celle réglée ici. Reprends « le thème " +
+                   "de l'atelier » dans cette palette pour juger du rendu réel."
+          }) + "</div>"
+        : "") +
+
+      U.carte({ titre: "Thèmes",
+        corps: '<div class="ad-themes">' + MNTheme.THEMES.map(vignette).join("") + "</div>" }) +
+
+      '<div style="margin-top:var(--e-4)">' + U.carte({
+        titre: "Couleurs libres",
+        actions: MNTheme.THEMES.some(x => x.id === t.id)
+          ? "" : U.etiquette("personnalisé", "action"),
+        corps:
+          '<div class="cols-3">' +
+            U.champ({ id: "t-acc", label: "Accent", type: "color", valeur: t.accent }) +
+            U.champ({ id: "t-bg", label: "Fond", type: "color", valeur: t.fond }) +
+            U.champ({ id: "t-su", label: "Encadrés", type: "color", valeur: t.surface }) +
+          "</div>" +
+          '<p class="champ__aide" style="margin-top:var(--e-3)">« Encadrés » donne leur ' +
+            "couleur aux cartes, aux rangées et aux panneaux — c'est elle qui fait " +
+            "l'essentiel de l'ambiance. Textes, bordures et contrastes en sont déduits. " +
+            "Un fond clair fait basculer tout le site en thème clair.</p>" +
+          '<div id="t-apercu"></div>'
+      }) + "</div>" +
+
+      '<div style="margin-top:var(--e-4)">' + U.carte({
+        titre: "Liberté de chacun",
+        corps:
+          U.champ({ id: "t-libre", type: "bascule",
+                    label: "Chacun peut choisir son apparence",
+                    valeur: brouillon.settings.themeLibre !== false }) +
+          '<p class="champ__aide" style="margin-top:var(--e-3)">La palette de la barre du ' +
+            "haut n'apparaît que si c'est coché. Un choix personnel ne change rien pour les " +
+            "autres — et ceux qui gèrent l'apparence gardent la main dans tous les cas, sans " +
+            "quoi ils ne pourraient plus juger de leurs propres réglages.</p>"
+      }) + "</div>" +
+
+      '<div class="rang" style="justify-content:flex-end;margin-top:var(--e-4)">' +
+        U.bouton("Essayer", { variante: "fantome", icone: "rafraichir", action: "essai" }) +
+        U.bouton("Enregistrer", { variante: "principal", icone: "check", action: "save" }) +
+      "</div>";
+
+    const acc = z.querySelector("#t-acc"), bg = z.querySelector("#t-bg"),
+          su = z.querySelector("#t-su"), apercu = z.querySelector("#t-apercu");
+
+    /* L'aperçu montre une carte posée sur le fond : c'est le rapport entre
+       les deux qui se juge, plus que chaque couleur prise isolément. */
+    const peindre = () => {
+      const p = MNTheme.palette({ accent: acc.value, fond: bg.value, surface: su.value });
+      apercu.innerHTML =
+        '<div class="ad-apercu" style="background:' + U.esc(p["--bg"]) +
+          ";border-color:" + U.esc(p["--line-2"]) + '">' +
+          '<div style="padding:14px;border-radius:12px;border:1px solid ' + U.esc(p["--line"]) +
+            ";background:linear-gradient(180deg," + U.esc(p["--surface-2"]) + "," +
+            U.esc(p["--surface-lo"]) + ')">' +
+            '<div class="rang">' +
+              '<span style="padding:9px 16px;border-radius:999px;font-weight:700;background:' +
+                U.esc(p["--pink"]) + ";color:" + U.esc(p["--on-accent"]) + '">Bouton</span>' +
+              '<span style="padding:5px 12px;border-radius:999px;background:' +
+                U.esc(p["--sunk"]) + ";color:" + U.esc(p["--pink-soft"]) + ";border:1px solid " +
+                U.esc(p["--line"]) + '">Champ</span>' +
+              '<span style="color:' + U.esc(p["--txt"]) + '">Texte principal</span>' +
+              '<span style="color:' + U.esc(p["--muted"]) + '">secondaire</span>' +
+              '<span style="color:' + U.esc(p["--dim"]) + '">discret</span>' +
+            "</div></div></div>" +
+        avertir(p);
+    };
+
+    /**
+     * Les couleurs sont libres, donc on peut en choisir de mauvaises. Plutôt
+     * que de les corriger en douce, on dit ce qui cloche : certains fonds —
+     * les gris moyens surtout — ne laissent aucune encre bien contraster.
+     */
+    function avertir(p) {
+      const c = (a, b) => MNTheme.contraste(MNTheme.lire(p[a]), MNTheme.lire(p[b]));
+      const soucis = [];
+      if (c("--bg", "--txt") < 7) {
+        soucis.push("le texte sur le fond (" + c("--bg", "--txt").toFixed(1) + ":1)");
+      }
+      if (c("--surface-2", "--txt") < 7) {
+        soucis.push("le texte sur les encadrés (" + c("--surface-2", "--txt").toFixed(1) + ":1)");
+      }
+      if (c("--pink", "--on-accent") < 4.5) {
+        soucis.push("le texte des boutons (" + c("--pink", "--on-accent").toFixed(1) + ":1)");
+      }
+      if (c("--bg", "--surface-2") < 1.04) soucis.push("les encadrés, indistincts du fond");
+
+      if (!soucis.length) return "";
+      return '<div style="margin-top:var(--e-3)">' + U.alerte({
+        ton: "alerte",
+        texte: "Lisibilité juste sur " + soucis.join(", ") + ". Un fond très clair ou très " +
+               "sombre laisse plus de marge qu'un ton moyen."
+      }) + "</div>";
+    }
+    peindre();
+
+    z.querySelectorAll("[data-th]").forEach(b => b.addEventListener("click", () => {
+      const x = MNTheme.THEMES.find(y => y.id === b.dataset.th);
+      if (!x) return;
+      const n = MNTheme.normalize(x);
+      acc.value = n.accent; bg.value = n.fond; su.value = n.surface;
+      brouillon.settings.theme = n;
+      z.querySelectorAll("[data-th]").forEach(y => y.classList.toggle("est-choisie", y === b));
+      peindre();
+    }));
+
+    [acc, bg, su].forEach(x => x.addEventListener("input", peindre));
+
+    /* Si les trois couleurs retombent exactement sur un thème connu, on garde
+       son identité plutôt que d'inventer un « personnalisé » jumeau. */
+    const lu = () => {
+      const connu = MNTheme.THEMES.find(x => {
+        const n = MNTheme.normalize(x);
+        return n.accent === acc.value && n.fond === bg.value && n.surface === su.value;
+      });
+      return MNTheme.normalize(connu || {
+        id: "perso", nom: "Personnalisé",
+        accent: acc.value, fond: bg.value, surface: su.value
+      });
+    };
+
+    /* « Essayer » applique sans enregistrer : on voit le vrai site, pas un
+       aperçu, et changer d'onglet suffit à revenir en arrière. */
+    z.querySelector('[data-a="essai"]').addEventListener("click", () => {
+      MNTheme.apply(lu());
+      U.toast("Aperçu appliqué — non enregistré", "info");
+    });
+
+    z.querySelector('[data-a="save"]').addEventListener("click", () => {
+      brouillon.settings.theme = lu();
+      brouillon.settings.themeLibre = z.querySelector("#t-libre").checked;
+      valider();
+      MNTheme.refresh();
+      U.toast(MNTheme.aUnChoixPerso()
+        ? "Apparence du site enregistrée (ton choix personnel reste actif)"
+        : "Apparence du site enregistrée", "ok");
+    });
+  }
+
+  /* ---- Discord ---------------------------------------------------------------------- */
+
+  function vueDiscord(z) {
+    const w = brouillon.settings.webhook;
+    const relais = brouillon.settings.relay || "";
+
+    /* Les champs affichent l'adresse en clair ; le brouillage se fait à
+       l'enregistrement, sans que personne ait à y penser. */
+    const bloc = (cle, titre, desc) => U.carte({
+      titre,
+      actions: MNWebhook.isValid(w[cle])
+        ? U.etiquette("configuré", "succes") : U.etiquette("vide"),
+      corps:
+        '<p class="champ__aide" style="margin-bottom:var(--e-3)">' + desc + "</p>" +
+        '<div class="champ"><label class="champ__label" for="w-' + cle + '">' +
+          "Adresse du webhook</label>" +
+          '<input class="saisie ad-id" id="w-' + cle + '" value="' +
+            U.esc(MNWebhook.unpack(w[cle])) +
+            '" placeholder="https://discord.com/api/webhooks/..."></div>' +
+        '<div class="rang" style="margin-top:var(--e-3)">' +
+          U.bouton("Envoyer un test", { variante: "fantome", taille: "sm", icone: "nuage",
+                                        action: "test-" + cle }) +
+          U.bouton("Vider", { variante: "fantome", taille: "sm", icone: "croix",
+                              action: "vider-" + cle }) +
+        "</div>"
+    });
+
+    z.innerHTML =
+      U.alerte({
+        ton: "alerte", titre: "À savoir avant de configurer",
+        texte: "L'adresse du webhook est enregistrée dans le fichier de données du site, qui " +
+               "est public. Quelqu'un qui sait chercher peut donc écrire dans le salon. Utilise " +
+               "un salon dédié, sans enjeu — et si tu vois passer n'importe quoi, régénère le " +
+               "webhook depuis Discord."
+      }) +
+
+      '<div class="pile" style="margin-top:var(--e-4)">' +
+        bloc("bt", "Bons de travail",
+          "Chaque bon enregistré est publié dans ce salon : mécano, client, véhicule, " +
+          "prestations et ressources.") +
+        bloc("duty", "Prises de service",
+          "Chaque arrivée et chaque départ de l'atelier y est annoncé, avec la durée du service.") +
+        bloc("conges", "Congés",
+          "Départs et retours de congés, avec les dates et le motif. <b>Laisse vide</b> pour " +
+          "qu'ils arrivent dans le salon des prises de service.") +
+
+        U.carte({ titre: "Apparence du bot", corps:
+          '<div class="ad-icochoix">' +
+            '<div class="ad-icochoix__vue" id="w-ava-vue">' +
+              mnIcon(w.avatar || brouillon.settings.brand.logo || "i-wrench") + "</div>" +
+            '<div class="pile pile--sm" style="flex:1;min-width:0">' +
+              '<div class="rang">' +
+                U.bouton("Choisir un logo", { variante: "fantome", taille: "sm",
+                                              action: "ava-pick", type: "button" }) +
+                U.bouton("Reprendre le logo du site", { variante: "fantome", taille: "sm",
+                                                        icone: "croix", action: "ava-vider",
+                                                        type: "button", desactive: !w.avatar }) +
+              "</div>" +
+              '<p class="champ__aide">Photo de profil du bot sur Discord. Vide = le logo de ' +
+                "l'atelier. Discord doit pouvoir la télécharger : elle doit donc être déjà " +
+                "<b>publiée en ligne</b>.</p>" +
+            "</div></div>" +
+          '<div class="cols-2" style="margin-top:var(--e-4)">' +
+            U.champ({ id: "w-nom", label: "Nom affiché", valeur: w.name, max: 70,
+                      repere: brouillon.settings.brand.name }) +
+            U.champ({ id: "w-mention", label: "Mention (facultatif)", valeur: w.mention,
+                      max: 80, repere: "<@&123456789012345678>" }) +
+          "</div>" +
+          '<p class="champ__aide" style="margin-top:var(--e-3)">La mention est ajoutée avant ' +
+            "chaque message. Pour un rôle : clic droit sur le rôle dans Discord → Copier " +
+            "l'identifiant, puis écris <code>&lt;@&amp;identifiant&gt;</code>.</p>"
+        }) +
+
+        U.carte({
+          titre: "Confidentialité des adresses",
+          actions: relais ? U.etiquette("relais actif", "succes") : "",
+          corps: '<p class="champ__aide">' + (relais
+            ? "Un relais est configuré : les adresses ci-dessus ne sont plus utilisées, c'est " +
+              "lui qui connaît les vraies. Elles ne sont donc plus dans le dépôt."
+            : "Sans relais, les adresses restent dans le fichier de données. Elles y sont " +
+              "<b>brouillées</b> — on ne les trouve pas en cherchant « discord.com » — mais " +
+              "c'est un ralentisseur, pas une protection : le site doit pouvoir les lire, donc " +
+              "quelqu'un de motivé le peut aussi. Le relais se règle dans l'onglet " +
+              "<b>Publier</b>.") + "</p>"
+        }) +
+
+        U.carte({ titre: "Créer un webhook", corps: etapes([
+          "Sur Discord, clic droit sur le salon → <b>Modifier le salon</b> → " +
+            "<b>Intégrations</b> → <b>Webhooks</b>.",
+          "<b>Nouveau webhook</b>, donne-lui un nom, puis <b>Copier l'URL du webhook</b>.",
+          "Colle l'adresse ci-dessus, clique sur <b>Envoyer un test</b>, et n'oublie pas de " +
+            "<b>publier</b>."
+        ]) }) +
+      "</div>" +
+
+      '<div class="rang" style="justify-content:flex-end;margin-top:var(--e-4)">' +
+        U.bouton("Enregistrer", { variante: "principal", icone: "check", action: "save" }) +
+      "</div>";
+
+    let avatar = w.avatar;
+    const zAva = z.querySelector("#w-ava-vue");
+    const peindreAva = () => {
+      zAva.innerHTML = mnIcon(avatar || brouillon.settings.brand.logo || "i-wrench");
+      z.querySelector('[data-a="ava-vider"]').disabled = !avatar;
+    };
+    z.querySelector('[data-a="ava-pick"]').addEventListener("click", () =>
+      choisirIcone(avatar || brouillon.settings.brand.logo || "i-wrench",
+        v => { avatar = v; peindreAva(); }));
+    z.querySelector('[data-a="ava-vider"]').addEventListener("click", () => {
+      avatar = ""; peindreAva();
+    });
+
+    /* Ce qu'on enregistre : adresses brouillées, le reste tel quel. */
+    const lire = () => ({
+      bt: MNWebhook.pack(z.querySelector("#w-bt").value.trim()),
+      duty: MNWebhook.pack(z.querySelector("#w-duty").value.trim()),
+      conges: MNWebhook.pack(z.querySelector("#w-conges").value.trim()),
+      mention: z.querySelector("#w-mention").value.trim(),
+      name: z.querySelector("#w-nom").value.trim(),
+      avatar,
+      proxy: ""
+    });
+
+    z.querySelector('[data-a="save"]').addEventListener("click", () => {
+      const v = lire();
+      const noms = { bt: "bons de travail", duty: "services", conges: "congés" };
+      for (const k of ["bt", "duty", "conges"]) {
+        if (v[k] && !MNWebhook.isValid(v[k])) {
+          return U.toast("Adresse de webhook invalide (" + noms[k] + ")", "err");
+        }
+      }
+      brouillon.settings.webhook = v;
+      valider();
+      U.toast("Réglages Discord enregistrés dans le brouillon", "ok");
+    });
+
+    ["bt", "duty", "conges"].forEach(k => {
+      z.querySelector('[data-a="vider-' + k + '"]').addEventListener("click", () => {
+        z.querySelector("#w-" + k).value = "";
+        U.toast("Champ vidé — pense à enregistrer", "info");
+      });
+
+      const t = z.querySelector('[data-a="test-' + k + '"]');
+      t.addEventListener("click", async () => {
+        const url = z.querySelector("#w-" + k).value.trim();
+        if (!MNWebhook.isValid(url)) {
+          return U.toast("Colle d'abord une adresse de webhook valide", "err");
+        }
+        /* Le test lit les réglages depuis le brouillon : on l'y met d'abord. */
+        brouillon.settings.webhook = lire();
+        MNStore.saveDraft(brouillon);
+
+        t.disabled = true;
+        const avant = t.innerHTML;
+        t.innerHTML = U.icone("rafraichir") + "<span>Envoi…</span>";
+        const r = await MNWebhook.sendTest(k, moi.pseudo);
+        t.disabled = false;
+        t.innerHTML = avant;
+        U.toast(r.ok ? "Message envoyé, regarde ton salon Discord" : "Échec : " + r.error,
+          r.ok ? "ok" : "err");
+      });
+    });
+  }
+
+  /* ---- Le site ------------------------------------------------------------------- */
+
+  function vueSite(z) {
+    const s = brouillon.settings;
+
+    z.innerHTML =
+      '<div class="pile">' +
+        U.carte({ titre: "Identité de l'entreprise", corps:
+          '<div class="cols-2">' +
+            U.champ({ id: "s-nom", label: "Nom", valeur: s.brand.name, max: 34 }) +
+            U.champ({ id: "s-slogan", label: "Slogan", valeur: s.brand.tagline, max: 34 }) +
+          "</div>" +
+          '<div class="champ" style="margin-top:var(--e-4)"><span class="champ__label">Logo</span>' +
+            '<div class="ad-icochoix">' +
+              '<div class="ad-icochoix__vue" id="s-logo-vue">' +
+                (s.brand.logo ? mnIcon(s.brand.logo) : U.esc(U.initiales(s.brand.name))) + "</div>" +
+              '<div class="pile pile--sm" style="flex:1;min-width:0">' +
+                '<div class="rang">' +
+                  U.bouton("Choisir un logo", { variante: "fantome", taille: "sm",
+                                                action: "logo-pick", type: "button" }) +
+                  U.bouton("Retirer", { variante: "fantome", taille: "sm", icone: "croix",
+                                        action: "logo-vider", type: "button",
+                                        desactive: !s.brand.logo }) +
+                "</div>" +
+                '<p class="champ__aide">Image, emoji ou icône. Sans logo, ce sont les initiales ' +
+                  "du nom qui s'affichent. Le logo apparaît dans la barre latérale et sur " +
+                  "l'écran de connexion.</p>" +
+              "</div></div></div>"
+        }) +
+
+        U.carte({ titre: "Connexion", corps:
+          U.champ({ id: "s-invites", type: "bascule",
+                    label: "Autoriser n'importe quel pseudo à entrer",
+                    valeur: s.auth.allowGuests }) +
+          '<p class="champ__aide" style="margin:var(--e-3) 0">Désactivé, seuls les pseudos de ' +
+            "l'onglet « Employés » peuvent se connecter. Activé, un inconnu entre avec le seul " +
+            "droit de faire des bons de travail.</p>" +
+          '<div style="max-width:220px">' +
+            U.champ({ id: "s-jours", label: "Durée de session (jours)", type: "number",
+                      min: 1, plafond: 365, valeur: Number(s.auth.sessionDays) }) +
+          "</div>"
+        }) +
+
+        U.carte({ titre: "Zone sensible", corps:
+          '<p class="champ__aide" style="margin-bottom:var(--e-3)">Efface le brouillon local ' +
+            "et recharge la version actuellement en ligne. Tes modifications non publiées " +
+            "seront perdues.</p>" +
+          U.bouton("Repartir de la version en ligne",
+            { variante: "danger", icone: "rafraichir", action: "reset" })
+        }) +
+      "</div>" +
+
+      '<div class="rang" style="justify-content:flex-end;margin-top:var(--e-4)">' +
+        U.bouton("Enregistrer les réglages", { variante: "principal", icone: "check",
+                                               action: "save" }) +
+      "</div>";
+
+    /* Le logo choisi n'entre dans le brouillon qu'à l'enregistrement. */
+    let logo = s.brand.logo;
+    const zLogo = z.querySelector("#s-logo-vue");
+    const peindreLogo = () => {
+      zLogo.innerHTML = logo
+        ? mnIcon(logo)
+        : U.esc(U.initiales(z.querySelector("#s-nom").value || "Atelier"));
+      z.querySelector('[data-a="logo-vider"]').disabled = !logo;
+    };
+    z.querySelector('[data-a="logo-pick"]').addEventListener("click", () =>
+      choisirIcone(logo || "i-wrench", v => { logo = v; peindreLogo(); }));
+    z.querySelector('[data-a="logo-vider"]').addEventListener("click", () => {
+      logo = ""; peindreLogo();
+    });
+    z.querySelector("#s-nom").addEventListener("input", () => { if (!logo) peindreLogo(); });
+
+    z.querySelector('[data-a="save"]').addEventListener("click", () => {
+      brouillon.settings.brand.name = z.querySelector("#s-nom").value.trim() || "Atelier";
+      brouillon.settings.brand.tagline = z.querySelector("#s-slogan").value.trim();
+      brouillon.settings.brand.logo = logo;
+      brouillon.settings.auth.allowGuests = z.querySelector("#s-invites").checked;
+      brouillon.settings.auth.sessionDays =
+        Math.max(1, Math.min(365, Number(z.querySelector("#s-jours").value) || 30));
+      valider();
+      V2Shell.rafraichirMarque();
+      U.toast("Réglages enregistrés dans le brouillon", "ok");
+    });
+
+    z.querySelector('[data-a="reset"]').addEventListener("click", async () => {
+      const ok = await U.confirmer({
+        titre: "Repartir de la version en ligne",
+        message: "Le brouillon local sera effacé et remplacé par ce qui est publié actuellement.",
+        confirmer: "Effacer le brouillon", danger: true
+      });
+      if (!ok) return;
+      MNStore.discardDraft();
+      localStorage.removeItem("mn.gh.stamp");
+      location.reload();
+    });
+  }
+
+  /* ---- Publier ---------------------------------------------------------------------- */
+
+  function vuePublier(z) {
+    const gh = brouillon.settings.github;
+    const devine = MNGitHub.detect();
+    const dernier = MNGitHub.lastPublish();
+    const sale = MNStore.hasDraft();
+    const parti = sale && localStorage.getItem("mn.gh.stamp") === brouillon.updatedAt;
+    const pret = MNGitHub.hasToken() && MNGitHub.isConfigured();
+
+    const etat = !MNGitHub.canPublish()
+      ? { ton: "attente", ico: "alerte", t: "Publication non configurée",
+          s: "Renseigne l'adresse de ton serveur, ou suis les quatre étapes ci-dessous " +
+             "une seule fois." }
+      : parti
+        ? { ton: "ok", ico: "nuage", t: "Publié — déploiement en cours",
+            s: "Le site se reconstruit. Compte environ une minute." +
+               (dernier ? " Dernier envoi " + U.ilYA(dernier.at) + "." : "") }
+        : sale
+          ? { ton: "attente", ico: "alerte", t: "Modifications non publiées",
+              s: "Ce que tu as changé n'est visible que dans ton navigateur." }
+          : { ton: "ok", ico: "check", t: "Tout est en ligne",
+              s: dernier ? "Dernière publication " + U.ilYA(dernier.at) + "."
+                         : "Aucune modification en attente." };
+
+    z.innerHTML =
+      '<div class="ad-etatpub ad-etatpub--' + etat.ton + '">' +
+        '<div class="ad-etatpub__ico">' + U.icone(etat.ico) + "</div>" +
+        '<div class="ad-etatpub__txt"><b>' + U.esc(etat.t) + "</b>" +
+          "<span>" + U.esc(etat.s) + "</span></div>" +
+        U.bouton("Publier maintenant", { variante: "principal", icone: "nuage",
+                                         action: "go", desactive: !(sale && !parti) }) +
+      "</div>" +
+
+      '<div class="pile" style="margin-top:var(--e-4)">' +
+        U.carte({ titre: "Publication automatique", corps:
+          U.champ({ id: "p-auto", type: "bascule",
+                    label: "Envoyer à chaque modification",
+                    valeur: localStorage.getItem(K_AUTO) === "1" }) +
+          '<p class="champ__aide" style="margin-top:var(--e-3)">Activé, tu n\'as plus rien à ' +
+            "cliquer : quelques secondes après ta dernière modification, le catalogue part " +
+            "tout seul. Les changements rapprochés sont regroupés en un seul envoi." +
+            (MNGitHub.canPublish() ? "" :
+              " <b>À configurer d'abord ci-dessous.</b>") + "</p>" +
+          '<p class="champ__aide" style="margin-top:var(--e-2)">Le réglage est propre à ce ' +
+            "navigateur : chacun décide pour lui. Tu peux toujours forcer un envoi avec " +
+            "« Publier maintenant ».</p>"
+        }) +
+
+        blocServeur() +
+
+        U.carte({ titre: "Dépôt GitHub", corps:
+          '<div class="cols-2">' +
+            U.champ({ id: "p-owner", label: "Propriétaire (ton pseudo GitHub)",
+                      valeur: gh.owner || devine.owner, repere: "moncompte" }) +
+            U.champ({ id: "p-repo", label: "Nom du dépôt", valeur: gh.repo || devine.repo,
+                      repere: "mecano-nord" }) +
+            U.champ({ id: "p-branche", label: "Branche", valeur: gh.branch, repere: "main" }) +
+            U.champ({ id: "p-chemin", label: "Fichier de données", valeur: gh.path }) +
+          "</div>" +
+          '<div class="champ" style="margin-top:var(--e-4)">' +
+            '<label class="champ__label" for="p-jeton">Jeton d\'accès GitHub</label>' +
+            '<div class="ad-copie">' +
+              '<input class="saisie" id="p-jeton" type="password" placeholder="' +
+                (MNGitHub.hasToken() ? "•••••••••• (enregistré sur cet appareil)"
+                                     : "github_pat_…") + '">' +
+              U.bouton("Vérifier", { variante: "fantome", icone: "check", action: "check" }) +
+            "</div>" +
+            '<p class="champ__aide">Le jeton reste dans <b>ton</b> navigateur, il n\'est jamais ' +
+              "écrit dans le dépôt. Chaque personne qui publie met le sien." + "</p>" +
+            (MNGitHub.hasToken()
+              ? '<div>' + U.bouton("Oublier le jeton de cet appareil",
+                  { variante: "fantome", taille: "sm", icone: "croix", action: "oublier" }) +
+                "</div>"
+              : "") +
+          "</div>" +
+          '<div id="p-resultat" style="margin-top:var(--e-3)"></div>' +
+          '<div style="margin-top:var(--e-3)">' +
+            U.bouton("Enregistrer les infos du dépôt", { variante: "fantome", taille: "sm",
+                                                         icone: "check", action: "save-depot" }) +
+          "</div>"
+        }) +
+
+        U.carte({ titre: "Mise en route (une seule fois)", corps: etapes([
+          "Va sur <b>github.com</b> → ton avatar → <b>Settings</b> → tout en bas " +
+            "<b>Developer settings</b> → <b>Personal access tokens</b> → " +
+            "<b>Fine-grained tokens</b> → <b>Generate new token</b>.",
+          "Dans <b>Repository access</b>, choisis <b>Only select repositories</b> et " +
+            "sélectionne le dépôt de ce site.",
+          "Dans <b>Permissions → Repository permissions</b>, mets <code>Contents</code> sur " +
+            "<b>Read and write</b>. Rien d'autre n'est nécessaire.",
+          "Copie le jeton généré, colle-le dans le champ ci-dessus, clique sur " +
+            "<b>Vérifier</b> puis sur <b>Publier maintenant</b>."
+        ]) }) +
+
+        U.carte({ titre: "Méthode manuelle (sans jeton)", corps:
+          '<p class="champ__aide" style="margin-bottom:var(--e-3)">Si tu préfères ne pas ' +
+            "utiliser de jeton : télécharge le fichier et remplace <code>" + U.esc(gh.path) +
+            "</code> dans ton dépôt GitHub.</p>" +
+          '<div class="rang">' +
+            U.bouton("Télécharger le fichier", { variante: "fantome", action: "dl" }) +
+            U.bouton("Copier le contenu", { variante: "fantome", action: "copier" }) +
+            U.bouton("Importer un fichier", { variante: "fantome", action: "import" }) +
+            '<input type="file" id="p-fichier" accept=".json,application/json" hidden>' +
+          "</div>" +
+          "<details style=\"margin-top:var(--e-3)\"><summary class=\"champ__aide\" " +
+            'style="cursor:pointer">Voir le contenu du fichier</summary>' +
+            '<pre class="ad-json">' + U.esc(MNStore.toJSON(brouillon)) + "</pre></details>"
+        }) +
+      "</div>";
+
+    brancherServeur(z);
+
+    z.querySelector('[data-a="go"]').addEventListener("click", () => publier(false));
+
+    z.querySelector("#p-auto").addEventListener("change", e => {
+      localStorage.setItem(K_AUTO, e.target.checked ? "1" : "0");
+      if (e.target.checked) {
+        U.toast("Publication automatique activée", "ok");
+        if (MNStore.hasDraft()) programmerEnvoi();
+      } else {
+        clearTimeout(minuterie);
+        U.toast("Publication automatique désactivée", "info");
+      }
+    });
+
+    const lireDepot = () => ({
+      owner: z.querySelector("#p-owner").value.trim(),
+      repo: z.querySelector("#p-repo").value.trim(),
+      branch: z.querySelector("#p-branche").value.trim() || "main",
+      path: z.querySelector("#p-chemin").value.trim() || "data/catalog.json"
+    });
+
+    z.querySelector('[data-a="save-depot"]').addEventListener("click", () => {
+      brouillon.settings.github = lireDepot();
+      valider();
+      U.toast("Infos du dépôt enregistrées", "ok");
+    });
+
+    z.querySelector('[data-a="check"]').addEventListener("click", async () => {
+      const boite = z.querySelector("#p-resultat");
+      const jeton = z.querySelector("#p-jeton").value.trim();
+      if (jeton) MNGitHub.setToken(jeton);
+      if (!MNGitHub.hasToken()) {
+        boite.innerHTML = U.alerte({ ton: "erreur", texte: "Colle d'abord un jeton." });
+        return;
+      }
+      brouillon.settings.github = lireDepot();
+      MNStore.saveDraft(brouillon);
+
+      boite.innerHTML = U.alerte({ ton: "info", texte: "Vérification…" });
+      try {
+        const r = await MNGitHub.check();
+        boite.innerHTML = U.alerte({
+          ton: r.canWrite ? "succes" : "alerte",
+          titre: "Connecté à " + r.repo + (r.login ? " en tant que " + r.login : ""),
+          texte: (r.canWrite
+            ? "Écriture autorisée — tu peux publier."
+            : "Mais le jeton n'a pas le droit d'écrire. Repasse par l'étape 3.") +
+            (r.fileExists ? ""
+              : " Le fichier n'existe pas encore, il sera créé à la première publication.")
+        });
+        z.querySelector("#p-jeton").value = "";
+      } catch (e) {
+        boite.innerHTML = U.alerte({ ton: "erreur", texte: e.message });
+      }
+    });
+
+    const oub = z.querySelector('[data-a="oublier"]');
+    if (oub) oub.addEventListener("click", () => {
+      MNGitHub.forgetToken();
+      U.toast("Jeton oublié sur cet appareil", "ok");
+      dessiner();
+    });
+
+    z.querySelector('[data-a="dl"]').addEventListener("click", () => {
+      MNStore.download(brouillon, "catalog.json");
+      U.toast("Fichier téléchargé", "ok");
+    });
+    z.querySelector('[data-a="copier"]').addEventListener("click", () =>
+      copier(MNStore.toJSON(brouillon), "Contenu copié"));
+    z.querySelector('[data-a="import"]').addEventListener("click", () =>
+      z.querySelector("#p-fichier").click());
+
+    z.querySelector("#p-fichier").addEventListener("change", e => {
+      const f = e.target.files[0];
+      e.target.value = "";
+      if (!f) return;
+      const rd = new FileReader();
+      rd.onload = async () => {
+        let data;
+        try { data = JSON.parse(rd.result); }
+        catch (_) { return U.toast("Fichier illisible — ce n'est pas un JSON valide", "err"); }
+        const ok = await U.confirmer({
+          titre: "Importer ce fichier",
+          message: "Le brouillon actuel sera entièrement remplacé par le contenu du fichier.",
+          confirmer: "Importer", danger: true
+        });
+        if (!ok) return;
+        brouillon = MNStore.saveDraft(data);
+        MNAuth.refresh();
+        dessiner();
+        U.toast("Fichier importé", "ok");
+      };
+      rd.readAsText(f);
+    });
+  }
+
+  /* ---- Serveur de l'atelier ------------------------------------------------------
+     Trois façons de rendre le pointage automatique pour toute l'équipe. Le
+     serveur les remplace toutes ; les deux autres restent pour qui n'en a
+     pas. */
+
+  function blocServeur() {
+    const serveur = brouillon.settings.serveur || "";
+    const base = brouillon.settings.dutyUrl || "";
+    const relais = brouillon.settings.relay || "";
+    const auto = !!(serveur || base || relais);
+
+    return U.carte({
+      titre: "Serveur de l'atelier",
+      actions: auto ? U.etiquette("actif", "succes") : U.etiquette("à configurer", "alerte"),
+      corps:
+        (serveur
+          ? U.alerte({ ton: "succes", titre: "Tout passe par ton serveur",
+              texte: "L'équipe pointe son service et les responsables publient depuis le " +
+                     "site, sans que personne n'ait de jeton. Les adresses Discord restent " +
+                     "chez toi." })
+          : auto
+            ? U.alerte({ ton: "succes",
+                texte: "Le pointage est partagé. Renseigne l'adresse du serveur ci-dessous " +
+                       "pour que la publication se passe aussi de jeton." })
+            : U.alerte({ ton: "alerte", titre: "Sans serveur, il faut un jeton par personne",
+                texte: "Pour publier comme pour apparaître dans le tableau de service. " +
+                       "Renseigne ton serveur ci-dessous et tout devient automatique." })) +
+
+        '<div class="champ" style="margin-top:var(--e-4)">' +
+          '<label class="champ__label" for="v-serveur">Adresse de ton serveur</label>' +
+          '<div class="ad-copie">' +
+            '<input class="saisie ad-id" id="v-serveur" value="' + U.esc(serveur) +
+              '" placeholder="https://mecano-nord.duckdns.org">' +
+            U.bouton("Tester", { variante: "fantome", icone: "nuage", action: "test-srv" }) +
+          "</div>" +
+          '<p class="champ__aide">Une seule adresse suffit : le site en déduit tout le reste ' +
+            "(pointage, relais Discord, publication, images). Guide d'installation dans " +
+            "<code>serveur/README.md</code>.</p></div>" +
+        '<div id="v-srv-msg" style="margin-top:var(--e-2)"></div>' +
+
+        '<details style="margin-top:var(--e-3)"><summary class="champ__aide" ' +
+          'style="cursor:pointer">Sans serveur : une base Firebase pour le seul pointage, ' +
+          "ou un relais Cloudflare</summary>" +
+          '<div class="champ" style="margin-top:var(--e-3)">' +
+            '<label class="champ__label" for="v-duty">Base partagée</label>' +
+            '<div class="ad-copie">' +
+              '<input class="saisie ad-id" id="v-duty" value="' + U.esc(base) +
+                '" placeholder="https://mon-projet-default-rtdb.europe-west1.firebasedatabase.app/duty">' +
+              U.bouton("Tester", { variante: "fantome", icone: "nuage", action: "test-duty" }) +
+            "</div></div>" +
+          '<div id="v-duty-msg" style="margin-top:var(--e-2)"></div>' +
+
+          '<div class="champ" style="margin-top:var(--e-3)">' +
+            '<label class="champ__label" for="v-relais">Relais Cloudflare</label>' +
+            '<div class="ad-copie">' +
+              '<input class="saisie ad-id" id="v-relais" value="' + U.esc(relais) +
+                '" placeholder="https://mon-relais.workers.dev">' +
+              U.bouton("Tester", { variante: "fantome", icone: "nuage", action: "test-relais" }) +
+            "</div></div>" +
+          '<div id="v-relais-msg" style="margin-top:var(--e-2)"></div>' +
+          '<p class="champ__aide" style="margin-top:var(--e-2)">Code prêt dans ' +
+            "<code>relais.js</code>. Ces deux champs ne servent que si tu n'as pas de " +
+            "serveur : l'adresse ci-dessus les remplace tous les deux.</p>" +
+        "</details>" +
+
+        '<div class="rang" style="justify-content:flex-end;margin-top:var(--e-4)">' +
+          U.bouton("Enregistrer", { variante: "principal", icone: "check",
+                                    action: "save-srv" }) +
+        "</div>"
+    });
+  }
+
+  function brancherServeur(z) {
+    const lire = () => ({
+      serveur: z.querySelector("#v-serveur").value.trim().replace(/\/+$/, ""),
+      duty: z.querySelector("#v-duty").value.trim(),
+      relais: z.querySelector("#v-relais").value.trim()
+    });
+
+    z.querySelector('[data-a="save-srv"]').addEventListener("click", () => {
+      const v = lire();
+      for (const [champ, nom] of [[v.serveur, "le serveur"], [v.duty, "la base partagée"],
+                                  [v.relais, "le relais"]]) {
+        if (champ && !/^https?:\/\/.+/i.test(champ)) {
+          return U.toast("L'adresse de " + nom + " doit commencer par http:// ou https://", "err");
+        }
+      }
+      brouillon.settings.serveur = v.serveur;
+      brouillon.settings.dutyUrl = v.duty;
+      brouillon.settings.relay = v.relais;
+      valider();
+
+      /* Une page en HTTPS ne peut pas appeler une adresse en HTTP : le
+         navigateur bloque, sans rien afficher. Mieux vaut le dire ici. */
+      const mixte = location.protocol === "https:" &&
+        [v.serveur, v.duty, v.relais].some(u => /^http:\/\//i.test(u));
+      if (!mixte) return U.toast("Réglages du serveur enregistrés dans le brouillon", "ok");
+
+      U.modale({
+        titre: "Cette adresse ne fonctionnera pas ici",
+        corps: U.alerte({ ton: "erreur",
+            texte: "Tu es sur une page https:// et l'adresse saisie est en http://. Le " +
+                   "navigateur bloquera l'appel sans message." }) +
+          '<p class="champ__aide" style="margin-top:var(--e-3)">Deux solutions : ouvrir le ' +
+            "site depuis ton serveur en <code>http://</code> lui aussi, ou mettre un " +
+            "sous-domaine gratuit avec HTTPS devant ton IP. Les deux chemins sont détaillés " +
+            "dans <code>serveur/README.md</code>.</p>",
+        actions: [{ label: "Compris", variante: "principal", onClick: f => f() }]
+      });
+    });
+
+    /* Test du serveur : /sante doit répondre, et on regarde ce qu'il sait faire. */
+    z.querySelector('[data-a="test-srv"]').addEventListener("click", async () => {
+      const boite = z.querySelector("#v-srv-msg");
+      const url = z.querySelector("#v-serveur").value.trim().replace(/\/+$/, "");
+      if (!/^https?:\/\/.+/i.test(url)) {
+        boite.innerHTML = U.alerte({ ton: "erreur",
+          texte: "Colle l'adresse de ton serveur (http:// ou https://)." });
+        return;
+      }
+      boite.innerHTML = U.alerte({ ton: "info", texte: "Test en cours…" });
+      try {
+        const r = await fetch(url + "/sante", { cache: "no-store" });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.ok) throw new Error("réponse " + r.status);
+
+        /* On regarde si la publication est configurée côté serveur, en lui
+           demandant d'écrire un chemin qu'il doit refuser. */
+        let pub = "";
+        try {
+          const t = await fetch(url + "/publier", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: "interdit.txt", content: "x" })
+          });
+          /* 403 = la route existe et refuse ce chemin : tout va bien.
+             404 = le serveur tourne, mais dans une version antérieure. */
+          pub = t.status === 403 ? "ok"
+            : t.status === 501 ? "absent"
+            : t.status === 404 ? "vieux"
+            : "inconnu:" + t.status;
+        } catch (_) { pub = "inconnu"; }
+
+        const pistes = {
+          ok: "La publication passera par lui — plus besoin de jeton.",
+          absent: "La publication n'est pas configurée : ajoute GH_TOKEN, GH_OWNER et " +
+                  "GH_REPO dans le service, puis redémarre-le.",
+          vieux: "Version trop ancienne : ce serveur ne connaît pas encore la publication. " +
+                 "Recopie serveur/serveur.js sur le VPS, puis redémarre le service."
+        };
+
+        /* `images` n'apparaît que sur les versions récentes : son absence dit
+           que le fichier du VPS n'a pas été recopié. */
+        const grave = pub !== "ok" || !j.images;
+        boite.innerHTML = U.alerte({
+          ton: grave ? "alerte" : "succes",
+          titre: "Serveur joignable" + (j.ops ? ", pointage sans conflit géré" : ""),
+          texte: (pistes[pub] || "Publication : état indéterminé (" + pub + ").") +
+            (j.images
+              ? " Il héberge aussi les images — elles ne passent plus par GitHub."
+              : " Il n'héberge pas encore les images : recopie serveur.js sur le VPS, " +
+                "puis redémarre le service.")
+        });
+      } catch (e) {
+        boite.innerHTML = U.alerte({ ton: "erreur", titre: "Serveur injoignable",
+          texte: "Vérifie l'adresse, que le service tourne, et que ORIGINE autorise ce site." });
+      }
+    });
+
+    /* Test de la base : on lit la clé, ce qui valide l'adresse ET les règles. */
+    z.querySelector('[data-a="test-duty"]').addEventListener("click", async () => {
+      const boite = z.querySelector("#v-duty-msg");
+      let url = z.querySelector("#v-duty").value.trim().replace(/\/+$/, "");
+      if (!/^https?:\/\/.+/i.test(url)) {
+        boite.innerHTML = U.alerte({ ton: "erreur",
+          texte: "Colle d'abord l'adresse de ta base (http:// ou https://)." });
+        return;
+      }
+      if (!/\.json$/i.test(url)) url += ".json";
+      boite.innerHTML = U.alerte({ ton: "info", texte: "Test en cours…" });
+
+      try {
+        const lu = await fetch(url + "?t=" + Date.now(), { cache: "no-store" });
+        if (!lu.ok) {
+          boite.innerHTML = U.alerte({ ton: "erreur",
+            texte: "Lecture refusée (" + lu.status + "). Vérifie les règles : la clé duty " +
+                   "doit avoir .read: true." });
+          return;
+        }
+        /* Écriture d'une valeur témoin : on réécrit ce qu'il y avait déjà. */
+        const avant = await lu.json();
+        const ecrit = await fetch(url, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(avant === null
+            ? { updatedAt: new Date(0).toISOString(), onDuty: [], log: [] } : avant)
+        });
+        boite.innerHTML = ecrit.ok
+          ? U.alerte({ ton: "succes", texte: "Lecture et écriture confirmées. Enregistre, " +
+              "publie, et toute l'équipe pourra pointer sans rien installer." })
+          : U.alerte({ ton: "erreur", texte: "Écriture refusée (" + ecrit.status +
+              "). Vérifie .write: true sur la clé duty." });
+      } catch (_) {
+        boite.innerHTML = U.alerte({ ton: "erreur",
+          texte: "Base injoignable. Vérifie l'adresse copiée depuis Firebase." });
+      }
+    });
+
+    z.querySelector('[data-a="test-relais"]').addEventListener("click", async () => {
+      const boite = z.querySelector("#v-relais-msg");
+      const url = z.querySelector("#v-relais").value.trim();
+      if (!/^https?:\/\/.+/i.test(url)) {
+        boite.innerHTML = U.alerte({ ton: "erreur",
+          texte: "Colle d'abord l'adresse de ton relais (http:// ou https://)." });
+        return;
+      }
+      boite.innerHTML = U.alerte({ ton: "info", texte: "Test en cours…" });
+      try {
+        /* Type inconnu : le relais doit refuser proprement, sans rien écrire. */
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "ping" })
+        });
+        const j = await r.json().catch(() => ({}));
+        const vivant = r.status === 400 && /Type inconnu/i.test(j.error || "");
+        boite.innerHTML = U.alerte({
+          ton: vivant ? "succes" : "alerte",
+          texte: vivant
+            ? "Le relais répond correctement."
+            : "Réponse inattendue (" + r.status + ") — vérifie que tu as bien collé le code " +
+              "de relais.js et déployé le worker."
+        });
+      } catch (_) {
+        boite.innerHTML = U.alerte({ ton: "erreur",
+          texte: "Relais injoignable. Vérifie l'adresse, et que ORIGINE vaut bien " +
+                 "l'adresse de ton site." });
+      }
+    });
+  }
+
+  /* ---- Envoi ------------------------------------------------------------------------ */
+
+  let envoiEnCours = false;
+
+  /**
+   * @param {boolean} auto true = déclenché par la publication automatique,
+   *                       donc sans fenêtre d'erreur bloquante.
+   */
+  async function publier(auto) {
+    if (envoiEnCours) return;
+    clearTimeout(minuterie);
+
+    if (!MNAuth.can("publish")) return U.toast("Tu n'as pas la permission de publier", "err");
+
+    if (!MNGitHub.canPublish()) {
+      if (auto) return;                  // rien à signaler : l'auto est simplement inactif
+      onglet = "publier"; dessiner();
+      return U.toast(MNGitHub.hasToken()
+        ? "Renseigne le propriétaire et le nom du dépôt"
+        : "Renseigne l'adresse de ton serveur, ou un jeton GitHub", "err");
+    }
+
+    const repere = brouillon.updatedAt;
+    envoiEnCours = true;
+
+    try {
+      const info = await MNGitHub.publish(MNStore.toJSON(brouillon),
+        "Catalogue mis à jour par " + moi.pseudo + (auto ? " (publication automatique)" : ""));
+      localStorage.setItem("mn.gh.stamp", repere);
+      U.toast((auto ? "Envoyé automatiquement" : "Publié !") +
+        " Le site sera à jour dans une minute environ" +
+        (info && info.commit ? " (" + info.commit + ")" : ""), "ok");
+    } catch (e) {
+      const m = String(e && e.message || e);
+      if (auto) {
+        U.toast("Envoi automatique impossible : " + m, "err");
+      } else {
+        /* Le conseil dépend de ce qui a échoué : inutile d'envoyer quelqu'un
+           vérifier son jeton quand c'est le serveur qui est en cause. */
+        let piste;
+        if (/Chemin inconnu/i.test(m)) {
+          piste = "Ton serveur tourne avec une <b>version trop ancienne</b> : il ne connaît " +
+            "pas encore la publication. Recopie <code>serveur/serveur.js</code> sur le VPS, " +
+            "puis redémarre le service.";
+        } else if (/non configurée|GH_TOKEN/i.test(m)) {
+          piste = "Ton serveur n'a pas les accès GitHub. Ajoute <code>GH_TOKEN</code>, " +
+            "<code>GH_OWNER</code> et <code>GH_REPO</code> dans son service, puis " +
+            "redémarre-le.";
+        } else if (/injoignable|ne répond pas/i.test(m)) {
+          piste = "Ton serveur ne répond pas. Vérifie son adresse et qu'il tourne.";
+        } else if (/Chemin non autorisé/i.test(m)) {
+          piste = "Le serveur refuse d'écrire ce fichier. C'est volontaire : il n'autorise " +
+            "que le catalogue et les images.";
+        } else {
+          piste = "Vérifie le jeton et les infos du dépôt ci-dessous, puis réessaie.";
+        }
+
+        U.modale({
+          titre: "La publication a échoué",
+          corps: U.alerte({ ton: "erreur", texte: m }) +
+            '<p class="champ__aide" style="margin-top:var(--e-3)">' + piste + "</p>" +
+            '<p class="champ__aide" style="margin-top:var(--e-2)">Rien n\'est perdu : tes ' +
+              "modifications sont toujours dans le brouillon.</p>",
+          actions: [{ label: "Compris", variante: "principal", onClick: f => f() }]
+        });
+      }
+    } finally {
+      envoiEnCours = false;
+      /* Le brouillon a encore bougé pendant l'envoi ? On repart pour un tour. */
+      if (brouillon.updatedAt !== localStorage.getItem("mn.gh.stamp")) programmerEnvoi();
+      if (onglet === "publier") dessiner(); else V2Shell.brouillon(dessiner);
+    }
+  }
+
+  /** Marche à suivre numérotée. */
+  const etapes = l => '<ol class="ad-etapes">' +
+    l.map(x => "<li>" + x + "</li>").join("") + "</ol>";
+
+  /** Copie dans le presse-papier, avec repli sur les vieux navigateurs. */
+  function copier(texte, message) {
+    const dire = ok => U.toast(ok ? (message || "Copié") : "Copie impossible", ok ? "ok" : "err");
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(texte).then(() => dire(true), () => dire(false));
+    }
+    const n = document.createElement("textarea");
+    n.value = texte;
+    n.style.position = "fixed";
+    n.style.opacity = "0";
+    document.body.appendChild(n);
+    n.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (_) { ok = false; }
+    n.remove();
+    dire(ok);
   }
 
   /* ---- Petit éditeur : nom + icône (+ couleur) ---------------------------------- */

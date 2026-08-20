@@ -218,10 +218,14 @@ deux versions coexistent.
 | Contrats | ✅ fait — registre, troc à plusieurs ressources, contrat PDF |
 | Service | ✅ fait — pointage, congés, corrections d’horaires |
 | Fiches équipe | ✅ fait — ancienneté, carrière, formations, historique |
-| Administration | ⏳ objets, catégories, ressources, types de contrat, employés, rôles ✅ — reste images, apparence, Discord, site, publication |
+| Administration | ✅ fait — les onze onglets |
 
-Les pages en attente affichent leur état et renvoient vers la V1, qui reste
-complète.
+**La reprise est complète.** Chaque page de la V1 a son équivalent, avec les
+mêmes fonctions et les mêmes garde-fous. Il reste à l'user à l'usage : c'est
+le rôle de la bêta.
+
+La V1 demeure la version officielle jusqu'à demande explicite — voir
+« Passer de bêta à production » plus bas.
 
 ---
 
