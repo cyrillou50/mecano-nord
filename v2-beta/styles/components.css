@@ -1235,3 +1235,216 @@
   .eq-tete__av { width: 48px; height: 48px; font-size: var(--t-lg); }
   .eq-jour__date { width: 100%; }
 }
+
+/* ---- Administration --------------------------------------------------------
+   Un onglet = une liste de lignes. La ligne est la brique : des flèches pour
+   l'ordre, une icône, un corps, des actions à droite. */
+
+.onglet__n {
+  padding: 0 6px;
+  border-radius: var(--r-plein);
+  background: var(--c-creux);
+  font-size: var(--t-xs); font-weight: 700;
+  color: var(--c-faible);
+}
+.onglet.is-actif .onglet__n { background: rgb(var(--accent-rgb) / .2); color: var(--c-action-doux); }
+
+.ad-outils {
+  display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
+  margin-bottom: var(--e-4);
+}
+.ad-outils__txt { flex: 1; min-width: 220px; font-size: var(--t-sm); color: var(--c-second); }
+.ad-outils .saisie { max-width: 100%; }
+
+/* Flèches d'ordre, communes à toutes les listes réordonnables. */
+.ad-ordre { display: flex; flex-direction: column; flex: none; }
+.ad-ordre button {
+  width: 18px; height: 14px;
+  border: 0; background: none;
+  color: var(--c-faible);
+  font-size: 8px; line-height: 1;
+  cursor: pointer;
+}
+.ad-ordre button:hover:not(:disabled) { color: var(--c-action-doux); }
+.ad-ordre button:disabled { opacity: .25; cursor: not-allowed; }
+
+.ad-ligne {
+  display: flex; align-items: center; gap: var(--e-3);
+  padding: var(--e-2) var(--e-3);
+  background: var(--c-carte);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-2);
+}
+.ad-ligne.est-eteint { opacity: .55; }
+.ad-ligne.est-repliee { display: none; }
+.ad-ligne--sous { margin-left: var(--e-5); background: var(--c-carte-2); }
+
+.ad-ico {
+  flex: none;
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: var(--r-2);
+  background: var(--c-creux);
+}
+.ad-ico svg, .ad-ico img { width: 20px; height: 20px; object-fit: contain; }
+
+.ad-corps { flex: 1; min-width: 0; }
+.ad-corps > b { font-size: var(--t-md); font-weight: 600; }
+
+.ad-meta {
+  display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap;
+  margin-top: 2px;
+  font-size: var(--t-xs); color: var(--c-faible);
+}
+.ad-meta i { font-style: normal; color: var(--c-second); }
+
+/* Le coût d'un objet : une puce par ressource. */
+.ad-cout {
+  padding: 1px 7px;
+  border-radius: var(--r-1);
+  background: var(--c-creux);
+  color: var(--c-second);
+  font-variant-numeric: tabular-nums;
+}
+.ad-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; opacity: .8; }
+
+.ad-actes { display: flex; gap: 2px; flex: none; }
+.ad-vide-chev { width: 32px; flex: none; }
+
+/* ---- Blocs repliables (les objets, rangés par catégorie) ------------------- */
+
+.ad-bloc { margin-bottom: var(--e-4); }
+.ad-bloc--sous { margin: var(--e-3) 0 0 var(--e-4); }
+
+.ad-tete {
+  display: flex; align-items: center; gap: var(--e-2);
+  padding: var(--e-2) 0;
+  font-family: var(--f-titre);
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--c-second);
+  cursor: pointer;
+  user-select: none;
+}
+.ad-tete--cat  { font-size: var(--t-md); color: var(--c-texte); }
+.ad-tete--sous { font-size: var(--t-sm); }
+.ad-tete:hover { color: var(--c-action-doux); }
+.ad-tete__chev { width: 15px; height: 15px; transition: transform var(--m-vif); }
+.est-plie > .ad-tete .ad-tete__chev { transform: rotate(-90deg); }
+.ad-tete__n {
+  padding: 0 6px;
+  border-radius: var(--r-plein);
+  background: var(--c-creux);
+  font-size: var(--t-xs);
+  color: var(--c-faible);
+}
+
+.ad-plie { display: flex; flex-direction: column; gap: var(--e-2); }
+.est-plie > .ad-plie { display: none; }
+
+/* ---- Coût en ressources, dans l'éditeur d'objet ---------------------------- */
+
+.ad-cout-ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px auto;
+  gap: var(--e-2);
+  align-items: center;
+}
+
+/* ---- Cases à cocher en liste (incompatibilités, permissions) --------------- */
+
+.ad-coches {
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 200px; overflow-y: auto;
+  padding: var(--e-2);
+  background: var(--c-creux);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-2);
+}
+.ad-coche {
+  display: flex; align-items: center; gap: var(--e-3);
+  width: 100%;
+  padding: 7px var(--e-3);
+  border: 0; border-radius: var(--r-1);
+  background: none;
+  color: var(--c-second);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--m-vif);
+}
+.ad-coche:hover { background: rgba(255, 255, 255, .05); }
+.ad-coche b { display: block; font-size: var(--t-sm); font-weight: 600; }
+.ad-coche i { display: block; font-style: normal; font-size: var(--t-xs); color: var(--c-faible); }
+
+.ad-coche__case {
+  flex: none;
+  width: 19px; height: 19px;
+  display: grid; place-items: center;
+  border: 1px solid var(--c-bord-net);
+  border-radius: var(--r-1);
+  color: transparent;
+}
+.ad-coche__case svg { width: 13px; height: 13px; }
+.ad-coche.est-cochee { color: var(--c-texte); }
+.ad-coche.est-cochee .ad-coche__case {
+  background: var(--c-action);
+  border-color: var(--c-action);
+  color: var(--c-sur-action);
+}
+/* Verrouillée : cochée depuis l'autre bout, donc pas décochable ici. */
+.ad-coche.est-bloquee { opacity: .6; cursor: not-allowed; }
+
+/* ---- Choix d'icône --------------------------------------------------------- */
+
+.ad-icochoix { display: flex; align-items: center; gap: var(--e-3); }
+.ad-icochoix__vue {
+  flex: none;
+  width: 56px; height: 56px;
+  display: grid; place-items: center;
+  background: var(--c-creux);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-2);
+}
+.ad-icochoix__vue svg, .ad-icochoix__vue img {
+  width: 32px; height: 32px; object-fit: contain;
+}
+
+.ad-icones {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+  gap: 4px;
+  max-height: 190px; overflow-y: auto;
+  padding: var(--e-2);
+  background: var(--c-creux);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-2);
+}
+.ad-icones--img { grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); max-height: 240px; }
+.ad-icones button {
+  aspect-ratio: 1;
+  display: grid; place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-1);
+  background: none;
+  color: var(--c-second);
+  cursor: pointer;
+  transition: background var(--m-vif), border-color var(--m-vif);
+}
+.ad-icones button:hover { background: rgba(255, 255, 255, .07); color: var(--c-texte); }
+.ad-icones button.est-choisie {
+  border-color: var(--c-action);
+  background: var(--c-action-fond);
+  color: var(--c-action-doux);
+}
+.ad-icones svg { width: 20px; height: 20px; }
+.ad-icones img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
+
+@media (max-width: 640px) {
+  .ad-ligne { flex-wrap: wrap; }
+  .ad-corps { flex: 1 1 100%; order: 3; }
+  .ad-actes { order: 2; margin-left: auto; }
+  .ad-ligne--sous { margin-left: var(--e-3); }
+  .ad-cout-ligne { grid-template-columns: minmax(0, 1fr) 80px auto; }
+}
+
+/* Le sélecteur de couleur natif a besoin de moins de rembourrage. */
+.saisie[type="color"] { height: 44px; padding: 4px; cursor: pointer; }

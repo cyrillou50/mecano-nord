@@ -218,7 +218,7 @@ deux versions coexistent.
 | Contrats | ✅ fait — registre, troc à plusieurs ressources, contrat PDF |
 | Service | ✅ fait — pointage, congés, corrections d’horaires |
 | Fiches équipe | ✅ fait — ancienneté, carrière, formations, historique |
-| Administration | ⏳ la plus grande — à reprendre onglet par onglet |
+| Administration | ⏳ objets, catégories, ressources, types de contrat ✅ — reste employés, rôles, images, apparence, Discord, site, publication |
 
 Les pages en attente affichent leur état et renvoient vers la V1, qui reste
 complète.
