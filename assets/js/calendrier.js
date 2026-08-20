@@ -86,14 +86,27 @@
     const vus = cg.slice(0, MAX);
     const reste = cg.slice(MAX);
 
-    return vus.map(c =>
-      '<span class="calini" title="' + esc(c.pseudo + " est en congés") + '">' +
-        esc(MNUI.initials(c.pseudo)) + "</span>").join("") +
+    /* Le grade accompagne le pseudo dans l'infobulle : la couleur seule ne
+       se retient pas quand l'atelier compte cinq grades. */
+    const nomEtGrade = c => {
+      const r = MNStore.roleById(c.roleId);
+      return c.pseudo + (r ? " (" + r.name + ")" : "");
+    };
+
+    return vus.map(c => {
+      /* La pastille prend la couleur du grade : dans une grille de trente
+         cases, deux lettres grises ne disent rien, alors qu'une couleur
+         connue se reconnaît sans lire. */
+      const r = MNStore.roleById(c.roleId);
+      return '<span class="calini"' + (r ? ' style="--ini:' + esc(r.color) + '"' : "") +
+        ' title="' + esc(nomEtGrade(c) + " est en congés") + '">' +
+        esc(MNUI.initials(c.pseudo)) + "</span>";
+    }).join("") +
       /* Au-delà de trois, un compteur : quatre pastilles ne tiendraient pas
          en face du numéro, et leur liste tient dans son infobulle. */
       (reste.length
         ? '<span class="calini calini--plus" title="' +
-          esc(reste.map(c => c.pseudo).join(", ") +
+          esc(reste.map(nomEtGrade).join(", ") +
             (reste.length > 1 ? " sont aussi en congés" : " est aussi en congés")) +
           '">+' + reste.length + "</span>"
         : "");

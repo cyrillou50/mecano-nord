@@ -1133,19 +1133,27 @@ button.calev:hover { filter: brightness(1.25); }
    tiennent en initiales à côté du numéro. Écrits en entier, ils mangeaient la
    case — à trois absents il ne restait plus de place pour les évènements, qui
    sont pourtant ce qu'on vient poser ici. Le nom complet revient au survol. */
+/* `--ini` porte la couleur du grade, posée par le script. Sans elle la
+   pastille reste grise ; le texte est ramené vers la couleur du texte pour
+   qu'un grade très clair ou très sombre reste lisible dans les deux thèmes. */
 .calini {
+  --ini: var(--line-2);
   display: inline-grid; place-items: center;
   min-width: 18px; height: 18px;
   padding: 0 4px;
-  border: 1px dashed var(--line-2);
+  border: 1px dashed color-mix(in srgb, var(--ini) 60%, transparent);
   border-radius: 999px;
-  background: transparent;
-  color: var(--dim);
+  background: color-mix(in srgb, var(--ini) 15%, transparent);
+  color: color-mix(in srgb, var(--ini) 75%, var(--txt));
   font-family: var(--font-display);
   font-size: 9.5px; font-weight: 700; letter-spacing: .04em;
   cursor: help;
 }
-.calini--plus { border-style: solid; }
+.calini--plus {
+  border-style: solid;
+  background: none;
+  color: var(--dim);
+}
 
 .calaide { margin-top: 14px; }
 
