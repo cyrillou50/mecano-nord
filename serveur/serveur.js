@@ -57,6 +57,11 @@ const FICHIER_VEH = path.join(DOSSIER, "vehicules.json");
 const FICHIER_CT = path.join(DOSSIER, "contrats.json");
 /* Et l'agenda de l'atelier, pour la même raison. */
 const FICHIER_AG = path.join(DOSSIER, "agenda.json");
+/* Le catalogue lui-même : objets, grades, employés, réglages. Tant qu'il
+   vivait dans le dépôt, chaque modification coûtait un commit et une minute
+   de reconstruction ; ici elle est en ligne aussitôt. La copie du dépôt reste
+   en secours, et sert à trouver l'adresse de ce serveur au démarrage. */
+const FICHIER_CAT = path.join(DOSSIER, "catalogue.json");
 
 /* Origines autorisées, séparées par des virgules. « * » = tout le monde. */
 const ORIGINES = String(process.env.ORIGINE || "*")
@@ -71,6 +76,9 @@ const WEBHOOKS = {
 
 const MAX_CORPS = 512 * 1024;      // 512 ko suffisent largement
 const MAX_IMAGE = 8 * 1024 * 1024; // sauf pour une photo, forcément plus lourde
+/* Le catalogue peut porter des icônes intégrées en clair : plus large que le
+   reste, mais pas illimité pour autant. */
+const MAX_CATALOGUE = 6 * 1024 * 1024;
 const SAUVEGARDES = 20;            // versions conservées du tableau
 
 /* ---- Limitation de débit --------------------------------------------------- */
@@ -964,7 +972,7 @@ const serveur = http.createServer(async (req, res) => {
          qu'il sait aller chercher une image sur un autre domaine. */
       return repondre(res, 200, {
         ok: true, ops: true, images: true, vehicules: true, relais: true, contrats: true,
-        calendrier: true,
+        calendrier: true, catalogue: true,
         recap: RECAP_ACTIF,
         depuis: Math.round(process.uptime()) + " s"
       }, req);
@@ -990,6 +998,41 @@ const serveur = http.createServer(async (req, res) => {
         const c = await corpsJson(req).catch(() => ({}));
         const r = await envoyerRecap(c.marquer === true);
         return repondre(res, r.ok ? 200 : 502, r, req);
+      }
+      return repondre(res, 405, { error: "Méthode non autorisée" }, req);
+    }
+
+    /* --- catalogue ---
+       GET rend ce qu'on garde ici, 404 s'il n'y a rien encore : le site
+       retombe alors sur la copie du dépôt, sans que ce soit une erreur.
+       PUT remplace le tout — le catalogue est un document, pas une liste
+       d'opérations, et c'est toujours l'administration qui l'envoie entier. */
+    if (chemin === "/catalogue") {
+      if (req.method === "GET") {
+        const c = await lireCatalogue();
+        if (!c) return repondre(res, 404, { error: "Aucun catalogue enregistré ici" }, req);
+        return repondre(res, 200, c, req);
+      }
+
+      if (req.method === "PUT" || req.method === "POST") {
+        let cat;
+        try {
+          cat = await corpsJson(req, MAX_CATALOGUE);
+        } catch (e) {
+          return repondre(res, e.tropGros ? 413 : 400, { error: e.message }, req);
+        }
+        if (!estCatalogue(cat)) {
+          return repondre(res, 400, {
+            error: "Ce n'est pas un catalogue : il faut au moins items, roles et users."
+          }, req);
+        }
+
+        /* Une écriture à la fois : deux responsables qui publient en même
+           temps ne doivent pas se croiser au milieu du fichier. */
+        await enFile(() => ecrireCatalogue(cat));
+        console.log(new Date().toISOString(), "catalogue :",
+          cat.items.length, "objets,", cat.users.length, "employés");
+        return repondre(res, 200, { ok: true, updatedAt: cat.updatedAt || null }, req);
       }
       return repondre(res, 405, { error: "Méthode non autorisée" }, req);
     }
@@ -1352,6 +1395,51 @@ async function ecrireAgenda(ag) {
   const tmp = FICHIER_AG + ".tmp";
   await fsp.writeFile(tmp, JSON.stringify(ag, null, 2) + "\n", "utf8");
   await fsp.rename(tmp, FICHIER_AG);
+}
+
+/* ---- Catalogue -----------------------------------------------------------------
+   Contrairement au reste, le serveur ne cherche pas à comprendre ce qu'il
+   range : le catalogue est mis en forme par le site, qui seul connaît son
+   modèle. Ici on vérifie seulement que c'est bien un catalogue, et on garde
+   des versions — c'est le fichier le plus précieux de l'atelier. */
+
+async function lireCatalogue() {
+  try {
+    const c = JSON.parse(await fsp.readFile(FICHIER_CAT, "utf8"));
+    return estCatalogue(c) ? c : null;
+  } catch (_) {
+    return null;                       // pas encore de catalogue ici
+  }
+}
+
+/** Assez de repères pour ne pas écraser le catalogue par n'importe quel JSON. */
+function estCatalogue(c) {
+  return !!c && typeof c === "object" && !Array.isArray(c) &&
+    Array.isArray(c.items) && Array.isArray(c.roles) && Array.isArray(c.users);
+}
+
+async function ecrireCatalogue(cat) {
+  await fsp.mkdir(DOSSIER, { recursive: true });
+
+  /* Une version par écriture, comme pour le tableau de service : une fausse
+     manœuvre dans l'administration se rattrape en recopiant un fichier. */
+  try {
+    if (fs.existsSync(FICHIER_CAT)) {
+      const dir = path.join(DOSSIER, "sauvegardes-catalogue");
+      await fsp.mkdir(dir, { recursive: true });
+      await fsp.copyFile(FICHIER_CAT, path.join(dir, Date.now() + ".json"));
+      const vieux = (await fsp.readdir(dir)).sort();
+      for (const f of vieux.slice(0, Math.max(0, vieux.length - SAUVEGARDES))) {
+        await fsp.unlink(path.join(dir, f)).catch(() => {});
+      }
+    }
+  } catch (e) {
+    console.error("sauvegarde du catalogue impossible :", e.message);
+  }
+
+  const tmp = FICHIER_CAT + ".tmp";
+  await fsp.writeFile(tmp, JSON.stringify(cat, null, 2) + "\n", "utf8");
+  await fsp.rename(tmp, FICHIER_CAT);
 }
 
 /* ---- Récapitulatif hebdomadaire ------------------------------------------------

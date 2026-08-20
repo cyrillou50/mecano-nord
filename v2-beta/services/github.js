@@ -30,6 +30,11 @@ window.MNGitHub = (function () {
     try { return MNStore.api("publier"); } catch (_) { return ""; }
   };
 
+  /** Le serveur garde-t-il le catalogue lui-même ? */
+  const catalogueUrl = () => {
+    try { return MNStore.api("catalogue"); } catch (_) { return ""; }
+  };
+
   /** Peut-on publier, d'une façon ou d'une autre ? */
   const canPublish = () => !!serveurUrl() || (hasToken() && isConfigured());
 
@@ -394,11 +399,64 @@ window.MNGitHub = (function () {
    * @param {string} json  contenu complet du fichier
    * @param {string} message  message de commit
    */
+  /**
+   * Dépose le catalogue sur le serveur de l'atelier.
+   * Renvoie faux si ce serveur ne connaît pas encore la route — auquel cas
+   * l'appelant reprend le chemin GitHub plutôt que d'échouer.
+   */
+  async function versServeurCatalogue(json) {
+    const base = catalogueUrl();
+    if (!base) return false;
+    const r = await fetch(base, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: json
+    });
+    if (r.status === 404 || r.status === 405) return false;   // serveur trop ancien
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw err("server", d.error || "Le serveur a répondu " + r.status);
+    }
+    return true;
+  }
+
   async function publish(json, message) {
     const c = repoConfig();
     const msg = message || "Mise à jour du catalogue depuis le panneau admin";
 
-    /* Le serveur d'abord : il a le jeton, l'utilisateur n'en a pas besoin. */
+    /* Le serveur garde désormais le catalogue lui-même : l'écriture y est
+       immédiate, sans commit ni reconstruction. La copie du dépôt reste en
+       secours et sert d'amorçage — c'est elle qui donne cette adresse. */
+    if (await versServeurCatalogue(json)) {
+      /* Le dépôt garde une copie d'amorçage : c'est elle qui indiquera au
+         prochain démarrage où joindre ce serveur. Tant que l'adresse ne
+         change pas, inutile de la réécrire — mais si elle change, ne pas le
+         faire couperait le site de son serveur au rechargement suivant. */
+      let secours = null;
+      try {
+        const depot = MNStore.depot();
+        const avant = depot && depot.settings && depot.settings.serveur;
+        const apres = MNStore.settings().serveur;
+        if (depot && avant !== apres) {
+          await (serveurUrl()
+            ? viaServeur(c.path, json, "Adresse du serveur mise à jour", false)
+            : putFile(c.path, b64(json), "Adresse du serveur mise à jour"));
+          secours = "adresse";
+        }
+      } catch (e) {
+        /* Le catalogue est en ligne : on ne fait pas échouer la publication
+           pour une copie de secours, on le signale. */
+        secours = "echec:" + (e && e.message || e);
+      }
+
+      const info = { at: Date.now(), commit: null, url: null, by: null,
+                     serveur: true, secours };
+      localStorage.setItem(K_LAST, JSON.stringify(info));
+      return info;
+    }
+
+    /* Sinon le chemin d'avant : le serveur commite pour nous s'il sait le
+       faire, sinon c'est le jeton de la personne qui publie. */
     const res = serveurUrl()
       ? await viaServeur(c.path, json, msg, false)
       : await putFile(c.path, b64(json), msg);
@@ -422,6 +480,6 @@ window.MNGitHub = (function () {
     detect, repoConfig, isConfigured,
     check, publish, lastPublish,
     putFile, putText, putFiles, listDir, uploadImage, imageBrute, getFile, deleteFile, renameFile,
-    serveurUrl, canPublish
+    serveurUrl, catalogueUrl, canPublish
   };
 })();

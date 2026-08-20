@@ -174,11 +174,13 @@ window.V2Shell = (function () {
       b.innerHTML = U().icone("rafraichir") + "<span>Publication…</span>";
       const cat = MNStore.catalog();
       try {
-        await MNGitHub.publish(MNStore.toJSON(cat),
+        const info = await MNGitHub.publish(MNStore.toJSON(cat),
           "Catalogue mis à jour par " + _session.pseudo);
         /* Le repère sert à la V1 pour savoir que ce brouillon est parti. */
         localStorage.setItem("mn.gh.stamp", cat.updatedAt);
-        U().toast("Publié — en ligne dans une minute environ", "ok");
+        U().toast(info && info.serveur
+          ? "Publié — en ligne tout de suite"
+          : "Publié — en ligne dans une minute environ", "ok");
       } catch (e) {
         U().toast("Publication impossible : " + (e && e.message || e), "err");
       }

@@ -205,8 +205,9 @@ window.MNStore = (function () {
   });
 
   let _published = null;   // version réellement en ligne
+  let _depot = null;       // la copie du dépôt, même quand le serveur l'emporte
   let _catalog = null;     // version affichée (brouillon si présent)
-  let _origin = "seed";    // "remote" | "seed"
+  let _origin = "seed";    // "serveur" | "remote" | "seed"
   let _draft = false;
 
   const listeners = [];
@@ -581,15 +582,47 @@ window.MNStore = (function () {
 
   /* ---- Chargement ------------------------------------------------------- */
 
+  /**
+   * Le catalogue tenu par le serveur de l'atelier, s'il en a un.
+   *
+   * On ne peut pas commencer par lui : c'est le fichier du dépôt qui porte
+   * son adresse. Une fois celle-ci connue, la version la plus récente des
+   * deux l'emporte — même règle que pour le brouillon. Un serveur muet ne
+   * bloque rien, on garde simplement la copie du dépôt.
+   */
+  async function catalogueDuServeur(depart) {
+    const base = String((depart.settings && depart.settings.serveur) || "").replace(/\/+$/, "");
+    if (!base) return null;
+    try {
+      const stop = new AbortController();
+      const t = setTimeout(() => stop.abort(), 6000);
+      const r = await fetch(base + "/catalogue?t=" + Date.now(),
+        { cache: "no-store", signal: stop.signal });
+      clearTimeout(t);
+      if (!r.ok) return null;          // 404 = il n'en tient pas encore
+      return normalize(await r.json());
+    } catch (_) {
+      return null;                     // injoignable ou trop ancien : tant pis
+    }
+  }
+
   async function load() {
     let published = null;
     try {
       const url = (window.MN_CONFIG.catalogUrl || "data/catalog.json") + "?v=" + Date.now();
       const r = await fetch(url, { cache: "no-store" });
-      if (r.ok) { published = normalize(await r.json()); _origin = "remote"; }
+      if (r.ok) { published = normalize(await r.json()); _origin = "remote"; _depot = published; }
     } catch (_) { /* file:// ou fichier absent → on retombe sur la graine */ }
 
     if (!published) { published = normalize(window.MN_CATALOG_SEED || {}); _origin = "seed"; }
+
+    /* Le serveur fait autorité quand il en tient un : c'est là que la
+       publication écrit, et sans attendre une reconstruction du site. */
+    const distant = await catalogueDuServeur(published);
+    if (distant && new Date(distant.updatedAt) >= new Date(published.updatedAt)) {
+      published = distant;
+      _origin = "serveur";
+    }
     _published = published;
 
     let local = null;
@@ -599,7 +632,7 @@ window.MNStore = (function () {
     } catch (_) { localStorage.removeItem(K_LOCAL); }
 
     /* Un brouillon plus vieux que la version en ligne = déjà publié ailleurs. */
-    if (local && _origin === "remote" && new Date(local.updatedAt) <= new Date(published.updatedAt)) {
+    if (local && _origin !== "seed" && new Date(local.updatedAt) <= new Date(published.updatedAt)) {
       localStorage.removeItem(K_LOCAL);
       local = null;
     }
@@ -643,6 +676,9 @@ window.MNStore = (function () {
 
   const catalog = () => _catalog;
   const published = () => _published;
+  /* La copie du dépôt, même quand celle du serveur l'emporte : c'est elle qui
+     portera l'adresse du serveur au prochain démarrage. */
+  const depot = () => _depot;
   const hasDraft = () => _draft;
   const origin = () => _origin;
   const settings = () => (_catalog ? _catalog.settings : normalize({}).settings);
@@ -786,7 +822,7 @@ window.MNStore = (function () {
   return {
     load, normalize, slugify, uniqueId, clone, onChange, recordPromotion,
     saveDraft, discardDraft, toJSON, download,
-    catalog, published, hasDraft, origin, settings, brand, api,
+    catalog, published, depot, hasDraft, origin, settings, brand, api,
     roleById, roleOf, itemById, resourceById, categoryById,
     topCategories, subCategories, categoryScope, itemLabel, totals, duree,
     normContrat, contratTotaux, nombre, ETATS_CONTRAT: ETATS,

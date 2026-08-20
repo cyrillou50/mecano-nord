@@ -324,6 +324,23 @@
     "</div>";
   }
 
+  /**
+   * Une couleur hexadécimale complète, ou "" si la saisie n'en est pas encore
+   * une. Le dièse est facultatif — on colle souvent sans lui — et la forme
+   * courte est étendue, le sélecteur natif n'acceptant que six chiffres.
+   *
+   * @param {boolean} [longueSeulement] refuse la forme courte. « #ff2 » est à
+   *   la fois une couleur valide et un « #ff2200 » à moitié tapé : pendant la
+   *   frappe on s'en tient à la forme longue, sinon l'aperçu clignote.
+   */
+  function normHex(v, longueSeulement) {
+    const s = String(v || "").trim().replace(/^#/, "");
+    if (!longueSeulement && /^[0-9a-f]{3}$/i.test(s)) {
+      return "#" + s[0] + s[0] + s[1] + s[1] + s[2] + s[2];
+    }
+    return /^[0-9a-f]{6}$/i.test(s) ? "#" + s.toLowerCase() : "";
+  }
+
   function moveInArray(arr, id, dir) {
     const i = arr.findIndex(x => x.id === id);
     const j = i + dir;
@@ -1833,7 +1850,10 @@
       icon: "i-badge", perms: ["bt", "duty"]
     };
     let perms = cur.perms.slice();
-    let color = cur.color;
+    /* Le sélecteur natif n'accepte que la forme longue : une couleur
+       enregistrée en « #8cf » doit être étendue pour s'y afficher, sans quoi
+       il retomberait sur du noir et effacerait le choix du grade. */
+    let color = normHex(cur.color) || cur.color;
     let icon = cur.icon || "i-badge";
 
     const body = document.createElement("div");
@@ -1852,9 +1872,20 @@
         "</div></div>" +
       '<div class="field"><label class="label">Couleur</label>' +
         '<div class="swatches" id="r-colors">' + MN_ROLE_COLORS.map(c =>
-          '<button type="button" class="swatch' + (c === color ? " is-on" : "") +
+          '<button type="button" class="swatch' +
+          (c.toLowerCase() === color.toLowerCase() ? " is-on" : "") +
           '" data-c="' + c + '" style="background:' + c + '" aria-label="' + c + '"></button>').join("") +
-        "</div></div>" +
+        "</div>" +
+        '<div class="colorpick">' +
+          '<input class="input" id="r-pipette" type="color" value="' + esc(color) +
+            '" aria-label="Choisir la couleur">' +
+          '<input class="input mono" id="r-hex" value="' + esc(color) + '" maxlength="7" ' +
+            'spellcheck="false" autocapitalize="off" placeholder="#ff2bd1" ' +
+            'aria-label="Code hexadécimal">' +
+        "</div>" +
+        '<p class="hint">Les pastilles ne sont que des raccourcis : le sélecteur et le code ' +
+          "hexadécimal acceptent n'importe quelle couleur, et celle déjà posée sur le grade " +
+          "est reprise telle quelle.</p></div>" +
       '<div class="fieldset"><span class="label">Permissions du rôle</span>' +
         '<div class="perms" id="r-perms"></div></div>';
 
@@ -1862,11 +1893,42 @@
     body.querySelector("#r-pick").addEventListener("click", () =>
       pickIcon(icon, v => { icon = v; prev.innerHTML = mnIcon(v); }));
 
-    body.querySelectorAll("[data-c]").forEach(b => b.addEventListener("click", () => {
-      color = b.dataset.c;
-      prev.style.color = color;
-      body.querySelectorAll("[data-c]").forEach(x => x.classList.toggle("is-on", x === b));
-    }));
+    const pipette = body.querySelector("#r-pipette");
+    const hex = body.querySelector("#r-hex");
+
+    /* Trois façons de choisir la même chose : tout repasse par ici, sinon les
+       trois se désaccordent dès le second clic. `depuis` évite de réécrire le
+       champ dans lequel on est en train de taper. */
+    function poserCouleur(v, depuis) {
+      color = v;
+      prev.style.color = v;
+      if (depuis !== "pipette") pipette.value = v;
+      if (depuis !== "hex") hex.value = v;
+      body.querySelectorAll("[data-c]").forEach(x =>
+        x.classList.toggle("is-on", x.dataset.c.toLowerCase() === v.toLowerCase()));
+    }
+    poserCouleur(color);
+
+    body.querySelectorAll("[data-c]").forEach(b =>
+      b.addEventListener("click", () => poserCouleur(b.dataset.c, "nuance")));
+
+    pipette.addEventListener("input", () => poserCouleur(pipette.value, "pipette"));
+
+    /* On n'applique que la forme longue tant qu'on tape, et on ne réécrit
+       jamais le champ : corriger sous les doigts déplacerait le curseur. */
+    hex.addEventListener("input", () => {
+      const v = normHex(hex.value, true);
+      if (v) poserCouleur(v, "hex");
+    });
+
+    /* La saisie finie, la forme courte est acceptée à son tour, et ce qui est
+       réellement appliqué reprend sa place : un code inachevé ne doit pas
+       rester à l'écran en laissant croire qu'il compte. */
+    const finirHex = () => poserCouleur(normHex(hex.value) || color);
+    hex.addEventListener("blur", finirHex);
+    hex.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); finirHex(); }
+    });
 
     const permsHost = body.querySelector("#r-perms");
     function paintPerms() {
@@ -1906,12 +1968,17 @@
               return MNUI.toast("C'est ton propre rôle : garde « Gérer l'équipe »", "err");
             }
 
+            /* Le champ peut porter un code jamais validé : on enregistre à
+               partir de ce qui est écrit, pas de la dernière frappe reconnue. */
+            const teinte = normHex(hex.value) || color;
+
             if (isNew) {
               draft.roles.push({
-                id: MNStore.uniqueId(name, draft.roles.map(x => x.id)), name, color, icon, perms
+                id: MNStore.uniqueId(name, draft.roles.map(x => x.id)),
+                name, color: teinte, icon, perms
               });
             } else {
-              r.name = name; r.color = color; r.icon = icon; r.perms = perms;
+              r.name = name; r.color = teinte; r.icon = icon; r.perms = perms;
             }
             commit(); close();
             MNUI.toast(isNew ? "Rôle créé" : "Rôle mis à jour", "ok");
@@ -2761,7 +2828,7 @@
 
         /* `images` n'apparaît que sur les versions récentes : son absence dit
            que le fichier du VPS n'a pas été recopié. */
-        const grave = pub !== "ok" || !j.images;
+        const grave = pub !== "ok" || !j.images || !j.catalogue;
         box.innerHTML = '<div class="alert alert--' + (grave ? "warn" : "ok") + '">' +
           svg(grave ? "alert" : "check") +
           "<span>Serveur joignable" + (j.ops ? ", pointage sans conflit géré" : "") + ". " +
@@ -2770,6 +2837,11 @@
             ? " <b>Il héberge aussi les images</b> — elles ne passent plus par GitHub."
             : " <b>Il n'héberge pas encore les images</b> : recopie <code>serveur.js</code> " +
               "sur le VPS, puis <code>systemctl restart mecano-nord</code>.") +
+          (j.catalogue
+            ? " <b>Et le catalogue lui-même</b> : publier devient immédiat, sans " +
+              "reconstruction du site."
+            : " <b>Le catalogue reste dans le dépôt</b> : chaque publication coûtera encore " +
+              "une minute de reconstruction.") +
           "</span></div>";
       } catch (e) {
         box.innerHTML = '<div class="alert alert--err">' + svg("alert") +
@@ -2882,8 +2954,13 @@
         "Catalogue mis à jour par " + me.pseudo + (auto ? " (publication automatique)" : "")
       );
       localStorage.setItem(K_STAMP, stamp);
+      /* Par le serveur c'est immédiat ; par GitHub il faut attendre la
+         reconstruction. Autant dire lequel des deux vient de se passer. */
       MNUI.toast((auto ? "Envoyé automatiquement" : "Publié !") +
-        " Le site sera à jour dans ~1 minute" + (info.commit ? " (" + info.commit + ")" : ""), "ok");
+        (info.serveur
+          ? " En ligne tout de suite."
+          : " Le site sera à jour dans ~1 minute" +
+            (info.commit ? " (" + info.commit + ")" : "")), "ok");
     } catch (e) {
       if (auto) {
         MNUI.toast("Envoi automatique impossible : " + e.message, "err");

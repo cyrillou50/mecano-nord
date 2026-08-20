@@ -413,6 +413,12 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
 .swatch:hover { transform: scale(1.12); }
 .swatch.is-on { border-color: #fff; transform: scale(1.12); }
 
+/* Sélecteur natif + code hexadécimal, côte à côte : on choisit à l'œil ou on
+   colle un code, les deux disent la même chose. */
+.colorpick { display: flex; gap: 8px; margin-top: 10px; }
+.colorpick input[type="color"] { flex: none; width: 56px; height: 42px; padding: 4px; cursor: pointer; }
+.colorpick .mono { flex: 1; min-width: 0; text-transform: lowercase; }
+
 /* ---- Équipe : menu de gauche ------------------------------------------------- */
 
 /* Colonne plus large : les noms complets tiennent sans être coupés. */

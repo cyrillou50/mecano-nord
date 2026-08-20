@@ -2364,7 +2364,7 @@
 
         /* `images` n'apparaît que sur les versions récentes : son absence dit
            que le fichier du VPS n'a pas été recopié. */
-        const grave = pub !== "ok" || !j.images;
+        const grave = pub !== "ok" || !j.images || !j.catalogue;
         boite.innerHTML = U.alerte({
           ton: grave ? "alerte" : "succes",
           titre: "Serveur joignable" + (j.ops ? ", pointage sans conflit géré" : ""),
@@ -2372,7 +2372,12 @@
             (j.images
               ? " Il héberge aussi les images — elles ne passent plus par GitHub."
               : " Il n'héberge pas encore les images : recopie serveur.js sur le VPS, " +
-                "puis redémarre le service.")
+                "puis redémarre le service.") +
+            (j.catalogue
+              ? " Et le catalogue lui-même : publier devient immédiat, sans " +
+                "reconstruction du site."
+              : " Le catalogue reste dans le dépôt : chaque publication coûtera " +
+                "encore une minute de reconstruction.")
         });
       } catch (e) {
         boite.innerHTML = U.alerte({ ton: "erreur", titre: "Serveur injoignable",
@@ -2481,9 +2486,13 @@
       const info = await MNGitHub.publish(MNStore.toJSON(brouillon),
         "Catalogue mis à jour par " + moi.pseudo + (auto ? " (publication automatique)" : ""));
       localStorage.setItem("mn.gh.stamp", repere);
+      /* Par le serveur c'est immédiat ; par GitHub il faut attendre la
+         reconstruction. Autant dire lequel des deux vient de se passer. */
       U.toast((auto ? "Envoyé automatiquement" : "Publié !") +
-        " Le site sera à jour dans une minute environ" +
-        (info && info.commit ? " (" + info.commit + ")" : ""), "ok");
+        (info && info.serveur
+          ? " En ligne tout de suite."
+          : " Le site sera à jour dans une minute environ" +
+            (info && info.commit ? " (" + info.commit + ")" : "")), "ok");
     } catch (e) {
       const m = String(e && e.message || e);
       if (auto) {

@@ -97,9 +97,12 @@
       b.disabled = true;
       b.innerHTML = svg("refresh") + "<span>Publication…</span>";
       try {
-        await MNGitHub.publish(MNStore.toJSON(draft), "Fiches équipe mises à jour par " + me.pseudo);
+        const info = await MNGitHub.publish(MNStore.toJSON(draft),
+          "Fiches équipe mises à jour par " + me.pseudo);
         localStorage.setItem("mn.gh.stamp", draft.updatedAt);
-        MNUI.toast("Publié — en ligne dans ~1 minute", "ok");
+        MNUI.toast(info && info.serveur
+          ? "Publié — en ligne tout de suite"
+          : "Publié — en ligne dans ~1 minute", "ok");
       } catch (e) {
         MNUI.toast("Publication impossible : " + e.message, "err");
       }

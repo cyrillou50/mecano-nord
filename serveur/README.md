@@ -422,17 +422,29 @@ journalctl -u mecano-nord -f     # journal en direct
 systemctl restart mecano-nord    # redémarrer
 ```
 
-Les données sont dans `/opt/mecano-nord/donnees/` : `duty.json` pour le
-pointage, `vehicules.json` pour le parc automobile, avec les
-20 dernières versions dans `donnees/sauvegardes/`. Les images déposées
-depuis l'admin sont dans `donnees/images/` — **pense à les sauvegarder**,
-elles ne sont plus dans le dépôt GitHub. Pour revenir en arrière :
+Les données sont dans `/opt/mecano-nord/donnees/` :
+
+| Fichier | Ce qu'il contient | Versions gardées |
+|---|---|---|
+| `duty.json` | pointage, congés, historique | `sauvegardes/` |
+| `catalogue.json` | objets, grades, employés, réglages | `sauvegardes-catalogue/` |
+| `vehicules.json` | parc automobile | — |
+| `contrats.json` | registre des contrats | — |
+| `agenda.json` | évènements du calendrier | — |
+| `images/` | images déposées depuis l'admin | — |
+
+**Pense à sauvegarder ce dossier** : les images et le catalogue ne sont plus
+dans le dépôt GitHub. Pour revenir en arrière :
 
 ```bash
 cd /opt/mecano-nord/donnees
 cp sauvegardes/LE-FICHIER.json duty.json
+cp sauvegardes-catalogue/LE-FICHIER.json catalogue.json
 systemctl restart mecano-nord
 ```
+
+Supprimer `catalogue.json` ne casse rien : le site repart de la copie du dépôt,
+`data/catalog.json`.
 
 ## Mettre à jour le serveur
 
@@ -475,11 +487,24 @@ jamais exposés** : c'est le gain principal, et il est total.
 En revanche, l'adresse `https://api.mecano-nord.fr` est forcément dans le code
 du site. Un navigateur ne peut pas l'appeler depuis ailleurs, mais un outil en
 ligne de commande peut falsifier l'origine et, au pire, écrire n'importe quoi
-dans le tableau de pointage — d'où les sauvegardes. Il ne peut ni lire tes
-webhooks, ni toucher au dépôt, ni au catalogue.
+dans les données que le serveur détient — d'où les sauvegardes. Il ne peut ni
+lire tes webhooks, ni toucher au dépôt GitHub.
 
-Si un jour ça te gêne, la parade est d'exiger la connexion côté serveur
-(jetons de session) — dis-le-moi, ça se rajoute.
+> **Depuis que le catalogue est hébergé ici, il fait partie de ces données.**
+> Le catalogue contient les employés et leurs droits : quelqu'un de motivé
+> pourrait donc les réécrire. C'est un cran au-dessus du tableau de pointage,
+> et il faut le savoir avant de basculer.
+>
+> Ce qui limite les dégâts : chaque écriture garde une version dans
+> `donnees/sauvegardes-catalogue/` (les vingt dernières), et le serveur refuse
+> tout ce qui ne ressemble pas à un catalogue. Revenir en arrière, c'est
+> recopier un fichier et redémarrer.
+>
+> Pour fermer vraiment la porte, il faut exiger la connexion côté serveur
+> (jetons de session) — dis-le-moi, ça se rajoute. Tant que ce n'est pas fait,
+> tu peux aussi laisser le catalogue dans le dépôt : il suffit de ne pas
+> déployer cette version du serveur, le site retombe alors tout seul sur
+> `data/catalog.json`.
 
 ---
 
