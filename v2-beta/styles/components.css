@@ -468,7 +468,13 @@
   border-radius: var(--r-1);
   border: 1px solid var(--c-bord);
 }
+/* La première pastille figure la surface, les deux autres les accents. */
 .theme-apercu i { display: block; flex: 1; height: 100%; border-radius: 3px; }
+.theme-apercu i:not(:first-child) {
+  flex: none;
+  width: 10px; height: 10px;
+  border-radius: var(--r-plein);
+}
 /* ==========================================================================
    FACTURATION
    ========================================================================== */
@@ -1592,3 +1598,9 @@
   .ad-copie { flex-direction: column; }
   .ad-etatpub .btn { width: 100%; }
 }
+
+/* Sélecteur natif + code hexadécimal, côte à côte : on choisit à l'œil ou
+   on colle un code, les deux disent la même chose. */
+.ad-couleur { display: flex; gap: var(--e-2); margin-top: var(--e-2); }
+.ad-couleur .saisie[type="color"] { flex: none; width: 56px; }
+.ad-couleur .ad-id { flex: 1; min-width: 0; text-transform: lowercase; }

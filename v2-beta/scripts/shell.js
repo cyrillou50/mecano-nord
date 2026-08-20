@@ -193,41 +193,89 @@ window.V2Shell = (function () {
      de personne, pas de version. */
 
   function choisirTheme() {
-    const actuel = MNTheme.actuel() || {};
+    const courant = MNTheme.actuel() || MNTheme.THEMES[0];
     const perso = MNTheme.aUnChoixPerso();
 
-    const carreau = t =>
-      '<button class="theme-carreau' + (t.id === actuel.id ? " is-actif" : "") +
-        '" data-t="' + esc(t.id) + '" type="button">' +
-        '<span class="theme-apercu" style="background:' + esc(t.fond) + '">' +
-          '<i style="background:' + esc(t.accent) + '"></i>' +
-          '<i style="background:' + esc(t.surface || t.fond) + '"></i>' +
+    /* La vignette passe par `palette()` plutôt que par les trois couleurs
+       brutes : c'est le vrai rendu, bordures et dégradés compris. */
+    const carreau = t => {
+      const p = MNTheme.palette(t);
+      return '<button class="theme-carreau' + (t.id === courant.id ? " is-actif" : "") +
+        '" data-t="' + esc(t.id) + '" type="button" title="' + esc(t.note || t.nom) + '">' +
+        '<span class="theme-apercu" style="background:' + esc(p["--bg"]) + '">' +
+          '<i style="background:linear-gradient(180deg,' + esc(p["--surface-2"]) + "," +
+            esc(p["--surface-lo"]) + ');border:1px solid ' + esc(p["--line"]) + '"></i>' +
+          '<i style="background:' + esc(p["--pink"]) + '"></i>' +
+          '<i style="background:' + esc(p["--pink-soft"]) + '"></i>' +
         "</span>" + esc(t.nom) + "</button>";
+    };
 
-    const m = U().modale({
-      titre: "Apparence",
-      corps:
-        '<p class="champ__aide" style="margin-bottom:var(--e-4)">Ce choix te suit sur ' +
-          "les deux versions du site, et n'affecte personne d'autre.</p>" +
-        '<div class="theme-grille">' + MNTheme.THEMES.map(carreau).join("") + "</div>" +
-        (perso
-          ? '<div style="margin-top:var(--e-4)">' +
-            U().bouton("Revenir au thème de l'atelier",
-              { variante: "fantome", taille: "sm", action: "reset" }) + "</div>"
-          : ""),
-      actions: [{ label: "Fermer", onClick: f => f() }]
-    });
+    const corps = document.createElement("div");
+    corps.innerHTML =
+      '<p class="champ__aide" style="margin-bottom:var(--e-4)">Ce réglage ne vaut que pour ' +
+        "<b>toi</b>, sur cet appareil, et te suit sur les deux versions du site.</p>" +
+      '<div class="theme-grille" id="th-grille">' +
+        MNTheme.THEMES.map(carreau).join("") + "</div>" +
 
-    m.corps.querySelectorAll("[data-t]").forEach(b => b.addEventListener("click", () => {
-      MNTheme.choisir(b.dataset.t);
-      m.fermer();
-      choisirTheme();
+      '<div class="champ" style="margin-top:var(--e-5)">' +
+        '<span class="champ__label">Couleurs libres</span>' +
+        '<div class="cols-3">' +
+          U().champ({ id: "th-acc", label: "Accent", type: "color", valeur: courant.accent }) +
+          U().champ({ id: "th-bg", label: "Fond", type: "color", valeur: courant.fond }) +
+          U().champ({ id: "th-su", label: "Encadrés", type: "color", valeur: courant.surface }) +
+        "</div>" +
+        '<p class="champ__aide" style="margin-top:var(--e-3)">« Encadrés » est la couleur des ' +
+          "cartes, des rangées et des panneaux. Le reste — textes, bordures, contrastes — se " +
+          "calcule à partir de ces trois couleurs. Un fond clair bascule l'ensemble en thème " +
+          "clair.</p>" +
+      "</div>" +
+      '<p class="champ__aide" style="margin-top:var(--e-3)">Les changements s\'appliquent en ' +
+        "direct : referme avec <b>Garder</b> pour les conserver.</p>";
+
+    /* On mémorise l'état de départ pour tout remettre en place si la personne
+       annule après avoir tâtonné. Sans choix personnel, `null` remet le thème
+       de l'atelier — ce qui est bien l'état d'avant. */
+    const avant = perso ? Object.assign({}, courant) : null;
+
+    const grille = corps.querySelector("#th-grille");
+    const acc = corps.querySelector("#th-acc");
+    const bg = corps.querySelector("#th-bg");
+    const su = corps.querySelector("#th-su");
+
+    const marquer = id => grille.querySelectorAll("[data-t]").forEach(b =>
+      b.classList.toggle("is-actif", b.dataset.t === id));
+
+    grille.querySelectorAll("[data-t]").forEach(b => b.addEventListener("click", () => {
+      const t = MNTheme.THEMES.find(x => x.id === b.dataset.t);
+      if (!t) return;
+      const n = MNTheme.choisir(t.id);
+      acc.value = n.accent; bg.value = n.fond; su.value = n.surface;
+      marquer(t.id);
     }));
-    const reset = m.corps.querySelector('[data-a="reset"]');
-    if (reset) reset.addEventListener("click", () => {
-      MNTheme.choisir(null);
-      m.fermer();
-      U().toast("Thème de l'atelier rétabli", "ok");
+
+    /* Toucher une couleur sort des thèmes proposés : plus aucune vignette
+       n'est active, et l'ensemble devient « Personnalisé ». */
+    const surMesure = () => {
+      MNTheme.choisir({
+        id: "perso", nom: "Personnalisé",
+        accent: acc.value, fond: bg.value, surface: su.value
+      });
+      marquer("perso");
+    };
+    [acc, bg, su].forEach(x => x.addEventListener("input", surMesure));
+
+    U().modale({
+      titre: "Apparence", corps,
+      actions: [
+        { label: "Reprendre celui du site",
+          onClick: f => {
+            MNTheme.choisir(null);
+            f();
+            U().toast("Apparence du site rétablie", "ok");
+          } },
+        { label: "Annuler", onClick: f => { MNTheme.choisir(avant); f(); } },
+        { label: "Garder", variante: "principal", icone: "check", onClick: f => f() }
+      ]
     });
   }
 
@@ -312,7 +360,10 @@ window.V2Shell = (function () {
       return;
     }
 
-    try { MNTheme.apply(); } catch (_) { /* thème facultatif */ }
+    /* `refresh()` et non `apply()` : le premier choisit entre la préférence
+       personnelle et le thème réglé dans l'administration, le second
+       appliquait un thème par défaut et écrasait les deux. */
+    try { MNTheme.refresh(); } catch (_) { /* thème facultatif */ }
 
     _session = MNAuth.session();
     if (!_session) {

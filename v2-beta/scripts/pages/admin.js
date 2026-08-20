@@ -530,6 +530,23 @@
 
   const borne = (v, max) => Math.max(0, Math.min(max, Math.round(Number(v) || 0)));
 
+  /**
+   * Une couleur hexadécimale complète, ou "" si la saisie n'en est pas
+   * encore une. Le dièse est facultatif — on colle souvent sans lui — et la
+   * forme courte est étendue, le sélecteur natif n'acceptant que six chiffres.
+   *
+   * @param {boolean} [longueSeulement] refuse la forme courte. « #ff2 » est
+   *   à la fois une couleur valide et un « #ff2200 » à moitié tapé : pendant
+   *   la frappe on s'en tient à la forme longue, sinon l'aperçu clignote.
+   */
+  function normHex(v, longueSeulement) {
+    const s = String(v || "").trim().replace(/^#/, "");
+    if (!longueSeulement && /^[0-9a-f]{3}$/i.test(s)) {
+      return "#" + s[0] + s[0] + s[1] + s[1] + s[2] + s[2];
+    }
+    return /^[0-9a-f]{6}$/i.test(s) ? "#" + s.toLowerCase() : "";
+  }
+
   /* ---- Catégories -------------------------------------------------------------------- */
 
   function vueCats(z) {
@@ -1098,7 +1115,10 @@
       icon: "i-badge", perms: ["bt", "duty"]
     };
     let droits = cur.perms.slice();
-    let couleur = cur.color;
+    /* Le sélecteur natif n'accepte que la forme longue : une couleur
+       enregistrée en « #8cf » doit être étendue pour s'y afficher, sans quoi
+       il retomberait sur du noir et effacerait le choix du grade. */
+    let couleur = normHex(cur.color) || cur.color;
     let icone = cur.icon || "i-badge";
 
     const corps = document.createElement("div");
@@ -1121,9 +1141,21 @@
 
       '<div class="champ"><span class="champ__label">Couleur</span>' +
         '<div class="ad-nuancier" id="r-couleurs">' + MN_ROLE_COLORS.map(c =>
-          '<button type="button" class="ad-nuance' + (c === couleur ? " est-choisie" : "") +
+          '<button type="button" class="ad-nuance' +
+          (c.toLowerCase() === couleur.toLowerCase() ? " est-choisie" : "") +
           '" data-c="' + c + '" style="background:' + c + '" aria-label="' + c +
-          '"></button>').join("") + "</div></div>" +
+          '"></button>').join("") + "</div>" +
+        '<div class="ad-couleur">' +
+          '<input class="saisie" id="r-pipette" type="color" value="' + U.esc(couleur) + '" ' +
+            'aria-label="Choisir la couleur">' +
+          '<input class="saisie ad-id" id="r-hex" value="' + U.esc(couleur) + '" maxlength="7" ' +
+            'spellcheck="false" autocapitalize="off" placeholder="#ff2bd1" ' +
+            'aria-label="Code hexadécimal">' +
+        "</div>" +
+        '<p class="champ__aide">Les pastilles ne sont que des raccourcis : le sélecteur et le ' +
+          "code hexadécimal acceptent n'importe quelle couleur, et celle déjà posée sur le " +
+          "grade est reprise telle quelle.</p>" +
+      "</div>" +
 
       '<div class="champ"><span class="champ__label">Permissions du rôle</span>' +
         '<div class="ad-coches ad-coches--hautes" id="r-droits"></div></div>';
@@ -1132,11 +1164,42 @@
     corps.querySelector('[data-a="r-pick"]').addEventListener("click", () =>
       choisirIcone(icone, v => { icone = v; vue.innerHTML = mnIcon(v); }));
 
-    corps.querySelectorAll("[data-c]").forEach(b => b.addEventListener("click", () => {
-      couleur = b.dataset.c;
-      vue.style.color = couleur;
-      corps.querySelectorAll("[data-c]").forEach(x => x.classList.toggle("est-choisie", x === b));
-    }));
+    const pipette = corps.querySelector("#r-pipette");
+    const hex = corps.querySelector("#r-hex");
+
+    /* Trois façons de choisir la même chose : tout repasse par ici, sinon
+       les trois se désaccordent dès le second clic. `depuis` évite de
+       réécrire le champ dans lequel on est en train de taper. */
+    function poserCouleur(v, depuis) {
+      couleur = v;
+      vue.style.color = v;
+      if (depuis !== "pipette") pipette.value = v;
+      if (depuis !== "hex") hex.value = v;
+      corps.querySelectorAll("[data-c]").forEach(x =>
+        x.classList.toggle("est-choisie", x.dataset.c.toLowerCase() === v.toLowerCase()));
+    }
+    poserCouleur(couleur);
+
+    corps.querySelectorAll("[data-c]").forEach(b =>
+      b.addEventListener("click", () => poserCouleur(b.dataset.c, "nuance")));
+
+    pipette.addEventListener("input", () => poserCouleur(pipette.value, "pipette"));
+
+    /* On n'applique que la forme longue tant qu'on tape, et on ne réécrit
+       jamais le champ : corriger sous les doigts déplacerait le curseur. */
+    hex.addEventListener("input", () => {
+      const v = normHex(hex.value, true);
+      if (v) poserCouleur(v, "hex");
+    });
+
+    /* La saisie finie, la forme courte est acceptée à son tour, et ce qui
+       est réellement appliqué reprend sa place : un code inachevé ne doit
+       pas rester à l'écran en laissant croire qu'il compte. */
+    const finirHex = () => poserCouleur(normHex(hex.value) || couleur);
+    hex.addEventListener("blur", finirHex);
+    hex.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); finirHex(); }
+    });
 
     const zDroits = corps.querySelector("#r-droits");
     function peindre() {
@@ -1176,13 +1239,17 @@
               return U.toast("C'est ton propre rôle : garde « Gérer l'équipe »", "err");
             }
 
+            /* Le champ peut porter un code jamais validé : on enregistre à
+               partir de ce qui est écrit, pas de la dernière frappe reconnue. */
+            const teinte = normHex(k.querySelector("#r-hex").value) || couleur;
+
             if (neuf) {
               brouillon.roles.push({
                 id: MNStore.uniqueId(nom, brouillon.roles.map(x => x.id)),
-                name: nom, color: couleur, icon: icone, perms: droits
+                name: nom, color: teinte, icon: icone, perms: droits
               });
             } else {
-              r.name = nom; r.color = couleur; r.icon = icone; r.perms = droits;
+              r.name = nom; r.color = teinte; r.icon = icone; r.perms = droits;
             }
             valider(); fermer();
             U.toast(neuf ? "Rôle créé" : "Rôle mis à jour", "ok");
