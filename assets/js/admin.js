@@ -2220,6 +2220,12 @@
         "Départs et retours de congés, avec les dates et le motif. " +
         "<b>Laisse vide</b> pour qu'ils arrivent dans le salon des prises de service.") +
 
+      block("avertissements", "Avertissements",
+        "Les sanctions posées sur une fiche : gravité, motif, qui l'a donnée. " +
+        "<b>Sans salon dédié, rien n'est envoyé</b> — contrairement aux congés, " +
+        "un avertissement ne se replie pas sur le salon des services. " +
+        "Choisis un salon réservé aux responsables.") +
+
       '<div class="panel"><div class="panel__head"><h2>Apparence du bot</h2></div>' +
         '<div class="panel__body editor">' +
           '<div class="iconpick">' +
@@ -2289,6 +2295,7 @@
       bt: MNWebhook.pack($("#w-bt").value.trim()),
       duty: MNWebhook.pack($("#w-duty").value.trim()),
       conges: MNWebhook.pack($("#w-conges").value.trim()),
+      avertissements: MNWebhook.pack($("#w-avertissements").value.trim()),
       mention: $("#w-mention").value.trim(),
       name: $("#w-name").value.trim(),
       avatar,
@@ -2297,8 +2304,8 @@
 
     $("#w-save").addEventListener("click", () => {
       const v = read();
-      const noms = { bt: "BT", duty: "services", conges: "congés" };
-      for (const k of ["bt", "duty", "conges"]) {
+      const noms = { bt: "BT", duty: "services", conges: "congés", avertissements: "avertissements" };
+      for (const k of ["bt", "duty", "conges", "avertissements"]) {
         if (v[k] && !MNWebhook.isValid(v[k])) {
           return MNUI.toast("Adresse de webhook invalide (" + noms[k] + ")", "err");
         }

@@ -27,6 +27,9 @@
         WEBHOOK_DUTY   →  adresse Discord des prises de service (facultatif)
         WEBHOOK_CONGES →  adresse Discord des congés (facultatif ; sans elle,
                           les congés partent dans le salon des services)
+        WEBHOOK_AVERTISSEMENTS → adresse Discord des avertissements
+                          (facultatif ; sans elle, aucun n'est envoyé — une
+                          sanction ne se replie pas sur un salon commun)
 
       Et en type « Text » :
 
@@ -90,7 +93,9 @@ async function relayerWebhook(corps, env, entetes) {
     bt: env.WEBHOOK_BT,
     duty: env.WEBHOOK_DUTY,
     /* Sans salon dédié, les congés rejoignent celui des prises de service. */
-    conges: env.WEBHOOK_CONGES || env.WEBHOOK_DUTY
+    conges: env.WEBHOOK_CONGES || env.WEBHOOK_DUTY,
+    /* Pas de repli pour les avertissements : sans salon à eux, rien ne part. */
+    avertissements: env.WEBHOOK_AVERTISSEMENTS
   };
   const cible = cibles[corps.kind];
   if (!cible) return json({ error: "Webhook non configuré : " + corps.kind }, 400, entetes);

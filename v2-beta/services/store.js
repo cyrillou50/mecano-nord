@@ -139,6 +139,62 @@ window.MNStore = (function () {
     };
   }
 
+  /* ---- Avertissements ------------------------------------------------------------
+     Une sanction posée sur la fiche de quelqu'un. Trois choses la rendent
+     utilisable plutôt que blessante : elle porte un motif écrit, elle dit qui
+     l'a donnée, et elle peut cesser de compter — soit d'elle-même à sa date
+     d'échéance, soit parce qu'un responsable la lève.
+     Rien ne s'efface : un avertissement levé garde sa trace. */
+
+  const GRAVITES = [
+    { id: "rappel", nom: "Rappel à l'ordre", court: "Rappel", poids: 1, couleur: "#7fd7e8" },
+    { id: "simple", nom: "Avertissement", court: "Avertissement", poids: 2, couleur: "#ffa92e" },
+    { id: "grave", nom: "Avertissement grave", court: "Grave", poids: 3, couleur: "#ff3b5c" }
+  ];
+  const graviteDe = id => GRAVITES.find(g => g.id === id) || GRAVITES[1];
+
+  function normAvertissement(a) {
+    const t = a && typeof a === "object" ? a : {};
+    return {
+      id: String(t.id || ""),
+      at: t.at || new Date().toISOString(),
+      by: String(t.by || "").slice(0, 60),
+      gravite: GRAVITES.some(g => g.id === t.gravite) ? t.gravite : "simple",
+      motif: String(t.motif || "").trim().slice(0, 120),
+      note: String(t.note || "").slice(0, 600),
+      /* Échéance facultative : passée, l'avertissement ne compte plus, mais
+         reste lisible. Un manquement de l'an dernier ne doit pas peser
+         éternellement. */
+      expire: jour(t.expire),
+      /* Levé à la main, avant l'échéance. */
+      leve: t.leve === true,
+      levePar: String(t.levePar || "").slice(0, 60),
+      leveLe: t.leveLe || null
+    };
+  }
+
+  /** Un avertissement pèse-t-il encore aujourd'hui ? */
+  const avertActif = a =>
+    !!a && !a.leve && (!a.expire || a.expire >= jourLocal());
+
+  /**
+   * Le poids cumulé des avertissements qui comptent encore.
+   * Un grave vaut trois rappels : c'est ce total qu'on regarde pour savoir
+   * si la situation est sérieuse, pas le simple décompte.
+   */
+  function avertBilan(u) {
+    const l = (u && u.avertissements) || [];
+    const actifs = l.filter(avertActif);
+    return {
+      total: l.length,
+      actifs: actifs.length,
+      poids: actifs.reduce((n, a) => n + graviteDe(a.gravite).poids, 0),
+      pire: actifs.reduce((p, a) =>
+        graviteDe(a.gravite).poids > graviteDe(p).poids ? a.gravite : p, "rappel"),
+      dernier: l[0] || null
+    };
+  }
+
   /** Un contrat dont la date est dépassée. Sans date, jamais expiré. */
   const contratExpire = k => !!(k && k.expire && k.expire < jourLocal());
 
@@ -254,6 +310,10 @@ window.MNStore = (function () {
         duty: String(w.duty || ""),
         /* Vide = les congés partent dans le salon des services. */
         conges: String(w.conges || ""),
+        /* Les avertissements n'ont pas de repli : sans salon à eux, rien
+           n'est envoyé. Une sanction n'a rien à faire dans le salon des
+           prises de service. */
+        avertissements: String(w.avertissements || ""),
         mention: String(w.mention || ""),
         /* Identité du bot Discord : vide = nom et logo de l'atelier */
         name: String(w.name || ""),
@@ -538,6 +598,16 @@ window.MNStore = (function () {
       }
       history.sort((a, b) => new Date(a.at) - new Date(b.at));
 
+      /* Avertissements : du plus récent au plus ancien, c'est l'ordre dans
+         lequel on les lit. Un avertissement levé n'est pas supprimé — il
+         garde sa trace, et c'est bien l'intérêt : on doit pouvoir dire qu'il
+         a existé et qui l'a levé. */
+      const avertissements = (Array.isArray(u.avertissements) ? u.avertissements : [])
+        .map(normAvertissement)
+        .filter(a => a.motif)
+        .sort((a, b) => new Date(b.at) - new Date(a.at))
+        .slice(0, 60);
+
       return {
         id,
         pseudo: String(u.pseudo || id),
@@ -553,7 +623,8 @@ window.MNStore = (function () {
         trainings: (Array.isArray(u.trainings) ? u.trainings : [])
           .map(t => String(t).trim()).filter(Boolean).slice(0, 30),
         note: u.note ? String(u.note).slice(0, 400) : "",
-        history: history.slice(-40)
+        history: history.slice(-40),
+        avertissements
       };
     });
 
@@ -578,6 +649,44 @@ window.MNStore = (function () {
     user.history.sort((a, b) => new Date(a.at) - new Date(b.at));
     user.history = user.history.slice(-40);
     return user;
+  }
+
+  /* ---- Écriture des avertissements ------------------------------------------- */
+
+  /** Pose un avertissement et renvoie celui qui vient d'être écrit. */
+  function addAvertissement(user, info, byPseudo) {
+    const a = normAvertissement(Object.assign({}, info, {
+      id: uniqueId("av-" + jourLocal(), (user.avertissements || []).map(x => x.id)),
+      at: info.at || new Date().toISOString(),
+      by: byPseudo || ""
+    }));
+    /* Le plus récent en tête : c'est dans cet ordre qu'on lit une fiche. */
+    user.avertissements = [a].concat(user.avertissements || [])
+      .sort((x, y) => new Date(y.at) - new Date(x.at))
+      .slice(0, 60);
+    return a;
+  }
+
+  /**
+   * Lève un avertissement : il cesse de compter, mais reste sur la fiche.
+   * Effacer serait plus simple et bien pire — on doit pouvoir dire qu'il a
+   * existé, et qui a décidé de le lever.
+   */
+  function leverAvertissement(user, id, byPseudo) {
+    const a = (user.avertissements || []).find(x => x.id === id);
+    if (!a || a.leve) return null;
+    a.leve = true;
+    a.levePar = byPseudo || "";
+    a.leveLe = new Date().toISOString();
+    return a;
+  }
+
+  /** Retire un avertissement pour de bon — une erreur de saisie, rien d'autre. */
+  function retirerAvertissement(user, id) {
+    const a = (user.avertissements || []).find(x => x.id === id);
+    if (!a) return null;
+    user.avertissements = user.avertissements.filter(x => x.id !== id);
+    return a;
   }
 
   /* ---- Chargement ------------------------------------------------------- */
@@ -825,6 +934,8 @@ window.MNStore = (function () {
     catalog, published, depot, hasDraft, origin, settings, brand, api,
     roleById, roleOf, itemById, resourceById, categoryById,
     topCategories, subCategories, categoryScope, itemLabel, totals, duree,
+    GRAVITES, graviteDe, normAvertissement, avertActif, avertBilan,
+    addAvertissement, leverAvertissement, retirerAvertissement,
     normContrat, contratTotaux, nombre, ETATS_CONTRAT: ETATS,
     contratExpire, joursAvant, jour, jourLocal,
     contractTypes: () => (_catalog.contractTypes || []).slice(),

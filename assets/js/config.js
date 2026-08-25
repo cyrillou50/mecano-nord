@@ -38,6 +38,9 @@ window.MN_PERMS = [
   { key: "duty_manage", name: "Gérer les services", desc: "Pointer à la place de quelqu'un, clôturer un service oublié, corriger l'historique." },
   { key: "staff",     name: "Voir les fiches",     desc: "Consulter les fiches employés : ancienneté, formations, carrière." },
   { key: "promote",   name: "Gérer les carrières", desc: "Promouvoir, changer les formations et compléter les fiches." },
+  /* Sanctionner n'est pas gérer une carrière : on peut vouloir confier les
+     promotions sans confier les avertissements, et l'inverse. */
+  { key: "warn",      name: "Avertir un employé",  desc: "Poser un avertissement sur une fiche, le lever, le retirer. Chacun voit toujours les siens." },
   { key: "items",     name: "Gérer le catalogue",  desc: "Créer / modifier objets, catégories, ressources et coûts." },
   { key: "vehicles",  name: "Gérer les véhicules", desc: "Modifier et supprimer les véhicules et leurs catégories. Tout le monde peut en proposer et les consulter." },
   { key: "vehicles_validate", name: "Valider les véhicules", desc: "Approuver ou refuser les véhicules proposés par l'équipe. Sans validation, une proposition n'apparaît pas dans le parc." },

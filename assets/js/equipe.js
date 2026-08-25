@@ -15,6 +15,7 @@
   let filter = "";
   let canEdit = false;
   let canSeeNotes = false;
+  let canWarn = false;
   let showHidden = false;
   let reorder = false;
   let ticker = null;
@@ -31,6 +32,7 @@
     me = session;
     canEdit = MNAuth.canAny("promote", "users");
     canSeeNotes = MNAuth.canAny("staff", "promote", "users");
+    canWarn = MNAuth.canAny("warn", "admin");
     draft = MNStore.clone(MNStore.catalog());
     const first = visibleUsers()[0];
     sel = first ? first.id : null;
@@ -209,6 +211,17 @@
             '<span class="staffrow__txt"><b>' + esc(u.pseudo) + "</b>" +
               '<i style="color:' + esc(r.color) + '">' + esc(r.name) + "</i></span>" +
             (u.hidden ? '<span class="staffrow__eye" title="Masqué de l\'équipe">' + svg("lock") + "</span>" : "") +
+            /* Un dossier chargé se voit depuis la liste : chercher fiche par
+               fiche qui a été averti n'aurait aucun sens. */
+            (function () {
+              if (!voitAvert(u)) return "";
+              const b = MNStore.avertBilan(u);
+              if (!b.actifs) return "";
+              const g = MNStore.graviteDe(b.pire);
+              return '<span class="staffrow__av" style="--grav:' + esc(g.couleur) + '" title="' +
+                esc(b.actifs + " avertissement" + (b.actifs > 1 ? "s" : "") + " en cours") +
+                '">' + b.actifs + "</span>";
+            })() +
             /* Une même pastille pour deux états qui s'excluent : vert en
                service, rouge en congés. */
             (on ? '<span class="dutydot" title="En service"></span>'
@@ -313,10 +326,18 @@
               : "") +
             (u.pin ? '<span class="pill pill--dim">' + svg("lock", "inline-lock") + " code</span>" : "") +
           "</div>" +
-          (canEdit
+          (canEdit || canWarn
             ? '<div class="staffhead__acts">' +
-                '<button class="btn btn--primary" id="c-promote">' + svg("tag") + "<span>Changer de grade</span></button>" +
-                '<button class="btn btn--ghost" id="c-edit">' + svg("edit") + "<span>Modifier la fiche</span></button>" +
+                (canEdit
+                  ? '<button class="btn btn--primary" id="c-promote">' + svg("tag") +
+                    "<span>Changer de grade</span></button>" +
+                    '<button class="btn btn--ghost" id="c-edit">' + svg("edit") +
+                    "<span>Modifier la fiche</span></button>"
+                  : "") +
+                (canWarn && u.id !== me.uid
+                  ? '<button class="btn btn--ghost" id="c-warn">' + svg("alert") +
+                    "<span>Avertir</span></button>"
+                  : "") +
               "</div>"
             : "") +
         "</div>" +
@@ -329,6 +350,7 @@
             stat("Service — total", MNDuty.dur(MNDuty.secondsFor(u.id)), on, "total") +
             stat("Formations", String((u.trainings || []).length),
               false, null, (u.trainings || []).length ? u.trainings.slice(0, 2).join(", ") : "aucune") +
+            (voitAvert(u) ? statAvert(u) : "") +
           "</div>" +
 
           '<h3 class="section-title" style="margin-top:24px">Carrière' +
@@ -354,6 +376,8 @@
                 '<span class="permtag">' + esc(t) + "</span>").join("") + "</div>"
             : '<p class="hint">Aucune formation enregistrée.</p>') +
 
+          (voitAvert(u) ? sectionAvert(u) : "") +
+
           serviceSection(u, on) +
 
           (u.note && canSeeNotes
@@ -365,6 +389,19 @@
 
     const p = $("#c-promote"); if (p) p.addEventListener("click", () => promote(u));
     const e = $("#c-edit"); if (e) e.addEventListener("click", () => editCard(u));
+    /* Deux entrées vers la même fenêtre : le bouton de l'entête, et celui du
+       bloc — on avertit rarement, mais quand on le fait on est déjà en bas de
+       la fiche à relire les précédents. */
+    ["#c-warn", "#c-warn2"].forEach(sel => {
+      const b = $(sel);
+      if (b) b.addEventListener("click", () => avertir(u));
+    });
+
+    pane.querySelectorAll("[data-av]").forEach(b => b.addEventListener("click", () => {
+      const [action, id] = b.dataset.av.split("|");
+      if (action === "lever") leverAvert(u, id);
+      else retirerAvert(u, id);
+    }));
   }
 
   const hhmm = d => new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
@@ -522,6 +559,220 @@
     /* Le total en jours va sur une seconde ligne : il lève l'ambiguïté sans
        allonger la valeur principale. */
     return { texte: p.join(" "), sous: total + " jour" + (total > 1 ? "s" : "") + " au total" };
+  }
+
+  /* ---- Avertissements ------------------------------------------------------------
+     Une sanction se lit et se conteste : elle porte un motif, une date et le
+     nom de qui l'a donnée. Chacun voit les siennes — un avertissement qu'on
+     ignore ne sert à rien — mais seuls ceux qui gèrent l'équipe voient ceux
+     des autres. */
+
+  const voitAvert = u =>
+    MNAuth.canAny("warn", "users", "admin") || (me && u.id === me.uid);
+
+  /** La tuile de chiffre : ce qui compte, c'est ce qui compte encore. */
+  function statAvert(u) {
+    const b = MNStore.avertBilan(u);
+    if (!b.total) return stat("Avertissements", "0", false, null, "aucun");
+
+    const g = MNStore.graviteDe(b.pire);
+    return '<div class="stat' + (b.actifs ? " stat--warn" : "") + '">' +
+      '<span class="stat__l">Avertissements</span>' +
+      '<b class="stat__v tnum"' + (b.actifs ? ' style="color:' + esc(g.couleur) + '"' : "") + ">" +
+        b.actifs + "</b>" +
+      '<span class="stat__s">' +
+        (b.actifs
+          ? "en cours" + (b.total > b.actifs ? " · " + (b.total - b.actifs) + " sans effet" : "")
+          : b.total + " au total, aucun en cours") +
+      "</span></div>";
+  }
+
+  function sectionAvert(u) {
+    const l = u.avertissements || [];
+    const b = MNStore.avertBilan(u);
+    const sien = me && u.id === me.uid;
+    const peut = canWarn && !sien;
+
+    const tete = '<h3 class="section-title" style="margin-top:24px">Avertissements' +
+      '<span class="count">' + l.length + "</span>" +
+      (peut
+        ? '<button class="btn btn--ghost btn--sm" id="c-warn2" style="margin-left:auto">' +
+          svg("plus") + "<span>Donner un avertissement</span></button>"
+        : "") +
+      "</h3>";
+
+    if (!l.length) {
+      return tete + '<p class="hint">' + (sien
+        ? "Aucun avertissement à ton dossier."
+        : "Aucun avertissement. Rien à signaler.") + "</p>";
+    }
+
+    return tete +
+      (b.actifs > 1
+        ? '<div class="alert alert--warn" style="margin-bottom:12px">' + svg("alert") +
+          "<span><b>" + b.actifs + " avertissements en cours.</b> " +
+          "Cumul de gravité : " + b.poids + ".</span></div>"
+        : "") +
+      '<div class="avlist">' + l.map(a => ligneAvert(a, u, peut)).join("") + "</div>";
+  }
+
+  function ligneAvert(a, u, peut) {
+    const g = MNStore.graviteDe(a.gravite);
+    const actif = MNStore.avertActif(a);
+    const perime = !a.leve && a.expire && a.expire < MNDuty.jourLocal();
+
+    return '<div class="av' + (actif ? "" : " is-off") + '" style="--grav:' + esc(g.couleur) + '">' +
+      '<span class="av__pastille">' + esc(g.court) + "</span>" +
+      '<div class="av__corps">' +
+        "<b>" + esc(a.motif) + "</b>" +
+        (a.note ? '<p class="av__note">' + esc(a.note) + "</p>" : "") +
+        '<div class="av__meta">' +
+          fdatetime(a.at) +
+          (a.by ? " · par " + esc(a.by) : "") +
+          (a.expire ? " · compte jusqu'au " + esc(jourCourt(a.expire)) : "") +
+          (a.leve
+            ? ' · <span class="av__leve">levé' + (a.levePar ? " par " + esc(a.levePar) : "") +
+              (a.leveLe ? " le " + esc(jourCourt(String(a.leveLe).slice(0, 10))) : "") + "</span>"
+            : perime ? ' · <span class="av__leve">échu, ne compte plus</span>' : "") +
+        "</div>" +
+      "</div>" +
+      (peut
+        ? '<div class="av__acts">' +
+            (a.leve ? "" : '<button class="btn btn--icon" data-av="lever|' + esc(a.id) +
+              '" title="Lever cet avertissement">' + svg("check") + "</button>") +
+            '<button class="btn btn--icon" data-av="retirer|' + esc(a.id) +
+              '" title="Retirer — erreur de saisie">' + svg("trash") + "</button>" +
+          "</div>"
+        : "") +
+    "</div>";
+  }
+
+  /** Fenêtre de saisie d'un avertissement. */
+  function avertir(u) {
+    const auj = MNDuty.jourLocal();
+    /* Une échéance à trois mois par défaut : un avertissement sans fin
+       n'existe que pour peser, et ce n'est pas le but. */
+    const dans3mois = (function () {
+      const d = new Date(auj + "T12:00:00");
+      d.setMonth(d.getMonth() + 3);
+      return MNDuty.jourLocal(d);
+    })();
+
+    const body = document.createElement("div");
+    body.className = "editor";
+    body.innerHTML =
+      '<p class="hint">Il partira sur Discord si un salon lui est réservé, et ' +
+        esc(u.pseudo) + " le verra sur sa propre fiche.</p>" +
+      '<div class="field"><label class="label">Gravité</label>' +
+        '<div class="gravites" id="a-grav">' + MNStore.GRAVITES.map((g, i) =>
+          '<button type="button" class="grav' + (i === 1 ? " is-on" : "") +
+          '" data-g="' + esc(g.id) + '" style="--grav:' + esc(g.couleur) + '">' +
+          esc(g.nom) + "</button>").join("") + "</div></div>" +
+      '<div class="field"><label class="label" for="a-motif">Motif</label>' +
+        '<input class="input" id="a-motif" maxlength="120" ' +
+          'placeholder="Ex. Véhicule rendu sans les freins"></div>' +
+      '<div class="field"><label class="label" for="a-note">Précisions (facultatif)</label>' +
+        '<textarea class="textarea" id="a-note" maxlength="600" ' +
+          'placeholder="Ce qui s\'est passé, ce qui est attendu ensuite…"></textarea></div>' +
+      '<div class="editor__grid">' +
+        '<div class="field"><label class="label" for="a-date">Date des faits</label>' +
+          '<input class="input" id="a-date" type="date" value="' + auj + '" max="' + auj + '"></div>' +
+        '<div class="field"><label class="label" for="a-exp">Compte jusqu\'au</label>' +
+          '<input class="input" id="a-exp" type="date" value="' + dans3mois + '">' +
+          '<p class="hint">Passée cette date il reste lisible, mais ne compte plus. ' +
+            "Vide = sans échéance.</p></div>" +
+      "</div>";
+
+    let gravite = "simple";
+    body.querySelectorAll("[data-g]").forEach(b => b.addEventListener("click", () => {
+      gravite = b.dataset.g;
+      body.querySelectorAll("[data-g]").forEach(x => x.classList.toggle("is-on", x === b));
+    }));
+
+    MNUI.modal({
+      title: "Avertir " + u.pseudo, body,
+      actions: [
+        { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
+        {
+          label: "Donner l'avertissement", variant: "btn--primary", icon: "alert",
+          onClick: async (close, b2, btn) => {
+            const motif = body.querySelector("#a-motif").value.trim();
+            if (motif.length < 3) return MNUI.toast("Écris un motif — c'est le cœur de l'avertissement", "err");
+
+            /* Seul le jour est demandé : pour aujourd'hui on garde l'heure
+               courante, pour une date passée midi — un horaire neutre. */
+            const j = body.querySelector("#a-date").value;
+            let quand = new Date();
+            if (j && j !== MNDuty.jourLocal()) quand = new Date(j + "T12:00:00");
+            if (isNaN(quand) || quand > new Date()) quand = new Date();
+
+            btn.disabled = true;
+            const a = MNStore.addAvertissement(u, {
+              gravite, motif,
+              note: body.querySelector("#a-note").value.trim(),
+              expire: body.querySelector("#a-exp").value || null,
+              at: quand.toISOString()
+            }, me.pseudo);
+
+            commit();
+            close();
+
+            const d = await MNWebhook.sendAvertissement({
+              action: "pose", pseudo: u.pseudo, role: roleOf(u).name,
+              gravite: MNStore.graviteDe(a.gravite).nom,
+              motif: a.motif, note: a.note, expire: a.expire, by: me.pseudo
+            });
+            MNUI.toast(d.ok
+              ? "Avertissement donné et annoncé sur Discord"
+              : d.skipped
+                ? "Avertissement donné (aucun salon Discord dédié)"
+                : "Avertissement donné, mais Discord : " + d.error,
+              d.ok || d.skipped ? "ok" : "info");
+          }
+        }
+      ]
+    });
+  }
+
+  async function leverAvert(u, id) {
+    const a = (u.avertissements || []).find(x => x.id === id);
+    if (!a) return;
+    const ok = await MNUI.confirm({
+      title: "Lever cet avertissement",
+      message: "« " + a.motif + " » cessera de compter, mais restera sur la fiche de " +
+        u.pseudo + " avec la mention « levé par " + me.pseudo + " ».",
+      confirmLabel: "Lever"
+    });
+    if (!ok) return;
+
+    MNStore.leverAvertissement(u, id, me.pseudo);
+    commit();
+    MNWebhook.sendAvertissement({
+      action: "leve", pseudo: u.pseudo, role: roleOf(u).name,
+      gravite: MNStore.graviteDe(a.gravite).nom, motif: a.motif, by: me.pseudo
+    });
+    MNUI.toast("Avertissement levé", "ok");
+  }
+
+  async function retirerAvert(u, id) {
+    const a = (u.avertissements || []).find(x => x.id === id);
+    if (!a) return;
+    const ok = await MNUI.confirm({
+      title: "Retirer cet avertissement",
+      message: "« " + a.motif + " » disparaîtra de la fiche sans laisser de trace. " +
+        "À réserver aux erreurs de saisie : pour annuler une sanction méritée, " +
+        "mieux vaut la lever.",
+      confirmLabel: "Retirer", danger: true
+    });
+    if (!ok) return;
+
+    MNStore.retirerAvertissement(u, id);
+    commit();
+    MNWebhook.sendAvertissement({
+      action: "retire", pseudo: u.pseudo, role: roleOf(u).name,
+      gravite: MNStore.graviteDe(a.gravite).nom, motif: a.motif, by: me.pseudo
+    });
+    MNUI.toast("Avertissement retiré", "ok");
   }
 
   /* ---- Montée de grade --------------------------------------------------------- */

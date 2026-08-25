@@ -20,7 +20,7 @@
   let brouillon = null;          // copie de travail du catalogue
   let sel = null;
   let filtre = "";
-  let peutEditer = false, voitNotes = false;
+  let peutEditer = false, voitNotes = false, peutAvertir = false;
   let voirMasques = false, ranger = false;
   let battement = null;
 
@@ -34,6 +34,7 @@
          responsables modifient. */
       peutEditer = V2Shell.peut("promote", "users", "admin");
       voitNotes = V2Shell.peut("staff", "promote", "users", "admin");
+      peutAvertir = V2Shell.peut("warn", "admin");
 
       brouillon = MNStore.clone(MNStore.catalog());
       const premier = visibles()[0];
@@ -196,6 +197,17 @@
           U.esc(r.name) + "</span></span>" +
       (u.hidden ? '<span class="duo__marque" title="Masqué de l\'équipe">' +
         U.icone("boite") + "</span>" : "") +
+      /* Un dossier chargé se voit depuis la liste : chercher fiche par fiche
+         qui a été averti n'aurait aucun sens. */
+      (function () {
+        if (!voitAvert(u)) return "";
+        const b = MNStore.avertBilan(u);
+        if (!b.actifs) return "";
+        const g = MNStore.graviteDe(b.pire);
+        return '<span class="eq-av" style="--grav:' + U.esc(g.couleur) + '" title="' +
+          U.esc(b.actifs + " avertissement" + (b.actifs > 1 ? "s" : "") + " en cours") +
+          '">' + b.actifs + "</span>";
+      })() +
       /* Une seule pastille pour deux états qui s'excluent : vert en service,
          rouge en congés. */
       (on
@@ -297,12 +309,17 @@
             (u.pin ? U.etiquette("code d'accès") : "") +
           "</div>" +
         "</div>" +
-        (peutEditer
+        (peutEditer || (peutAvertir && u.id !== moi.uid)
           ? '<div class="rang">' +
-              U.bouton("Changer de grade", { variante: "principal", icone: "etoile",
-                                             action: "grade" }) +
-              U.bouton("Modifier la fiche", { variante: "fantome", icone: "crayon",
-                                              action: "edit" }) +
+              (peutEditer
+                ? U.bouton("Changer de grade", { variante: "principal", icone: "etoile",
+                                                 action: "grade" }) +
+                  U.bouton("Modifier la fiche", { variante: "fantome", icone: "crayon",
+                                                  action: "edit" })
+                : "") +
+              (peutAvertir && u.id !== moi.uid
+                ? U.bouton("Avertir", { variante: "fantome", icone: "alerte", action: "warn" })
+                : "") +
             "</div>"
           : "") +
       "</div>" +
@@ -317,6 +334,7 @@
                     icone: "etoile",
                     pied: (u.trainings || []).length
                       ? u.trainings.slice(0, 2).join(", ") : "aucune" }) +
+          (voitAvert(u) ? tuileAvert(u) : "") +
         "</div>" +
 
         section("Carrière", carriere.length,
@@ -341,6 +359,8 @@
                 U.etiquette(t)).join("") + "</div>"
             : '<p class="champ__aide">Aucune formation enregistrée.</p>') +
 
+        (voitAvert(u) ? blocAvert(u) : "") +
+
         historique(u, on) +
 
         (u.note && voitNotes
@@ -353,6 +373,21 @@
     if (g) g.addEventListener("click", () => promouvoir(u));
     const e = z.querySelector('[data-a="edit"]');
     if (e) e.addEventListener("click", () => modifier(u));
+
+    /* Deux entrées vers la même fenêtre : le bouton de l'entête, et celui du
+       bloc — on avertit rarement, mais quand on le fait on est déjà en bas de
+       la fiche à relire les précédents. */
+    ["warn", "warn2"].forEach(a => {
+      const b = z.querySelector('[data-a="' + a + '"]');
+      if (b) b.addEventListener("click", () => avertir(u));
+    });
+
+    z.querySelectorAll('[data-a^="lever|"], [data-a^="retirer|"]').forEach(b =>
+      b.addEventListener("click", () => {
+        const coupe = b.dataset.a.indexOf("|");
+        const action = b.dataset.a.slice(0, coupe), id = b.dataset.a.slice(coupe + 1);
+        if (action === "lever") leverAvert(u, id); else retirerAvert(u, id);
+      }));
   }
 
   const section = (titre, n, corps) =>
@@ -512,6 +547,212 @@
 
     return { texte: p.join(" "),
              sous: total + " jour" + (total > 1 ? "s" : "") + " au total" };
+  }
+
+  /* ---- Avertissements ------------------------------------------------------------
+     Une sanction se lit et se conteste : elle porte un motif, une date et le
+     nom de qui l'a donnée. Chacun voit les siennes — un avertissement qu'on
+     ignore ne sert à rien — mais seuls ceux qui gèrent l'équipe voient ceux
+     des autres. */
+
+  const voitAvert = u =>
+    V2Shell.peut("warn", "users", "admin") || (moi && u.id === moi.uid);
+
+  function tuileAvert(u) {
+    const b = MNStore.avertBilan(u);
+    if (!b.total) {
+      return U.tuile({ label: "Avertissements", valeur: "0", icone: "alerte", pied: "aucun" });
+    }
+    const g = MNStore.graviteDe(b.pire);
+    return '<div class="tuile' + (b.actifs ? " tuile--alerte" : "") + '">' +
+      '<span class="tuile__label">' + U.icone("alerte") + "Avertissements</span>" +
+      '<span class="tuile__val"' + (b.actifs ? ' style="color:' + U.esc(g.couleur) + '"' : "") +
+        ">" + b.actifs + "</span>" +
+      '<span class="tuile__pied">' + U.esc(b.actifs
+        ? "en cours" + (b.total > b.actifs ? " · " + (b.total - b.actifs) + " sans effet" : "")
+        : b.total + " au total, aucun en cours") + "</span>" +
+    "</div>";
+  }
+
+  function blocAvert(u) {
+    const l = u.avertissements || [];
+    const b = MNStore.avertBilan(u);
+    const sien = moi && u.id === moi.uid;
+    const peut = peutAvertir && !sien;
+
+    const corps = !l.length
+      ? '<p class="champ__aide">' + (sien
+          ? "Aucun avertissement à ton dossier."
+          : "Aucun avertissement. Rien à signaler.") + "</p>"
+      : (b.actifs > 1
+          ? '<div style="margin-bottom:var(--e-3)">' + U.alerte({
+              ton: "alerte", titre: b.actifs + " avertissements en cours",
+              texte: "Cumul de gravité : " + b.poids + "."
+            }) + "</div>"
+          : "") +
+        '<div class="pile pile--sm">' + l.map(a => ligneAvert(a, peut)).join("") + "</div>";
+
+    return '<section class="eq-bloc"><h3>Avertissements' +
+      (l.length ? '<span class="eq-bloc__n">' + l.length + "</span>" : "") +
+      (peut
+        ? '<span class="pousse">' + U.bouton("Donner un avertissement",
+            { variante: "fantome", taille: "sm", icone: "plus", action: "warn2" }) + "</span>"
+        : "") +
+      "</h3>" + corps + "</section>";
+  }
+
+  function ligneAvert(a, peut) {
+    const g = MNStore.graviteDe(a.gravite);
+    const actif = MNStore.avertActif(a);
+    const echu = !a.leve && a.expire && a.expire < MNDuty.jourLocal();
+
+    return '<div class="av' + (actif ? "" : " est-eteint") +
+      '" style="--grav:' + U.esc(g.couleur) + '">' +
+      '<span class="av__pastille">' + U.esc(g.court) + "</span>" +
+      '<div class="av__corps">' +
+        "<b>" + U.esc(a.motif) + "</b>" +
+        (a.note ? '<p class="av__note">' + U.esc(a.note) + "</p>" : "") +
+        '<div class="av__meta">' + U.esc(dateheure(a.at)) +
+          (a.by ? " · par " + U.esc(a.by) : "") +
+          (a.expire ? " · compte jusqu'au " + U.esc(jourCourt(a.expire)) : "") +
+          (a.leve
+            ? ' · <i class="av__leve">levé' + (a.levePar ? " par " + U.esc(a.levePar) : "") +
+              (a.leveLe ? " le " + U.esc(jourCourt(String(a.leveLe).slice(0, 10))) : "") + "</i>"
+            : echu ? ' · <i class="av__leve">échu, ne compte plus</i>' : "") +
+        "</div>" +
+      "</div>" +
+      (peut
+        ? '<div class="av__acts">' +
+            (a.leve ? "" : U.bouton("", { icone: "check", variante: "fantome", taille: "sm",
+              titre: "Lever cet avertissement", action: "lever|" + a.id })) +
+            U.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
+              titre: "Retirer — erreur de saisie", action: "retirer|" + a.id }) +
+          "</div>"
+        : "") +
+    "</div>";
+  }
+
+  function avertir(u) {
+    const auj = MNDuty.jourLocal();
+    /* Une échéance à trois mois par défaut : un avertissement sans fin
+       n'existe que pour peser, et ce n'est pas le but. */
+    const dans3mois = (function () {
+      const d = new Date(auj + "T12:00:00");
+      d.setMonth(d.getMonth() + 3);
+      return MNDuty.jourLocal(d);
+    })();
+
+    const corps = document.createElement("div");
+    corps.className = "pile";
+    corps.innerHTML =
+      '<p class="champ__aide">Il partira sur Discord si un salon lui est réservé, et ' +
+        U.esc(u.pseudo) + " le verra sur sa propre fiche.</p>" +
+      '<div class="champ"><span class="champ__label">Gravité</span>' +
+        '<div class="gravites">' + MNStore.GRAVITES.map((g, i) =>
+          '<button type="button" class="grav' + (i === 1 ? " est-choisie" : "") +
+          '" data-g="' + U.esc(g.id) + '" style="--grav:' + U.esc(g.couleur) + '">' +
+          U.esc(g.nom) + "</button>").join("") + "</div></div>" +
+      U.champ({ id: "a-motif", label: "Motif", max: 120,
+                repere: "Ex. Véhicule rendu sans les freins" }) +
+      U.champ({ id: "a-note", label: "Précisions (facultatif)", type: "zone", max: 600,
+                repere: "Ce qui s'est passé, ce qui est attendu ensuite…" }) +
+      '<div class="cols-2">' +
+        U.champ({ id: "a-date", label: "Date des faits", type: "date", valeur: auj,
+                  plafond: auj }) +
+        U.champ({ id: "a-exp", label: "Compte jusqu'au", type: "date", valeur: dans3mois,
+                  aide: "Passée cette date il reste lisible, mais ne compte plus. " +
+                        "Vide = sans échéance." }) +
+      "</div>";
+
+    let gravite = "simple";
+    corps.querySelectorAll("[data-g]").forEach(b => b.addEventListener("click", () => {
+      gravite = b.dataset.g;
+      corps.querySelectorAll("[data-g]").forEach(x => x.classList.toggle("est-choisie", x === b));
+    }));
+
+    U.modale({
+      titre: "Avertir " + u.pseudo, corps,
+      actions: [
+        { label: "Annuler", onClick: f => f() },
+        { label: "Donner l'avertissement", variante: "principal", icone: "alerte",
+          onClick: async (fermer, k, btn) => {
+            const motif = k.querySelector("#a-motif").value.trim();
+            if (motif.length < 3) {
+              return U.toast("Écris un motif — c'est le cœur de l'avertissement", "err");
+            }
+
+            /* Seul le jour est demandé : pour aujourd'hui on garde l'heure
+               courante, pour une date passée midi — un horaire neutre. */
+            const j = k.querySelector("#a-date").value;
+            let quand = new Date();
+            if (j && j !== MNDuty.jourLocal()) quand = new Date(j + "T12:00:00");
+            if (isNaN(quand) || quand > new Date()) quand = new Date();
+
+            btn.disabled = true;
+            const a = MNStore.addAvertissement(u, {
+              gravite, motif,
+              note: k.querySelector("#a-note").value.trim(),
+              expire: k.querySelector("#a-exp").value || null,
+              at: quand.toISOString()
+            }, moi.pseudo);
+
+            enregistrer(); fermer();
+
+            const d = await MNWebhook.sendAvertissement({
+              action: "pose", pseudo: u.pseudo, role: grade(u).name,
+              gravite: MNStore.graviteDe(a.gravite).nom,
+              motif: a.motif, note: a.note, expire: a.expire, by: moi.pseudo
+            });
+            U.toast(d.ok
+              ? "Avertissement donné et annoncé sur Discord"
+              : d.skipped
+                ? "Avertissement donné (aucun salon Discord dédié)"
+                : "Avertissement donné, mais Discord : " + d.error,
+              d.ok || d.skipped ? "ok" : "info");
+          } }
+      ]
+    });
+  }
+
+  async function leverAvert(u, id) {
+    const a = (u.avertissements || []).find(x => x.id === id);
+    if (!a) return;
+    const ok = await U.confirmer({
+      titre: "Lever cet avertissement",
+      message: "« " + a.motif + " » cessera de compter, mais restera sur la fiche de " +
+        u.pseudo + " avec la mention « levé par " + moi.pseudo + " ».",
+      confirmer: "Lever"
+    });
+    if (!ok) return;
+
+    MNStore.leverAvertissement(u, id, moi.pseudo);
+    enregistrer();
+    MNWebhook.sendAvertissement({
+      action: "leve", pseudo: u.pseudo, role: grade(u).name,
+      gravite: MNStore.graviteDe(a.gravite).nom, motif: a.motif, by: moi.pseudo
+    });
+    U.toast("Avertissement levé", "ok");
+  }
+
+  async function retirerAvert(u, id) {
+    const a = (u.avertissements || []).find(x => x.id === id);
+    if (!a) return;
+    const ok = await U.confirmer({
+      titre: "Retirer cet avertissement",
+      message: "« " + a.motif + " » disparaîtra de la fiche sans laisser de trace. " +
+        "À réserver aux erreurs de saisie : pour annuler une sanction méritée, " +
+        "mieux vaut la lever.",
+      confirmer: "Retirer", danger: true
+    });
+    if (!ok) return;
+
+    MNStore.retirerAvertissement(u, id);
+    enregistrer();
+    MNWebhook.sendAvertissement({
+      action: "retire", pseudo: u.pseudo, role: grade(u).name,
+      gravite: MNStore.graviteDe(a.gravite).nom, motif: a.motif, by: moi.pseudo
+    });
+    U.toast("Avertissement retiré", "ok");
   }
 
   /* ---- Montée de grade -------------------------------------------------------------- */

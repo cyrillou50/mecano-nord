@@ -71,7 +71,10 @@ const WEBHOOKS = {
   bt: process.env.WEBHOOK_BT || "",
   duty: process.env.WEBHOOK_DUTY || "",
   /* Sans salon dédié, les congés rejoignent celui des prises de service. */
-  conges: process.env.WEBHOOK_CONGES || process.env.WEBHOOK_DUTY || ""
+  conges: process.env.WEBHOOK_CONGES || process.env.WEBHOOK_DUTY || "",
+  /* Les avertissements n'ont pas de repli : sans salon à eux, rien n'est
+     envoyé. Une sanction n'a rien à faire dans un salon de service. */
+  avertissements: process.env.WEBHOOK_AVERTISSEMENTS || ""
 };
 
 const MAX_CORPS = 512 * 1024;      // 512 ko suffisent largement

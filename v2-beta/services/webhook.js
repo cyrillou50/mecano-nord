@@ -97,7 +97,9 @@ window.MNWebhook = (function () {
     dutyIn: 0xa8ff52,    // vert : prise de service
     dutyOut: 0xffa92e,   // ambre : fin de service
     leaveOn: 0x7fd7e8,   // bleu : congés posés
-    leaveOff: 0x8b8397   // gris : congés annulés
+    leaveOff: 0x8b8397,  // gris : congés annulés
+    warn: 0xff3b5c,      // rouge : avertissement pose
+    warnOff: 0x8b8397    // gris : avertissement leve ou retire
   };
 
   /**
@@ -291,7 +293,48 @@ window.MNWebhook = (function () {
     });
   }
 
-  const NOMS = { bt: "bons de travail", duty: "services", conges: "congés" };
+  /**
+   * Avertissement posé, levé ou retiré.
+   *
+   * Pas de repli sur un autre salon : une sanction ne doit pas atterrir par
+   * défaut là où tout le monde lit les prises de service. Sans salon dédié,
+   * `send` s'arrête de lui-même sur `skipped`.
+   *
+   * @param {object} i  action ("pose"|"leve"|"retire"), pseudo, role, gravite
+   *                    (nom lisible), motif, note, expire, by
+   */
+  function sendAvertissement(i) {
+    const f = [];
+    if (i.role) f.push({ name: "Poste", value: i.role, inline: true });
+    f.push({ name: "Gravité", value: "**" + i.gravite + "**", inline: true });
+    if (i.by) {
+      f.push({
+        name: i.action === "leve" ? "Levé par" : i.action === "retire" ? "Retiré par" : "Donné par",
+        value: i.by, inline: true
+      });
+    }
+    if (i.expire) f.push({ name: "Compte jusqu'au", value: jourFr(i.expire), inline: true });
+    if (i.motif) f.push({ name: "Motif", value: String(i.motif).slice(0, 1024) });
+    if (i.note && i.action === "pose") {
+      f.push({ name: "Précisions", value: String(i.note).slice(0, 1024) });
+    }
+
+    const titres = {
+      pose: "Avertissement",
+      leve: "Avertissement levé",
+      retire: "Avertissement retiré"
+    };
+    return send("avertissements", {
+      title: (titres[i.action] || titres.pose) + " — " + i.pseudo,
+      color: i.action === "pose" ? COLORS.warn : COLORS.warnOff,
+      fields: f
+    });
+  }
+
+  const NOMS = {
+    bt: "bons de travail", duty: "services", conges: "congés",
+    avertissements: "avertissements"
+  };
 
   /** Message de test depuis le panneau admin. */
   function sendTest(kind, by) {
@@ -303,5 +346,6 @@ window.MNWebhook = (function () {
     });
   }
 
-  return { isValid, has, send, sendBT, sendDuty, sendConge, sendTest, pack, unpack, absUrl, relayUrl };
+  return { isValid, has, send, sendBT, sendDuty, sendConge, sendAvertissement,
+           sendTest, pack, unpack, absUrl, relayUrl };
 })();

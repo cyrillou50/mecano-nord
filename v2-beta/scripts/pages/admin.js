@@ -1787,6 +1787,12 @@
           "Départs et retours de congés, avec les dates et le motif. <b>Laisse vide</b> pour " +
           "qu'ils arrivent dans le salon des prises de service.") +
 
+        bloc("avertissements", "Avertissements",
+          "Les sanctions posées sur une fiche : gravité, motif, qui l'a donnée. <b>Sans " +
+          "salon dédié, rien n'est envoyé</b> — contrairement aux congés, un avertissement " +
+          "ne se replie pas sur le salon des services. Choisis un salon réservé aux " +
+          "responsables.") +
+
         U.carte({ titre: "Apparence du bot", corps:
           '<div class="ad-icochoix">' +
             '<div class="ad-icochoix__vue" id="w-ava-vue">' +
@@ -1858,6 +1864,7 @@
       bt: MNWebhook.pack(z.querySelector("#w-bt").value.trim()),
       duty: MNWebhook.pack(z.querySelector("#w-duty").value.trim()),
       conges: MNWebhook.pack(z.querySelector("#w-conges").value.trim()),
+      avertissements: MNWebhook.pack(z.querySelector("#w-avertissements").value.trim()),
       mention: z.querySelector("#w-mention").value.trim(),
       name: z.querySelector("#w-nom").value.trim(),
       avatar,
@@ -1866,8 +1873,9 @@
 
     z.querySelector('[data-a="save"]').addEventListener("click", () => {
       const v = lire();
-      const noms = { bt: "bons de travail", duty: "services", conges: "congés" };
-      for (const k of ["bt", "duty", "conges"]) {
+      const noms = { bt: "bons de travail", duty: "services", conges: "congés",
+                     avertissements: "avertissements" };
+      for (const k of ["bt", "duty", "conges", "avertissements"]) {
         if (v[k] && !MNWebhook.isValid(v[k])) {
           return U.toast("Adresse de webhook invalide (" + noms[k] + ")", "err");
         }
@@ -1877,7 +1885,7 @@
       U.toast("Réglages Discord enregistrés dans le brouillon", "ok");
     });
 
-    ["bt", "duty", "conges"].forEach(k => {
+    ["bt", "duty", "conges", "avertissements"].forEach(k => {
       z.querySelector('[data-a="vider-' + k + '"]').addEventListener("click", () => {
         z.querySelector("#w-" + k).value = "";
         U.toast("Champ vidé — pense à enregistrer", "info");

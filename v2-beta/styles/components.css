@@ -1604,3 +1604,84 @@
 .ad-couleur { display: flex; gap: var(--e-2); margin-top: var(--e-2); }
 .ad-couleur .saisie[type="color"] { flex: none; width: 56px; }
 .ad-couleur .ad-id { flex: 1; min-width: 0; text-transform: lowercase; }
+
+/* ---- Avertissements ---------------------------------------------------------
+   Une sanction doit se lire d'un coup d'œil et cesser de crier quand elle ne
+   compte plus : la couleur vient de la gravité, l'opacité de l'état. */
+
+.eq-av {
+  flex: none;
+  min-width: 18px; height: 18px;
+  display: grid; place-items: center;
+  padding: 0 5px;
+  border-radius: var(--r-plein);
+  background: color-mix(in srgb, var(--grav) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--grav) 55%, transparent);
+  color: var(--grav);
+  font-family: var(--f-titre);
+  font-size: 10px; font-weight: 800;
+  cursor: help;
+}
+
+.av {
+  display: flex; align-items: flex-start; gap: var(--e-3);
+  padding: var(--e-3) var(--e-4);
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--grav) 9%, transparent), transparent 40%);
+  border: 1px solid var(--c-bord);
+  border-left: 3px solid var(--grav);
+  border-radius: var(--r-2);
+}
+.av.est-eteint { opacity: .5; border-left-color: var(--c-bord-net); background: none; }
+
+.av__pastille {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: var(--r-plein);
+  background: color-mix(in srgb, var(--grav) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--grav) 45%, transparent);
+  color: var(--grav);
+  font-family: var(--f-titre);
+  font-size: 10px; font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.av.est-eteint .av__pastille {
+  background: none; border-color: var(--c-bord-net); color: var(--c-faible);
+}
+
+.av__corps { flex: 1; min-width: 0; }
+.av__corps > b { font-size: var(--t-md); }
+.av__note {
+  margin-top: 4px;
+  font-size: var(--t-sm); color: var(--c-second);
+  white-space: pre-wrap;
+}
+.av__meta { margin-top: 5px; font-size: var(--t-xs); color: var(--c-faible); }
+.av__leve { color: var(--c-second); }
+.av__acts { display: flex; gap: 2px; flex: none; }
+
+/* Choix de la gravité : trois boutons, pas une liste déroulante — c'est la
+   décision la plus lourde de la fenêtre, elle doit être sous les yeux. */
+.gravites { display: flex; gap: var(--e-2); flex-wrap: wrap; }
+.grav {
+  flex: 1; min-width: 120px;
+  padding: 10px var(--e-3);
+  border: 1px solid var(--c-bord-net);
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--c-second);
+  font-family: var(--f-titre);
+  font-size: var(--t-sm); font-weight: 700;
+  cursor: pointer;
+  transition: border-color var(--m-vif), color var(--m-vif), background var(--m-vif);
+}
+.grav:hover { color: var(--c-texte); border-color: var(--grav); }
+.grav.est-choisie {
+  border-color: var(--grav);
+  background: color-mix(in srgb, var(--grav) 15%, transparent);
+  color: var(--grav);
+}
+
+/* Le titre de bloc pousse son bouton à droite. */
+.eq-bloc h3 .pousse { margin-left: auto; }

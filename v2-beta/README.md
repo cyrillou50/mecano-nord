@@ -190,7 +190,7 @@ V1 — même comportement, mêmes garde-fous :
 
 | Module | Rôle |
 |---|---|
-| `MNStore` | catalogue, objets, ressources, contrats, panier, bons de travail |
+| `MNStore` | catalogue, objets, ressources, contrats, avertissements, panier, bons |
 | `MNAuth` | session et permissions (`MNAuth.can`, `canAny`) |
 | `MNDuty` | pointage, congés, historique de service |
 | `MNParc` | parc automobile |
