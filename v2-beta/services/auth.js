@@ -192,8 +192,10 @@ window.MNAuth = (function () {
    */
   function login(pseudo, pin) {
     const clean = String(pseudo || "").trim();
-    if (clean.length < 2) return fail("pseudo-court", "Ton pseudo doit faire au moins 2 caractères.");
-    if (clean.length > 32) return fail("pseudo-long", "32 caractères maximum.");
+    if (clean.length < 2) return fail("pseudo-court", "Ton nom doit faire au moins 2 caractères.");
+    /* 40 comme les fiches employés : plus bas, un « Prénom Nom » un peu long
+       aurait été enregistrable sans pouvoir se connecter ensuite. */
+    if (clean.length > 40) return fail("pseudo-long", "40 caractères maximum.");
 
     const list = users();
 
@@ -224,11 +226,11 @@ window.MNAuth = (function () {
         writeStored({ guest: true, pseudo: clean });
         return { ok: true, guest: true };
       }
-      return fail("inconnu", "Ce pseudo n'est pas enregistré. Demande à un responsable de t'ajouter.");
+      return fail("inconnu", "Ce nom n'est pas enregistré. Demande à un responsable de t'ajouter.");
     }
     if (u.active === false) return fail("desactive", "Ce compte a été désactivé.");
     if (u.pin) {
-      if (!pin) return fail("pin-requis", "Ce pseudo est protégé par un code.");
+      if (!pin) return fail("pin-requis", "Ce compte est protégé par un code.");
       if (hashPin(u.id, pin) !== u.pin) return fail("pin-faux", "Code incorrect.");
     }
 

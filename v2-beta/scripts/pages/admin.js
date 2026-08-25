@@ -957,8 +957,8 @@
     corps.className = "pile";
     corps.innerHTML =
       '<div class="cols-2">' +
-        U.champ({ id: "u-pseudo", label: "Pseudo (sert à se connecter)", valeur: cur.pseudo,
-                  max: 32, repere: "Ex. Rico" }) +
+        U.champ({ id: "u-pseudo", label: "Prénom & Nom (sert à se connecter)", valeur: cur.pseudo,
+                  max: 40, repere: "Ex. Rico Martin" }) +
         U.champ({ id: "u-role", label: "Rôle", type: "liste", valeur: cur.roleId,
                   options: brouillon.roles.map(r => ({ valeur: r.id, nom: r.name })),
                   aide: "Les droits viennent du rôle. Onglet « Rôles » pour les modifier." }) +
@@ -974,7 +974,7 @@
           (cur.pin
             ? U.bouton("Retirer le code", { variante: "fantome", icone: "croix",
                                             action: "vider-pin", type: "button" })
-            : '<p class="champ__aide">Sans code, il suffit de taper le pseudo pour entrer.</p>') +
+            : '<p class="champ__aide">Sans code, il suffit de taper son nom pour entrer.</p>') +
         "</div></div>" +
 
       U.champ({ id: "u-actif", type: "bascule", label: "Compte actif", valeur: cur.active }) +
@@ -1010,10 +1010,10 @@
         { label: neuf ? "Ajouter" : "Enregistrer", variante: "principal", icone: "check",
           onClick: (fermer, k) => {
             const pseudo = k.querySelector("#u-pseudo").value.trim();
-            if (pseudo.length < 2) return U.toast("Pseudo trop court", "err");
+            if (pseudo.length < 2) return U.toast("Nom trop court", "err");
             if (brouillon.users.some(x =>
                 x.pseudo.toLowerCase() === pseudo.toLowerCase() && (neuf || x.id !== u.id))) {
-              return U.toast("Ce pseudo est déjà pris", "err");
+              return U.toast("Ce nom est déjà pris", "err");
             }
 
             const roleId = k.querySelector("#u-role").value;
@@ -1945,7 +1945,7 @@
 
         U.carte({ titre: "Connexion", corps:
           U.champ({ id: "s-invites", type: "bascule",
-                    label: "Autoriser n'importe quel pseudo à entrer",
+                    label: "Autoriser n'importe quel nom à entrer",
                     valeur: s.auth.allowGuests }) +
           '<p class="champ__aide" style="margin:var(--e-3) 0">Désactivé, seuls les pseudos de ' +
             "l'onglet « Employés » peuvent se connecter. Activé, un inconnu entre avec le seul " +

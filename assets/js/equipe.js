@@ -846,7 +846,7 @@
     body.className = "editor";
     body.innerHTML =
       '<div class="editor__grid">' +
-        '<div class="field"><label class="label" for="f-pseudo">Pseudo</label>' +
+        '<div class="field"><label class="label" for="f-pseudo">Prénom &amp; Nom</label>' +
           '<input class="input" id="f-pseudo" maxlength="40" value="' + esc(u.pseudo) + '"></div>' +
         '<div class="field"><label class="label" for="f-hired">Date de recrutement</label>' +
           '<input class="input" id="f-hired" type="date" value="' + esc(u.hiredAt || "") + '"></div>' +
@@ -900,9 +900,9 @@
           label: "Enregistrer", variant: "btn--primary", icon: "save",
           onClick: close => {
             const pseudo = body.querySelector("#f-pseudo").value.trim();
-            if (pseudo.length < 2) return MNUI.toast("Pseudo trop court", "err");
+            if (pseudo.length < 2) return MNUI.toast("Nom trop court", "err");
             if (draft.users.some(x => x.id !== u.id && x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
-              return MNUI.toast("Ce pseudo est déjà pris", "err");
+              return MNUI.toast("Ce nom est déjà pris", "err");
             }
             u.pseudo = pseudo;
             u.hiredAt = body.querySelector("#f-hired").value || u.hiredAt;
@@ -933,7 +933,7 @@
     body.className = "editor";
     body.innerHTML =
       '<div class="editor__grid">' +
-        '<div class="field"><label class="label" for="n-pseudo">Pseudo (sert à se connecter)</label>' +
+        '<div class="field"><label class="label" for="n-pseudo">Prénom &amp; Nom (sert à se connecter)</label>' +
           '<input class="input" id="n-pseudo" maxlength="40" placeholder="Ex. Rico Martin"></div>' +
         '<div class="field"><label class="label" for="n-role">Grade d\'entrée</label>' +
           '<select class="select" id="n-role">' + draft.roles.map(r =>
@@ -953,9 +953,9 @@
           label: "Recruter", variant: "btn--primary", icon: "plus",
           onClick: close => {
             const pseudo = body.querySelector("#n-pseudo").value.trim();
-            if (pseudo.length < 2) return MNUI.toast("Pseudo trop court", "err");
+            if (pseudo.length < 2) return MNUI.toast("Nom trop court", "err");
             if (draft.users.some(x => x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
-              return MNUI.toast("Ce pseudo est déjà pris", "err");
+              return MNUI.toast("Ce nom est déjà pris", "err");
             }
             const id = MNStore.uniqueId(pseudo, draft.users.map(x => x.id));
             const roleId = body.querySelector("#n-role").value;

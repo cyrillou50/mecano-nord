@@ -346,13 +346,13 @@ window.MNUI = (function () {
         '<p class="gate__tag">' + esc(b.tagline) + "</p>" +
         (first
           ? '<div class="alert alert--warn" style="margin-bottom:16px">' + svg("alert") +
-            "<span><b>Première connexion.</b> Aucun employé n'est enregistré : le pseudo que tu saisis " +
+            "<span><b>Première connexion.</b> Aucun employé n'est enregistré : le nom que tu saisis " +
             "deviendra automatiquement <b>patron</b>, avec tous les droits.</span></div>"
           : "") +
         '<form class="gate__form" id="gate-form" autocomplete="off">' +
           '<div class="field">' +
-            '<label class="label" for="g-pseudo">Ton pseudo</label>' +
-            '<input class="input" id="g-pseudo" name="pseudo" placeholder="Ex. Rico" maxlength="32" autocomplete="off" required>' +
+            '<label class="label" for="g-pseudo">Prénom &amp; Nom</label>' +
+            '<input class="input" id="g-pseudo" name="pseudo" placeholder="Ex. Rico Martin" maxlength="40" autocomplete="off" required>' +
           "</div>" +
           '<div class="field" id="g-pinwrap" hidden>' +
             '<label class="label" for="g-pin">Code d\'accès' + (first ? " (facultatif)" : "") + "</label>" +
@@ -362,9 +362,9 @@ window.MNUI = (function () {
           '<button class="btn btn--solid btn--block" type="submit">' + svg("login") + "<span>Entrer dans l'atelier</span></button>" +
         "</form>" +
         '<p class="gate__foot">' +
-          (first ? "Choisis bien : ce pseudo sera le compte patron de l'atelier."
-            : guests ? "Pseudo libre : tu peux entrer avec le nom que tu veux."
-            : "Ton pseudo doit avoir été enregistré par un responsable.") +
+          (first ? "Choisis bien : ce nom sera le compte patron de l'atelier."
+            : guests ? "Nom libre : tu peux entrer avec le nom que tu veux."
+            : "Ton nom doit avoir été enregistré par un responsable.") +
         "</p>" +
       "</div>";
 

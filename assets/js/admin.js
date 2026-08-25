@@ -1393,8 +1393,8 @@
     body.className = "editor";
     body.innerHTML =
       '<div class="editor__grid">' +
-        '<div class="field"><label class="label" for="u-pseudo">Pseudo (sert à se connecter)</label>' +
-          '<input class="input" id="u-pseudo" maxlength="32" value="' + esc(cur.pseudo) + '" placeholder="Ex. Rico"></div>' +
+        '<div class="field"><label class="label" for="u-pseudo">Prénom &amp; Nom (sert à se connecter)</label>' +
+          '<input class="input" id="u-pseudo" maxlength="40" value="' + esc(cur.pseudo) + '" placeholder="Ex. Rico Martin"></div>' +
         '<div class="field"><label class="label" for="u-role">Rôle</label>' +
           '<select class="select" id="u-role">' + draft.roles.map(r =>
             '<option value="' + esc(r.id) + '"' + (r.id === cur.roleId ? " selected" : "") + ">" +
@@ -1411,7 +1411,7 @@
             'placeholder="' + (cur.pin ? "Laisser vide = code inchangé" : "Aucun code — laisser vide") + '" maxlength="24"></div>' +
           '<div class="field">' + (cur.pin
             ? '<button class="btn btn--ghost" id="u-pin-clear" type="button">' + svg("x") + "<span>Retirer le code</span></button>"
-            : '<p class="hint">Sans code, il suffit de taper le pseudo pour entrer.</p>') + "</div>" +
+            : '<p class="hint">Sans code, il suffit de taper son nom pour entrer.</p>') + "</div>" +
         "</div></div>" +
 
       '<label class="switch"><input type="checkbox" id="u-active"' + (cur.active ? " checked" : "") +
@@ -1452,11 +1452,11 @@
           label: isNew ? "Ajouter" : "Enregistrer", variant: "btn--primary", icon: "save",
           onClick: close => {
             const pseudo = body.querySelector("#u-pseudo").value.trim();
-            if (pseudo.length < 2) return MNUI.toast("Pseudo trop court", "err");
+            if (pseudo.length < 2) return MNUI.toast("Nom trop court", "err");
 
             const clash = draft.users.find(x =>
               x.pseudo.toLowerCase() === pseudo.toLowerCase() && (isNew || x.id !== u.id));
-            if (clash) return MNUI.toast("Ce pseudo est déjà pris", "err");
+            if (clash) return MNUI.toast("Ce nom est déjà pris", "err");
 
             const roleId = body.querySelector("#u-role").value;
             const pin = body.querySelector("#u-pin").value.trim();
@@ -2374,7 +2374,7 @@
       '<div class="panel"><div class="panel__head"><h2>Connexion</h2></div>' +
         '<div class="panel__body editor">' +
           '<label class="switch"><input type="checkbox" id="s-guest"' + (s.auth.allowGuests ? " checked" : "") + ">" +
-            '<span class="switch__box"></span><span>Autoriser n\'importe quel pseudo à entrer</span></label>' +
+            '<span class="switch__box"></span><span>Autoriser n\'importe quel nom à entrer</span></label>' +
           '<p class="hint">Désactivé, seuls les pseudos de l\'onglet « Employés » peuvent se connecter. ' +
             "Activé, un inconnu entre avec les droits « Faire des BT » uniquement.</p>" +
           '<div class="field" style="max-width:220px"><label class="label" for="s-days">Durée de session (jours)</label>' +

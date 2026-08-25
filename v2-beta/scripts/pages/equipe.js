@@ -821,7 +821,7 @@
     corps.className = "pile";
     corps.innerHTML =
       '<div class="cols-2">' +
-        U.champ({ id: "f-pseudo", label: "Pseudo", valeur: u.pseudo, max: 40 }) +
+        U.champ({ id: "f-pseudo", label: "Prénom & Nom", valeur: u.pseudo, max: 40 }) +
         U.champ({ id: "f-emb", label: "Date de recrutement", type: "date",
                   valeur: u.hiredAt || "" }) +
       "</div>" +
@@ -880,10 +880,10 @@
         { label: "Enregistrer", variante: "principal", icone: "check",
           onClick: (fermer, k) => {
             const pseudo = k.querySelector("#f-pseudo").value.trim();
-            if (pseudo.length < 2) return U.toast("Pseudo trop court", "err");
+            if (pseudo.length < 2) return U.toast("Nom trop court", "err");
             if (brouillon.users.some(x => x.id !== u.id &&
                 x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
-              return U.toast("Ce pseudo est déjà pris", "err");
+              return U.toast("Ce nom est déjà pris", "err");
             }
 
             u.pseudo = pseudo;
@@ -918,7 +918,7 @@
     corps.className = "pile";
     corps.innerHTML =
       '<div class="cols-2">' +
-        U.champ({ id: "n-pseudo", label: "Pseudo (sert à se connecter)", max: 40,
+        U.champ({ id: "n-pseudo", label: "Prénom & Nom (sert à se connecter)", max: 40,
                   repere: "Ex. Rico Martin" }) +
         U.champ({ id: "n-role", label: "Grade d'entrée", type: "liste", valeur: plusBas.id,
                   options: brouillon.roles.map(r => ({ valeur: r.id, nom: r.name })) }) +
@@ -934,9 +934,9 @@
         { label: "Recruter", variante: "principal", icone: "plus",
           onClick: (fermer, k) => {
             const pseudo = k.querySelector("#n-pseudo").value.trim();
-            if (pseudo.length < 2) return U.toast("Pseudo trop court", "err");
+            if (pseudo.length < 2) return U.toast("Nom trop court", "err");
             if (brouillon.users.some(x => x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
-              return U.toast("Ce pseudo est déjà pris", "err");
+              return U.toast("Ce nom est déjà pris", "err");
             }
 
             const id = MNStore.uniqueId(pseudo, brouillon.users.map(x => x.id));
