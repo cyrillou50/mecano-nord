@@ -73,13 +73,48 @@
     if (live) live.textContent = MNDuty.sinceDur(live.dataset.sinceLive);
   }
 
-  /* ---- Enregistrement --------------------------------------------------------- */
+  /* ---- Enregistrement -----------------------------------------------------------
+     Deux chemins, et l'appelant n'a pas à savoir lequel a servi.
+
+     Quand le serveur tient le catalogue, l'opération part chez lui : le geste
+     est visible par toute l'équipe aussitôt, sans publication, et deux
+     responsables qui modifient en même temps ne s'écrasent plus.
+
+     Sinon — pas de serveur, version trop ancienne, ou brouillon déjà en
+     attente — on écrit dans le brouillon comme avant, et ça partira à la
+     prochaine publication. */
 
   function commit() {
     draft = MNStore.saveDraft(draft);
     MNAuth.refresh();
     render();
   }
+
+  /**
+   * Applique un geste de fiche par le serveur si possible, sinon localement.
+   * @param {object} op        l'opération pour le serveur
+   * @param {Function} aLaMain ce qu'il faut faire au brouillon à défaut
+   * @returns {Promise<{ok:boolean, parServeur:boolean, error?:string}>}
+   */
+  async function appliquer(op, aLaMain) {
+    const r = await MNEquipe.envoyer(op);
+
+    if (r && r.ok) {
+      /* Le serveur a rendu le catalogue à jour : on repart de lui. */
+      draft = MNStore.clone(MNStore.catalog());
+      MNAuth.refresh();
+      render();
+      return { ok: true, parServeur: true };
+    }
+    if (r && !r.ok) return { ok: false, parServeur: true, error: r.error };
+
+    aLaMain();
+    commit();
+    return { ok: true, parServeur: false };
+  }
+
+  /** « … et l'équipe le voit » ou « … pense à publier », selon le chemin. */
+  const suite = r => r.parServeur ? "" : " — pense à publier";
 
   function renderDraftbar() {
     const bar = $("#draftbar");
@@ -736,20 +771,25 @@
         { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
         {
           label: "Archiver la fiche", variant: "btn--primary", icon: "logout",
-          onClick: close => {
-            const j = body.querySelector("#d-date").value || auj;
-            MNStore.archiverUser(u, {
-              le: j, motif,
-              note: body.querySelector("#d-note").value.trim()
-            }, me.pseudo);
+          onClick: async close => {
+            const depart = {
+              le: body.querySelector("#d-date").value || auj, motif,
+              note: body.querySelector("#d-note").value.trim(), par: me.pseudo
+            };
 
             /* On bascule sur les archives : c'est là qu'il se trouve
                désormais, le laisser sur une liste où il n'est plus serait
                déroutant. */
             vueArchives = true; tranche = null; filter = "";
             sel = u.id;
-            commit(); close();
-            MNUI.toast(u.pseudo + " est archivé — sa fiche reste consultable", "ok");
+
+            const r = await appliquer(
+              { op: "depart", uid: u.id, depart },
+              () => MNStore.archiverUser(u, depart, me.pseudo));
+            if (!r.ok) return MNUI.toast("Archivage impossible : " + r.error, "err");
+
+            close();
+            MNUI.toast(u.pseudo + " est archivé — sa fiche reste consultable" + suite(r), "ok");
           }
         }
       ]
@@ -765,11 +805,15 @@
     });
     if (!ok) return;
 
-    MNStore.reintegrerUser(u);
     vueArchives = false; tranche = null; filter = "";
     sel = u.id;
-    commit();
-    MNUI.toast(u.pseudo + " a rejoint l'équipe", "ok");
+
+    const r = await appliquer(
+      { op: "retour", uid: u.id },
+      () => MNStore.reintegrerUser(u));
+    if (!r.ok) return MNUI.toast("Réintégration impossible : " + r.error, "err");
+
+    MNUI.toast(u.pseudo + " a rejoint l'équipe" + suite(r), "ok");
   }
 
   /* ---- Avertissements ------------------------------------------------------------
@@ -918,26 +962,40 @@
             if (isNaN(quand) || quand > new Date()) quand = new Date();
 
             btn.disabled = true;
-            const a = MNStore.addAvertissement(u, {
+
+            /* On construit l'avertissement ici : le serveur le range tel
+               quel, et à défaut c'est lui qu'on écrit dans le brouillon. */
+            const a = MNStore.normAvertissement({
+              id: MNStore.uniqueId("av-" + MNDuty.jourLocal(),
+                (u.avertissements || []).map(x => x.id)),
+              at: quand.toISOString(), by: me.pseudo,
               gravite, motif,
               note: body.querySelector("#a-note").value.trim(),
-              expire: body.querySelector("#a-exp").value || null,
-              at: quand.toISOString()
-            }, me.pseudo);
+              expire: body.querySelector("#a-exp").value || null
+            });
 
-            commit();
+            const r = await appliquer(
+              { op: "avert-add", uid: u.id, avert: a },
+              () => {
+                u.avertissements = [a].concat(u.avertissements || []).slice(0, 60);
+              });
+
+            if (!r.ok) {
+              btn.disabled = false;
+              return MNUI.toast("Enregistrement impossible : " + r.error, "err");
+            }
             close();
 
             const d = await MNWebhook.sendAvertissement({
-              action: "pose", pseudo: u.pseudo, role: roleOf(u).name,
+              action: "pose", pseudo: u.pseudo,
               gravite: MNStore.graviteDe(a.gravite).nom,
               motif: a.motif, note: a.note, expire: a.expire, by: me.pseudo
             });
             MNUI.toast(d.ok
-              ? "Avertissement donné et annoncé sur Discord"
+              ? "Avertissement donné et annoncé sur Discord" + suite(r)
               : d.skipped
-                ? "Avertissement donné (aucun salon Discord dédié)"
-                : "Avertissement donné, mais Discord : " + d.error,
+                ? "Avertissement donné (aucun salon Discord dédié)" + suite(r)
+                : "Avertissement donné" + suite(r) + ", mais Discord : " + d.error,
               d.ok || d.skipped ? "ok" : "info");
           }
         }
@@ -956,13 +1014,16 @@
     });
     if (!ok) return;
 
-    MNStore.leverAvertissement(u, id, me.pseudo);
-    commit();
+    const r = await appliquer(
+      { op: "avert-lever", uid: u.id, id, par: me.pseudo },
+      () => MNStore.leverAvertissement(u, id, me.pseudo));
+    if (!r.ok) return MNUI.toast("Levée impossible : " + r.error, "err");
+
     MNWebhook.sendAvertissement({
-      action: "leve", pseudo: u.pseudo, role: roleOf(u).name,
+      action: "leve", pseudo: u.pseudo,
       gravite: MNStore.graviteDe(a.gravite).nom, motif: a.motif, by: me.pseudo
     });
-    MNUI.toast("Avertissement levé", "ok");
+    MNUI.toast("Avertissement levé" + suite(r), "ok");
   }
 
   async function retirerAvert(u, id) {
@@ -977,13 +1038,16 @@
     });
     if (!ok) return;
 
-    MNStore.retirerAvertissement(u, id);
-    commit();
+    const r = await appliquer(
+      { op: "avert-retirer", uid: u.id, id },
+      () => MNStore.retirerAvertissement(u, id));
+    if (!r.ok) return MNUI.toast("Retrait impossible : " + r.error, "err");
+
     MNWebhook.sendAvertissement({
-      action: "retire", pseudo: u.pseudo, role: roleOf(u).name,
+      action: "retire", pseudo: u.pseudo,
       gravite: MNStore.graviteDe(a.gravite).nom, motif: a.motif, by: me.pseudo
     });
-    MNUI.toast("Avertissement retiré", "ok");
+    MNUI.toast("Avertissement retiré" + suite(r), "ok");
   }
 
   /* ---- Montée de grade --------------------------------------------------------- */
@@ -1013,7 +1077,7 @@
         { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
         {
           label: "Valider la montée", variant: "btn--primary", icon: "tag",
-          onClick: close => {
+          onClick: async close => {
             const roleId = body.querySelector("#p-role").value;
             if (roleId === u.roleId) return MNUI.toast("C'est déjà son grade actuel", "info");
 
@@ -1034,14 +1098,18 @@
             if (isNaN(quand) || quand > new Date()) quand = new Date();
 
             const to = draft.roles.find(x => x.id === roleId);
-            MNStore.recordPromotion(
-              u, roleId, draft.roles, me.pseudo,
-              body.querySelector("#p-note").value.trim(), quand.toISOString()
-            );
-            commit();
+            const note = body.querySelector("#p-note").value.trim();
+
+            const r = await appliquer(
+              { op: "promotion", uid: u.id, roleId, roleName: to ? to.name : roleId,
+                par: me.pseudo, note, at: quand.toISOString() },
+              () => MNStore.recordPromotion(u, roleId, draft.roles, me.pseudo, note,
+                quand.toISOString()));
+            if (!r.ok) return MNUI.toast("Promotion impossible : " + r.error, "err");
+
             close();
             MNUI.toast(u.pseudo + " passe " + (to ? to.name : roleId) +
-              " (au " + quand.toLocaleDateString("fr-FR") + ")", "ok");
+              " (au " + quand.toLocaleDateString("fr-FR") + ")" + suite(r), "ok");
           }
         }
       ]
@@ -1109,23 +1177,32 @@
         { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
         {
           label: "Enregistrer", variant: "btn--primary", icon: "save",
-          onClick: close => {
+          onClick: async close => {
             const pseudo = body.querySelector("#f-pseudo").value.trim();
             if (pseudo.length < 2) return MNUI.toast("Nom trop court", "err");
             if (draft.users.some(x => x.id !== u.id && x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
               return MNUI.toast("Ce nom est déjà pris", "err");
             }
-            u.pseudo = pseudo;
-            u.hiredAt = body.querySelector("#f-hired").value || u.hiredAt;
-            u.trainings = trainings;
-            u.note = body.querySelector("#f-note").value.trim();
-            u.active = u.id === me.uid ? true : body.querySelector("#f-active").checked;
-            u.hidden = body.querySelector("#f-hidden").checked;
+
+            const champs = {
+              pseudo,
+              hiredAt: body.querySelector("#f-hired").value || u.hiredAt,
+              trainings,
+              note: body.querySelector("#f-note").value.trim(),
+              active: u.id === me.uid ? true : body.querySelector("#f-active").checked,
+              hidden: body.querySelector("#f-hidden").checked
+            };
 
             /* On garde la personne à l'écran même si elle vient d'être masquée. */
-            if (u.hidden && !showHidden && canEdit) showHidden = true;
-            commit(); close();
-            MNUI.toast("Fiche mise à jour", "ok");
+            if (champs.hidden && !showHidden && canEdit) showHidden = true;
+
+            const r = await appliquer(
+              Object.assign({ op: "fiche", uid: u.id }, champs),
+              () => Object.assign(u, champs));
+            if (!r.ok) return MNUI.toast("Enregistrement impossible : " + r.error, "err");
+
+            close();
+            MNUI.toast("Fiche mise à jour" + suite(r), "ok");
           }
         }
       ]
@@ -1163,7 +1240,7 @@
         { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
         {
           label: "Recruter", variant: "btn--primary", icon: "plus",
-          onClick: close => {
+          onClick: async close => {
             const pseudo = body.querySelector("#n-pseudo").value.trim();
             if (pseudo.length < 2) return MNUI.toast("Nom trop court", "err");
             if (draft.users.some(x => x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
@@ -1172,25 +1249,33 @@
             const id = MNStore.uniqueId(pseudo, draft.users.map(x => x.id));
             const roleId = body.querySelector("#n-role").value;
             const pin = body.querySelector("#n-pin").value.trim();
-            const r = draft.roles.find(x => x.id === roleId);
+            const rr = draft.roles.find(x => x.id === roleId);
             const hiredAt = body.querySelector("#n-hired").value || new Date().toISOString().slice(0, 10);
 
-            draft.users.push({
+            const nouveau = {
               id, pseudo, roleId, active: true,
               pin: pin ? MNAuth.hashPin(id, pin) : null,
               createdAt: new Date().toISOString(),
               hiredAt,
               trainings: [],
               note: "",
+              avertissements: [],
+              depart: null,
               history: [{
-                roleId, roleName: r ? r.name : roleId,
+                roleId, roleName: rr ? rr.name : roleId,
                 at: new Date(hiredAt + "T12:00:00").toISOString(),
                 by: me.pseudo, note: "Entrée dans l'entreprise"
               }]
-            });
+            };
             sel = id;
-            commit(); close();
-            MNUI.toast(pseudo + " a rejoint l'équipe", "ok");
+
+            const r = await appliquer(
+              { op: "recrue", user: nouveau },
+              () => draft.users.push(nouveau));
+            if (!r.ok) return MNUI.toast("Recrutement impossible : " + r.error, "err");
+
+            close();
+            MNUI.toast(pseudo + " a rejoint l'équipe" + suite(r), "ok");
           }
         }
       ]

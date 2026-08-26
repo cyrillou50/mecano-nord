@@ -145,11 +145,48 @@
     "</div>";
   }
 
+  /* ---- Enregistrement -----------------------------------------------------------
+     Deux chemins, et l'appelant n'a pas à savoir lequel a servi.
+
+     Quand le serveur tient le catalogue, l'opération part chez lui : le geste
+     est visible par toute l'équipe aussitôt, sans publication, et deux
+     responsables qui modifient en même temps ne s'écrasent plus.
+
+     Sinon — pas de serveur, version trop ancienne, ou brouillon déjà en
+     attente — on écrit dans le brouillon comme avant, et ça partira à la
+     prochaine publication. */
+
   function enregistrer() {
     brouillon = MNStore.saveDraft(brouillon);
     MNAuth.refresh();
     dessiner();
   }
+
+  /**
+   * Applique un geste de fiche par le serveur si possible, sinon localement.
+   * @param {object} op        l'opération pour le serveur
+   * @param {Function} aLaMain ce qu'il faut faire au brouillon à défaut
+   * @returns {Promise<{ok:boolean, parServeur:boolean, error?:string}>}
+   */
+  async function appliquer(op, aLaMain) {
+    const r = await MNEquipe.envoyer(op);
+
+    if (r && r.ok) {
+      /* Le serveur a rendu le catalogue à jour : on repart de lui. */
+      brouillon = MNStore.clone(MNStore.catalog());
+      MNAuth.refresh();
+      dessiner();
+      return { ok: true, parServeur: true };
+    }
+    if (r && !r.ok) return { ok: false, parServeur: true, error: r.error };
+
+    aLaMain();
+    enregistrer();
+    return { ok: true, parServeur: false };
+  }
+
+  /** Rien à ajouter si c'est déjà en ligne ; sinon on rappelle la publication. */
+  const suite = r => r.parServeur ? "" : " — pense à publier";
 
   /* ---- Congés -----------------------------------------------------------------
      La fiche ne montre que l'absence du jour ; les périodes à venir se
@@ -726,20 +763,25 @@
       actions: [
         { label: "Annuler", onClick: f => f() },
         { label: "Archiver la fiche", variante: "principal", icone: "sortie",
-          onClick: (fermer, k) => {
-            MNStore.archiverUser(u, {
-              le: k.querySelector("#d-date").value || auj,
-              motif,
-              note: k.querySelector("#d-note").value.trim()
-            }, moi.pseudo);
+          onClick: async (fermer, k) => {
+            const depart = {
+              le: k.querySelector("#d-date").value || auj, motif,
+              note: k.querySelector("#d-note").value.trim(), par: moi.pseudo
+            };
 
             /* On bascule sur les archives : c'est là qu'il se trouve
                désormais, le laisser sur une liste où il n'est plus serait
                déroutant. */
             vueArchives = true; tranche = null; filtre = "";
             sel = u.id;
-            enregistrer(); fermer();
-            U.toast(u.pseudo + " est archivé — sa fiche reste consultable", "ok");
+
+            const r = await appliquer(
+              { op: "depart", uid: u.id, depart },
+              () => MNStore.archiverUser(u, depart, moi.pseudo));
+            if (!r.ok) return U.toast("Archivage impossible : " + r.error, "err");
+
+            fermer();
+            U.toast(u.pseudo + " est archivé — sa fiche reste consultable" + suite(r), "ok");
           } }
       ]
     });
@@ -754,11 +796,15 @@
     });
     if (!ok) return;
 
-    MNStore.reintegrerUser(u);
     vueArchives = false; tranche = null; filtre = "";
     sel = u.id;
-    enregistrer();
-    U.toast(u.pseudo + " a rejoint l'équipe", "ok");
+
+    const r = await appliquer(
+      { op: "retour", uid: u.id },
+      () => MNStore.reintegrerUser(u));
+    if (!r.ok) return U.toast("Réintégration impossible : " + r.error, "err");
+
+    U.toast(u.pseudo + " a rejoint l'équipe" + suite(r), "ok");
   }
 
   /* ---- Avertissements ------------------------------------------------------------
@@ -901,25 +947,40 @@
             if (isNaN(quand) || quand > new Date()) quand = new Date();
 
             btn.disabled = true;
-            const a = MNStore.addAvertissement(u, {
+
+            /* On construit l'avertissement ici : le serveur le range tel
+               quel, et à défaut c'est lui qu'on écrit dans le brouillon. */
+            const a = MNStore.normAvertissement({
+              id: MNStore.uniqueId("av-" + MNDuty.jourLocal(),
+                (u.avertissements || []).map(x => x.id)),
+              at: quand.toISOString(), by: moi.pseudo,
               gravite, motif,
               note: k.querySelector("#a-note").value.trim(),
-              expire: k.querySelector("#a-exp").value || null,
-              at: quand.toISOString()
-            }, moi.pseudo);
+              expire: k.querySelector("#a-exp").value || null
+            });
 
-            enregistrer(); fermer();
+            const r = await appliquer(
+              { op: "avert-add", uid: u.id, avert: a },
+              () => {
+                u.avertissements = [a].concat(u.avertissements || []).slice(0, 60);
+              });
+
+            if (!r.ok) {
+              btn.disabled = false;
+              return U.toast("Enregistrement impossible : " + r.error, "err");
+            }
+            fermer();
 
             const d = await MNWebhook.sendAvertissement({
-              action: "pose", pseudo: u.pseudo, role: grade(u).name,
+              action: "pose", pseudo: u.pseudo,
               gravite: MNStore.graviteDe(a.gravite).nom,
               motif: a.motif, note: a.note, expire: a.expire, by: moi.pseudo
             });
             U.toast(d.ok
-              ? "Avertissement donné et annoncé sur Discord"
+              ? "Avertissement donné et annoncé sur Discord" + suite(r)
               : d.skipped
-                ? "Avertissement donné (aucun salon Discord dédié)"
-                : "Avertissement donné, mais Discord : " + d.error,
+                ? "Avertissement donné (aucun salon Discord dédié)" + suite(r)
+                : "Avertissement donné" + suite(r) + ", mais Discord : " + d.error,
               d.ok || d.skipped ? "ok" : "info");
           } }
       ]
@@ -937,13 +998,16 @@
     });
     if (!ok) return;
 
-    MNStore.leverAvertissement(u, id, moi.pseudo);
-    enregistrer();
+    const r = await appliquer(
+      { op: "avert-lever", uid: u.id, id, par: moi.pseudo },
+      () => MNStore.leverAvertissement(u, id, moi.pseudo));
+    if (!r.ok) return U.toast("Levée impossible : " + r.error, "err");
+
     MNWebhook.sendAvertissement({
-      action: "leve", pseudo: u.pseudo, role: grade(u).name,
+      action: "leve", pseudo: u.pseudo,
       gravite: MNStore.graviteDe(a.gravite).nom, motif: a.motif, by: moi.pseudo
     });
-    U.toast("Avertissement levé", "ok");
+    U.toast("Avertissement levé" + suite(r), "ok");
   }
 
   async function retirerAvert(u, id) {
@@ -958,13 +1022,16 @@
     });
     if (!ok) return;
 
-    MNStore.retirerAvertissement(u, id);
-    enregistrer();
+    const r = await appliquer(
+      { op: "avert-retirer", uid: u.id, id },
+      () => MNStore.retirerAvertissement(u, id));
+    if (!r.ok) return U.toast("Retrait impossible : " + r.error, "err");
+
     MNWebhook.sendAvertissement({
-      action: "retire", pseudo: u.pseudo, role: grade(u).name,
+      action: "retire", pseudo: u.pseudo,
       gravite: MNStore.graviteDe(a.gravite).nom, motif: a.motif, by: moi.pseudo
     });
-    U.toast("Avertissement retiré", "ok");
+    U.toast("Avertissement retiré" + suite(r), "ok");
   }
 
   /* ---- Montée de grade -------------------------------------------------------------- */
@@ -992,7 +1059,7 @@
       actions: [
         { label: "Annuler", onClick: f => f() },
         { label: "Valider la montée", variante: "principal", icone: "etoile",
-          onClick: (fermer, k) => {
+          onClick: async (fermer, k) => {
             const roleId = k.querySelector("#p-role").value;
             if (roleId === u.roleId) return U.toast("C'est déjà son grade actuel", "info");
 
@@ -1014,11 +1081,18 @@
             if (isNaN(quand) || quand > new Date()) quand = new Date();
 
             const vers = brouillon.roles.find(x => x.id === roleId);
-            MNStore.recordPromotion(u, roleId, brouillon.roles, moi.pseudo,
-              k.querySelector("#p-note").value.trim(), quand.toISOString());
-            enregistrer(); fermer();
+            const note = k.querySelector("#p-note").value.trim();
+
+            const r = await appliquer(
+              { op: "promotion", uid: u.id, roleId, roleName: vers ? vers.name : roleId,
+                par: moi.pseudo, note, at: quand.toISOString() },
+              () => MNStore.recordPromotion(u, roleId, brouillon.roles, moi.pseudo, note,
+                quand.toISOString()));
+            if (!r.ok) return U.toast("Promotion impossible : " + r.error, "err");
+
+            fermer();
             U.toast(u.pseudo + " passe " + (vers ? vers.name : roleId) +
-              " (au " + quand.toLocaleDateString("fr-FR") + ")", "ok");
+              " (au " + quand.toLocaleDateString("fr-FR") + ")" + suite(r), "ok");
           } }
       ]
     });
@@ -1090,7 +1164,7 @@
       actions: [
         { label: "Annuler", onClick: f => f() },
         { label: "Enregistrer", variante: "principal", icone: "check",
-          onClick: (fermer, k) => {
+          onClick: async (fermer, k) => {
             const pseudo = k.querySelector("#f-pseudo").value.trim();
             if (pseudo.length < 2) return U.toast("Nom trop court", "err");
             if (brouillon.users.some(x => x.id !== u.id &&
@@ -1098,17 +1172,25 @@
               return U.toast("Ce nom est déjà pris", "err");
             }
 
-            u.pseudo = pseudo;
-            u.hiredAt = k.querySelector("#f-emb").value || u.hiredAt;
-            u.trainings = formations;
-            u.note = k.querySelector("#f-note").value.trim();
-            u.active = u.id === moi.uid ? true : k.querySelector("#f-actif").checked;
-            u.hidden = k.querySelector("#f-masq").checked;
+            const champs = {
+              pseudo,
+              hiredAt: k.querySelector("#f-emb").value || u.hiredAt,
+              trainings: formations,
+              note: k.querySelector("#f-note").value.trim(),
+              active: u.id === moi.uid ? true : k.querySelector("#f-actif").checked,
+              hidden: k.querySelector("#f-masq").checked
+            };
 
             /* On garde la personne à l'écran même si elle vient d'être masquée. */
-            if (u.hidden && !voirMasques && peutEditer) voirMasques = true;
-            enregistrer(); fermer();
-            U.toast("Fiche mise à jour", "ok");
+            if (champs.hidden && !voirMasques && peutEditer) voirMasques = true;
+
+            const r = await appliquer(
+              Object.assign({ op: "fiche", uid: u.id }, champs),
+              () => Object.assign(u, champs));
+            if (!r.ok) return U.toast("Enregistrement impossible : " + r.error, "err");
+
+            fermer();
+            U.toast("Fiche mise à jour" + suite(r), "ok");
           } }
       ]
     });
@@ -1144,7 +1226,7 @@
       actions: [
         { label: "Annuler", onClick: f => f() },
         { label: "Recruter", variante: "principal", icone: "plus",
-          onClick: (fermer, k) => {
+          onClick: async (fermer, k) => {
             const pseudo = k.querySelector("#n-pseudo").value.trim();
             if (pseudo.length < 2) return U.toast("Nom trop court", "err");
             if (brouillon.users.some(x => x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
@@ -1154,24 +1236,31 @@
             const id = MNStore.uniqueId(pseudo, brouillon.users.map(x => x.id));
             const roleId = k.querySelector("#n-role").value;
             const pin = k.querySelector("#n-pin").value.trim();
-            const r = brouillon.roles.find(x => x.id === roleId);
+            const rr = brouillon.roles.find(x => x.id === roleId);
             const emb = k.querySelector("#n-emb").value || auj;
 
-            brouillon.users.push({
+            const nouveau = {
               id, pseudo, roleId, active: true,
               pin: pin ? MNAuth.hashPin(id, pin) : null,
               createdAt: new Date().toISOString(),
               hiredAt: emb,
               trainings: [], note: "",
+              avertissements: [], depart: null,
               history: [{
-                roleId, roleName: r ? r.name : roleId,
+                roleId, roleName: rr ? rr.name : roleId,
                 at: new Date(emb + "T12:00:00").toISOString(),
                 by: moi.pseudo, note: "Entrée dans l'entreprise"
               }]
-            });
+            };
             sel = id;
-            enregistrer(); fermer();
-            U.toast(pseudo + " a rejoint l'équipe", "ok");
+
+            const r = await appliquer(
+              { op: "recrue", user: nouveau },
+              () => brouillon.users.push(nouveau));
+            if (!r.ok) return U.toast("Recrutement impossible : " + r.error, "err");
+
+            fermer();
+            U.toast(pseudo + " a rejoint l'équipe" + suite(r), "ok");
           } }
       ]
     });

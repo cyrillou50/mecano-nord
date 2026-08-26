@@ -433,7 +433,7 @@ Les données sont dans `/opt/mecano-nord/donnees/` :
 | Fichier | Ce qu'il contient | Versions gardées |
 |---|---|---|
 | `duty.json` | pointage, congés, historique | `sauvegardes/` |
-| `catalogue.json` | objets, grades, employés, réglages | `sauvegardes-catalogue/` |
+| `catalogue.json` | objets, grades, employés, réglages, sanctions | `sauvegardes-catalogue/` |
 | `vehicules.json` | parc automobile | — |
 | `contrats.json` | registre des contrats | — |
 | `agenda.json` | évènements du calendrier | — |
@@ -496,6 +496,13 @@ ligne de commande peut falsifier l'origine et, au pire, écrire n'importe quoi
 dans les données que le serveur détient — d'où les sauvegardes. Il ne peut ni
 lire tes webhooks, ni toucher au dépôt GitHub.
 
+> **Les gestes de fiche passent aussi par ici.** Sanctionner, promouvoir,
+> archiver, recruter : le site envoie l'opération au serveur, qui l'applique
+> sur la fiche visée. C'est ce qui les rend visibles aussitôt, sans
+> publication — et ce qui évite que deux responsables qui modifient en même
+> temps s'écrasent. Cela veut dire aussi qu'un outil en ligne de commande
+> pourrait envoyer ces opérations.
+>
 > **Depuis que le catalogue est hébergé ici, il fait partie de ces données.**
 > Le catalogue contient les employés et leurs droits : quelqu'un de motivé
 > pourrait donc les réécrire. C'est un cran au-dessus du tableau de pointage,

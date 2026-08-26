@@ -817,6 +817,24 @@ window.MNStore = (function () {
     return c;
   }
 
+  /**
+   * Le serveur vient d'appliquer une opération et rend le catalogue à jour :
+   * il fait autorité. Publié et affiché deviennent celui-là, et il n'y a plus
+   * de brouillon — rien n'attend d'être publié.
+   *
+   * À n'appeler que sans brouillon en cours : sinon on effacerait des
+   * modifications que le serveur ne connaît pas.
+   */
+  function adopter(cat) {
+    const c = normalize(cat);
+    _published = c;
+    _catalog = clone(c);
+    _draft = false;
+    try { localStorage.removeItem(K_LOCAL); } catch (_) { /* rien à nettoyer */ }
+    emit();
+    return _catalog;
+  }
+
   function discardDraft() {
     localStorage.removeItem(K_LOCAL);
     _catalog = clone(_published); _draft = false;
@@ -984,7 +1002,7 @@ window.MNStore = (function () {
 
   return {
     load, normalize, slugify, uniqueId, clone, onChange, recordPromotion,
-    saveDraft, discardDraft, toJSON, download,
+    saveDraft, discardDraft, adopter, toJSON, download,
     catalog, published, depot, hasDraft, origin, settings, brand, api,
     roleById, roleOf, itemById, resourceById, categoryById,
     topCategories, subCategories, categoryScope, itemLabel, totals, duree,

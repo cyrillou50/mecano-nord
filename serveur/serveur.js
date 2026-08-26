@@ -975,7 +975,7 @@ const serveur = http.createServer(async (req, res) => {
          qu'il sait aller chercher une image sur un autre domaine. */
       return repondre(res, 200, {
         ok: true, ops: true, images: true, vehicules: true, relais: true, contrats: true,
-        calendrier: true, catalogue: true,
+        calendrier: true, catalogue: true, equipe: true,
         recap: RECAP_ACTIF,
         depuis: Math.round(process.uptime()) + " s"
       }, req);
@@ -1038,6 +1038,36 @@ const serveur = http.createServer(async (req, res) => {
         return repondre(res, 200, { ok: true, updatedAt: cat.updatedAt || null }, req);
       }
       return repondre(res, 405, { error: "Méthode non autorisée" }, req);
+    }
+
+    /* --- fiches équipe ---
+       Une opération, une fiche. Le catalogue doit déjà être ici : sans lui on
+       répond 409, et le site reprend son chemin habituel — brouillon puis
+       publication — plutôt que d'échouer. */
+    if (chemin === "/equipe" && req.method === "POST") {
+      const op = await corpsJson(req);
+      if (!op || !op.op) return repondre(res, 400, { error: "Opération manquante" }, req);
+
+      const r = await enFile(async () => {
+        const cat = await lireCatalogue();
+        if (!cat) return { sansCatalogue: true };
+        const res2 = appliquerEquipe(cat, op);
+        if (res2.erreur) return res2;
+        if (!res2.deja) {
+          cat.updatedAt = new Date().toISOString();
+          await ecrireCatalogue(cat);
+        }
+        return { ok: true, deja: !!res2.deja, catalogue: cat };
+      });
+
+      if (r.sansCatalogue) {
+        return repondre(res, 409, {
+          error: "Aucun catalogue ici : publie-le une fois depuis l'administration."
+        }, req);
+      }
+      if (r.erreur) return repondre(res, 400, { error: r.erreur }, req);
+      console.log(new Date().toISOString(), "équipe :", op.op, "—", op.uid || "");
+      return repondre(res, 200, { ok: true, deja: r.deja, catalogue: r.catalogue }, req);
     }
 
     /* --- agenda --- */
@@ -1398,6 +1428,124 @@ async function ecrireAgenda(ag) {
   const tmp = FICHIER_AG + ".tmp";
   await fsp.writeFile(tmp, JSON.stringify(ag, null, 2) + "\n", "utf8");
   await fsp.rename(tmp, FICHIER_AG);
+}
+
+/* ---- Fiches équipe --------------------------------------------------------------
+   Sanctions, promotions, départs : ce sont des faits d'atelier, pas des
+   réglages. Ils doivent être visibles aussitôt, sans qu'un responsable ait à
+   publier — et sans que deux personnes qui modifient en même temps
+   s'écrasent. D'où des opérations appliquées ici, sur la fiche visée, plutôt
+   qu'un catalogue entier réécrit à chaque geste.
+
+   Le serveur ne remet pas les fiches en forme : c'est le site qui connaît le
+   modèle, et il les renormalise à la lecture. On se borne à borner. */
+
+const MAX_AVERT = 60;
+
+function appliquerEquipe(cat, op) {
+  const uid = texte(op.uid, 60);
+  const users = cat.users || [];
+  const u = users.find(x => x.id === uid);
+
+  /* Le recrutement est le seul geste qui ne vise pas une fiche existante. */
+  if (op.op === "recrue") {
+    const n = op.user;
+    if (!n || typeof n !== "object" || !texte(n.id, 60)) return { erreur: "employé invalide" };
+    if (users.some(x => x.id === n.id)) return { deja: true };
+    users.push(n);
+    return { ok: true };
+  }
+
+  if (!u) return { erreur: "employé introuvable : " + uid };
+
+  switch (op.op) {
+    case "avert-add": {
+      const a = op.avert;
+      if (!a || typeof a !== "object" || !texte(a.id, 80) || !texte(a.motif, 200)) {
+        return { erreur: "avertissement invalide" };
+      }
+      u.avertissements = u.avertissements || [];
+      if (u.avertissements.some(x => x.id === a.id)) return { deja: true };
+      u.avertissements.unshift(a);
+      u.avertissements = u.avertissements.slice(0, MAX_AVERT);
+      return { ok: true };
+    }
+
+    case "avert-lever": {
+      const a = (u.avertissements || []).find(x => x.id === texte(op.id, 80));
+      if (!a) return { erreur: "avertissement introuvable" };
+      if (a.leve === true) return { deja: true };
+      a.leve = true;
+      a.levePar = texte(op.par, 60);
+      a.leveLe = new Date().toISOString();
+      return { ok: true };
+    }
+
+    case "avert-retirer": {
+      const id = texte(op.id, 80);
+      const avant = (u.avertissements || []).length;
+      u.avertissements = (u.avertissements || []).filter(x => x.id !== id);
+      return u.avertissements.length === avant ? { deja: true } : { ok: true };
+    }
+
+    case "promotion": {
+      const roleId = texte(op.roleId, 60);
+      if (!(cat.roles || []).some(r => r.id === roleId)) return { erreur: "grade inconnu" };
+      u.roleId = roleId;
+      u.history = (u.history || []).concat([{
+        roleId,
+        roleName: texte(op.roleName, 60),
+        at: dateIso(op.at) || new Date().toISOString(),
+        by: texte(op.par, 60),
+        note: texte(op.note, 200)
+      }]).sort((a, b) => new Date(a.at) - new Date(b.at)).slice(-40);
+      return { ok: true };
+    }
+
+    /* Modification de la fiche : seuls les champs envoyés sont touchés, pour
+       ne pas effacer ce qu'une autre version du site ne connaîtrait pas. */
+    case "fiche": {
+      if (op.pseudo !== undefined) {
+        const p = texte(op.pseudo, 40).trim();
+        if (p.length < 2) return { erreur: "nom trop court" };
+        if (users.some(x => x.id !== uid && String(x.pseudo).toLowerCase() === p.toLowerCase())) {
+          return { erreur: "ce nom est déjà pris" };
+        }
+        u.pseudo = p;
+      }
+      if (op.hiredAt !== undefined) u.hiredAt = jour(op.hiredAt) || u.hiredAt;
+      if (Array.isArray(op.trainings)) {
+        u.trainings = op.trainings.map(t => texte(t, 40)).filter(Boolean).slice(0, 30);
+      }
+      if (op.note !== undefined) u.note = texte(op.note, 400);
+      if (op.active !== undefined) u.active = op.active === true;
+      if (op.hidden !== undefined) u.hidden = op.hidden === true;
+      return { ok: true };
+    }
+
+    case "depart": {
+      const d = op.depart;
+      if (!d || !jour(d.le)) return { erreur: "départ invalide" };
+      u.depart = {
+        le: jour(d.le),
+        motif: texte(d.motif, 30) || "autre",
+        note: texte(d.note, 600),
+        par: texte(d.par, 60)
+      };
+      u.active = false;
+      return { ok: true };
+    }
+
+    case "retour": {
+      if (!u.depart) return { deja: true };
+      u.depart = null;
+      u.active = true;
+      return { ok: true };
+    }
+
+    default:
+      return { erreur: "opération inconnue : " + op.op };
+  }
 }
 
 /* ---- Catalogue -----------------------------------------------------------------
