@@ -103,6 +103,7 @@ window.V2Shell = (function () {
                            action: "burger" }) +
           '<h1 class="topbar__titre">' + esc(titre) + "</h1>" +
           '<div class="rang pousse" id="v2-actions"></div>' +
+          '<div id="v2-avert"></div>' +
           (MNTheme.libre()
             ? U().bouton("", { icone: "palette", variante: "fantome", titre: "Apparence",
                                action: "theme" })
@@ -129,6 +130,113 @@ window.V2Shell = (function () {
         { nom: "Se déconnecter", icone: "sortie", onClick: deconnexion }
       ]);
     });
+  }
+
+  /* ---- Avertissements reçus ------------------------------------------------------
+     Une sanction ne sert à rien si l'intéressé ne la voit pas. À l'arrivée sur
+     le site, ce qui est nouveau s'affiche en grand ; ensuite un jeton discret
+     reste dans la barre du haut tant que quelque chose pèse au dossier.
+
+     L'accusé de lecture vit dans le navigateur, pas dans les données : un
+     employé n'a pas le droit d'écrire le catalogue, et surtout le site ne peut
+     pas prouver qu'on a lu — il peut seulement éviter de répéter. */
+
+  const clefVus = uid => "mn.av.vus." + (uid || "x");
+
+  function avVus(uid) {
+    try { return JSON.parse(localStorage.getItem(clefVus(uid))) || []; }
+    catch (_) { return []; }
+  }
+
+  function avMarquerVus(uid, ids) {
+    /* On plafonne : la liste ne doit pas enfler indéfiniment avec des
+       identifiants d'avertissements retirés depuis. */
+    try {
+      localStorage.setItem(clefVus(uid), JSON.stringify(avVus(uid).concat(ids).slice(-200)));
+    } catch (_) { /* quota : au pire le rappel se répète */ }
+  }
+
+  /** Les avertissements qui pèsent encore sur le compte connecté. */
+  function mesAvertissements() {
+    const s = _session;
+    if (!s || !s.uid || !s.user) return [];
+    return (s.user.avertissements || []).filter(MNStore.avertActif);
+  }
+
+  const dateLongue = d => {
+    const x = new Date(d);
+    return isNaN(x) ? "—" : x.toLocaleDateString("fr-FR",
+      { day: "2-digit", month: "long", year: "numeric" });
+  };
+  const jourLong = j => {
+    const d = new Date(String(j) + "T12:00:00");
+    return isNaN(d) ? String(j) : d.toLocaleDateString("fr-FR",
+      { day: "numeric", month: "long", year: "numeric" });
+  };
+
+  function montrerAvertissements(liste, nouveaux) {
+    if (!liste.length) return;
+
+    U().modale({
+      titre: nouveaux
+        ? (liste.length > 1 ? "Des avertissements ont été portés à ton dossier"
+                            : "Un avertissement a été porté à ton dossier")
+        : "Ton dossier",
+      corps:
+        '<p class="champ__aide" style="margin-bottom:var(--e-4)">' + (nouveaux
+          ? "Adresse-toi à un responsable si tu contestes."
+          : "Ce qui pèse aujourd'hui à ton dossier.") + "</p>" +
+        '<div class="pile pile--sm">' + liste.map(a => {
+          const g = MNStore.graviteDe(a.gravite);
+          return '<div class="av" style="--grav:' + esc(g.couleur) + '">' +
+            '<span class="av__pastille">' + esc(g.court) + "</span>" +
+            '<div class="av__corps"><b>' + esc(a.motif) + "</b>" +
+              (a.note ? '<p class="av__note">' + esc(a.note) + "</p>" : "") +
+              '<div class="av__meta">' + esc(dateLongue(a.at)) +
+                (a.by ? " · par " + esc(a.by) : "") +
+                (a.expire ? " · compte jusqu'au " + esc(jourLong(a.expire)) : "") +
+              "</div></div></div>";
+        }).join("") + "</div>",
+      actions: [{
+        label: nouveaux ? "J'ai compris" : "Fermer",
+        variante: "principal", icone: "check",
+        onClick: f => {
+          /* Marqué lu seulement par ce bouton : refermer d'un Échap laisse le
+             rappel revenir, ce qui est bien le but. */
+          if (nouveaux) avMarquerVus(_session.uid, liste.map(a => a.id));
+          f();
+          rafraichirJetonAvert();
+        }
+      }]
+    });
+  }
+
+  /** Le jeton de la barre du haut, posé ou retiré selon l'état du dossier. */
+  function rafraichirJetonAvert() {
+    const z = document.getElementById("v2-avert");
+    if (!z) return;
+    const l = mesAvertissements();
+    if (!l.length) { z.innerHTML = ""; return; }
+
+    const pire = l.reduce((p, a) =>
+      MNStore.graviteDe(a.gravite).poids > MNStore.graviteDe(p).poids ? a.gravite : p, "rappel");
+    z.innerHTML = '<button class="avchip" style="--grav:' +
+      esc(MNStore.graviteDe(pire).couleur) +
+      '" title="Voir ce qui pèse à ton dossier">' + U().icone("alerte") +
+      "<span>" + l.length + " avertissement" + (l.length > 1 ? "s" : "") + "</span></button>";
+
+    /* Le jeton rouvre le détail : la page Équipe demande un droit qu'un
+       mécano n'a pas, il n'y accéderait pas. */
+    z.querySelector(".avchip").addEventListener("click", () =>
+      montrerAvertissements(mesAvertissements(), false));
+  }
+
+  /** À l'arrivée : rien si tout a déjà été lu. */
+  function rappelAvertissements() {
+    if (!_session || !_session.uid) return;
+    const vus = avVus(_session.uid);
+    const neufs = mesAvertissements().filter(a => vus.indexOf(a.id) === -1);
+    if (neufs.length) montrerAvertissements(neufs, true);
   }
 
   /** Le nom ou le logo de l'atelier a changé : on repeint la marque plutôt
@@ -388,6 +496,11 @@ window.V2Shell = (function () {
         texte: String(e && e.message || e)
       });
     }
+
+    /* Après la page : un avertissement doit se voir, mais pas retarder
+       l'affichage de ce qu'on venait faire. */
+    rafraichirJetonAvert();
+    rappelAvertissements();
   }
 
   /** Boutons propres à la page, posés dans la barre du haut. */

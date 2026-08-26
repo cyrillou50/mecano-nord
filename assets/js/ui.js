@@ -292,6 +292,20 @@ window.MNUI = (function () {
         (canAdmin ? '<a class="navlink' + (active === "admin" ? " is-active" : "") + '" href="admin.html">Admin</a>' : "") +
       "</nav>" +
       '<div class="topbar__spacer"></div>' +
+      /* Un dossier qui pèse reste sous les yeux, même une fois la fenêtre
+         d'arrivée refermée. Le jeton rouvre le détail : la page Équipe est
+         réservée aux responsables, un mécano n'y accéderait pas. */
+      (function () {
+        const n = mesAvertissements().length;
+        if (!n) return "";
+        const g = MNStore.graviteDe(
+          mesAvertissements().reduce((p, a) =>
+            MNStore.graviteDe(a.gravite).poids > MNStore.graviteDe(p).poids ? a.gravite : p,
+            "rappel"));
+        return '<button class="avchip" id="btn-av" style="--grav:' + esc(g.couleur) +
+          '" title="Voir ce qui pèse à ton dossier">' + svg("alert") +
+          "<span>" + n + " avertissement" + (n > 1 ? "s" : "") + "</span></button>";
+      })() +
       /* La palette n'apparaît que si chacun a le droit de se choisir une
          apparence — sinon le bouton ne mènerait nulle part. */
       (MNTheme.libre()
@@ -310,6 +324,9 @@ window.MNUI = (function () {
             "</button>" +
           "</div>"
         : "");
+
+    const av = document.getElementById("btn-av");
+    if (av) av.addEventListener("click", () => montrerAvertissements(mesAvertissements(), false));
 
     const th = document.getElementById("btn-theme");
     if (th) th.addEventListener("click", themeModal);
@@ -425,6 +442,7 @@ window.MNUI = (function () {
     if (gate) gate.hidden = true;
     if (app) app.hidden = false;
 
+    document.body.dataset.page = opt.page || "";
     mountTopbar(opt.page);
 
     /* Une page dont l'initialisation échoue doit le dire, pas rester figée
@@ -435,6 +453,103 @@ window.MNUI = (function () {
     } catch (e) {
       pageCassee(e);
     }
+
+    /* Après la page : un avertissement doit se voir, mais pas retarder
+       l'affichage de ce qu'on venait faire. */
+    rappelAvertissements();
+  }
+
+  /* ---- Avertissements reçus ------------------------------------------------------
+     Une sanction ne sert à rien si l'intéressé ne la voit pas. À l'arrivée sur
+     le site, ce qui est nouveau s'affiche en grand ; ensuite un jeton discret
+     reste dans la barre du haut tant que quelque chose pèse au dossier.
+
+     L'accusé de lecture vit dans le navigateur, pas dans les données : un
+     employé n'a pas le droit d'écrire le catalogue, et surtout le site ne
+     peut pas prouver qu'on a lu — il peut seulement éviter de répéter. */
+
+  const K_AV_VUS = uid => "mn.av.vus." + (uid || "x");
+
+  function avVus(uid) {
+    try { return JSON.parse(localStorage.getItem(K_AV_VUS(uid))) || []; }
+    catch (_) { return []; }
+  }
+
+  function avMarquerVus(uid, ids) {
+    const l = avVus(uid).concat(ids);
+    /* On ne garde que ce qui existe encore : la liste ne doit pas enfler
+       indéfiniment avec des identifiants d'avertissements retirés. */
+    try { localStorage.setItem(K_AV_VUS(uid), JSON.stringify(l.slice(-200))); }
+    catch (_) { /* quota : au pire le rappel se répète */ }
+  }
+
+  /** Les avertissements qui pèsent encore sur le compte connecté. */
+  function mesAvertissements() {
+    const s = MNAuth.session();
+    if (!s || !s.uid || !s.user) return [];
+    return (s.user.avertissements || []).filter(MNStore.avertActif);
+  }
+
+  /** Fenêtre de lecture. `nouveaux` = ceux qu'on n'avait pas encore montrés. */
+  function montrerAvertissements(liste, nouveaux) {
+    if (!liste.length) return;
+    const s = MNAuth.session();
+
+    const body = document.createElement("div");
+    body.innerHTML =
+      '<p class="hint" style="margin-bottom:14px">' + (nouveaux
+        ? "Adresse-toi à un responsable si tu contestes."
+        : "Ce qui pèse aujourd'hui à ton dossier.") + "</p>" +
+      '<div class="avlist">' + liste.map(a => {
+        const g = MNStore.graviteDe(a.gravite);
+        return '<div class="av" style="--grav:' + esc(g.couleur) + '">' +
+          '<span class="av__pastille">' + esc(g.court) + "</span>" +
+          '<div class="av__corps"><b>' + esc(a.motif) + "</b>" +
+            (a.note ? '<p class="av__note">' + esc(a.note) + "</p>" : "") +
+            '<div class="av__meta">' + fdate(a.at) +
+              (a.by ? " · par " + esc(a.by) : "") +
+              (a.expire ? " · compte jusqu'au " + esc(fjour(a.expire)) : "") +
+            "</div></div></div>";
+      }).join("") + "</div>";
+
+    modal({
+      title: nouveaux
+        ? (liste.length > 1 ? "Des avertissements ont été portés à ton dossier"
+                            : "Un avertissement a été porté à ton dossier")
+        : "Ton dossier",
+      body,
+      actions: [{
+        label: nouveaux ? "J'ai compris" : "Fermer",
+        variant: "btn--primary", icon: "check",
+        onClick: c => {
+          /* Marqué lu seulement par ce bouton : refermer d'un Échap laisse le
+             rappel revenir, ce qui est bien le but. */
+          if (nouveaux) avMarquerVus(s.uid, liste.map(a => a.id));
+          c();
+          mountTopbar(document.body.dataset.page || "");
+        }
+      }]
+    });
+  }
+
+  const fdate = d => {
+    const x = new Date(d);
+    return isNaN(x) ? "—" : x.toLocaleDateString("fr-FR",
+      { day: "2-digit", month: "long", year: "numeric" });
+  };
+  const fjour = j => {
+    const d = new Date(String(j) + "T12:00:00");
+    return isNaN(d) ? String(j) : d.toLocaleDateString("fr-FR",
+      { day: "numeric", month: "long", year: "numeric" });
+  };
+
+  /** À l'arrivée : rien si tout a déjà été lu. */
+  function rappelAvertissements() {
+    const s = MNAuth.session();
+    if (!s || !s.uid) return;
+    const vus = avVus(s.uid);
+    const neufs = mesAvertissements().filter(a => vus.indexOf(a.id) === -1);
+    if (neufs.length) montrerAvertissements(neufs, true);
   }
 
   function pageCassee(e) {

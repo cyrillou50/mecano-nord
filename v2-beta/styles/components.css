@@ -1685,3 +1685,23 @@
 
 /* Le titre de bloc pousse son bouton à droite. */
 .eq-bloc h3 .pousse { margin-left: auto; }
+
+/* Jeton de la barre du haut : ce qui pèse au dossier, toujours sous les yeux. */
+.avchip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px var(--e-3);
+  border-radius: var(--r-plein);
+  background: color-mix(in srgb, var(--grav) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--grav) 50%, transparent);
+  color: var(--grav);
+  font-family: var(--f-titre);
+  font-size: var(--t-sm); font-weight: 700;
+  letter-spacing: .04em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--m-vif);
+}
+.avchip:hover { background: color-mix(in srgb, var(--grav) 26%, transparent); }
+.avchip svg { width: 15px; height: 15px; flex: none; }
+
+@media (max-width: 760px) { .avchip span { display: none; } .avchip { padding: 7px 9px; } }
