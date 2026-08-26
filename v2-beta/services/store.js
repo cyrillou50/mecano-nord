@@ -139,6 +139,59 @@ window.MNStore = (function () {
     };
   }
 
+  /* ---- Départs ---------------------------------------------------------------------
+     Quelqu'un qui s'en va n'est pas quelqu'un qu'on efface. Sa fiche quitte
+     l'équipe pour les archives, et garde tout : ancienneté, carrière,
+     formations, avertissements. On doit pouvoir dire, deux ans après, qui
+     était là et ce qui s'est passé.
+
+     Le pseudo reste pris, volontairement : une nouvelle recrue du même nom
+     hériterait sinon d'un historique qui n'est pas le sien. */
+
+  const MOTIFS_DEPART = [
+    { id: "demission", nom: "Démission", court: "Démission" },
+    { id: "renvoi", nom: "Renvoi", court: "Renvoyé" },
+    { id: "fin", nom: "Fin de contrat", court: "Fin de contrat" },
+    { id: "inactif", nom: "Inactivité prolongée", court: "Inactif" },
+    { id: "autre", nom: "Autre", court: "Parti" }
+  ];
+  const motifDepart = id => MOTIFS_DEPART.find(m => m.id === id) || MOTIFS_DEPART[4];
+
+  function normDepart(d) {
+    if (!d || typeof d !== "object") return null;
+    const le = jour(d.le);
+    if (!le) return null;                   // sans date de départ, pas de départ
+    return {
+      le,
+      motif: MOTIFS_DEPART.some(m => m.id === d.motif) ? d.motif : "autre",
+      note: String(d.note || "").slice(0, 600),
+      par: String(d.par || "").slice(0, 60)
+    };
+  }
+
+  const estArchive = u => !!(u && u.depart);
+
+  /** Archive quelqu'un : il quitte l'équipe sans rien perdre. */
+  function archiverUser(user, info, byPseudo) {
+    user.depart = normDepart(Object.assign({ le: jourLocal() }, info, { par: byPseudo || "" }));
+    /* Désactivé aussi : c'est ce que lisent la connexion et la session, donc
+       la personne est déconnectée au prochain chargement. */
+    user.active = false;
+    return user;
+  }
+
+  /** Le fait revenir dans l'équipe, son passé avec lui. */
+  function reintegrerUser(user) {
+    user.depart = null;
+    user.active = true;
+    return user;
+  }
+
+  /* Deux listes, partout : l'équipe d'aujourd'hui, et ceux qui sont passés. */
+  const usersActifs = () => (_catalog.users || []).filter(u => !estArchive(u));
+  const usersArchives = () => (_catalog.users || []).filter(estArchive)
+    .slice().sort((a, b) => String(b.depart.le).localeCompare(String(a.depart.le)));
+
   /* ---- Avertissements ------------------------------------------------------------
      Une sanction posée sur la fiche de quelqu'un. Trois choses la rendent
      utilisable plutôt que blessante : elle porte un motif écrit, elle dit qui
@@ -623,6 +676,7 @@ window.MNStore = (function () {
         trainings: (Array.isArray(u.trainings) ? u.trainings : [])
           .map(t => String(t).trim()).filter(Boolean).slice(0, 30),
         note: u.note ? String(u.note).slice(0, 400) : "",
+        depart: normDepart(u.depart),
         history: history.slice(-40),
         avertissements
       };
@@ -934,6 +988,8 @@ window.MNStore = (function () {
     catalog, published, depot, hasDraft, origin, settings, brand, api,
     roleById, roleOf, itemById, resourceById, categoryById,
     topCategories, subCategories, categoryScope, itemLabel, totals, duree,
+    MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,
+    usersActifs, usersArchives,
     GRAVITES, graviteDe, normAvertissement, avertActif, avertBilan,
     addAvertissement, leverAvertissement, retirerAvertissement,
     normContrat, contratTotaux, nombre, ETATS_CONTRAT: ETATS,

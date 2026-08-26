@@ -886,16 +886,27 @@
     z.innerHTML =
       outils("Qui peut se connecter, et avec quels droits — les flèches réordonnent la liste",
         U.bouton("Nouvel employé", { variante: "principal", icone: "plus", action: "add" })) +
-      (brouillon.users.length
-        ? '<div class="pile pile--sm">' + brouillon.users.map(ligneUser).join("") + "</div>"
-        : U.vide({ icone: "equipe", titre: "Aucun employé",
-                   texte: "Ajoute les pseudos de ton équipe pour qu'ils puissent se connecter." })) +
-      '<div style="margin-top:var(--e-4)">' + U.alerte({
-        ton: "info",
-        texte: "Le pseudo est la seule chose à retenir. Le code d'accès est facultatif : " +
-               "utile pour les comptes qui gèrent le catalogue ou l'équipe. Les fiches " +
-               "détaillées se tiennent sur la page Équipe."
-      }) + "</div>";
+      /* L'administration ne gère que l'équipe en poste : les partis se
+         consultent sur la page Équipe, onglet Archives. */
+      (function () {
+        const vivants = brouillon.users.filter(x => !MNStore.estArchive(x));
+        const partis = brouillon.users.length - vivants.length;
+        return (vivants.length
+          ? '<div class="pile pile--sm">' + vivants.map(ligneUser).join("") + "</div>"
+          : U.vide({ icone: "equipe", titre: "Aucun employé",
+                     texte: "Ajoute les noms de ton équipe pour qu'ils puissent se connecter." })) +
+        '<div style="margin-top:var(--e-4)">' + U.alerte({
+          ton: "info",
+          texte: "Le nom est la seule chose à retenir. Le code d'accès est facultatif : " +
+                 "utile pour les comptes qui gèrent le catalogue ou l'équipe. Les fiches " +
+                 "détaillées se tiennent sur la page Équipe."
+        }) + "</div>" +
+        (partis
+          ? '<p class="champ__aide" style="margin-top:var(--e-3)">' + partis + " fiche" +
+            (partis > 1 ? "s" : "") + " archivée" + (partis > 1 ? "s" : "") +
+            ' — voir <a href="equipe.html">Équipe → Archives</a>.</p>'
+          : "");
+      })();
 
     z.querySelector('[data-a="add"]').addEventListener("click", () => editerUser(null));
     brancherLignes(z, brouillon.users, {
@@ -1068,15 +1079,22 @@
     if (gerants.length <= 1 && gerants[0] && gerants[0].id === u.id) {
       return U.toast("C'est le dernier compte capable de gérer l'équipe", "err");
     }
+    /* Effacer une fiche fait disparaître une ancienneté, une carrière, des
+       avertissements — tout ce qui permettrait plus tard de dire ce qui s'est
+       passé. On archive par défaut, et l'effacement reste possible pour ce à
+       quoi il sert vraiment : une fiche créée par erreur. */
     const ok = await U.confirmer({
-      titre: "Retirer l'employé",
-      message: "« " + u.pseudo + " » ne pourra plus se connecter au site.",
-      confirmer: "Retirer", danger: true
+      titre: "Retirer " + u.pseudo,
+      message: "Sa fiche sera effacée : ancienneté, carrière, formations et " +
+        "avertissements avec elle, sans retour possible. Pour un départ normal, " +
+        "ferme cette fenêtre et utilise « Archiver » sur la page Équipe : la fiche " +
+        "est alors conservée et consultable.",
+      confirmer: "Effacer définitivement", danger: true
     });
     if (!ok) return;
     brouillon.users = brouillon.users.filter(x => x.id !== u.id);
     valider();
-    U.toast("Employé retiré", "ok");
+    U.toast("Fiche effacée", "ok");
   }
 
   /* ---- Rôles -------------------------------------------------------------------- */

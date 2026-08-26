@@ -17,6 +17,8 @@
   let canSeeNotes = false;
   let canWarn = false;
   let showHidden = false;
+  let vueArchives = false;      /* la liste montre-t-elle les partis ? */
+  let tranche = null;           /* tranche du répertoire, en archives */
   let reorder = false;
   let ticker = null;
 
@@ -159,26 +161,102 @@
     return c ? " jusqu'au " + jourCourt(c.to) : "";
   }
 
-  /** Les personnes masquées ne sortent que si un responsable le demande. */
-  const visibleUsers = () =>
-    draft.users.filter(u => !u.hidden || (canEdit && showHidden));
+  /* ---- Équipe d'aujourd'hui / archives ----------------------------------------
+     Deux populations qui ne se mélangent pas : ceux qui travaillent ici, et
+     ceux qui sont passés. La bascule est en tête de liste, pas un filtre
+     perdu au milieu — on ne consulte pas les archives par accident. */
 
-  const hiddenCount = () => draft.users.filter(u => u.hidden).length;
+  const actifs = () => draft.users.filter(u => !MNStore.estArchive(u));
+  const archives = () => draft.users.filter(MNStore.estArchive);
+
+  /** Les personnes masquées ne sortent que si un responsable le demande. */
+  const visibleUsers = () => (vueArchives
+    ? triArchives(archives())
+    : actifs().filter(u => !u.hidden || (canEdit && showHidden)));
+
+  /* Les archives se lisent par ordre alphabétique : on y cherche un nom, pas
+     une date. La liste vivante garde l'ordre choisi par l'atelier. */
+  const triArchives = l => l.slice()
+    .sort((a, b) => a.pseudo.localeCompare(b.pseudo, "fr", { sensitivity: "base" }));
+
+  const hiddenCount = () => actifs().filter(u => u.hidden).length;
+
+  /* ---- Index alphabétique --------------------------------------------------
+     Les archives grossissent sans jamais rétrécir. Un répertoire par tranches
+     de deux lettres évite de faire défiler tout l'historique de l'atelier
+     pour retrouver quelqu'un. */
+
+  const TRANCHES = (function () {
+    const t = [];
+    for (let i = 0; i < 26; i += 2) {
+      const a = String.fromCharCode(97 + i);
+      const b = String.fromCharCode(97 + Math.min(25, i + 1));
+      t.push({ id: a + "-" + b, nom: a + "-" + b, lettres: a === b ? [a] : [a, b] });
+    }
+    return t;
+  })();
+
+  /** La lettre de classement : sans accent, minuscule. */
+  const initialeDe = u => String(u.pseudo || "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .charAt(0).toLowerCase();
+
+  const dansTranche = (u, t) => !t || t.lettres.indexOf(initialeDe(u)) !== -1;
+
+  /**
+   * Le répertoire, en colonne. Une tranche vide reste affichée mais éteinte :
+   * la voir grisée dit qu'on a bien cherché au bon endroit, alors qu'une
+   * tranche absente laisserait croire à un oubli.
+   */
+  function indexAlpha(liste, recherche) {
+    if (recherche) return "";                 // la recherche fouille tout
+    const compte = {};
+    liste.forEach(u => {
+      const l = initialeDe(u);
+      TRANCHES.forEach(t => { if (t.lettres.indexOf(l) !== -1) compte[t.id] = (compte[t.id] || 0) + 1; });
+    });
+
+    return '<div class="alpha">' +
+      '<button class="alpha__t' + (tranche ? "" : " is-on") + '" data-tr="">Tout</button>' +
+      TRANCHES.map(t =>
+        '<button class="alpha__t' + (tranche && tranche.id === t.id ? " is-on" : "") +
+          (compte[t.id] ? "" : " is-vide") + '" data-tr="' + t.id + '"' +
+          (compte[t.id] ? ' title="' + compte[t.id] + ' fiche' + (compte[t.id] > 1 ? "s" : "") + '"'
+                        : " disabled") + ">" + t.nom + "</button>").join("") +
+    "</div>";
+  }
 
   function renderList() {
     const nav = $("#staff-nav");
     const f = filter.toLowerCase();
-    const list = visibleUsers().filter(u =>
+    const base = visibleUsers().filter(u =>
       !f || u.pseudo.toLowerCase().indexOf(f) !== -1 || roleOf(u).name.toLowerCase().indexOf(f) !== -1);
+    /* La tranche s'applique aux seules archives, et cède devant une
+       recherche : chercher un nom précis doit fouiller tout le répertoire. */
+    const list = (vueArchives && !f) ? base.filter(u => dansTranche(u, tranche)) : base;
     const nHidden = hiddenCount();
+    const nArch = archives().length;
 
-    /* Réorganiser n'a de sens que sur la liste entière, sans filtre. */
-    const canSort = canEdit && reorder && !filter;
+    /* Réorganiser n'a de sens que sur la liste vivante, entière et sans filtre. */
+    const canSort = canEdit && reorder && !filter && !vueArchives;
 
     nav.innerHTML =
       '<div class="stafflist__top">' +
-        '<input class="input" id="s-find" placeholder="Chercher…" value="' + esc(filter) + '">' +
-        (canEdit
+        /* La bascule n'apparaît que s'il y a quelque chose à archiver ou déjà
+           archivé : un atelier neuf n'a pas à porter un onglet vide. */
+        (nArch || vueArchives
+          ? '<div class="segbar">' +
+              '<button class="seg' + (vueArchives ? "" : " is-on") + '" data-vue="equipe">' +
+                "Équipe</button>" +
+              '<button class="seg' + (vueArchives ? " is-on" : "") + '" data-vue="archives">' +
+                "Archives<span>" + nArch + "</span></button>" +
+            "</div>"
+          : "") +
+        '<input class="input" id="s-find" placeholder="' +
+          (vueArchives ? "Chercher dans les archives…" : "Chercher…") + '" value="' +
+          esc(filter) + '">' +
+        (vueArchives ? indexAlpha(base, f) : "") +
+        (canEdit && !vueArchives
           ? '<div class="row" style="margin-top:8px;gap:6px">' +
               '<button class="btn btn--primary btn--sm" id="s-add" style="flex:1">' +
                 svg("plus") + "<span>Employé</span></button>" +
@@ -209,7 +287,13 @@
             '<span class="userchip__av" style="width:34px;height:34px;flex:none;background:' +
               esc(r.color) + '">' + esc(MNUI.initials(u.pseudo)) + "</span>" +
             '<span class="staffrow__txt"><b>' + esc(u.pseudo) + "</b>" +
-              '<i style="color:' + esc(r.color) + '">' + esc(r.name) + "</i></span>" +
+              /* En archives, le grade importe moins que la raison du départ :
+                 c'est ce qu'on vient vérifier. */
+              (MNStore.estArchive(u)
+                ? "<i>" + esc(MNStore.motifDepart(u.depart.motif).court) + " · " +
+                  esc(jourCourt(u.depart.le)) + "</i>"
+                : '<i style="color:' + esc(r.color) + '">' + esc(r.name) + "</i>") +
+            "</span>" +
             (u.hidden ? '<span class="staffrow__eye" title="Masqué de l\'équipe">' + svg("lock") + "</span>" : "") +
             /* Un dossier chargé se voit depuis la liste : chercher fiche par
                fiche qui a été averti n'aurait aucun sens. */
@@ -239,6 +323,27 @@
             (nHidden > 1 ? "s" : "") + "</span></button>"
           : "") +
       "</div>";
+
+    nav.querySelectorAll("[data-vue]").forEach(b => b.addEventListener("click", () => {
+      const veut = b.dataset.vue === "archives";
+      if (veut === vueArchives) return;
+      vueArchives = veut;
+      /* On repart d'une liste propre : la recherche et la tranche d'une vue
+         n'ont pas de sens dans l'autre. */
+      filter = ""; tranche = null; reorder = false;
+      const p = visibleUsers()[0];
+      sel = p ? p.id : null;
+      render();
+    }));
+
+    nav.querySelectorAll("[data-tr]").forEach(b => b.addEventListener("click", () => {
+      if (b.disabled) return;
+      tranche = b.dataset.tr ? TRANCHES.find(t => t.id === b.dataset.tr) : null;
+      const l = visibleUsers().filter(u => dansTranche(u, tranche));
+      /* La fiche affichée doit rester dans ce qu'on regarde. */
+      if (!l.some(u => u.id === sel)) sel = l.length ? l[0].id : null;
+      render();
+    }));
 
     const sortBtn = $("#s-sort");
     if (sortBtn) sortBtn.addEventListener("click", () => {
@@ -316,7 +421,8 @@
             esc(MNUI.initials(u.pseudo)) + "</div>" +
           '<div class="staffhead__id">' +
             "<h2>" + esc(u.pseudo) +
-              (u.active ? "" : ' <span class="pill pill--dim">désactivé</span>') +
+              (MNStore.estArchive(u) ? " <span class=\"pill pill--danger\">archivé</span>" : "") +
+              (u.active || MNStore.estArchive(u) ? "" : " <span class=\"pill pill--dim\">désactivé</span>") +
               (u.hidden ? ' <span class="pill pill--warn">masqué</span>' : "") + "</h2>" +
             '<span class="rolechip rolechip--ico" style="color:' + esc(r.color) + '">' +
               mnIcon(r.icon) + esc(r.name) + "</span>" +
@@ -326,23 +432,39 @@
               : "") +
             (u.pin ? '<span class="pill pill--dim">' + svg("lock", "inline-lock") + " code</span>" : "") +
           "</div>" +
-          (canEdit || canWarn
-            ? '<div class="staffhead__acts">' +
-                (canEdit
-                  ? '<button class="btn btn--primary" id="c-promote">' + svg("tag") +
-                    "<span>Changer de grade</span></button>" +
-                    '<button class="btn btn--ghost" id="c-edit">' + svg("edit") +
-                    "<span>Modifier la fiche</span></button>"
-                  : "") +
-                (canWarn && u.id !== me.uid
-                  ? '<button class="btn btn--ghost" id="c-warn">' + svg("alert") +
-                    "<span>Avertir</span></button>"
-                  : "") +
-              "</div>"
-            : "") +
+          /* Une fiche archivée ne se modifie plus : elle témoigne. La seule
+             action qui reste est de faire revenir la personne. */
+          (MNStore.estArchive(u)
+            ? (canEdit
+                ? '<div class="staffhead__acts">' +
+                    '<button class="btn btn--primary" id="c-back">' + svg("refresh") +
+                      "<span>Réintégrer</span></button>" +
+                  "</div>"
+                : "")
+            : (canEdit || canWarn
+              ? '<div class="staffhead__acts">' +
+                  (canEdit
+                    ? '<button class="btn btn--primary" id="c-promote">' + svg("tag") +
+                      "<span>Changer de grade</span></button>" +
+                      '<button class="btn btn--ghost" id="c-edit">' + svg("edit") +
+                      "<span>Modifier la fiche</span></button>"
+                    : "") +
+                  (canWarn && u.id !== me.uid
+                    ? '<button class="btn btn--ghost" id="c-warn">' + svg("alert") +
+                      "<span>Avertir</span></button>"
+                    : "") +
+                  (canEdit && u.id !== me.uid
+                    ? '<button class="btn btn--ghost" id="c-leave">' + svg("logout") +
+                      "<span>Archiver</span></button>"
+                    : "") +
+                "</div>"
+              : "")) +
         "</div>" +
 
         '<div class="panel__body">' +
+          /* Le départ passe avant tout le reste : c'est la première chose à
+             savoir en ouvrant la fiche de quelqu'un qui n'est plus là. */
+          (MNStore.estArchive(u) ? bandeauDepart(u) : "") +
           '<div class="statgrid">' +
             (() => { const a = seniority(u.hiredAt);
               return stat("Ancienneté", a.texte, false, null, a.sous); })() +
@@ -389,6 +511,8 @@
 
     const p = $("#c-promote"); if (p) p.addEventListener("click", () => promote(u));
     const e = $("#c-edit"); if (e) e.addEventListener("click", () => editCard(u));
+    const dep = $("#c-leave"); if (dep) dep.addEventListener("click", () => archiver(u));
+    const ret = $("#c-back"); if (ret) ret.addEventListener("click", () => reintegrer(u));
     /* Deux entrées vers la même fenêtre : le bouton de l'entête, et celui du
        bloc — on avertit rarement, mais quand on le fait on est déjà en bas de
        la fiche à relire les précédents. */
@@ -559,6 +683,89 @@
     /* Le total en jours va sur une seconde ligne : il lève l'ambiguïté sans
        allonger la valeur principale. */
     return { texte: p.join(" "), sous: total + " jour" + (total > 1 ? "s" : "") + " au total" };
+  }
+
+  /* ---- Départs et archives -------------------------------------------------------- */
+
+  function bandeauDepart(u) {
+    const d = u.depart;
+    const m = MNStore.motifDepart(d.motif);
+    return '<div class="depart">' +
+      '<div class="depart__tete">' + svg("logout") +
+        "<b>" + esc(m.nom) + "</b>" +
+        '<span>le ' + esc(jourCourt(d.le)) + (d.par ? " · par " + esc(d.par) : "") + "</span>" +
+      "</div>" +
+      (d.note ? '<p class="depart__note">' + esc(d.note) + "</p>" : "") +
+      '<p class="hint">Cette fiche est conservée telle quelle : ancienneté, carrière, ' +
+        "formations et avertissements restent lisibles. Elle ne se modifie plus.</p>" +
+    "</div>";
+  }
+
+  /** Faire partir quelqu'un : la fiche passe aux archives, rien n'est perdu. */
+  function archiver(u) {
+    const auj = MNDuty.jourLocal();
+    const body = document.createElement("div");
+    body.className = "editor";
+    body.innerHTML =
+      '<p class="hint">' + esc(u.pseudo) + " quittera l'équipe et ne pourra plus se " +
+        "connecter. <b>Rien n'est supprimé</b> : sa fiche part aux archives avec toute " +
+        "son histoire, et tu pourras la rouvrir ou le réintégrer plus tard.</p>" +
+      '<div class="field"><label class="label">Motif</label>' +
+        '<div class="motifs" id="d-motifs">' + MNStore.MOTIFS_DEPART.map((m, i) =>
+          '<button type="button" class="motif' + (i === 0 ? " is-on" : "") +
+          '" data-m="' + esc(m.id) + '">' + esc(m.nom) + "</button>").join("") + "</div></div>" +
+      '<div class="field" style="max-width:220px"><label class="label" for="d-date">Date du départ</label>' +
+        '<input class="input" id="d-date" type="date" value="' + auj + '" max="' + auj + '"></div>' +
+      '<div class="field"><label class="label" for="d-note">Précisions (facultatif)</label>' +
+        '<textarea class="textarea" id="d-note" maxlength="600" ' +
+          'placeholder="Ce qu\'il faut retenir de ce départ…"></textarea></div>';
+
+    let motif = MNStore.MOTIFS_DEPART[0].id;
+    body.querySelectorAll("[data-m]").forEach(b => b.addEventListener("click", () => {
+      motif = b.dataset.m;
+      body.querySelectorAll("[data-m]").forEach(x => x.classList.toggle("is-on", x === b));
+    }));
+
+    MNUI.modal({
+      title: "Archiver " + u.pseudo, body,
+      actions: [
+        { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
+        {
+          label: "Archiver la fiche", variant: "btn--primary", icon: "logout",
+          onClick: close => {
+            const j = body.querySelector("#d-date").value || auj;
+            MNStore.archiverUser(u, {
+              le: j, motif,
+              note: body.querySelector("#d-note").value.trim()
+            }, me.pseudo);
+
+            /* On bascule sur les archives : c'est là qu'il se trouve
+               désormais, le laisser sur une liste où il n'est plus serait
+               déroutant. */
+            vueArchives = true; tranche = null; filter = "";
+            sel = u.id;
+            commit(); close();
+            MNUI.toast(u.pseudo + " est archivé — sa fiche reste consultable", "ok");
+          }
+        }
+      ]
+    });
+  }
+
+  async function reintegrer(u) {
+    const ok = await MNUI.confirm({
+      title: "Réintégrer " + u.pseudo,
+      message: "Sa fiche revient dans l'équipe avec toute son histoire, et il pourra " +
+        "de nouveau se connecter. Son grade est celui qu'il avait en partant.",
+      confirmLabel: "Réintégrer"
+    });
+    if (!ok) return;
+
+    MNStore.reintegrerUser(u);
+    vueArchives = false; tranche = null; filter = "";
+    sel = u.id;
+    commit();
+    MNUI.toast(u.pseudo + " a rejoint l'équipe", "ok");
   }
 
   /* ---- Avertissements ------------------------------------------------------------

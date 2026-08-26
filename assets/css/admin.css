@@ -1286,3 +1286,87 @@ button.calev:hover { filter: brightness(1.25); }
 .avchip svg { width: 15px; height: 15px; flex: none; }
 
 @media (max-width: 760px) { .avchip span { display: none; } .avchip { padding: 7px 9px; } }
+
+/* ---- Archives ---------------------------------------------------------------
+   Ceux qui sont passés. Deux populations qui ne se mélangent pas, donc une
+   bascule franche plutôt qu'un filtre discret. */
+
+.segbar {
+  display: flex; gap: 3px;
+  margin-bottom: 8px;
+  padding: 3px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.seg {
+  flex: 1;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 12px; font-weight: 700;
+  letter-spacing: .06em;
+  transition: background .14s, color .14s;
+}
+.seg:hover { color: var(--txt); }
+.seg.is-on { background: var(--pink-ink); color: var(--pink-soft); }
+.seg span {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .09);
+  font-size: 10.5px;
+}
+
+/* Répertoire alphabétique : une colonne de tranches, comme un classeur. */
+.alpha {
+  display: flex; flex-wrap: wrap; gap: 3px;
+  margin-top: 8px;
+}
+.alpha__t {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .04);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .04em;
+  transition: background .12s, color .12s;
+}
+.alpha__t:hover:not(:disabled) { background: rgb(var(--accent-rgb) / .16); color: var(--pink-soft); }
+.alpha__t.is-on { background: var(--pink); color: var(--on-accent); }
+.alpha__t.is-vide { opacity: .28; cursor: default; }
+
+/* Le départ, en tête de fiche archivée. */
+.depart {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: rgba(255, 59, 92, .07);
+  border: 1px solid rgba(255, 59, 92, .3);
+  border-left: 3px solid var(--danger);
+  border-radius: 12px;
+}
+.depart__tete {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  color: var(--danger);
+}
+.depart__tete svg { width: 17px; height: 17px; flex: none; }
+.depart__tete b { font-family: var(--font-display); font-size: 14.5px; letter-spacing: .05em; }
+.depart__tete span { color: var(--muted); font-size: 12.5px; }
+.depart__note { margin: 8px 0; font-size: 13.5px; white-space: pre-wrap; }
+.depart .hint { margin-top: 8px; }
+
+/* Choix du motif de départ : à plat, comme les gravités. */
+.motifs { display: flex; gap: 7px; flex-wrap: wrap; }
+.motif {
+  padding: 9px 13px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 12.5px; font-weight: 700;
+  transition: border-color .12s, color .12s, background .12s;
+}
+.motif:hover { color: var(--txt); border-color: var(--pink); }
+.motif.is-on { border-color: var(--pink); background: var(--pink-ink); color: var(--pink-soft); }

@@ -1315,15 +1315,25 @@
         '<span class="spacer"></span>' +
         '<button class="btn btn--primary" id="add">' + svg("plus") + "<span>Nouvel employé</span></button>" +
       "</div>" +
-      (draft.users.length
-        ? '<div class="rows">' + draft.users.map(u => userRow(u, me)).join("") + "</div>"
+      (function () {
+        /* L'admin ne gère que l'équipe en poste : les partis se consultent
+           sur la page Équipe, onglet Archives. */
+        const vivants = draft.users.filter(x => !MNStore.estArchive(x));
+        const partis = draft.users.length - vivants.length;
+        return (vivants.length
+          ? '<div class="rows">' + vivants.map(u => userRow(u, me)).join("") + "</div>"
         : '<div class="empty">' + svg("users") + "<b>Aucun employé</b>" +
           "<p>Ajoute les pseudos de ton équipe pour qu'ils puissent se connecter.</p></div>") +
       '<div class="alert alert--info" style="margin-top:6px">' + svg("info") +
         "<span>Le pseudo est la seule chose à retenir. Le code d'accès est facultatif : " +
         "utile pour les comptes qui gèrent le catalogue ou l'équipe. " +
         'Pour les fiches détaillées (ancienneté, formations, carrière), va sur la page ' +
-        '<a href="equipe.html">Équipe</a>.</span></div>';
+        '<a href="equipe.html">Équipe</a>.</span></div>' +
+        (partis
+          ? '<p class="hint">' + partis + " fiche" + (partis > 1 ? "s" : "") + " archivée" +
+            (partis > 1 ? "s" : "") + ' — voir <a href="equipe.html">Équipe → Archives</a>.</p>'
+          : "");
+      })();
 
     $("#add").addEventListener("click", () => editUser(null));
     bindRows(host, draft.users, {
@@ -1508,15 +1518,22 @@
     if (admins.length <= 1 && admins[0] && admins[0].id === u.id) {
       return MNUI.toast("C'est le dernier compte capable de gérer l'équipe", "err");
     }
+    /* Effacer une fiche fait disparaître une ancienneté, une carrière, des
+       avertissements — tout ce qui permettrait plus tard de dire ce qui s'est
+       passé. On archive par défaut, et l'effacement reste possible pour ce à
+       quoi il sert vraiment : une fiche créée par erreur. */
     const ok = await MNUI.confirm({
-      title: "Retirer l'employé",
-      message: "« " + u.pseudo + " » ne pourra plus se connecter au site.",
-      confirmLabel: "Retirer", danger: true
+      title: "Retirer " + u.pseudo,
+      message: "Sa fiche sera effacée : ancienneté, carrière, formations et " +
+        "avertissements avec elle, sans retour possible.\n\n" +
+        "Pour un départ normal, ferme cette fenêtre et utilise « Archiver » sur la " +
+        "page Équipe : la fiche est conservée et consultable.",
+      confirmLabel: "Effacer définitivement", danger: true
     });
     if (!ok) return;
     draft.users = draft.users.filter(x => x.id !== u.id);
     commit();
-    MNUI.toast("Employé retiré", "ok");
+    MNUI.toast("Fiche effacée", "ok");
   }
 
   /* =========================================================================

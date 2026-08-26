@@ -228,6 +228,13 @@ window.MNAuth = (function () {
       }
       return fail("inconnu", "Ce nom n'est pas enregistré. Demande à un responsable de t'ajouter.");
     }
+    /* Un compte archivé se distingue d'un compte simplement désactivé : la
+       personne a quitté l'atelier, autant le lui dire plutôt que de laisser
+       croire à une panne de droits. */
+    if (u.depart) {
+      return fail("archive", "Ce compte a été archivé — tu ne fais plus partie de l'atelier. " +
+        "Vois avec un responsable si c'est une erreur.");
+    }
     if (u.active === false) return fail("desactive", "Ce compte a été désactivé.");
     if (u.pin) {
       if (!pin) return fail("pin-requis", "Ce compte est protégé par un code.");

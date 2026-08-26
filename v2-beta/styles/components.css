@@ -1705,3 +1705,92 @@
 .avchip svg { width: 15px; height: 15px; flex: none; }
 
 @media (max-width: 760px) { .avchip span { display: none; } .avchip { padding: 7px 9px; } }
+
+/* ---- Archives ---------------------------------------------------------------
+   Ceux qui sont passés. Deux populations qui ne se mélangent pas, donc une
+   bascule franche plutôt qu'un filtre discret. */
+
+.segbar {
+  display: flex; gap: 3px;
+  padding: 3px;
+  background: var(--c-creux);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-plein);
+}
+.seg {
+  flex: 1;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px var(--e-3);
+  border: 0; border-radius: var(--r-plein);
+  background: none;
+  color: var(--c-second);
+  font-family: var(--f-titre);
+  font-size: var(--t-sm); font-weight: 700;
+  letter-spacing: .06em;
+  cursor: pointer;
+  transition: background var(--m-vif), color var(--m-vif);
+}
+.seg:hover { color: var(--c-texte); }
+.seg.est-choisie { background: var(--c-action-fond); color: var(--c-action-doux); }
+.seg span {
+  padding: 0 6px;
+  border-radius: var(--r-plein);
+  background: rgba(255, 255, 255, .09);
+  font-size: var(--t-xs);
+}
+
+/* Répertoire alphabétique : un classeur, tranche par tranche. */
+.alpha { display: flex; flex-wrap: wrap; gap: 3px; }
+.alpha__t {
+  padding: 4px 8px;
+  border: 0; border-radius: var(--r-1);
+  background: rgba(255, 255, 255, .04);
+  color: var(--c-second);
+  font-family: var(--f-titre);
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .04em;
+  cursor: pointer;
+  transition: background var(--m-vif), color var(--m-vif);
+}
+.alpha__t:hover:not(:disabled) { background: var(--c-action-fond); color: var(--c-action-doux); }
+.alpha__t.est-choisie { background: var(--c-action); color: var(--c-sur-action); }
+.alpha__t.est-vide { opacity: .28; cursor: default; }
+
+/* Le départ, en tête de fiche archivée. */
+.depart {
+  padding: var(--e-3) var(--e-4);
+  background: color-mix(in srgb, var(--c-erreur) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-erreur) 32%, transparent);
+  border-left: 3px solid var(--c-erreur);
+  border-radius: var(--r-2);
+}
+.depart__tete {
+  display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap;
+  color: var(--c-erreur);
+}
+.depart__tete svg { width: 17px; height: 17px; flex: none; }
+.depart__tete b {
+  font-family: var(--f-titre); font-size: var(--t-md); letter-spacing: .05em;
+}
+.depart__tete span { color: var(--c-second); font-size: var(--t-sm); }
+.depart__note { margin: var(--e-2) 0; font-size: var(--t-md); white-space: pre-wrap; }
+
+/* Choix du motif de départ : à plat, comme les gravités. */
+.motifs { display: flex; gap: 7px; flex-wrap: wrap; }
+.motif {
+  padding: 9px var(--e-3);
+  border: 1px solid var(--c-bord-net);
+  border-radius: var(--r-2);
+  background: none;
+  color: var(--c-second);
+  font-family: var(--f-titre);
+  font-size: var(--t-sm); font-weight: 700;
+  cursor: pointer;
+  transition: border-color var(--m-vif), color var(--m-vif), background var(--m-vif);
+}
+.motif:hover { color: var(--c-texte); border-color: var(--c-action); }
+.motif.est-choisie {
+  border-color: var(--c-action);
+  background: var(--c-action-fond);
+  color: var(--c-action-doux);
+}
