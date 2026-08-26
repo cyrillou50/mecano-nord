@@ -305,13 +305,16 @@ window.MNWebhook = (function () {
    */
   function sendAvertissement(i) {
     const f = [];
-    /* Qui a sanctionné passe en premier : c'est à lui qu'on s'adresse pour
-       contester, et le poste de la personne sanctionnée n'apprenait rien que
-       le salon ne sache déjà. */
+    /* Qui la prend, puis qui la met. Les deux côte à côte et nommés : un seul
+       nom dans le message laissait deviner lequel des deux c'était. */
+    f.push({
+      name: i.action === "pose" ? "Sanctionné" : "Employé",
+      value: "**" + i.pseudo + "**", inline: true
+    });
     if (i.by) {
       f.push({
-        name: i.action === "leve" ? "Levé par" : i.action === "retire" ? "Retiré par"
-                                                                      : "Sanction prise par",
+        name: i.action === "leve" ? "Levée par" : i.action === "retire" ? "Retirée par"
+                                                                       : "Mise par",
         value: i.by, inline: true
       });
     }
