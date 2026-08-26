@@ -203,16 +203,16 @@
 
     z.innerHTML =
       '<div class="duo__filtres">' +
-        /* La bascule n'apparaît que s'il y a quelque chose d'archivé : un
-           atelier neuf n'a pas à porter un onglet vide. */
-        (nArch || vueArchives
-          ? '<div class="segbar">' +
-              '<button class="seg' + (vueArchives ? "" : " est-choisie") +
-                '" data-vue="equipe">Équipe</button>' +
-              '<button class="seg' + (vueArchives ? " est-choisie" : "") +
-                '" data-vue="archives">Archives<span>' + nArch + "</span></button>" +
-            "</div>"
-          : "") +
+        /* Toujours visible, même sans personne d'archivé : une bascule qui
+           n'apparaît qu'une fois la fonctionnalité utilisée ne se découvre
+           jamais. Les archives vides le disent d'elles-mêmes. */
+        '<div class="segbar">' +
+          '<button class="seg' + (vueArchives ? "" : " est-choisie") +
+            '" data-vue="equipe">Équipe</button>' +
+          '<button class="seg' + (vueArchives ? " est-choisie" : "") +
+            '" data-vue="archives">Archives' +
+            (nArch ? "<span>" + nArch + "</span>" : "") + "</button>" +
+        "</div>" +
         '<input class="saisie" id="e-cherche" placeholder="' +
           (vueArchives ? "Chercher dans les archives…" : "Chercher un employé…") +
           '" value="' + U.esc(filtre) + '">' +
@@ -234,7 +234,11 @@
       '<div class="duo__corps">' +
         (l.length
           ? l.map(u => ligne(u, trie)).join("")
-          : '<p class="champ__aide" style="padding:var(--e-3)">Personne ne correspond.</p>') +
+          : '<p class="champ__aide" style="padding:var(--e-3)">' +
+            (vueArchives && !f && !tranche
+              ? "Personne n'a encore quitté l'atelier. Les fiches des partants " +
+                "arriveront ici, avec toute leur histoire."
+              : "Personne ne correspond.") + "</p>") +
       "</div>" +
 
       '<div class="duo__pied">' +
@@ -1113,12 +1117,12 @@
   /* ---- Recrutement ------------------------------------------------------------------- */
 
   function recruter() {
-    /* Le grade proposé par défaut est le moins doté : on monte quelqu'un,
-       on ne le descend pas. */
-    const plusBas = brouillon.roles.slice().sort((a, b) => {
-      const poids = r => (r.perms.indexOf("admin") !== -1 ? 99 : r.perms.length);
-      return poids(a) - poids(b);
-    })[0];
+    /* Le dernier de la liste : c'est le bas de la hiérarchie, telle que
+       l'atelier l'a rangée dans Administration → Rôles. Compter les
+       permissions paraissait plus malin, mais donnait un choix imprévisible
+       dès que deux grades en avaient autant — et pouvait proposer un
+       administrateur. */
+    const plusBas = brouillon.roles[brouillon.roles.length - 1];
     if (!plusBas) return U.toast("Crée d'abord un grade dans l'administration", "err");
 
     const auj = new Date().toISOString().slice(0, 10);

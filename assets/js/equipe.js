@@ -242,16 +242,15 @@
 
     nav.innerHTML =
       '<div class="stafflist__top">' +
-        /* La bascule n'apparaît que s'il y a quelque chose à archiver ou déjà
-           archivé : un atelier neuf n'a pas à porter un onglet vide. */
-        (nArch || vueArchives
-          ? '<div class="segbar">' +
-              '<button class="seg' + (vueArchives ? "" : " is-on") + '" data-vue="equipe">' +
-                "Équipe</button>" +
-              '<button class="seg' + (vueArchives ? " is-on" : "") + '" data-vue="archives">' +
-                "Archives<span>" + nArch + "</span></button>" +
-            "</div>"
-          : "") +
+        /* Toujours visible, même sans personne d'archivé : une bascule qui
+           n'apparaît qu'une fois la fonctionnalité utilisée ne se découvre
+           jamais. Les archives vides le disent d'elles-mêmes. */
+        '<div class="segbar">' +
+          '<button class="seg' + (vueArchives ? "" : " is-on") + '" data-vue="equipe">' +
+            "Équipe</button>" +
+          '<button class="seg' + (vueArchives ? " is-on" : "") + '" data-vue="archives">' +
+            "Archives" + (nArch ? "<span>" + nArch + "</span>" : "") + "</button>" +
+        "</div>" +
         '<input class="input" id="s-find" placeholder="' +
           (vueArchives ? "Chercher dans les archives…" : "Chercher…") + '" value="' +
           esc(filter) + '">' +
@@ -313,7 +312,12 @@
                   ? '<span class="dutydot dutydot--conge" title="' + esc(titreConge(u.id)) + '"></span>'
                   : "") +
           "</div>";
-        }).join("") : '<p class="hint" style="padding:12px">Personne ne correspond.</p>') +
+        }).join("")
+          : '<p class="hint" style="padding:12px">' +
+            (vueArchives && !filter && !tranche
+              ? "Personne n'a encore quitté l'atelier. Les fiches des partants arriveront " +
+                "ici, avec toute leur histoire."
+              : "Personne ne correspond.") + "</p>") +
       "</div>" +
       '<div class="stafflist__foot">' +
         '<span class="hint">' + list.length + " affiché" + (list.length > 1 ? "s" : "") + "</span>" +
@@ -1131,10 +1135,11 @@
   /* ---- Nouvel employé ------------------------------------------------------------ */
 
   function newUser() {
-    const weakest = draft.roles.slice().sort((a, b) => {
-      const w = r => (r.perms.indexOf("admin") !== -1 ? 99 : r.perms.length);
-      return w(a) - w(b);
-    })[0];
+    /* Le dernier de la liste : c'est le bas de la hiérarchie, telle que
+       l'atelier l'a rangée dans Admin → Rôles. Compter les permissions
+       paraissait plus malin, mais donnait un choix imprévisible dès que deux
+       grades en avaient autant — et pouvait proposer un administrateur. */
+    const weakest = draft.roles[draft.roles.length - 1];
 
     const body = document.createElement("div");
     body.className = "editor";

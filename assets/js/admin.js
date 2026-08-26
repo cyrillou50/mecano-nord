@@ -1391,12 +1391,12 @@
     const isNew = !u;
     const me = MNAuth.session();
     const isMe = !isNew && me.uid === u.id;
-    /* Un nouvel employé arrive sur le rôle le MOINS doté : on ne crée jamais
-       un admin par inadvertance. */
-    const weakest = draft.roles.slice().sort((a, b) => {
-      const w = r => (r.perms.indexOf("admin") !== -1 ? 99 : r.perms.length);
-      return w(a) - w(b);
-    })[0];
+    /* Un nouvel employé arrive au bas de la hiérarchie : le dernier grade de
+       la liste, telle que l'atelier l'a rangée dans l'onglet Rôles. Compter
+       les permissions paraissait plus malin, mais donnait un choix
+       imprévisible dès que deux grades en avaient autant — et pouvait
+       proposer un administrateur. */
+    const weakest = draft.roles[draft.roles.length - 1];
     const cur = u || { pseudo: "", roleId: weakest.id, pin: null, active: true };
 
     const body = document.createElement("div");

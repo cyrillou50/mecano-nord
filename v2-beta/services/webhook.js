@@ -305,14 +305,17 @@ window.MNWebhook = (function () {
    */
   function sendAvertissement(i) {
     const f = [];
-    if (i.role) f.push({ name: "Poste", value: i.role, inline: true });
-    f.push({ name: "Gravité", value: "**" + i.gravite + "**", inline: true });
+    /* Qui a sanctionné passe en premier : c'est à lui qu'on s'adresse pour
+       contester, et le poste de la personne sanctionnée n'apprenait rien que
+       le salon ne sache déjà. */
     if (i.by) {
       f.push({
-        name: i.action === "leve" ? "Levé par" : i.action === "retire" ? "Retiré par" : "Donné par",
+        name: i.action === "leve" ? "Levé par" : i.action === "retire" ? "Retiré par"
+                                                                      : "Sanction prise par",
         value: i.by, inline: true
       });
     }
+    f.push({ name: "Gravité", value: "**" + i.gravite + "**", inline: true });
     if (i.expire) f.push({ name: "Compte jusqu'au", value: jourFr(i.expire), inline: true });
     if (i.motif) f.push({ name: "Motif", value: String(i.motif).slice(0, 1024) });
     if (i.note && i.action === "pose") {

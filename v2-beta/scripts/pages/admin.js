@@ -956,12 +956,12 @@
     const cestMoi = !neuf && moi.uid === u.id;
     if (!brouillon.roles.length) return U.toast("Crée d'abord un rôle", "err");
 
-    /* Un nouvel employé arrive sur le rôle le MOINS doté : on ne crée jamais
-       un administrateur par inadvertance. */
-    const plusBas = brouillon.roles.slice().sort((a, b) => {
-      const poids = r => (r.perms.indexOf("admin") !== -1 ? 99 : r.perms.length);
-      return poids(a) - poids(b);
-    })[0];
+    /* Un nouvel employé arrive au bas de la hiérarchie : le dernier grade de
+       la liste, telle que l'atelier l'a rangée dans l'onglet Rôles. Compter
+       les permissions paraissait plus malin, mais donnait un choix
+       imprévisible dès que deux grades en avaient autant — et pouvait
+       proposer un administrateur. */
+    const plusBas = brouillon.roles[brouillon.roles.length - 1];
     const cur = u || { pseudo: "", roleId: plusBas.id, pin: null, active: true };
 
     const corps = document.createElement("div");
