@@ -209,10 +209,22 @@
     ? triArchives(archives())
     : actifs().filter(u => !u.hidden || (canEdit && showHidden)));
 
-  /* Les archives se lisent par ordre alphabétique : on y cherche un nom, pas
-     une date. La liste vivante garde l'ordre choisi par l'atelier. */
-  const triArchives = l => l.slice()
-    .sort((a, b) => a.pseudo.localeCompare(b.pseudo, "fr", { sensitivity: "base" }));
+  /**
+   * Le nom de famille : le dernier mot du nom complet. C'est par lui qu'on
+   * classe, comme dans n'importe quel répertoire — on cherche « Martin », pas
+   * « Rico ». Un nom d'un seul mot est à lui-même son nom de famille.
+   */
+  const nomFamille = u => {
+    const mots = String(u.pseudo || "").trim().split(/\s+/).filter(Boolean);
+    return mots.length ? mots[mots.length - 1] : "";
+  };
+
+  /* Les archives se lisent par ordre alphabétique de nom de famille : on y
+     cherche quelqu'un, pas une date. À nom de famille égal, le prénom
+     départage. La liste vivante garde l'ordre choisi par l'atelier. */
+  const triArchives = l => l.slice().sort((a, b) =>
+    nomFamille(a).localeCompare(nomFamille(b), "fr", { sensitivity: "base" }) ||
+    a.pseudo.localeCompare(b.pseudo, "fr", { sensitivity: "base" }));
 
   const hiddenCount = () => actifs().filter(u => u.hidden).length;
 
@@ -231,8 +243,8 @@
     return t;
   })();
 
-  /** La lettre de classement : sans accent, minuscule. */
-  const initialeDe = u => String(u.pseudo || "")
+  /** La lettre de classement : l'initiale du nom de famille, sans accent. */
+  const initialeDe = u => nomFamille(u)
     .normalize("NFD").replace(/[̀-ͯ]/g, "")
     .charAt(0).toLowerCase();
 
