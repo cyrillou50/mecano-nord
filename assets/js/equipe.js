@@ -298,6 +298,14 @@
                 ' title="Réorganiser la liste">' + svg(reorder ? "check" : "layers") + "</button>" +
             "</div>"
           : "") +
+        /* Tout le monde n'est pas parti depuis que le site existe : il faut
+           pouvoir écrire une fiche d'archive directement. */
+        (canEdit && vueArchives
+          ? '<div class="row" style="margin-top:8px">' +
+              '<button class="btn btn--primary btn--sm" id="s-arch" style="flex:1">' +
+                svg("plus") + "<span>Ajouter aux archives</span></button>" +
+            "</div>"
+          : "") +
         (reorder && filter
           ? '<p class="hint hint--warn" style="margin-top:8px">Vide la recherche pour réorganiser.</p>'
           : "") +
@@ -425,6 +433,9 @@
     const add = $("#s-add");
     if (add) add.addEventListener("click", newUser);
 
+    const arch = $("#s-arch");
+    if (arch) arch.addEventListener("click", ajouterAuxArchives);
+
     nav.querySelectorAll("[data-u]").forEach(b => {
       const pick = () => { sel = b.dataset.u; renderList(); renderCard(); };
       b.addEventListener("click", pick);
@@ -505,8 +516,12 @@
              savoir en ouvrant la fiche de quelqu'un qui n'est plus là. */
           (MNStore.estArchive(u) ? bandeauDepart(u) : "") +
           '<div class="statgrid">' +
-            (() => { const a = seniority(u.hiredAt);
-              return stat("Ancienneté", a.texte, false, null, a.sous); })() +
+            (() => {
+              const parti = MNStore.estArchive(u) ? u.depart.le : null;
+              const a = seniority(u.hiredAt, parti);
+              return stat(parti ? "Ancienneté au départ" : "Ancienneté",
+                a.texte, false, null, a.sous);
+            })() +
             stat("Service — semaine", MNDuty.dur(MNDuty.secondsFor(u.id, MNDuty.weekStart())), on, "week") +
             stat("Service — total", MNDuty.dur(MNDuty.secondsFor(u.id)), on, "total") +
             stat("Formations", String((u.trainings || []).length),
@@ -691,13 +706,16 @@
    * Ancienneté exacte en années / mois / jours, en tenant compte de la
    * longueur réelle de chaque mois (pas d'approximation à 30,44 jours).
    */
-  function seniority(hiredAt) {
+  function seniority(hiredAt, jusqua) {
     if (!hiredAt) return { texte: "—", sous: "" };
     const d = new Date(hiredAt + "T00:00:00");
     if (isNaN(d)) return { texte: "—", sous: "" };
 
-    const now = new Date();
+    /* Pour quelqu'un qui est parti, on s'arrête à son départ : sans ça son
+       ancienneté continuerait de grandir des années après. */
+    const now = jusqua ? new Date(jusqua + "T00:00:00") : new Date();
     now.setHours(0, 0, 0, 0);
+    if (isNaN(now)) return { texte: "—", sous: "" };
     if (d > now) return { texte: "à venir", sous: "" };
 
     let years = now.getFullYear() - d.getFullYear();
@@ -790,6 +808,113 @@
 
             close();
             MNUI.toast(u.pseudo + " est archivé — sa fiche reste consultable" + suite(r), "ok");
+          }
+        }
+      ]
+    });
+  }
+
+  /**
+   * Écrire directement une fiche d'archive.
+   *
+   * L'atelier a existé avant le site : des gens sont partis sans jamais avoir
+   * eu de fiche, et on veut quand même pouvoir dire qu'ils étaient là. La
+   * fiche naît archivée — elle ne passe pas par l'équipe en poste.
+   */
+  function ajouterAuxArchives() {
+    if (!draft.roles.length) return MNUI.toast("Crée d'abord un grade", "err");
+    const auj = MNDuty.jourLocal();
+    const plusBas = draft.roles[draft.roles.length - 1];
+
+    const body = document.createElement("div");
+    body.className = "editor";
+    body.innerHTML =
+      '<p class="hint">Pour quelqu\'un qui a quitté l\'atelier sans avoir eu de fiche ici. ' +
+        "Elle sera créée <b>directement dans les archives</b> : la personne ne rejoint pas " +
+        "l'équipe et ne peut pas se connecter.</p>" +
+      '<div class="editor__grid">' +
+        '<div class="field"><label class="label" for="x-pseudo">Prénom &amp; Nom</label>' +
+          '<input class="input" id="x-pseudo" maxlength="40" placeholder="Ex. Rico Martin"></div>' +
+        '<div class="field"><label class="label" for="x-role">Grade qu\'il tenait</label>' +
+          '<select class="select" id="x-role">' + draft.roles.map(r =>
+            '<option value="' + esc(r.id) + '"' + (r.id === plusBas.id ? " selected" : "") + ">" +
+            esc(r.name) + "</option>").join("") + "</select></div>" +
+      "</div>" +
+      '<div class="field"><label class="label">Motif du départ</label>' +
+        '<div class="motifs" id="x-motifs">' + MNStore.MOTIFS_DEPART.map((m, i) =>
+          '<button type="button" class="motif' + (i === 0 ? " is-on" : "") +
+          '" data-m="' + esc(m.id) + '">' + esc(m.nom) + "</button>").join("") + "</div></div>" +
+      '<div class="editor__grid">' +
+        '<div class="field"><label class="label" for="x-hired">Date d\'arrivée</label>' +
+          '<input class="input" id="x-hired" type="date" max="' + auj + '">' +
+          '<p class="hint">Si tu ne sais plus, laisse vide : l\'ancienneté restera ' +
+            "inconnue plutôt que fausse.</p></div>" +
+        '<div class="field"><label class="label" for="x-left">Date du départ</label>' +
+          '<input class="input" id="x-left" type="date" value="' + auj + '" max="' + auj + '"></div>' +
+      "</div>" +
+      '<div class="field"><label class="label" for="x-note">Précisions (facultatif)</label>' +
+        '<textarea class="textarea" id="x-note" maxlength="600" ' +
+          'placeholder="Ce qu\'il faut retenir de son passage…"></textarea></div>';
+
+    let motif = MNStore.MOTIFS_DEPART[0].id;
+    body.querySelectorAll("[data-m]").forEach(b => b.addEventListener("click", () => {
+      motif = b.dataset.m;
+      body.querySelectorAll("[data-m]").forEach(x => x.classList.toggle("is-on", x === b));
+    }));
+
+    MNUI.modal({
+      title: "Ajouter aux archives", body,
+      actions: [
+        { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
+        {
+          label: "Créer la fiche", variant: "btn--primary", icon: "plus",
+          onClick: async close => {
+            const pseudo = body.querySelector("#x-pseudo").value.trim();
+            if (pseudo.length < 2) return MNUI.toast("Nom trop court", "err");
+            /* Le contrôle porte sur tout le monde, archives comprises : deux
+               fiches du même nom seraient impossibles à démêler. */
+            if (draft.users.some(x => x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
+              return MNUI.toast("Ce nom est déjà pris", "err");
+            }
+
+            const le = body.querySelector("#x-left").value || auj;
+            const hired = body.querySelector("#x-hired").value;
+            const roleId = body.querySelector("#x-role").value;
+            const r = draft.roles.find(x => x.id === roleId);
+            const id = MNStore.uniqueId(pseudo, draft.users.map(x => x.id));
+
+            const fiche = {
+              id, pseudo, roleId,
+              active: false, hidden: false, pin: null,
+              createdAt: new Date().toISOString(),
+              /* Sans date d'arrivée connue, on prend celle du départ : la
+                 fiche affichera une ancienneté nulle, ce qui se lit comme
+                 « on ne sait pas » plutôt que comme un chiffre inventé. */
+              hiredAt: hired || le,
+              trainings: [], note: "",
+              avertissements: [],
+              depart: {
+                le, motif,
+                note: body.querySelector("#x-note").value.trim(),
+                par: me.pseudo
+              },
+              history: [{
+                roleId, roleName: r ? r.name : roleId,
+                at: new Date((hired || le) + "T12:00:00").toISOString(),
+                by: me.pseudo, note: "Entrée dans l'entreprise"
+              }]
+            };
+
+            vueArchives = true; tranche = null; filter = "";
+            sel = id;
+
+            const res = await appliquer(
+              { op: "recrue", user: fiche },
+              () => draft.users.push(fiche));
+            if (!res.ok) return MNUI.toast("Création impossible : " + res.error, "err");
+
+            close();
+            MNUI.toast(pseudo + " est ajouté aux archives" + suite(res), "ok");
           }
         }
       ]

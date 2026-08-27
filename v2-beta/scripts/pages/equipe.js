@@ -263,6 +263,12 @@
                              titre: "Réorganiser la liste", action: "trier" }) +
             "</div>"
           : "") +
+        /* Tout le monde n'est pas parti depuis que le site existe : il faut
+           pouvoir écrire une fiche d'archive directement. */
+        (peutEditer && vueArchives
+          ? U.bouton("Ajouter aux archives", { variante: "principal", taille: "sm",
+                                               icone: "plus", bloc: true, action: "archadd" })
+          : "") +
         (ranger && filtre
           ? '<p class="champ__aide">Vide la recherche pour réorganiser.</p>'
           : "") +
@@ -408,6 +414,9 @@
     const a = z.querySelector('[data-a="add"]');
     if (a) a.addEventListener("click", recruter);
 
+    const arch = z.querySelector('[data-a="archadd"]');
+    if (arch) arch.addEventListener("click", ajouterAuxArchives);
+
     z.querySelectorAll("[data-u]").forEach(b => {
       const choisir = () => { sel = b.dataset.u; liste(); fiche(); };
       b.addEventListener("click", choisir);
@@ -431,7 +440,8 @@
     const r = grade(u);
     const on = MNDuty.isOn(u.id);
     const carriere = (u.history || []).slice().reverse();
-    const anc = anciennete(u.hiredAt);
+    const parti = MNStore.estArchive(u) ? u.depart.le : null;
+    const anc = anciennete(u.hiredAt, parti);
 
     /* « Actuel » se pose sur la ligne du grade réellement porté, pas
        forcément la plus récente : une promotion peut être enregistrée après
@@ -487,7 +497,8 @@
            savoir en ouvrant la fiche de quelqu'un qui n'est plus là. */
         (MNStore.estArchive(u) ? bandeauDepart(u) : "") +
         '<div class="grille grille--sm">' +
-          U.tuile({ label: "Ancienneté", valeur: anc.texte, pied: anc.sous, icone: "calendrier" }) +
+          U.tuile({ label: parti ? "Ancienneté au départ" : "Ancienneté",
+                    valeur: anc.texte, pied: anc.sous, icone: "calendrier" }) +
           tuileVive("Service — semaine",
             MNDuty.dur(MNDuty.secondsFor(u.id, MNDuty.weekStart())), "semaine", on) +
           tuileVive("Service — total", MNDuty.dur(MNDuty.secondsFor(u.id)), "total", on) +
@@ -683,13 +694,16 @@
    * Ancienneté en années / mois / jours, en tenant compte de la longueur
    * réelle de chaque mois — pas d'approximation à 30,44 jours.
    */
-  function anciennete(depuis) {
+  function anciennete(depuis, jusqua) {
     if (!depuis) return { texte: "—", sous: "" };
     const d = new Date(depuis + "T00:00:00");
     if (isNaN(d)) return { texte: "—", sous: "" };
 
-    const auj = new Date();
+    /* Pour quelqu'un qui est parti, on s'arrête à son départ : sans ça son
+       ancienneté continuerait de grandir des années après. */
+    const auj = jusqua ? new Date(jusqua + "T00:00:00") : new Date();
     auj.setHours(0, 0, 0, 0);
+    if (isNaN(auj)) return { texte: "—", sous: "" };
     if (d > auj) return { texte: "à venir", sous: "" };
 
     let ans = auj.getFullYear() - d.getFullYear();
@@ -782,6 +796,108 @@
 
             fermer();
             U.toast(u.pseudo + " est archivé — sa fiche reste consultable" + suite(r), "ok");
+          } }
+      ]
+    });
+  }
+
+  /**
+   * Écrire directement une fiche d'archive.
+   *
+   * L'atelier a existé avant le site : des gens sont partis sans jamais avoir
+   * eu de fiche, et on veut quand même pouvoir dire qu'ils étaient là. La
+   * fiche naît archivée — elle ne passe pas par l'équipe en poste.
+   */
+  function ajouterAuxArchives() {
+    if (!brouillon.roles.length) return U.toast("Crée d'abord un grade", "err");
+    const auj = MNDuty.jourLocal();
+    const plusBas = brouillon.roles[brouillon.roles.length - 1];
+
+    const corps = document.createElement("div");
+    corps.className = "pile";
+    corps.innerHTML =
+      '<p class="champ__aide">Pour quelqu\'un qui a quitté l\'atelier sans avoir eu de ' +
+        "fiche ici. Elle sera créée <b>directement dans les archives</b> : la personne " +
+        "ne rejoint pas l'équipe et ne peut pas se connecter.</p>" +
+      '<div class="cols-2">' +
+        U.champ({ id: "x-pseudo", label: "Prénom & Nom", max: 40, repere: "Ex. Rico Martin" }) +
+        U.champ({ id: "x-role", label: "Grade qu'il tenait", type: "liste",
+                  valeur: plusBas.id,
+                  options: brouillon.roles.map(r => ({ valeur: r.id, nom: r.name })) }) +
+      "</div>" +
+      '<div class="champ"><span class="champ__label">Motif du départ</span>' +
+        '<div class="motifs">' + MNStore.MOTIFS_DEPART.map((m, i) =>
+          '<button type="button" class="motif' + (i === 0 ? " est-choisie" : "") +
+          '" data-m="' + U.esc(m.id) + '">' + U.esc(m.nom) + "</button>").join("") +
+      "</div></div>" +
+      '<div class="cols-2">' +
+        U.champ({ id: "x-hired", label: "Date d'arrivée", type: "date", plafond: auj,
+                  aide: "Si tu ne sais plus, laisse vide : l'ancienneté restera " +
+                        "inconnue plutôt que fausse." }) +
+        U.champ({ id: "x-left", label: "Date du départ", type: "date", valeur: auj,
+                  plafond: auj }) +
+      "</div>" +
+      U.champ({ id: "x-note", label: "Précisions (facultatif)", type: "zone", max: 600,
+                repere: "Ce qu'il faut retenir de son passage…" });
+
+    let motif = MNStore.MOTIFS_DEPART[0].id;
+    corps.querySelectorAll("[data-m]").forEach(b => b.addEventListener("click", () => {
+      motif = b.dataset.m;
+      corps.querySelectorAll("[data-m]").forEach(x => x.classList.toggle("est-choisie", x === b));
+    }));
+
+    U.modale({
+      titre: "Ajouter aux archives", corps,
+      actions: [
+        { label: "Annuler", onClick: f => f() },
+        { label: "Créer la fiche", variante: "principal", icone: "plus",
+          onClick: async (fermer, k) => {
+            const pseudo = k.querySelector("#x-pseudo").value.trim();
+            if (pseudo.length < 2) return U.toast("Nom trop court", "err");
+            /* Le contrôle porte sur tout le monde, archives comprises : deux
+               fiches du même nom seraient impossibles à démêler. */
+            if (brouillon.users.some(x => x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
+              return U.toast("Ce nom est déjà pris", "err");
+            }
+
+            const le = k.querySelector("#x-left").value || auj;
+            const arrivee = k.querySelector("#x-hired").value;
+            const roleId = k.querySelector("#x-role").value;
+            const rr = brouillon.roles.find(x => x.id === roleId);
+            const id = MNStore.uniqueId(pseudo, brouillon.users.map(x => x.id));
+
+            const fiche = {
+              id, pseudo, roleId,
+              active: false, hidden: false, pin: null,
+              createdAt: new Date().toISOString(),
+              /* Sans date d'arrivée connue, on prend celle du départ : la
+                 fiche affichera une ancienneté nulle, ce qui se lit comme
+                 « on ne sait pas » plutôt que comme un chiffre inventé. */
+              hiredAt: arrivee || le,
+              trainings: [], note: "",
+              avertissements: [],
+              depart: {
+                le, motif,
+                note: k.querySelector("#x-note").value.trim(),
+                par: moi.pseudo
+              },
+              history: [{
+                roleId, roleName: rr ? rr.name : roleId,
+                at: new Date((arrivee || le) + "T12:00:00").toISOString(),
+                by: moi.pseudo, note: "Entrée dans l'entreprise"
+              }]
+            };
+
+            vueArchives = true; tranche = null; filtre = "";
+            sel = id;
+
+            const res = await appliquer(
+              { op: "recrue", user: fiche },
+              () => brouillon.users.push(fiche));
+            if (!res.ok) return U.toast("Création impossible : " + res.error, "err");
+
+            fermer();
+            U.toast(pseudo + " est ajouté aux archives" + suite(res), "ok");
           } }
       ]
     });
