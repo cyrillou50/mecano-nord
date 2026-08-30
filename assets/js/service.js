@@ -115,6 +115,11 @@
     const cgp = $("#d-conge-other");
     if (cgp) cgp.addEventListener("click", leaveForSomeone);
 
+    /* Les deux panneaux partagent le même filtre : voir « à venir » d'un côté
+       et « année 2025 » de l'autre n'aurait aucun sens sur la même page. */
+    document.querySelectorAll("[data-anneeconges]").forEach(s =>
+      s.addEventListener("change", () => { anneeConges = s.value; render(); }));
+
     document.querySelectorAll("[data-editconge]").forEach(b =>
       b.addEventListener("click", () => {
         const c = MNDuty.congeById(b.dataset.editconge);
@@ -183,13 +188,86 @@
       " · " + MNDuty.nbJours(c.from, c.to) + " jour" + (MNDuty.nbJours(c.from, c.to) > 1 ? "s" : "");
   }
 
+  /* ---- Historique -------------------------------------------------------------
+     Les périodes passées n'ont jamais été effacées, seulement masquées : par
+     défaut on ne montre que ce qui vient, parce que c'est ce qu'on consulte
+     tous les jours. Mais « combien de jours a-t-il pris cette année » est une
+     question qui se pose, et il n'y avait aucun moyen d'y répondre.
+
+     `anneeConges` : "" = en cours et à venir, "tout" = depuis toujours,
+     sinon une année. */
+
+  let anneeConges = "";
+
+  /** L'état d'une période vis-à-vis d'aujourd'hui. */
+  function etatConge(c) {
+    const j = MNDuty.jourLocal();
+    if (c.to < j) return "passe";
+    if (c.from <= j) return "encours";
+    return "avenir";
+  }
+
+  /** Les années où des congés ont été posés, la plus récente d'abord. */
+  function anneesConges(liste) {
+    const vues = {};
+    liste.forEach(c => { vues[String(c.from).slice(0, 4)] = true; });
+    return Object.keys(vues).filter(a => /^\d{4}$/.test(a)).sort().reverse();
+  }
+
+  /**
+   * Applique le filtre choisi.
+   * @param {Array} tous toutes les périodes connues, passées comprises
+   */
+  function filtrerConges(tous) {
+    if (!anneeConges) {
+      const j = MNDuty.jourLocal();
+      return tous.filter(c => c.to >= j).sort((a, b) => a.from.localeCompare(b.from));
+    }
+    /* En historique, le plus récent d'abord : on remonte le temps. */
+    const l = anneeConges === "tout"
+      ? tous.slice()
+      /* Une période à cheval sur deux années compte dans les deux. */
+      : tous.filter(c => c.from <= anneeConges + "-12-31" && c.to >= anneeConges + "-01-01");
+    return l.sort((a, b) => b.from.localeCompare(a.from));
+  }
+
+  /** Le sélecteur de période, posé dans l'entête d'un panneau. */
+  function selecteurConges(tous) {
+    const annees = anneesConges(tous);
+    if (!annees.length) return "";
+    const opt = (v, nom) => '<option value="' + v + '"' +
+      (v === anneeConges ? " selected" : "") + ">" + nom + "</option>";
+    return '<select class="select select--sm" data-anneeconges>' +
+      opt("", "En cours et à venir") +
+      annees.map(a => opt(a, "Année " + a)).join("") +
+      opt("tout", "Depuis toujours") +
+    "</select>";
+  }
+
+  /** « 3 périodes · 24 jours » — ce qu'on vient chercher dans un historique. */
+  function bilanConges(liste) {
+    if (!liste.length || !anneeConges) return "";
+    const jours = liste.reduce((n, c) => n + MNDuty.nbJours(c.from, c.to), 0);
+    return '<p class="hint" style="margin-top:10px">' + liste.length + " période" +
+      (liste.length > 1 ? "s" : "") + " · <b>" + jours + " jour" +
+      (jours > 1 ? "s" : "") + "</b> au total.</p>";
+  }
+
+  /** Étiquette d'état, commune aux deux panneaux. */
+  const puceEtat = c => ({
+    encours: '<span class="permtag permtag--on">en cours</span>',
+    avenir: "<em>à venir</em>",
+    passe: '<span class="permtag">passés</span>'
+  })[etatConge(c)];
+
   /**
    * Mes périodes. Elles sont listées ici et pas seulement dans le panneau
    * d'équipe : un employé sans droit de regard sur l'équipe doit quand même
    * pouvoir gérer les siennes.
    */
   function myLeaveCard() {
-    const list = MNDuty.congesOf(me.uid);
+    const tous = MNDuty.congesOf(me.uid, true);
+    const list = filtrerConges(tous);
     const now = MNDuty.enConge(me.uid);
 
     return '<div class="panel" style="margin-bottom:18px">' +
@@ -197,24 +275,25 @@
         (now ? '<span class="permtag permtag--on">en congés</span>' : "") +
         (list.length ? '<span class="pill pill--ok">' + list.length + "</span>" : "") +
         '<span class="spacer"></span>' +
+        selecteurConges(tous) +
         '<button class="btn btn--solid btn--sm" id="d-conge">' + svg("calendar") +
-          "<span>" + (list.length ? "Ajouter une période" : "Poser des congés") + "</span></button>" +
+          "<span>" + (tous.length ? "Ajouter une période" : "Poser des congés") + "</span></button>" +
       "</div>" +
       '<div class="panel__body">' +
         (list.length
-          ? '<div class="rows">' + list.map(myLeaveRow).join("") + "</div>"
-          : '<p class="hint">Aucune absence prévue. Préviens l\'équipe de tes dates, ' +
-            "elles partent sur Discord.</p>") +
+          ? '<div class="rows">' + list.map(myLeaveRow).join("") + "</div>" + bilanConges(list)
+          : '<p class="hint">' + (anneeConges
+              ? "Aucun congé sur cette période."
+              : "Aucune absence prévue. Préviens l'équipe de tes dates, elles partent " +
+                "sur Discord.") + "</p>") +
       "</div></div>";
   }
 
   function myLeaveRow(c) {
-    const now = MNDuty.enConge(me.uid, MNDuty.jourLocal()) &&
-      c.from <= MNDuty.jourLocal() && MNDuty.jourLocal() <= c.to;
-    return '<div class="trow">' +
+    return '<div class="trow' + (etatConge(c) === "passe" ? " is-off" : "") + '">' +
       '<div class="trow__main"><b>' + esc(periode(c)) + "</b>" +
         '<div class="trow__meta">' +
-          (now ? '<span class="permtag permtag--on">en cours</span>' : "<em>à venir</em>") +
+          puceEtat(c) +
           (c.note ? "<i>" + esc(c.note) + "</i>" : "") +
           (c.by ? "<i>posés par " + esc(c.by) + "</i>" : "") +
         "</div></div>" +
@@ -226,11 +305,13 @@
   }
 
   function leavePanel(canManage) {
-    const list = MNDuty.conges();
+    const tous = MNDuty.conges(true);
+    const list = filtrerConges(tous);
     return '<div class="panel" style="margin-bottom:18px">' +
       '<div class="panel__head"><h2>Congés</h2>' +
         '<span class="pill' + (list.length ? " pill--ok" : "") + '">' + list.length + "</span>" +
         '<span class="spacer"></span>' +
+        selecteurConges(tous) +
         (canManage
           ? '<button class="btn btn--ghost btn--sm" id="d-conge-other">' + svg("calendar") +
             "<span>Poser pour quelqu'un</span></button>"
@@ -238,21 +319,24 @@
       "</div>" +
       '<div class="panel__body">' +
         (list.length
-          ? '<div class="rows">' + list.map(c => leaveRow(c, canManage)).join("") + "</div>"
-          : '<div class="empty">' + svg("calendar") + "<b>Personne en congés</b>" +
-            "<p>Aucune absence prévue pour le moment.</p></div>") +
+          ? '<div class="rows">' + list.map(c => leaveRow(c, canManage)).join("") + "</div>" +
+            bilanConges(list)
+          : '<div class="empty">' + svg("calendar") +
+            "<b>" + (anneeConges ? "Aucun congé sur cette période" : "Personne en congés") + "</b>" +
+            "<p>" + (anneeConges
+              ? "Personne n'a posé de congés dans cet intervalle."
+              : "Aucune absence prévue pour le moment.") + "</p></div>") +
       "</div></div>";
   }
 
   function leaveRow(c, canManage) {
     const role = MNStore.roleById(c.roleId);
-    const now = MNDuty.enConge(c.id);
-    return '<div class="trow">' +
+    return '<div class="trow' + (etatConge(c) === "passe" ? " is-off" : "") + '">' +
       '<div class="userchip__av" style="width:38px;height:38px;flex:none' +
         (role ? ";background:" + esc(role.color) : "") + '">' + esc(MNUI.initials(c.pseudo)) + "</div>" +
       '<div class="trow__main"><b>' + esc(c.pseudo) + "</b>" +
         '<div class="trow__meta">' +
-          (now ? '<span class="permtag permtag--on">en congés</span>' : "<em>à venir</em>") +
+          puceEtat(c) +
           (role ? '<span class="permtag" style="border-color:' + esc(role.color) +
                   ';color:' + esc(role.color) + '">' + esc(role.name) + "</span>" : "") +
           (c.note ? "<i>" + esc(c.note) + "</i>" : "") +

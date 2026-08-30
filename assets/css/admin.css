@@ -1370,3 +1370,10 @@ button.calev:hover { filter: brightness(1.25); }
 }
 .motif:hover { color: var(--txt); border-color: var(--pink); }
 .motif.is-on { border-color: var(--pink); background: var(--pink-ink); color: var(--pink-soft); }
+
+/* Sélecteur compact, dans l'entête d'un panneau. */
+.select--sm {
+  width: auto;
+  padding: 6px 30px 6px 10px;
+  font-size: 12.5px;
+}

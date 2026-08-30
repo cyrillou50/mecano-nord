@@ -205,54 +205,121 @@
   const periode = c => "du " + jourCourt(c.from) + " au " + jourCourt(c.to) +
     " · " + MNDuty.nbJours(c.from, c.to) + " jour" + (MNDuty.nbJours(c.from, c.to) > 1 ? "s" : "");
 
+  /* ---- Historique -------------------------------------------------------------
+     Les périodes passées n'ont jamais été effacées, seulement masquées : par
+     défaut on ne montre que ce qui vient, parce que c'est ce qu'on consulte
+     tous les jours. Mais « combien de jours a-t-il pris cette année » est une
+     question qui se pose, et il n'y avait aucun moyen d'y répondre.
+
+     "" = en cours et à venir, "tout" = depuis toujours, sinon une année. */
+
+  let anneeConges = "";
+
+  function etatConge(c) {
+    const j = MNDuty.jourLocal();
+    if (c.to < j) return "passe";
+    if (c.from <= j) return "encours";
+    return "avenir";
+  }
+
+  const PUCE = {
+    encours: () => U.etiquette("en cours", "info"),
+    avenir: () => U.etiquette("à venir"),
+    passe: () => U.etiquette("passés")
+  };
+
+  /** Les années où des congés ont été posés, la plus récente d'abord. */
+  function anneesConges(tous) {
+    const vues = {};
+    tous.forEach(c => { vues[String(c.from).slice(0, 4)] = true; });
+    return Object.keys(vues).filter(a => /^\d{4}$/.test(a)).sort().reverse();
+  }
+
+  function filtrerConges(tous) {
+    if (!anneeConges) {
+      const j = MNDuty.jourLocal();
+      return tous.filter(c => c.to >= j).sort((a, b) => a.from.localeCompare(b.from));
+    }
+    /* En historique, le plus récent d'abord : on remonte le temps. */
+    const l = anneeConges === "tout"
+      ? tous.slice()
+      /* Une période à cheval sur deux années compte dans les deux. */
+      : tous.filter(c => c.from <= anneeConges + "-12-31" && c.to >= anneeConges + "-01-01");
+    return l.sort((a, b) => b.from.localeCompare(a.from));
+  }
+
+  function selecteurConges(tous) {
+    const annees = anneesConges(tous);
+    if (!annees.length) return "";
+    const opt = (v, nom) => '<option value="' + v + '"' +
+      (v === anneeConges ? " selected" : "") + ">" + nom + "</option>";
+    return '<select class="liste liste--sm" data-annee>' +
+      opt("", "En cours et à venir") +
+      annees.map(a => opt(a, "Année " + a)).join("") +
+      opt("tout", "Depuis toujours") +
+    "</select>";
+  }
+
+  /** « 3 périodes · 24 jours » — ce qu'on vient chercher dans un historique. */
+  function bilanConges(l) {
+    if (!l.length || !anneeConges) return "";
+    const jours = l.reduce((n, c) => n + MNDuty.nbJours(c.from, c.to), 0);
+    return '<p class="champ__aide" style="margin-top:var(--e-3)">' + l.length + " période" +
+      (l.length > 1 ? "s" : "") + " · <b>" + jours + " jour" + (jours > 1 ? "s" : "") +
+      "</b> au total.</p>";
+  }
+
   function mesConges(z) {
-    const l = MNDuty.congesOf(moi.uid);
-    const auj = MNDuty.jourLocal();
+    const tous = MNDuty.congesOf(moi.uid, true);
+    const l = filtrerConges(tous);
 
     z.innerHTML = U.carte({
       titre: "Mes congés",
       actions:
         (MNDuty.enConge(moi.uid) ? U.etiquette("En congés", "info") : "") +
-        U.bouton(l.length ? "Ajouter une période" : "Poser des congés",
+        selecteurConges(tous) +
+        U.bouton(tous.length ? "Ajouter une période" : "Poser des congés",
           { variante: "principal", taille: "sm", icone: "calendrier", action: "poser" }),
       corps: l.length
-        ? '<div class="pile pile--sm">' + l.map(c => {
-            const enCours = c.from <= auj && auj <= c.to;
-            return '<div class="rang s-rang">' +
+        ? '<div class="pile pile--sm">' + l.map(c =>
+            '<div class="rang s-rang' + (etatConge(c) === "passe" ? " est-eteint" : "") + '">' +
               "<b>" + U.esc(periode(c)) + "</b>" +
-              U.etiquette(enCours ? "en cours" : "à venir", enCours ? "info" : "") +
+              PUCE[etatConge(c)]() +
               (c.note ? '<span class="muet txt-sm">' + U.esc(c.note) + "</span>" : "") +
               '<span class="pousse"></span>' +
               U.bouton("", { icone: "crayon", variante: "fantome", taille: "sm",
                 titre: "Modifier", action: "ed-" + c.cid }) +
               U.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
                 titre: "Annuler", action: "rm-" + c.cid }) +
-            "</div>";
-          }).join("") + "</div>"
-        : U.vide({ icone: "calendrier", titre: "Aucune absence prévue",
-                   texte: "Préviens l'équipe de tes dates, elles partent sur Discord." })
+            "</div>").join("") + "</div>" + bilanConges(l)
+        : U.vide({ icone: "calendrier",
+                   titre: anneeConges ? "Aucun congé sur cette période"
+                                      : "Aucune absence prévue",
+                   texte: anneeConges
+                     ? "Rien n'a été posé dans cet intervalle."
+                     : "Préviens l'équipe de tes dates, elles partent sur Discord." })
     });
     brancherConges(z);
   }
 
   function congesEquipe(z) {
-    const l = MNDuty.conges();
-    const auj = MNDuty.jourLocal();
+    const tous = MNDuty.conges(true);
+    const l = filtrerConges(tous);
 
     z.innerHTML = U.carte({
       titre: "Congés de l'équipe",
-      actions: peutGerer
-        ? U.bouton("Poser pour quelqu'un", { variante: "fantome", taille: "sm",
-            icone: "calendrier", action: "pour" })
-        : "",
+      actions: selecteurConges(tous) +
+        (peutGerer
+          ? U.bouton("Poser pour quelqu'un", { variante: "fantome", taille: "sm",
+              icone: "calendrier", action: "pour" })
+          : ""),
       corps: l.length
         ? U.tableau(
             [{ nom: "Employé", rendu: c => '<span class="rang">' +
                 '<span class="avatar avatar--sm">' + U.esc(U.initiales(c.pseudo)) + "</span>" +
                 U.esc(c.pseudo) + "</span>" },
              { nom: "Période", rendu: c => U.esc(periode(c)) },
-             { nom: "État", rendu: c => c.from <= auj && auj <= c.to
-                 ? U.etiquette("en cours", "info") : U.etiquette("à venir") },
+             { nom: "État", rendu: c => PUCE[etatConge(c)]() },
              { nom: "Note", rendu: c => U.esc(c.note || "—") },
              { nom: "", rendu: c => peutGerer
                  ? U.bouton("", { icone: "crayon", variante: "fantome", taille: "sm",
@@ -260,14 +327,23 @@
                    U.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
                      titre: "Annuler", action: "rm-" + c.cid })
                  : "" }],
-            l)
-        : U.vide({ icone: "calendrier", titre: "Personne en congés",
-                   texte: "Aucune absence n'est posée." })
+            l) + bilanConges(l)
+        : U.vide({ icone: "calendrier",
+                   titre: anneeConges ? "Aucun congé sur cette période"
+                                      : "Personne en congés",
+                   texte: anneeConges
+                     ? "Personne n'a posé de congés dans cet intervalle."
+                     : "Aucune absence n'est posée." })
     });
     brancherConges(z);
   }
 
   function brancherConges(z) {
+    /* Le filtre est commun aux deux onglets : passer de « à venir » à
+       « année 2025 » puis changer d'onglet doit garder la même lecture. */
+    const an = z.querySelector("[data-annee]");
+    if (an) an.addEventListener("change", () => { anneeConges = an.value; vue(); });
+
     z.querySelectorAll("[data-a^='ed-']").forEach(b => b.addEventListener("click", () => {
       const c = MNDuty.congeById(b.dataset.a.slice(3));
       if (c) poserConge(c.id, c.pseudo, c.roleId, c.cid);

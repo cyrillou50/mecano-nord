@@ -1794,3 +1794,9 @@
   background: var(--c-action-fond);
   color: var(--c-action-doux);
 }
+
+/* Sélecteur compact, dans l'entête d'une carte. */
+.liste--sm { width: auto; padding: 6px var(--e-6) 6px var(--e-3); font-size: var(--t-sm); }
+
+/* Une période de congés révolue : lisible, mais en retrait. */
+.s-rang.est-eteint { opacity: .55; }
