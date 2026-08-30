@@ -592,6 +592,12 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
 }
 .svc__day + .svc__day { border-top: 1px solid rgba(255, 255, 255, .045); }
 .svc__day:nth-child(even) { background: rgba(255, 255, 255, .014); }
+/* Une période de congés révolue : présente, mais en retrait. */
+.svc__day.is-off { opacity: .5; }
+/* Une période se lit en toutes lettres : ni serrée sur 108 px, ni
+   recapitalisée mot à mot comme un nom de jour. */
+.svc__day--conge { grid-template-columns: minmax(150px, max-content) 1fr auto; }
+.svc__day--conge .svc__date { text-transform: none; white-space: normal; }
 
 .svc__date {
   font-size: 12.5px;

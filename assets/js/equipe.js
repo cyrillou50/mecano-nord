@@ -538,6 +538,7 @@
             stat("Service — total", MNDuty.dur(MNDuty.secondsFor(u.id)), on, "total") +
             stat("Formations", String((u.trainings || []).length),
               false, null, (u.trainings || []).length ? u.trainings.slice(0, 2).join(", ") : "aucune") +
+            statConges(u, MNStore.estArchive(u) ? u.depart.le : null) +
             (voitAvert(u) ? statAvert(u) : "") +
           "</div>" +
 
@@ -563,6 +564,8 @@
             ? '<div class="permtags">' + u.trainings.map(t =>
                 '<span class="permtag">' + esc(t) + "</span>").join("") + "</div>"
             : '<p class="hint">Aucune formation enregistrée.</p>') +
+
+          congesSection(u) +
 
           (voitAvert(u) ? sectionAvert(u) : "") +
 
@@ -595,6 +598,98 @@
   }
 
   const hhmm = d => new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
+  /* ---- Congés -----------------------------------------------------------------
+     La page Service montre les congés de tout le monde, à plat. Sur une fiche
+     la question est autre : combien cette personne en a pris, et quand.
+
+     Une période est rattachée à son année de début, une seule fois — ainsi la
+     somme des années fait exactement le total. (Le filtre de la page Service
+     montre, lui, une période à cheval dans les deux années : filtrer n'est pas
+     compter.) */
+
+  /** « du 10 au 20 août » — l'année est portée par le groupe, sauf à cheval. */
+  function periodeCourte(c) {
+    const memeAn = String(c.from).slice(0, 4) === String(c.to).slice(0, 4);
+    const jour = (j, avecAn) => {
+      const d = new Date(String(j) + "T12:00:00");
+      if (isNaN(d)) return String(j);
+      const o = { day: "numeric", month: "long" };
+      if (avecAn) o.year = "numeric";
+      return d.toLocaleDateString("fr-FR", o);
+    };
+    return "du " + jour(c.from, !memeAn) + " au " + jour(c.to, !memeAn);
+  }
+
+  const etatConge = c => {
+    const j = MNDuty.jourLocal();
+    return c.to < j ? "passe" : c.from <= j ? "encours" : "avenir";
+  };
+
+  /** Le total de l'année en cours — ou celui de toute la carrière, pour un parti. */
+  function statConges(u, parti) {
+    const tous = MNDuty.congesOf(u.id, true);
+    const an = String(new Date().getFullYear());
+    const l = parti ? tous : tous.filter(c => String(c.from).slice(0, 4) === an);
+    const jours = l.reduce((n, c) => n + MNDuty.nbJours(c.from, c.to), 0);
+    return stat(parti ? "Congés — total" : "Congés — " + an, jours + " j", false, null,
+      l.length ? l.length + " période" + (l.length > 1 ? "s" : "") : "aucun");
+  }
+
+  function congesSection(u) {
+    const tous = MNDuty.congesOf(u.id, true).slice()
+      .sort((a, b) => b.from.localeCompare(a.from));
+    const tete = '<h3 class="section-title" style="margin-top:24px">Congés' +
+      '<span class="count">' + tous.length + "</span></h3>";
+
+    if (!tous.length) return tete + '<p class="hint">Aucun congé posé.</p>';
+
+    const annees = [];
+    tous.forEach(c => {
+      const an = String(c.from).slice(0, 4);
+      let g = annees.find(x => x.an === an);
+      if (!g) { g = { an: an, jours: 0, periodes: [] }; annees.push(g); }
+      g.periodes.push(c);
+      g.jours += MNDuty.nbJours(c.from, c.to);
+    });
+
+    const anCourante = String(new Date().getFullYear());
+    const jours = tous.reduce((n, c) => n + MNDuty.nbJours(c.from, c.to), 0);
+
+    /* L'année en cours est dépliée, les précédentes repliées : on ne veut pas
+       dérouler cinq ans de congés pour lire la fiche de quelqu'un. */
+    return tete + '<div class="svc">' + annees.map(g =>
+      '<details class="svcweek"' + (g.an === anCourante ? " open" : "") + ">" +
+        '<summary class="svcweek__head">' +
+          '<span class="svcweek__chev">' + svg("chevDown") + "</span>" +
+          '<span class="svcweek__label">' + esc(g.an) +
+            (g.an === anCourante ? ' <span class="pill pill--ok">en cours</span>' : "") + "</span>" +
+          '<span class="svcweek__meta">' + g.periodes.length + " période" +
+            (g.periodes.length > 1 ? "s" : "") + "</span>" +
+          '<b class="svcweek__tot tnum">' + g.jours + " j</b>" +
+        "</summary>" +
+        '<div class="svcweek__body">' +
+          g.periodes.map(c => {
+            const e = etatConge(c);
+            return '<div class="svc__day svc__day--conge' +
+              (e === "passe" ? " is-off" : "") + '">' +
+              '<span class="svc__date">' + esc(periodeCourte(c)) + "</span>" +
+              '<span class="svc__slots">' +
+                '<span class="pill pill--' + (e === "encours" ? "ok" : "outline") + '">' +
+                  (e === "encours" ? "en cours" : e === "avenir" ? "à venir" : "passés") +
+                "</span>" +
+                (c.note ? '<span class="svc__slot">' + esc(c.note) + "</span>" : "") +
+              "</span>" +
+              '<span class="svc__tot tnum">' + MNDuty.nbJours(c.from, c.to) + " j</span>" +
+            "</div>";
+          }).join("") +
+        "</div>" +
+      "</details>"
+    ).join("") + "</div>" +
+      '<p class="hint" style="margin-top:8px">' + tous.length + " période" +
+      (tous.length > 1 ? "s" : "") + " · <b>" + jours + " jour" + (jours > 1 ? "s" : "") +
+      "</b> au total.</p>";
+  }
 
   /**
    * Historique de service, regroupé par mois puis par jour : une ligne par

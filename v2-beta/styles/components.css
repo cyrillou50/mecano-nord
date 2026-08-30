@@ -1218,6 +1218,12 @@
 .eq-jour__date { width: 130px; flex: none; color: var(--c-second); text-transform: capitalize; }
 .eq-jour__creneaux { display: flex; gap: var(--e-2); flex-wrap: wrap; flex: 1; min-width: 0; }
 .eq-jour__tot { font-weight: 700; margin-left: auto; }
+/* Une période de congés se lit en toutes lettres, et une période révolue
+   reste présente mais en retrait. */
+.eq-jour--conge .eq-jour__date {
+  width: auto; min-width: 150px; text-transform: none;
+}
+.eq-jour.est-eteint { opacity: .5; }
 
 .eq-creneau {
   padding: 1px 7px;

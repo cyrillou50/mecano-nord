@@ -519,6 +519,7 @@
                     icone: "etoile",
                     pied: (u.trainings || []).length
                       ? u.trainings.slice(0, 2).join(", ") : "aucune" }) +
+          tuileConges(u, parti) +
           (voitAvert(u) ? tuileAvert(u) : "") +
         "</div>" +
 
@@ -543,6 +544,8 @@
             ? '<div class="rang">' + u.trainings.map(t =>
                 U.etiquette(t)).join("") + "</div>"
             : '<p class="champ__aide">Aucune formation enregistrée.</p>') +
+
+        blocConges(u) +
 
         (voitAvert(u) ? blocAvert(u) : "") +
 
@@ -577,6 +580,103 @@
         const action = b.dataset.a.slice(0, coupe), id = b.dataset.a.slice(coupe + 1);
         if (action === "lever") leverAvert(u, id); else retirerAvert(u, id);
       }));
+  }
+
+  /* ---- Congés -----------------------------------------------------------------
+     La page Service montre les congés de tout le monde, à plat. Sur une fiche
+     la question est autre : combien cette personne en a pris, et quand.
+
+     Une période est rattachée à son année de début, une seule fois — ainsi la
+     somme des années fait exactement le total. (Le filtre de la page Service
+     montre, lui, une période à cheval dans les deux années : filtrer n'est pas
+     compter.) */
+
+  /** « du 10 au 20 août » — l'année est portée par le groupe, sauf à cheval. */
+  function periodeCourte(c) {
+    const memeAn = String(c.from).slice(0, 4) === String(c.to).slice(0, 4);
+    const jour = (j, avecAn) => {
+      const d = new Date(String(j) + "T12:00:00");
+      if (isNaN(d)) return String(j);
+      const o = { day: "numeric", month: "long" };
+      if (avecAn) o.year = "numeric";
+      return d.toLocaleDateString("fr-FR", o);
+    };
+    return "du " + jour(c.from, !memeAn) + " au " + jour(c.to, !memeAn);
+  }
+
+  const etatConge = c => {
+    const j = MNDuty.jourLocal();
+    return c.to < j ? "passe" : c.from <= j ? "encours" : "avenir";
+  };
+
+  /** Le total de l'année en cours — ou celui de toute la carrière, pour un parti. */
+  function tuileConges(u, parti) {
+    const tous = MNDuty.congesOf(u.id, true);
+    const an = String(new Date().getFullYear());
+    const l = parti ? tous : tous.filter(c => String(c.from).slice(0, 4) === an);
+    const jours = l.reduce((n, c) => n + MNDuty.nbJours(c.from, c.to), 0);
+    return U.tuile({
+      label: parti ? "Congés — total" : "Congés — " + an,
+      valeur: jours + " j", icone: "calendrier",
+      pied: l.length ? l.length + " période" + (l.length > 1 ? "s" : "") : "aucun"
+    });
+  }
+
+  function blocConges(u) {
+    const tous = MNDuty.congesOf(u.id, true).slice()
+      .sort((a, b) => b.from.localeCompare(a.from));
+
+    if (!tous.length) {
+      return section("Congés", 0, '<p class="champ__aide">Aucun congé posé.</p>');
+    }
+
+    const annees = [];
+    tous.forEach(c => {
+      const an = String(c.from).slice(0, 4);
+      let g = annees.find(x => x.an === an);
+      if (!g) { g = { an: an, jours: 0, periodes: [] }; annees.push(g); }
+      g.periodes.push(c);
+      g.jours += MNDuty.nbJours(c.from, c.to);
+    });
+
+    const anCourante = String(new Date().getFullYear());
+    const jours = tous.reduce((n, c) => n + MNDuty.nbJours(c.from, c.to), 0);
+
+    /* L'année en cours est dépliée, les précédentes repliées : on ne veut pas
+       dérouler cinq ans de congés pour lire la fiche de quelqu'un. */
+    return section("Congés", tous.length,
+      annees.map(g =>
+        "<details class=\"eq-sem\"" + (g.an === anCourante ? " open" : "") + ">" +
+          '<summary class="eq-sem__tete">' +
+            '<span class="eq-sem__nom">' + U.esc(g.an) +
+              (g.an === anCourante ? " " + U.etiquette("en cours", "succes") : "") + "</span>" +
+            '<span class="eq-sem__meta">' + g.periodes.length + " période" +
+              (g.periodes.length > 1 ? "s" : "") + "</span>" +
+            '<b class="nombre">' + g.jours + " j</b>" +
+          "</summary>" +
+          '<div class="eq-sem__corps">' +
+            g.periodes.map(c => {
+              const e = etatConge(c);
+              return '<div class="eq-jour eq-jour--conge' +
+                (e === "passe" ? " est-eteint" : "") + '">' +
+                '<span class="eq-jour__date">' + U.esc(periodeCourte(c)) + "</span>" +
+                '<span class="eq-jour__creneaux">' +
+                  U.etiquette(e === "encours" ? "en cours" : e === "avenir" ? "à venir" : "passés",
+                    e === "encours" ? "succes" : "") +
+                  (c.note ? '<span class="eq-creneau">' + U.esc(c.note) + "</span>" : "") +
+                "</span>" +
+                '<span class="eq-jour__tot nombre">' +
+                  MNDuty.nbJours(c.from, c.to) + " j</span>" +
+              "</div>";
+            }).join("") +
+            '<div class="eq-sem__moy"><span>' + g.periodes.length + " période" +
+              (g.periodes.length > 1 ? "s" : "") + " en " + U.esc(g.an) + "</span>" +
+              '<b class="nombre">' + g.jours + " j</b></div>" +
+          "</div>" +
+        "</details>").join("") +
+      '<p class="champ__aide" style="margin-top:var(--e-2)">' + tous.length + " période" +
+        (tous.length > 1 ? "s" : "") + " · <b>" + jours + " jour" + (jours > 1 ? "s" : "") +
+        "</b> au total.</p>");
   }
 
   const section = (titre, n, corps) =>
