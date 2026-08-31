@@ -976,7 +976,7 @@ const serveur = http.createServer(async (req, res) => {
       return repondre(res, 200, {
         ok: true, ops: true, images: true, vehicules: true, relais: true, contrats: true,
         calendrier: true, catalogue: true, equipe: true,
-        recap: RECAP_ACTIF,
+        recap: RECAP_ACTIF, recapMini: RECAP_MINI,
         depuis: Math.round(process.uptime()) + " s"
       }, req);
     }
@@ -993,8 +993,9 @@ const serveur = http.createServer(async (req, res) => {
         return repondre(res, 200, {
           ok: true, actif: RECAP_ACTIF, jour: RECAP_JOUR, heure: RECAP_HEURE,
           salonConfigure: !!WEBHOOKS.duty, dejaEnvoyee: etat.derniere === p.semaine,
-          semaine: p.semaine, debut: p.debut, fin: p.fin,
-          total: p.recap.total, services: p.recap.services, lignes: p.recap.lignes
+          semaine: p.semaine, debut: p.debut, fin: p.fin, mini: RECAP_MINI,
+          total: p.recap.total, services: p.recap.services, lignes: p.recap.lignes,
+          sous: p.recap.sous
         }, req);
       }
       if (req.method === "POST") {
@@ -1605,12 +1606,15 @@ async function ecrireCatalogue(cat) {
      RECAP=off          n'envoie rien
      RECAP_JOUR=0       jour de l'envoi, 0 = dimanche … 6 = samedi
      RECAP_HEURE=20     heure locale de l'envoi
+     RECAP_MINI=4       heures attendues dans la semaine, 0 pour ne rien signaler
    L'heure est celle de la machine : mets TZ=Europe/Paris dans le service. */
 
 const FICHIER_RECAP = path.join(DOSSIER, "recap.json");
 const RECAP_ACTIF = String(process.env.RECAP || "on").toLowerCase() !== "off";
 const RECAP_JOUR = nombre(process.env.RECAP_JOUR === undefined ? 0 : process.env.RECAP_JOUR, 0, 6);
 const RECAP_HEURE = nombre(process.env.RECAP_HEURE === undefined ? 20 : process.env.RECAP_HEURE, 0, 23);
+/* Le minimum attendu sur la semaine. En dessous, la personne est signalée. */
+const RECAP_MINI = nombre(process.env.RECAP_MINI === undefined ? 4 : process.env.RECAP_MINI, 0, 168);
 
 /** Lundi 00:00 de la semaine où tombe `d`. */
 function debutSemaine(d) {
@@ -1648,13 +1652,13 @@ function dureeCourte(sec) {
  * Même découpage que le site (MNDuty.totals), pour que les deux disent la
  * même chose.
  */
-function recapSemaine(board, depuis, jusqua) {
+function recapSemaine(board, depuis, jusqua, roster) {
   const par = {};
   (board.log || []).forEach(e => {
     if (!e.out) return;
     const t = new Date(e.out).getTime();
     if (t < depuis || t > jusqua) return;
-    if (!par[e.id]) par[e.id] = { pseudo: e.pseudo, seconds: 0, sessions: 0 };
+    if (!par[e.id]) par[e.id] = { id: e.id, pseudo: e.pseudo, seconds: 0, sessions: 0 };
     par[e.id].seconds += e.seconds;
     par[e.id].sessions++;
   });
@@ -1663,30 +1667,128 @@ function recapSemaine(board, depuis, jusqua) {
   return {
     lignes,
     total: lignes.reduce((n, l) => n + l.seconds, 0),
-    services: lignes.reduce((n, l) => n + l.sessions, 0)
+    services: lignes.reduce((n, l) => n + l.sessions, 0),
+    sous: sousLeSeuil(par, roster, board, depuis, jusqua)
+  };
+}
+
+/** « AAAA-MM-JJ » dans le fuseau de la machine : les congés se comptent en
+    jours, et passer par UTC ferait glisser un dimanche soir sur le lundi. */
+const jourDe = d =>
+  new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+
+/**
+ * Les employés qu'on attend cette semaine, tirés du catalogue quand il est
+ * là. Sans lui le serveur ne connaît que ceux qui ont pointé — or zéro heure
+ * est justement le cas qu'on veut voir.
+ */
+async function rosterRecap() {
+  const cat = await lireCatalogue();
+  if (!cat) return null;
+  return (cat.users || [])
+    .filter(u => u && u.id && u.active !== false && !u.depart && u.hidden !== true)
+    .map(u => ({ id: String(u.id), pseudo: String(u.pseudo || "?") }));
+}
+
+/**
+ * Ce que la personne avait posé sur la semaine : "" rien, "partie" quelques
+ * jours, "tout" les sept. On compte jour par jour — deux périodes qui se
+ * suivent couvrent la semaine aussi sûrement qu'une seule.
+ */
+function congesSemaine(board, uid, jDebut, jFin) {
+  const l = (board.conges || []).filter(c => c.id === uid);
+  if (!l.length) return "";
+  let jours = 0, poses = 0;
+  const d = new Date(jDebut + "T12:00:00");
+  for (let j = jourDe(d); j <= jFin; d.setDate(d.getDate() + 1), j = jourDe(d)) {
+    jours++;
+    if (l.some(c => c.from <= j && j <= c.to)) poses++;
+  }
+  return !poses ? "" : poses >= jours ? "tout" : "partie";
+}
+
+/**
+ * Ceux qui n'atteignent pas le minimum de la semaine.
+ *
+ * Deux précautions. Zéro heure est le cas le plus grave, et c'est le seul qui
+ * ne laisse aucune trace dans le journal : il faut aller le chercher dans le
+ * catalogue. Et une absence n'est pas un manquement — qui était en congés
+ * toute la semaine sort de la liste ; qui l'était en partie y reste, avec la
+ * mention, au lecteur de juger.
+ */
+function sousLeSeuil(par, roster, board, depuis, jusqua) {
+  if (!RECAP_MINI) return null;
+  const seuil = RECAP_MINI * 3600;
+  const jDebut = jourDe(new Date(depuis)), jFin = jourDe(new Date(jusqua));
+
+  const gens = (roster || Object.keys(par).map(k => par[k])).map(u => ({
+    id: u.id,
+    pseudo: (par[u.id] && par[u.id].pseudo) || u.pseudo,
+    seconds: par[u.id] ? par[u.id].seconds : 0
+  }));
+
+  return {
+    seuil: RECAP_MINI,
+    /* Faux : on ne voit que ceux qui ont pointé. Le message le dira, plutôt
+       que de laisser croire que tous les autres ont fait leur temps. */
+    complet: !!roster,
+    attendus: gens.length,
+    gens: gens
+      .filter(g => g.seconds < seuil)
+      .map(g => Object.assign(g, { conges: congesSemaine(board, g.id, jDebut, jFin) }))
+      .filter(g => g.conges !== "tout")
+      .sort((a, b) => a.seconds - b.seconds)
   };
 }
 
 function embedRecap(r, debut, fin) {
   const jour = d => new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+  const s = r.sous;
+  const fields = [];
+
+  if (r.lignes.length) {
+    fields.push({
+      name: "Temps par personne",
+      /* Discord coupe un champ à 1024 caractères : on borne la liste
+         plutôt que de laisser le message partir tronqué n'importe où. */
+      value: r.lignes.slice(0, 25)
+        .map((l, i) => (i + 1) + ". **" + l.pseudo + "** — " + dureeCourte(l.seconds) +
+          "  (" + l.sessions + " service" + (l.sessions > 1 ? "s" : "") + ")")
+        .join("\n").slice(0, 1024)
+    });
+  }
+
+  if (s && s.gens.length) {
+    fields.push({
+      name: "⚠️ Moins de " + s.seuil + " h cette semaine",
+      value: s.gens.slice(0, 25)
+        .map(g => "• **" + g.pseudo + "** — " +
+          (g.seconds ? dureeCourte(g.seconds) : "aucun service") +
+          (g.conges === "partie" ? "  *(congés dans la semaine)*" : ""))
+        .join("\n").slice(0, 1024)
+    });
+  }
+
+  /* Le silence serait ambigu : on ne saurait pas si personne n'est en dessous
+     ou si le serveur ne regarde rien. Une phrase suffit, pas un champ de plus. */
+  const bilan = s && !s.gens.length && s.complet && s.attendus
+    ? " Tout le monde atteint les " + s.seuil + " h."
+    : "";
+
   return {
     title: "Semaine du " + jour(debut) + " au " + jour(fin),
-    description: r.lignes.length
+    description: (r.lignes.length
       ? "**" + dureeCourte(r.total) + "** en tout, sur " + r.services +
         " service" + (r.services > 1 ? "s" : "") + "."
-      : "Personne n'a pointé cette semaine.",
+      : "Personne n'a pointé cette semaine.") + bilan,
     color: 0xffa92e,
-    fields: r.lignes.length
-      ? [{
-          name: "Temps par personne",
-          /* Discord coupe un champ à 1024 caractères : on borne la liste
-             plutôt que de laisser le message partir tronqué n'importe où. */
-          value: r.lignes.slice(0, 25)
-            .map((l, i) => (i + 1) + ". **" + l.pseudo + "** — " + dureeCourte(l.seconds) +
-              "  (" + l.sessions + " service" + (l.sessions > 1 ? "s" : "") + ")")
-            .join("\n").slice(0, 1024)
-        }]
-      : []
+    fields,
+    /* Sans catalogue ici, ceux qui n'ont jamais pointé restent invisibles :
+       mieux vaut l'écrire que laisser lire une liste incomplète. */
+    footer: s && s.gens.length && !s.complet
+      ? { text: "Seules les personnes ayant pointé sont connues du serveur — " +
+                "publie le catalogue pour voir aussi celles restées à zéro." }
+      : undefined
   };
 }
 
@@ -1707,11 +1809,12 @@ async function prepareRecap(maintenant) {
   const fin = maintenant || new Date();
   const debut = debutSemaine(fin);
   const board = nettoyer(await lire()) || VIDE;
+  const roster = await rosterRecap();
   return {
     semaine: cleSemaine(fin),
     debut: debut.toISOString(),
     fin: fin.toISOString(),
-    recap: recapSemaine(board, debut.getTime(), fin.getTime())
+    recap: recapSemaine(board, debut.getTime(), fin.getTime(), roster)
   };
 }
 

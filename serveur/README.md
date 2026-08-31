@@ -557,10 +557,29 @@ Il n'y a rien à installer — pas de `cron`, pas de dépendance. Il suffit que
 | `RECAP` | `on` | `off` pour ne rien envoyer |
 | `RECAP_JOUR` | `0` | jour de l'envoi — 0 = dimanche, 6 = samedi |
 | `RECAP_HEURE` | `20` | heure locale de l'envoi |
+| `RECAP_MINI` | `4` | heures attendues dans la semaine — `0` pour ne rien signaler |
 | `TZ` | heure système | fuseau, par exemple `Europe/Paris` |
 
 **Mets `TZ`** dans le service : sans lui, beaucoup de VPS sont en UTC et le
 message partirait deux heures trop tôt l'été.
+
+### Le minimum de la semaine
+
+Sous `RECAP_MINI` heures, la personne est signalée dans un second champ du
+message. Deux points méritent d'être connus.
+
+**Ceux qui n'ont pas pointé du tout.** Zéro heure est le cas le plus grave, et
+c'est le seul qui ne laisse aucune trace dans le journal des services : pour le
+voir, le serveur a besoin de l'effectif, donc du catalogue publié ici
+(`PUT /catalogue`). Sans lui la liste ne contient que ceux qui ont pointé un
+peu, et le message le dit en note plutôt que de laisser croire que les autres
+ont fait leur temps.
+
+**Les congés.** Qui était en congés toute la semaine n'apparaît pas — une
+absence posée n'est pas un manquement. Qui l'était en partie apparaît avec la
+mention *(congés dans la semaine)* : au lecteur de juger.
+
+Sont écartés de l'effectif attendu les comptes désactivés, archivés et cachés.
 
 La semaine déjà envoyée est retenue dans `donnees/recap.json`. Sans ce
 repère, un serveur redémarré trois fois dans la soirée enverrait trois fois
