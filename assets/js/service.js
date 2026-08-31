@@ -96,32 +96,55 @@
      bas. On pointe cent fois par jour et on consulte l'historique une fois par
      mois : ils n'ont rien à faire l'un sous l'autre.
 
-     La carte de pointage, elle, reste hors des onglets — c'est le geste qu'on
+     Deux niveaux plutôt qu'une rangée unique : une rangée de six ne dit pas ce
+     qui va avec quoi. La catégorie répond à « de qui parle-t-on » — l'atelier
+     maintenant, moi, l'équipe — et le second niveau à « quoi ». Il ne s'affiche
+     que là où il y a vraiment un choix à faire.
+
+     La carte de pointage, elle, reste hors des onglets : c'est le geste qu'on
      vient faire, il ne doit jamais demander un clic de plus. */
 
-  let onglet = "atelier";
+  const CATEGORIES = [
+    ["atelier", "L'atelier"],
+    ["moi", "Moi"],
+    ["equipe", "L'équipe"]
+  ];
 
-  function onglets(canPoint, canView) {
-    const l = [["atelier", "L'atelier"]];
-    if (canPoint) l.push(["temps", "Mon temps"], ["conges", "Mes congés"]);
-    if (canView) l.push(["equipe", "Congés de l'équipe"], ["histo", "Historique"]);
-    return l;
-  }
+  /* Une seule table pour les deux barres et pour le contenu : impossible qu'un
+     onglet apparaisse quelque part et manque ailleurs. `droit` vide = pour
+     tout le monde. */
+  const VUES = [
+    { id: "atelier",  cat: "atelier", nom: "En service",         droit: "" },
+    { id: "temps",    cat: "moi",     nom: "Mon temps",          droit: "point" },
+    { id: "conges",   cat: "moi",     nom: "Mes congés",         droit: "point" },
+    { id: "eqconges", cat: "equipe",  nom: "Congés",             droit: "voir" },
+    { id: "eqtemps",  cat: "equipe",  nom: "Temps de service",   droit: "voir" },
+    { id: "eqlog",    cat: "equipe",  nom: "Derniers pointages", droit: "voir" }
+  ];
 
-  const barreOnglets = l =>
-    '<div class="ptabs">' + l.map(o =>
-      '<button class="ptab' + (onglet === o[0] ? " is-active" : "") +
-        '" data-o="' + o[0] + '">' + esc(o[1]) + "</button>").join("") + "</div>";
+  let vueActive = "atelier";
 
-  function vue(canView, canManage) {
+  const vuesDe = (cat, canPoint, canView) => VUES.filter(v =>
+    v.cat === cat && (!v.droit || (v.droit === "point" ? canPoint : canView)));
+
+  const barreCat = (cats, actuelle) =>
+    '<div class="ptabs">' + cats.map(c =>
+      '<button class="ptab' + (c[0] === actuelle ? " is-active" : "") +
+        '" data-cat="' + c[0] + '">' + esc(c[1]) + "</button>").join("") + "</div>";
+
+  const barreSous = l =>
+    '<div class="ptabs ptabs--sous">' + l.map(v =>
+      '<button class="ptab' + (v.id === vueActive ? " is-active" : "") +
+        '" data-vue="' + v.id + '">' + esc(v.nom) + "</button>").join("") + "</div>";
+
+  function contenu(id, canView, canManage) {
     const onDuty = MNDuty.board().onDuty;
-    if (onglet === "atelier") {
-      return canView ? boardPanel(onDuty, canManage) : teamCount(onDuty);
-    }
-    if (onglet === "temps") return myTimeCard();
-    if (onglet === "conges") return myLeaveCard();
-    if (onglet === "equipe") return leavePanel(canManage);
-    return statsPanel(canManage);
+    if (id === "atelier") return canView ? boardPanel(onDuty, canManage) : teamCount(onDuty);
+    if (id === "temps") return myTimeCard();
+    if (id === "conges") return myLeaveCard();
+    if (id === "eqconges") return leavePanel(canManage);
+    if (id === "eqtemps") return statsPanel();
+    return logPanel(canManage);
   }
 
   function render() {
@@ -130,10 +153,16 @@
     const canManage = MNAuth.can("duty_manage");
     const canView = MNAuth.can("duty_view") || canManage;
 
-    /* Un onglet peut disparaître avec un changement de droits : on ne laisse
-       pas la page vide pour autant. */
-    const tabs = onglets(canPoint, canView);
-    if (!tabs.some(o => o[0] === onglet)) onglet = tabs[0][0];
+    const cats = CATEGORIES.filter(c => vuesDe(c[0], canPoint, canView).length);
+
+    /* Un droit retiré peut faire disparaître la vue retenue : on retombe sur
+       la première plutôt que de laisser la page vide. */
+    let v = VUES.find(x => x.id === vueActive);
+    if (!v || !vuesDe(v.cat, canPoint, canView).some(x => x.id === v.id)) {
+      v = vuesDe(cats[0][0], canPoint, canView)[0];
+      vueActive = v.id;
+    }
+    const soeurs = vuesDe(v.cat, canPoint, canView);
 
     $("#service-root").innerHTML =
       '<h1 class="page-title">Service</h1>' +
@@ -146,11 +175,27 @@
           "Vérifie l'adresse dans le panneau admin (Publier → Pointage de l'équipe).</span></div>"
         : "") +
       (MNDuty.canShare() ? "" : shareWarning()) +
-      barreOnglets(tabs) +
-      vue(canView, canManage);
 
-    document.querySelectorAll("[data-o]").forEach(b =>
-      b.addEventListener("click", () => { onglet = b.dataset.o; render(); }));
+      '<div class="ptabnav">' +
+        barreCat(cats, v.cat) +
+        /* Pas de second niveau là où il n'y a rien à choisir. */
+        (soeurs.length > 1 ? barreSous(soeurs) : "") +
+      "</div>" +
+      contenu(v.id, canView, canManage);
+
+    document.querySelectorAll("[data-cat]").forEach(b =>
+      b.addEventListener("click", () => {
+        const l = vuesDe(b.dataset.cat, canPoint, canView);
+        if (!l.length || l.some(x => x.id === vueActive)) return;
+        vueActive = l[0].id;
+        render();
+      }));
+    document.querySelectorAll("[data-vue]").forEach(b =>
+      b.addEventListener("click", () => {
+        if (b.dataset.vue === vueActive) return;
+        vueActive = b.dataset.vue;
+        render();
+      }));
 
     if (canPoint) $("#d-toggle").addEventListener("click", toggle);
 
@@ -624,10 +669,9 @@
     "</div>";
   }
 
-  function statsPanel(canManage) {
+  function statsPanel() {
     const t = MNDuty.totals(7);
-    const log = MNDuty.board().log.slice(0, 12);
-    return '<div class="panel" style="margin-bottom:18px">' +
+    return '<div class="panel">' +
       '<div class="panel__head"><h2>Temps de service — 7 derniers jours</h2></div>' +
       '<div class="panel__body">' +
         (t.length
@@ -643,9 +687,12 @@
                 '<span class="trow__price tnum">' + MNDuty.dur(u.seconds) + "</span></div>";
             }).join("") + "</div>"
           : '<p class="hint">Aucun service terminé sur la période.</p>') +
-      "</div></div>" +
+      "</div></div>";
+  }
 
-      '<div class="panel"><div class="panel__head"><h2>Derniers pointages</h2>' +
+  function logPanel(canManage) {
+    const log = MNDuty.board().log.slice(0, 12);
+    return '<div class="panel"><div class="panel__head"><h2>Derniers pointages</h2>' +
         '<span class="spacer"></span>' +
         (canManage && log.length
           ? '<button class="btn btn--ghost btn--sm" id="d-clearlog">' + svg("trash") +

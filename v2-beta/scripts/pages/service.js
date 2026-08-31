@@ -18,6 +18,32 @@
 
   let hote = null, moi = null;
   let peutPointer = false, peutVoir = false, peutGerer = false;
+
+  /* Deux niveaux plutôt qu'une rangée unique : une rangée de six ne dit pas ce
+     qui va avec quoi. La catégorie répond à « de qui parle-t-on » — l'atelier
+     maintenant, moi, l'équipe — et le second niveau à « quoi ». Il ne s'affiche
+     que là où il y a vraiment un choix à faire. */
+  const CATEGORIES = [
+    ["atelier", "L'atelier"],
+    ["moi", "Moi"],
+    ["equipe", "L'équipe"]
+  ];
+
+  /* Une seule table pour les deux barres et pour le contenu : impossible qu'un
+     onglet apparaisse quelque part et manque ailleurs. `droit` vide = pour
+     tout le monde. */
+  const VUES = [
+    { id: "atelier",  cat: "atelier", nom: "En service",         droit: "" },
+    { id: "temps",    cat: "moi",     nom: "Mon temps",          droit: "point" },
+    { id: "moi",      cat: "moi",     nom: "Mes congés",         droit: "point" },
+    { id: "equipe",   cat: "equipe",  nom: "Congés",             droit: "voir" },
+    { id: "eqtemps",  cat: "equipe",  nom: "Temps de service",   droit: "voir" },
+    { id: "histo",    cat: "equipe",  nom: "Derniers pointages", droit: "voir" }
+  ];
+
+  const vuesDe = cat => VUES.filter(v =>
+    v.cat === cat && (!v.droit || (v.droit === "point" ? peutPointer : peutVoir)));
+
   let onglet = "atelier";
 
   V2Shell.demarrer({
@@ -68,19 +94,40 @@
   /* ---- Rendu ------------------------------------------------------------------ */
 
   function dessiner() {
-    const onglets = [["atelier", "L'atelier"]]
-      .concat(peutPointer ? [["temps", "Mon temps"]] : [])
-      .concat([["moi", "Mes congés"]])
-      .concat(peutVoir ? [["equipe", "Congés de l'équipe"], ["histo", "Historique"]] : []);
+    const cats = CATEGORIES.filter(c => vuesDe(c[0]).length);
+
+    /* Un droit retiré peut faire disparaître la vue retenue : on retombe sur
+       la première plutôt que de laisser la page vide. */
+    let v = VUES.find(x => x.id === onglet);
+    if (!v || !vuesDe(v.cat).some(x => x.id === v.id)) {
+      v = vuesDe(cats[0][0])[0];
+      onglet = v.id;
+    }
+    const soeurs = vuesDe(v.cat);
 
     hote.innerHTML =
       monEtat() +
-      '<div class="onglets" style="margin:var(--e-4) 0">' + onglets.map(o =>
-        '<button class="onglet' + (onglet === o[0] ? " is-actif" : "") +
-          '" data-o="' + o[0] + '">' + U.esc(o[1]) + "</button>").join("") + "</div>" +
+      '<div class="onglets-nav">' +
+        '<div class="onglets">' + cats.map(c =>
+          '<button class="onglet' + (c[0] === v.cat ? " is-actif" : "") +
+            '" data-cat="' + c[0] + '">' + U.esc(c[1]) + "</button>").join("") + "</div>" +
+        /* Pas de second niveau là où il n'y a rien à choisir. */
+        (soeurs.length > 1
+          ? '<div class="onglets onglets--sous">' + soeurs.map(s =>
+              '<button class="onglet' + (s.id === onglet ? " is-actif" : "") +
+                '" data-o="' + s.id + '">' + U.esc(s.nom) + "</button>").join("") + "</div>"
+          : "") +
+      "</div>" +
       '<div id="s-vue"></div>';
 
+    hote.querySelectorAll("[data-cat]").forEach(b => b.addEventListener("click", () => {
+      const l = vuesDe(b.dataset.cat);
+      if (!l.length || l.some(x => x.id === onglet)) return;
+      onglet = l[0].id;
+      dessiner();
+    }));
     hote.querySelectorAll("[data-o]").forEach(b => b.addEventListener("click", () => {
+      if (b.dataset.o === onglet) return;
       onglet = b.dataset.o; dessiner();
     }));
 
@@ -175,7 +222,8 @@
     if (onglet === "temps") return monTemps(z);
     if (onglet === "moi") return mesConges(z);
     if (onglet === "equipe") return congesEquipe(z);
-    return historique(z);
+    if (onglet === "eqtemps") return tempsEquipe(z);
+    return pointages(z);
   }
 
   function atelier(z) {
@@ -677,9 +725,8 @@
 
   /* ---- Historique ---------------------------------------------------------------------- */
 
-  function historique(z) {
+  function tempsEquipe(z) {
     const t = MNDuty.totals(7);
-    const log = MNDuty.board().log.slice(0, 30);
 
     z.innerHTML =
       U.carte({
@@ -694,8 +741,13 @@
               t)
           : U.vide({ icone: "horloge", titre: "Aucun service terminé",
                      texte: "Rien sur les sept derniers jours." })
-      }) +
-      '<div style="margin-top:var(--e-4)">' +
+      });
+  }
+
+  function pointages(z) {
+    const log = MNDuty.board().log.slice(0, 30);
+
+    z.innerHTML =
       U.carte({
         titre: "Derniers pointages",
         actions: peutGerer && log.length
@@ -719,7 +771,7 @@
                    : "" }],
               log)
           : U.vide({ icone: "horloge", titre: "Aucun pointage enregistré" })
-      }) + "</div>";
+      });
 
     const v = z.querySelector('[data-a="vider"]');
     if (v) v.addEventListener("click", viderHisto);

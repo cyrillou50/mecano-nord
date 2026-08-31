@@ -383,6 +383,32 @@
 .onglet:hover { color: var(--c-texte); }
 .onglet.is-actif { background: var(--c-carte); color: var(--c-action-doux); box-shadow: var(--o-1); }
 
+/* Les deux niveaux se tiennent : une catégorie, puis ce qu'elle contient. */
+.onglets-nav {
+  display: flex; flex-direction: column; gap: var(--e-2);
+  margin: var(--e-4) 0;
+}
+
+/* Second niveau : sans cadre et plus discret. C'est une précision à
+   l'intérieur d'une catégorie, pas une seconde navigation de même rang. */
+.onglets--sous {
+  padding: 0 2px;
+  background: none;
+  border: none;
+}
+.onglets--sous .onglet {
+  padding: var(--e-1) var(--e-3);
+  border-radius: var(--r-plein);
+  font-size: var(--t-xs);
+  color: var(--c-faible);
+}
+.onglets--sous .onglet:hover { color: var(--c-second); }
+.onglets--sous .onglet.is-actif {
+  background: var(--c-creux);
+  color: var(--c-texte);
+  box-shadow: none;
+}
+
 /* ---- Menu déroulant ------------------------------------------------------------ */
 
 .menu {
