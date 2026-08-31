@@ -575,9 +575,15 @@ voir, le serveur a besoin de l'effectif, donc du catalogue publié ici
 peu, et le message le dit en note plutôt que de laisser croire que les autres
 ont fait leur temps.
 
-**Les congés.** Qui était en congés toute la semaine n'apparaît pas — une
-absence posée n'est pas un manquement. Qui l'était en partie apparaît avec la
-mention *(congés dans la semaine)* : au lecteur de juger.
+**Les congés.** Un congé posé n'est pas un manquement : personne n'est signalé
+pour une semaine qu'il avait prévu de ne pas travailler, ne serait-ce qu'en
+partie. Ces personnes ne disparaissent pas pour autant — un second champ
+**Congés cette semaine** les nomme, sans reproche, pour qui se demande où est
+passé un nom.
+
+La semaine entière est prise en compte, pas seulement les jours écoulés : des
+congés posés pour vendredi comptent déjà le lundi. Sans quoi un aperçu en
+milieu de semaine signalerait quelqu'un que le message du dimanche épargnera.
 
 Sont écartés de l'effectif attendu les comptes désactivés, archivés et cachés.
 

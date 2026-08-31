@@ -232,9 +232,25 @@
   const hhmm = d => new Date(d).toLocaleTimeString("fr-FR",
     { hour: "2-digit", minute: "2-digit" });
 
+  /**
+   * Ai-je posé des congés sur cette semaine ? On regarde la semaine entière,
+   * pas seulement les jours passés : des congés prévus pour vendredi comptent
+   * déjà le lundi, exactement comme dans le récapitulatif du dimanche.
+   */
+  function congesCetteSemaine() {
+    const lundi = MNDuty.weekStart();
+    const a = MNDuty.jourLocal(new Date(lundi));
+    const b = MNDuty.jourLocal(new Date(lundi + 6 * 86400000));
+    return MNDuty.congesOf(moi.uid, true).some(c => c.from <= b && c.to >= a);
+  }
+
   /** Où j'en suis des heures attendues cette semaine. */
   function jauge(sec) {
     if (!objectif) return "";
+    /* Un congé posé n'est pas un manquement : on ne réclame pas des heures à
+       quelqu'un qui avait prévu de ne pas être là, et le récapitulatif du
+       dimanche ne le signalera pas non plus. */
+    if (congesCetteSemaine()) return U.esc("congés cette semaine — aucun minimum attendu");
     const but = objectif * 3600;
     const fait = sec >= but;
     return '<span class="jauge' + (fait ? " est-fait" : "") + '">' +

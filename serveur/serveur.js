@@ -1668,7 +1668,7 @@ function recapSemaine(board, depuis, jusqua, roster) {
     lignes,
     total: lignes.reduce((n, l) => n + l.seconds, 0),
     services: lignes.reduce((n, l) => n + l.sessions, 0),
-    sous: sousLeSeuil(par, roster, board, depuis, jusqua)
+    sous: sousLeSeuil(par, roster, board, depuis)
   };
 }
 
@@ -1712,32 +1712,39 @@ function congesSemaine(board, uid, jDebut, jFin) {
  *
  * Deux précautions. Zéro heure est le cas le plus grave, et c'est le seul qui
  * ne laisse aucune trace dans le journal : il faut aller le chercher dans le
- * catalogue. Et une absence n'est pas un manquement — qui était en congés
- * toute la semaine sort de la liste ; qui l'était en partie y reste, avec la
- * mention, au lecteur de juger.
+ * catalogue. Et un congé posé n'est pas un manquement : personne n'est
+ * signalé pour une semaine qu'il avait prévu de ne pas travailler, ne serait-ce
+ * qu'en partie. Ces gens-là ne disparaissent pas pour autant — ils passent
+ * dans une liste à part, sans reproche.
  */
-function sousLeSeuil(par, roster, board, depuis, jusqua) {
+function sousLeSeuil(par, roster, board, depuis) {
   if (!RECAP_MINI) return null;
   const seuil = RECAP_MINI * 3600;
-  const jDebut = jourDe(new Date(depuis)), jFin = jourDe(new Date(jusqua));
 
-  const gens = (roster || Object.keys(par).map(k => par[k])).map(u => ({
-    id: u.id,
-    pseudo: (par[u.id] && par[u.id].pseudo) || u.pseudo,
-    seconds: par[u.id] ? par[u.id].seconds : 0
-  }));
+  /* La semaine entière, pas seulement jusqu'à maintenant : des congés posés
+     pour vendredi comptent déjà le lundi, sinon un aperçu en milieu de semaine
+     signalerait quelqu'un que le message du dimanche épargnera. */
+  const jDebut = jourDe(new Date(depuis));
+  const jFin = jourDe(new Date(depuis + 6 * 86400000));
+
+  const sous = (roster || Object.keys(par).map(k => par[k]))
+    .map(u => ({
+      id: u.id,
+      pseudo: (par[u.id] && par[u.id].pseudo) || u.pseudo,
+      seconds: par[u.id] ? par[u.id].seconds : 0
+    }))
+    .filter(g => g.seconds < seuil)
+    .map(g => Object.assign(g, { conges: congesSemaine(board, g.id, jDebut, jFin) }))
+    .sort((a, b) => a.seconds - b.seconds);
 
   return {
     seuil: RECAP_MINI,
     /* Faux : on ne voit que ceux qui ont pointé. Le message le dira, plutôt
        que de laisser croire que tous les autres ont fait leur temps. */
     complet: !!roster,
-    attendus: gens.length,
-    gens: gens
-      .filter(g => g.seconds < seuil)
-      .map(g => Object.assign(g, { conges: congesSemaine(board, g.id, jDebut, jFin) }))
-      .filter(g => g.conges !== "tout")
-      .sort((a, b) => a.seconds - b.seconds)
+    attendus: (roster || Object.keys(par)).length,
+    gens: sous.filter(g => !g.conges),
+    conges: sous.filter(g => g.conges)
   };
 }
 
@@ -1763,15 +1770,30 @@ function embedRecap(r, debut, fin) {
       name: "⚠️ Moins de " + s.seuil + " h cette semaine",
       value: s.gens.slice(0, 25)
         .map(g => "• **" + g.pseudo + "** — " +
-          (g.seconds ? dureeCourte(g.seconds) : "aucun service") +
-          (g.conges === "partie" ? "  *(congés dans la semaine)*" : ""))
+          (g.seconds ? dureeCourte(g.seconds) : "aucun service"))
+        .join("\n").slice(0, 1024)
+    });
+  }
+
+  /* Ceux qui auraient été signalés sans leurs congés. Ils ne sont pas cachés
+     — ils sont juste ailleurs, et sans reproche : le message doit rester
+     lisible pour qui se demande où est passé un nom. */
+  if (s && s.conges.length) {
+    fields.push({
+      name: "Congés cette semaine",
+      value: s.conges.slice(0, 25)
+        .map(g => "• **" + g.pseudo + "** — " +
+          (g.conges === "tout" ? "absent toute la semaine" : "congés une partie de la semaine") +
+          (g.seconds ? " · " + dureeCourte(g.seconds) + " tout de même" : ""))
         .join("\n").slice(0, 1024)
     });
   }
 
   /* Le silence serait ambigu : on ne saurait pas si personne n'est en dessous
-     ou si le serveur ne regarde rien. Une phrase suffit, pas un champ de plus. */
-  const bilan = s && !s.gens.length && s.complet && s.attendus
+     ou si le serveur ne regarde rien. Une phrase suffit, pas un champ de plus.
+     Elle ne se dit que si personne n'est en dessous, congés compris : sinon
+     elle contredirait le champ juste en dessous. */
+  const bilan = s && !s.gens.length && !s.conges.length && s.complet && s.attendus
     ? " Tout le monde atteint les " + s.seuil + " h."
     : "";
 
@@ -1785,7 +1807,7 @@ function embedRecap(r, debut, fin) {
     fields,
     /* Sans catalogue ici, ceux qui n'ont jamais pointé restent invisibles :
        mieux vaut l'écrire que laisser lire une liste incomplète. */
-    footer: s && s.gens.length && !s.complet
+    footer: s && (s.gens.length || s.conges.length) && !s.complet
       ? { text: "Seules les personnes ayant pointé sont connues du serveur — " +
                 "publie le catalogue pour voir aussi celles restées à zéro." }
       : undefined
