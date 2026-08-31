@@ -37,6 +37,9 @@
       dessiner();
 
       relireSouvent();
+      /* En fond : la page est déjà utilisable sans, l'objectif s'ajoute
+         s'il existe. */
+      lireObjectif();
     }
   });
 
@@ -65,7 +68,9 @@
   /* ---- Rendu ------------------------------------------------------------------ */
 
   function dessiner() {
-    const onglets = [["atelier", "L'atelier"], ["moi", "Mes congés"]]
+    const onglets = [["atelier", "L'atelier"]]
+      .concat(peutPointer ? [["temps", "Mon temps"]] : [])
+      .concat([["moi", "Mes congés"]])
       .concat(peutVoir ? [["equipe", "Congés de l'équipe"], ["histo", "Historique"]] : []);
 
     hote.innerHTML =
@@ -104,6 +109,11 @@
               { hour: "2-digit", minute: "2-digit" }) +
             ' — <b class="nombre" id="s-duree">' + MNDuty.sinceDur(mien.since, true) + "</b>"
           : "Pointe en arrivant à l'atelier, l'équipe est prévenue sur Discord.") + "</span>" +
+        /* Le chiffre de la semaine se lit d'un coup d'œil ; l'onglet « Mon
+           temps » est là pour le détail. */
+        '<span><b class="nombre" id="s-sem">' +
+          U.esc(MNDuty.dur(MNDuty.secondsFor(moi.uid, MNDuty.weekStart()), true)) +
+          "</b> cette semaine</span>" +
       "</div>" +
       (enConge ? U.etiquette("En congés", "info") : "") +
       U.bouton(mien ? "Quitter le service" : "Prendre mon service",
@@ -119,9 +129,25 @@
     /* La durée avance : on la remplace sans redessiner la page. */
     clearInterval(brancherEtat._t);
     brancherEtat._t = setInterval(() => {
-      const n = document.getElementById("s-duree");
       const mien = MNDuty.entryOf(moi.uid);
-      if (n && mien) n.textContent = MNDuty.sinceDur(mien.since, true);
+      if (!mien) return;
+      const n = document.getElementById("s-duree");
+      if (n) n.textContent = MNDuty.sinceDur(mien.since, true);
+
+      /* Mes compteurs avancent avec elle : les laisser figés donnerait
+         l'impression que le service en cours ne compte pas. */
+      const sem = MNDuty.secondsFor(moi.uid, MNDuty.weekStart());
+      const maj = (sel, txt) => {
+        const e = document.querySelector(sel);
+        if (e) e.textContent = txt;
+      };
+      maj("#s-sem", MNDuty.dur(sem, true));
+      maj('[data-mien="sem"]', MNDuty.dur(sem, true));
+      maj('[data-mien="sept"]',
+        MNDuty.dur(MNDuty.secondsFor(moi.uid, Date.now() - 7 * 86400000), true));
+      maj('[data-mien="tot"]', MNDuty.dur(MNDuty.secondsFor(moi.uid), true));
+      const g = document.querySelector('[data-mien="jauge"]');
+      if (g) g.innerHTML = jauge(sem);
     }, 30000);
   }
 
@@ -146,6 +172,7 @@
   function vue() {
     const z = $("#s-vue");
     if (onglet === "atelier") return atelier(z);
+    if (onglet === "temps") return monTemps(z);
     if (onglet === "moi") return mesConges(z);
     if (onglet === "equipe") return congesEquipe(z);
     return historique(z);
@@ -191,6 +218,105 @@
     if (au) au.addEventListener("click", pointerQuelquun);
     z.querySelectorAll("[data-a^='out-']").forEach(b =>
       b.addEventListener("click", () => cloturer(b.dataset.a.slice(4))));
+  }
+
+  /* ---- Mon temps ----------------------------------------------------------------------
+     La page savait dire le temps de toute l'équipe à qui a le droit de le
+     voir, et rien du sien à celui qui n'a que le pointage. « Combien j'ai fait
+     cette semaine » est pourtant la première question qu'on se pose ici. */
+
+  /* Heures attendues sur la semaine, telles que le serveur les signalera dans
+     le récapitulatif du dimanche. null = pas encore su, 0 = rien à afficher. */
+  let objectif = null;
+
+  const hhmm = d => new Date(d).toLocaleTimeString("fr-FR",
+    { hour: "2-digit", minute: "2-digit" });
+
+  /** Où j'en suis des heures attendues cette semaine. */
+  function jauge(sec) {
+    if (!objectif) return "";
+    const but = objectif * 3600;
+    const fait = sec >= but;
+    return '<span class="jauge' + (fait ? " est-fait" : "") + '">' +
+        '<span class="jauge__p" style="width:' +
+          Math.min(100, Math.round((sec / but) * 100)) + '%"></span></span>' +
+      U.esc(fait
+        ? "objectif de " + objectif + " h atteint"
+        : "encore " + MNDuty.dur(but - sec, true) + " avant " + objectif + " h");
+  }
+
+  function monTemps(z) {
+    const on = !!MNDuty.entryOf(moi.uid);
+    const sem = MNDuty.secondsFor(moi.uid, MNDuty.weekStart());
+    const sept = MNDuty.secondsFor(moi.uid, Date.now() - 7 * 86400000);
+    const tot = MNDuty.secondsFor(moi.uid);
+    const log = MNDuty.logOf(moi.uid);
+    const moy = log.length
+      ? Math.round(log.reduce((n, e) => n + e.seconds, 0) / log.length) : 0;
+
+    /* La tuile de la semaine porte la jauge : `U.tuile` échappe son pied, or
+       il y a ici du balisage. */
+    const tuileSemaine =
+      '<div class="tuile' + (on ? " tuile--succes" : "") + '">' +
+        '<span class="tuile__label">' + U.icone("horloge") + "Cette semaine</span>" +
+        '<span class="tuile__val nombre" data-mien="sem">' +
+          U.esc(MNDuty.dur(sem, true)) + "</span>" +
+        '<span class="tuile__pied" data-mien="jauge">' + jauge(sem) + "</span>" +
+      "</div>";
+
+    z.innerHTML =
+      '<div class="grille grille--sm" style="margin-bottom:var(--e-4)">' +
+        tuileSemaine +
+        '<div class="tuile"><span class="tuile__label">' + U.icone("calendrier") +
+          "7 derniers jours</span>" +
+          '<span class="tuile__val nombre" data-mien="sept">' +
+            U.esc(MNDuty.dur(sept, true)) + "</span></div>" +
+        '<div class="tuile"><span class="tuile__label">' + U.icone("horloge") +
+          "Total</span>" +
+          '<span class="tuile__val nombre" data-mien="tot">' +
+            U.esc(MNDuty.dur(tot, true)) + "</span>" +
+          '<span class="tuile__pied">' +
+            U.esc(log.length + " service" + (log.length > 1 ? "s" : "")) + "</span></div>" +
+        U.tuile({ label: "Moyenne par service", icone: "etoile",
+                  valeur: moy ? MNDuty.dur(moy, true) : "—" }) +
+      "</div>" +
+
+      /* Ses propres pointages, même pour qui n'a pas le droit de voir ceux des
+         autres : vérifier une heure qu'on croit fausse est un besoin courant,
+         et ça n'oblige personne à demander à un gérant. */
+      U.carte({
+        titre: "Mes derniers services",
+        actions: log.length ? U.etiquette(log.length + " au total") : "",
+        corps: log.length
+          ? '<div class="pile pile--sm">' + log.slice(0, 8).map(e =>
+              '<div class="rang">' +
+                "<b>" + U.esc(new Date(e.in).toLocaleDateString("fr-FR",
+                  { weekday: "long", day: "2-digit", month: "2-digit" })) + "</b>" +
+                U.etiquette(hhmm(e.in) + " → " + hhmm(e.out)) +
+                (e.forced ? U.etiquette("sorti par un gérant") : "") +
+                (e.corrigePar ? U.etiquette("horaires corrigés") : "") +
+                '<span class="pousse nombre">' + U.esc(MNDuty.dur(e.seconds)) + "</span>" +
+              "</div>").join("") + "</div>"
+          : U.vide({ icone: "horloge", titre: "Aucun service terminé",
+                     texte: "Ton temps s'affichera ici dès ton premier pointage." })
+      });
+  }
+
+  /**
+   * Le seuil du récapitulatif hebdomadaire, demandé au serveur. Sans serveur,
+   * serveur trop ancien ou seuil désactivé, aucun objectif ne s'affiche :
+   * mieux vaut rien qu'un chiffre inventé ici, qui ne vaudrait rien dimanche.
+   */
+  async function lireObjectif() {
+    let u = "";
+    try { u = MNStore.api("sante"); } catch (_) { return; }
+    if (!u) return;
+    try {
+      const r = await fetch(u, { cache: "no-store" });
+      const j = r.ok ? await r.json() : null;
+      const h = j && Number(j.recapMini);
+      if (h > 0) { objectif = h; dessiner(); }
+    } catch (_) { /* pas de serveur : pas d'objectif, et rien de cassé */ }
   }
 
   /* ---- Congés ------------------------------------------------------------------------ */

@@ -238,6 +238,11 @@
 
   function liste() {
     const z = $("#e-liste");
+    /* La liste défile dans son propre cadre : la reconstruire remet ce cadre
+       en haut. Sans ce report, une flèche de rangement ou une frappe dans la
+       recherche ramènerait au premier nom à chaque fois. */
+    const avant = z.querySelector(".duo__corps");
+    const defile = avant ? avant.scrollTop : 0;
     const f = filtre.toLowerCase();
     const base = visibles().filter(u =>
       !f || u.pseudo.toLowerCase().indexOf(f) !== -1 ||
@@ -305,6 +310,9 @@
                 icone: voirMasques ? "check" : "boite", action: "masques" })
           : "") +
       "</div>";
+
+    const corps = z.querySelector(".duo__corps");
+    if (corps && defile) corps.scrollTop = defile;
 
     brancherListe(z);
   }
@@ -431,7 +439,16 @@
     if (arch) arch.addEventListener("click", ajouterAuxArchives);
 
     z.querySelectorAll("[data-u]").forEach(b => {
-      const choisir = () => { sel = b.dataset.u; liste(); fiche(); };
+      /* Choisir quelqu'un ne change qu'une chose dans la liste : qui est
+         surligné. Tout refaire pour ça la ferait sursauter sous le doigt. */
+      const choisir = () => {
+        if (b.dataset.u === sel) return;
+        sel = b.dataset.u;
+        z.querySelectorAll(".duo__item.is-actif")
+          .forEach(x => x.classList.remove("is-actif"));
+        b.classList.add("is-actif");
+        fiche();
+      };
       b.addEventListener("click", choisir);
       b.addEventListener("keydown", e => {
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); choisir(); }

@@ -54,6 +54,10 @@
        pointages et les congés posés depuis un autre poste. */
     if (stopRefresh) stopRefresh();
     stopRefresh = MNUI.autoRefresh(rafraichir, RYTHME);
+
+    /* En fond : la page est déjà utilisable sans, l'objectif s'ajoute s'il
+       existe. */
+    lireObjectif();
   }
 
   /**
@@ -98,7 +102,7 @@
       '<h1 class="page-title">Service</h1>' +
       '<p class="page-sub">Pointage de l\'atelier</p>' +
 
-      (canPoint ? myCard(mine) + myLeaveCard() : "") +
+      (canPoint ? myCard(mine) + myTimeCard() + myLeaveCard() : "") +
       (MNDuty.souci()
         ? '<div class="alert alert--err" style="margin-bottom:18px">' + svg("alert") +
           "<span><b>" + esc(MNDuty.souci()) + "</b> Le tableau affiché peut être incomplet. " +
@@ -169,6 +173,98 @@
       '<button class="btn ' + (on ? "btn--danger" : "btn--solid") + '" id="d-toggle">' +
         svg(on ? "logout" : "login") + "<span>" + (on ? "Quitter le service" : "Prendre mon service") + "</span></button>" +
     "</div>";
+  }
+
+  /* ---- Mon temps ---------------------------------------------------------------
+     La page savait dire le temps de toute l'équipe à qui a le droit de le
+     voir, et rien du sien à celui qui n'a que le pointage. « Combien j'ai fait
+     cette semaine » est pourtant la première question qu'on se pose ici. */
+
+  /* Heures attendues sur la semaine, telles que le serveur les signalera dans
+     le récapitulatif du dimanche. null = pas encore su, 0 = rien à afficher. */
+  let objectif = null;
+
+  const hhmm = d => new Date(d).toLocaleTimeString("fr-FR",
+    { hour: "2-digit", minute: "2-digit" });
+
+  /** `sous` passe en HTML : la jauge en a besoin, les autres appels échappent. */
+  const stat = (label, valeur, vif, cle, sous) =>
+    '<div class="stat' + (vif ? " stat--live" : "") + '">' +
+      '<span class="stat__l">' + esc(label) + "</span>" +
+      '<b class="stat__v tnum"' + (cle ? ' data-mien="' + cle + '"' : "") + ">" +
+        esc(valeur) + "</b>" +
+      (sous ? '<span class="stat__s">' + sous + "</span>" : "") +
+    "</div>";
+
+  /** Où j'en suis des heures attendues cette semaine. */
+  function jauge(sec) {
+    if (!objectif) return "";
+    const but = objectif * 3600;
+    const fait = sec >= but;
+    return '<span class="jauge' + (fait ? " est-fait" : "") + '">' +
+        '<span class="jauge__p" style="width:' +
+          Math.min(100, Math.round((sec / but) * 100)) + '%"></span></span>' +
+      esc(fait
+        ? "objectif de " + objectif + " h atteint"
+        : "encore " + MNDuty.dur(but - sec, true) + " avant " + objectif + " h");
+  }
+
+  function myTimeCard() {
+    const on = !!MNDuty.entryOf(me.uid);
+    const sem = MNDuty.secondsFor(me.uid, MNDuty.weekStart());
+    const sept = MNDuty.secondsFor(me.uid, Date.now() - 7 * 86400000);
+    const tot = MNDuty.secondsFor(me.uid);
+    const log = MNDuty.logOf(me.uid);
+    const moy = log.length
+      ? Math.round(log.reduce((n, e) => n + e.seconds, 0) / log.length) : 0;
+
+    return '<div class="panel" style="margin-bottom:18px">' +
+      '<div class="panel__head"><h2>Mon temps de service</h2></div>' +
+      '<div class="panel__body">' +
+        '<div class="statgrid">' +
+          stat("Cette semaine", MNDuty.dur(sem, true), on, "sem",
+            '<span data-mien="jauge">' + jauge(sem) + "</span>") +
+          stat("7 derniers jours", MNDuty.dur(sept, true), on, "sept") +
+          stat("Total", MNDuty.dur(tot, true), on, "tot",
+            esc(log.length + " service" + (log.length > 1 ? "s" : ""))) +
+          stat("Moyenne par service", moy ? MNDuty.dur(moy, true) : "—") +
+        "</div>" +
+
+        /* Ses propres pointages, même pour qui n'a pas le droit de voir ceux
+           des autres : vérifier une heure qu'on croit fausse est un besoin
+           courant, et ça n'oblige personne à demander à un gérant. */
+        (log.length
+          ? '<div class="rows" style="margin-top:12px">' + log.slice(0, 8).map(e =>
+              '<div class="trow"><div class="trow__main"><b>' +
+                esc(new Date(e.in).toLocaleDateString("fr-FR",
+                  { weekday: "long", day: "2-digit", month: "2-digit" })) + "</b>" +
+                '<div class="trow__meta"><i>' + esc(hhmm(e.in) + " → " + hhmm(e.out)) + "</i>" +
+                  (e.forced ? '<span class="permtag">sorti par un gérant</span>' : "") +
+                  (e.corrigePar
+                    ? '<span class="permtag">horaires corrigés par ' + esc(e.corrigePar) + "</span>"
+                    : "") +
+                "</div></div>" +
+                '<span class="trow__price tnum">' + MNDuty.dur(e.seconds) + "</span>" +
+              "</div>").join("") + "</div>"
+          : '<p class="hint" style="margin-top:12px">Aucun service terminé pour l\'instant.</p>') +
+      "</div></div>";
+  }
+
+  /**
+   * Le seuil du récapitulatif hebdomadaire, demandé au serveur. Sans serveur,
+   * serveur trop ancien ou seuil désactivé, aucun objectif ne s'affiche :
+   * mieux vaut rien qu'un chiffre inventé ici, qui ne vaudrait rien dimanche.
+   */
+  async function lireObjectif() {
+    let u = "";
+    try { u = MNStore.api("sante"); } catch (_) { return; }
+    if (!u) return;
+    try {
+      const r = await fetch(u, { cache: "no-store" });
+      const j = r.ok ? await r.json() : null;
+      const h = j && Number(j.recapMini);
+      if (h > 0) { objectif = h; render(); }
+    } catch (_) { /* pas de serveur : pas d'objectif, et rien de cassé */ }
   }
 
   /* ---- Congés ---------------------------------------------------------------- */
@@ -532,6 +628,20 @@
     document.querySelectorAll("[data-since]").forEach(n => {
       n.textContent = MNDuty.sinceDur(n.dataset.since);
     });
+
+    /* Mes compteurs avancent aussi tant que je suis en service : les laisser
+       figés donnerait l'impression que le service en cours ne compte pas. */
+    if (!mine) return;
+    const sem = MNDuty.secondsFor(me.uid, MNDuty.weekStart());
+    const maj = (cle, txt) => {
+      const n = document.querySelector('[data-mien="' + cle + '"]');
+      if (n) n.textContent = txt;
+    };
+    maj("sem", MNDuty.dur(sem, true));
+    maj("sept", MNDuty.dur(MNDuty.secondsFor(me.uid, Date.now() - 7 * 86400000), true));
+    maj("tot", MNDuty.dur(MNDuty.secondsFor(me.uid), true));
+    const g = document.querySelector('[data-mien="jauge"]');
+    if (g) g.innerHTML = jauge(sem);
   }
 
   /* ---- Actions -------------------------------------------------------------- */

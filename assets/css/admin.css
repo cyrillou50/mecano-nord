@@ -519,6 +519,24 @@ details[open]:not(.svcweek) > summary::before { content: "▾ "; }
   white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
+/* Avancement vers les heures attendues sur la semaine. Le trait passe au vert
+   une fois le compte fait : c'est l'information, pas le pourcentage. */
+.jauge {
+  display: block;
+  height: 5px;
+  margin: 6px 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .08);
+  overflow: hidden;
+}
+.jauge__p {
+  display: block; height: 100%;
+  border-radius: inherit;
+  background: var(--amber);
+  transition: width .4s ease;
+}
+.jauge.est-fait .jauge__p { background: var(--toxic); }
+
 .stat__s {
   display: block;
   margin-top: 3px;

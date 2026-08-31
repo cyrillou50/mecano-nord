@@ -1021,6 +1021,24 @@
   color: var(--c-succes);
 }
 
+/* Avancement vers les heures attendues sur la semaine. Le trait passe au vert
+   une fois le compte fait : c'est l'information, pas le pourcentage. */
+.jauge {
+  display: block;
+  height: 5px;
+  margin: 5px 0 4px;
+  border-radius: var(--r-plein);
+  background: var(--c-creux);
+  overflow: hidden;
+}
+.jauge__p {
+  display: block; height: 100%;
+  border-radius: inherit;
+  background: var(--c-alerte);
+  transition: width .4s ease;
+}
+.jauge.est-fait .jauge__p { background: var(--c-succes); }
+
 .s-etat__txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .s-etat__txt b    { font-size: var(--t-lg); font-weight: 650; }
 .s-etat__txt span { font-size: var(--t-sm); color: var(--c-second); }

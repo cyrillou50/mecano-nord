@@ -275,6 +275,11 @@
 
   function renderList() {
     const nav = $("#staff-nav");
+    /* La liste défile dans son propre cadre : la reconstruire remet ce cadre
+       en haut. Sans ce report, une flèche de réorganisation ou une frappe
+       dans la recherche ramènerait au premier nom à chaque fois. */
+    const avant = nav.querySelector(".stafflist__body");
+    const defile = avant ? avant.scrollTop : 0;
     const f = filter.toLowerCase();
     const base = visibleUsers().filter(u =>
       !f || u.pseudo.toLowerCase().indexOf(f) !== -1 || roleOf(u).name.toLowerCase().indexOf(f) !== -1);
@@ -383,6 +388,9 @@
           : "") +
       "</div>";
 
+    const corps = nav.querySelector(".stafflist__body");
+    if (corps && defile) corps.scrollTop = defile;
+
     nav.querySelectorAll("[data-vue]").forEach(b => b.addEventListener("click", () => {
       const veut = b.dataset.vue === "archives";
       if (veut === vueArchives) return;
@@ -449,7 +457,16 @@
     if (arch) arch.addEventListener("click", ajouterAuxArchives);
 
     nav.querySelectorAll("[data-u]").forEach(b => {
-      const pick = () => { sel = b.dataset.u; renderList(); renderCard(); };
+      /* Choisir quelqu'un ne change qu'une chose dans la liste : qui est
+         surligné. Tout refaire pour ça la ferait sursauter sous le doigt. */
+      const pick = () => {
+        if (b.dataset.u === sel) return;
+        sel = b.dataset.u;
+        nav.querySelectorAll(".staffrow.is-active")
+          .forEach(x => x.classList.remove("is-active"));
+        b.classList.add("is-active");
+        renderCard();
+      };
       b.addEventListener("click", pick);
       b.addEventListener("keydown", e => {
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); }
