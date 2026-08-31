@@ -502,7 +502,11 @@
             "<h2>" + esc(u.pseudo) +
               (MNStore.estArchive(u) ? " <span class=\"pill pill--danger\">archivé</span>" : "") +
               (u.active || MNStore.estArchive(u) ? "" : " <span class=\"pill pill--dim\">désactivé</span>") +
-              (u.hidden ? ' <span class="pill pill--warn">masqué</span>' : "") + "</h2>" +
+              (u.hidden ? ' <span class="pill pill--warn">masqué</span>' : "") +
+              /* Se voir sans ouvrir l'éditeur : sinon on cherche pourquoi
+                 quelqu'un manque au récapitulatif du dimanche. */
+              (u.horsRecap && !u.hidden
+                ? ' <span class="pill pill--dim">hors comptes</span>' : "") + "</h2>" +
             '<span class="rolechip rolechip--ico" style="color:' + esc(r.color) + '">' +
               mnIcon(r.icon) + esc(r.name) + "</span>" +
             (on ? '<span class="pill pill--ok">en service</span>' : "") +
@@ -1394,7 +1398,18 @@
         '<span class="switch__box"></span><span>Masquer de l\'onglet Équipe</span></label>' +
       '<p class="hint">Masqué, l\'employé n\'apparaît plus dans la liste de gauche, mais son compte ' +
         "reste pleinement fonctionnel : il se connecte, fait ses BT et pointe son service normalement. " +
-        "Les responsables peuvent le réafficher avec le bouton en bas de la liste.</p>";
+        "Les responsables peuvent le réafficher avec le bouton en bas de la liste.</p>" +
+
+      '<label class="switch"><input type="checkbox" id="f-hors"' +
+        (u.horsRecap ? " checked" : "") + ">" +
+        '<span class="switch__box"></span><span>Sortir des comptes hebdomadaires</span></label>' +
+      '<p class="hint">Ses heures ne pèsent plus sur le récapitulatif du dimanche ' +
+        "ni sur le tableau des sept derniers jours, et il n'est jamais signalé pour " +
+        "un minimum non atteint. Ses pointages restent au journal — c'est un relevé, " +
+        "pas un classement." +
+        (u.hidden
+          ? " Ce compte est masqué : il en est déjà sorti de toute façon."
+          : "") + "</p>";
 
     const tagsHost = body.querySelector("#f-tags");
     function paintTags() {
@@ -1439,7 +1454,8 @@
               trainings,
               note: body.querySelector("#f-note").value.trim(),
               active: u.id === me.uid ? true : body.querySelector("#f-active").checked,
-              hidden: body.querySelector("#f-hidden").checked
+              hidden: body.querySelector("#f-hidden").checked,
+              horsRecap: body.querySelector("#f-hors").checked
             };
 
             /* On garde la personne à l'écran même si elle vient d'être masquée. */

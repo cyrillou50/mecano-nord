@@ -697,15 +697,16 @@ window.MNDuty = (function () {
   }
 
   /**
-   * Un compte masqué n'est pas un membre de l'atelier — c'est un compte
-   * technique ou d'administration. Il ne compte donc pas dans les totaux ni
-   * dans le minimum hebdomadaire. Ses pointages restent, eux, dans le
-   * journal : un relevé se doit d'être complet.
+   * Certaines personnes ne pèsent sur aucun chiffre : les comptes masqués,
+   * qui sont techniques ou d'administration et non des membres de l'atelier,
+   * et celles qu'un responsable a explicitement sorties des comptes depuis
+   * leur fiche. Leurs pointages restent, eux, dans le journal : un relevé se
+   * doit d'être complet.
    */
-  function estMasque(uid) {
+  function horsComptes(uid) {
     try {
       const u = (MNStore.catalog().users || []).find(x => x.id === uid);
-      return !!(u && u.hidden);
+      return !!(u && (u.hidden || u.horsRecap));
     } catch (_) {
       return false;
     }
@@ -717,7 +718,7 @@ window.MNDuty = (function () {
     const by = {};
     board().log.forEach(e => {
       if (!e.out || new Date(e.out).getTime() < since) return;
-      if (estMasque(e.id)) return;
+      if (horsComptes(e.id)) return;
       if (!by[e.id]) by[e.id] = { id: e.id, pseudo: e.pseudo, roleId: e.roleId, seconds: 0, sessions: 0 };
       by[e.id].seconds += e.seconds;
       by[e.id].sessions++;
@@ -757,7 +758,7 @@ window.MNDuty = (function () {
     clockIn, clockOut, forceOut, forceIn, clearLog, removeLog, editLog,
     conges, congesOf, congeOf, congeById, enConge, chevauche,
     setConge, clearConge, jourLocal, nbJours,
-    logOf, secondsFor, weekStart, estMasque,
+    logOf, secondsFor, weekStart, horsComptes,
     totals, dur, sinceDur, secBetween, minutesBetween
   };
 })();

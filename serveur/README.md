@@ -587,11 +587,16 @@ milieu de semaine signalerait quelqu'un que le message du dimanche épargnera.
 
 Sont écartés de l'effectif attendu les comptes désactivés et archivés.
 
-**Les comptes masqués** — comptes techniques ou d'administration — ne sont pas
-des membres de l'atelier : ils sortent de tous les comptes, y compris du
-« Temps par personne » et du total de la semaine. Leurs pointages restent dans
-le journal, mais ne pèsent sur aucun chiffre. Le site applique la même règle au
-tableau des sept derniers jours.
+**Qui ne compte pas.** Deux cas sortent de tous les comptes — « Temps par
+personne », total de la semaine, signalements :
+
+- les **comptes masqués**, techniques ou d'administration plutôt que membres de
+  l'atelier ;
+- ceux qu'un responsable a explicitement sortis, avec l'interrupteur **Sortir
+  des comptes hebdomadaires** sur leur fiche (champ `horsRecap`).
+
+Leurs pointages restent dans le journal, mais ne pèsent sur aucun chiffre. Le
+site applique la même règle au tableau des sept derniers jours.
 
 La semaine déjà envoyée est retenue dans `donnees/recap.json`. Sans ce
 repère, un serveur redémarré trois fois dans la soirée enverrait trois fois

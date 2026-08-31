@@ -493,6 +493,9 @@
             (MNStore.estArchive(u) ? U.etiquette("archivé", "erreur") : "") +
             (u.active || MNStore.estArchive(u) ? "" : U.etiquette("désactivé")) +
             (u.hidden ? U.etiquette("masqué", "alerte") : "") +
+            /* Se voir sans ouvrir l'éditeur : sinon on cherche pourquoi
+               quelqu'un manque au récapitulatif du dimanche. */
+            (u.horsRecap && !u.hidden ? U.etiquette("hors comptes") : "") +
             (u.pin ? U.etiquette("code d'accès") : "") +
           "</div>" +
         "</div>" +
@@ -1372,7 +1375,15 @@
                 valeur: u.hidden }) +
       '<p class="champ__aide">Masqué, l\'employé n\'apparaît plus dans la liste de gauche, ' +
         "mais son compte reste entier : il se connecte, fait ses bons et pointe son service " +
-        "normalement. Le bouton en bas de la liste le réaffiche.</p>";
+        "normalement. Le bouton en bas de la liste le réaffiche.</p>" +
+      U.champ({ id: "f-hors", type: "bascule", label: "Sortir des comptes hebdomadaires",
+                valeur: u.horsRecap }) +
+      '<p class="champ__aide">Ses heures ne pèsent plus sur le récapitulatif du dimanche ' +
+        "ni sur le tableau des sept derniers jours, et il n'est jamais signalé pour un " +
+        "minimum non atteint. Ses pointages restent au journal — c'est un relevé, pas un " +
+        "classement." +
+        (u.hidden ? " Ce compte est masqué : il en est déjà sorti de toute façon." : "") +
+        "</p>";
 
     /* On ne se désactive pas soi-même : la case reste bloquée sur « actif ». */
     if (u.id === moi.uid) corps.querySelector("#f-actif").disabled = true;
@@ -1424,7 +1435,8 @@
               trainings: formations,
               note: k.querySelector("#f-note").value.trim(),
               active: u.id === moi.uid ? true : k.querySelector("#f-actif").checked,
-              hidden: k.querySelector("#f-masq").checked
+              hidden: k.querySelector("#f-masq").checked,
+              horsRecap: k.querySelector("#f-hors").checked
             };
 
             /* On garde la personne à l'écran même si elle vient d'être masquée. */

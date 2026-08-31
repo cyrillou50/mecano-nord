@@ -1521,6 +1521,7 @@ function appliquerEquipe(cat, op) {
       if (op.note !== undefined) u.note = texte(op.note, 400);
       if (op.active !== undefined) u.active = op.active === true;
       if (op.hidden !== undefined) u.hidden = op.hidden === true;
+      if (op.horsRecap !== undefined) u.horsRecap = op.horsRecap === true;
       return { ok: true };
     }
 
@@ -1687,19 +1688,22 @@ const jourDe = d =>
  * veut voir.
  *
  * `attendus` : ceux dont on attend des heures cette semaine.
- * `masques`  : les comptes masqués — comptes techniques ou d'administration,
- *              pas des membres de l'atelier. Ils sortent de tous les comptes :
- *              ni dans les temps, ni dans le total, ni dans les signalements.
+ * `masques`  : ceux qui ne pèsent sur aucun chiffre — les comptes masqués,
+ *              techniques ou d'administration plutôt que membres de l'atelier,
+ *              et ceux qu'un responsable a sortis des comptes depuis leur
+ *              fiche. Ni dans les temps, ni dans le total, ni dans les
+ *              signalements.
  */
 async function effectifRecap() {
   const cat = await lireCatalogue();
   if (!cat) return null;
   const users = cat.users || [];
+  const hors = u => u.hidden === true || u.horsRecap === true;
   return {
     attendus: users
-      .filter(u => u && u.id && u.active !== false && !u.depart && u.hidden !== true)
+      .filter(u => u && u.id && u.active !== false && !u.depart && !hors(u))
       .map(u => ({ id: String(u.id), pseudo: String(u.pseudo || "?") })),
-    masques: users.filter(u => u && u.id && u.hidden === true).map(u => String(u.id))
+    masques: users.filter(u => u && u.id && hors(u)).map(u => String(u.id))
   };
 }
 

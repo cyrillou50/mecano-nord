@@ -670,6 +670,10 @@ window.MNStore = (function () {
         /* Masqué du trombinoscope Équipe, mais compte pleinement fonctionnel :
            la personne se connecte et travaille normalement. */
         hidden: u.hidden === true,
+        /* Hors des comptes hebdomadaires : ses heures ne pèsent ni sur le
+           récapitulatif du dimanche ni sur le tableau des sept derniers jours.
+           Ses pointages, eux, restent au journal. */
+        horsRecap: u.horsRecap === true,
         createdAt,
         /* Date d'embauche (AAAA-MM-JJ), séparée de la création du compte. */
         hiredAt: /^\d{4}-\d{2}-\d{2}$/.test(u.hiredAt) ? u.hiredAt : createdAt.slice(0, 10),
