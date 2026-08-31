@@ -696,12 +696,28 @@ window.MNDuty = (function () {
     return total;
   }
 
+  /**
+   * Un compte masqué n'est pas un membre de l'atelier — c'est un compte
+   * technique ou d'administration. Il ne compte donc pas dans les totaux ni
+   * dans le minimum hebdomadaire. Ses pointages restent, eux, dans le
+   * journal : un relevé se doit d'être complet.
+   */
+  function estMasque(uid) {
+    try {
+      const u = (MNStore.catalog().users || []).find(x => x.id === uid);
+      return !!(u && u.hidden);
+    } catch (_) {
+      return false;
+    }
+  }
+
   /** Secondes cumulées par employé sur les N derniers jours. */
   function totals(days) {
     const since = Date.now() - (days || 7) * 86400000;
     const by = {};
     board().log.forEach(e => {
       if (!e.out || new Date(e.out).getTime() < since) return;
+      if (estMasque(e.id)) return;
       if (!by[e.id]) by[e.id] = { id: e.id, pseudo: e.pseudo, roleId: e.roleId, seconds: 0, sessions: 0 };
       by[e.id].seconds += e.seconds;
       by[e.id].sessions++;
@@ -741,7 +757,7 @@ window.MNDuty = (function () {
     clockIn, clockOut, forceOut, forceIn, clearLog, removeLog, editLog,
     conges, congesOf, congeOf, congeById, enConge, chevauche,
     setConge, clearConge, jourLocal, nbJours,
-    logOf, secondsFor, weekStart,
+    logOf, secondsFor, weekStart, estMasque,
     totals, dur, sinceDur, secBetween, minutesBetween
   };
 })();

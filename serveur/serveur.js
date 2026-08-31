@@ -1652,12 +1652,16 @@ function dureeCourte(sec) {
  * Même découpage que le site (MNDuty.totals), pour que les deux disent la
  * même chose.
  */
-function recapSemaine(board, depuis, jusqua, roster) {
+function recapSemaine(board, depuis, jusqua, effectif) {
+  const masques = (effectif && effectif.masques) || [];
   const par = {};
   (board.log || []).forEach(e => {
     if (!e.out) return;
     const t = new Date(e.out).getTime();
     if (t < depuis || t > jusqua) return;
+    /* Un compte masqué garde ses pointages, mais ne compte pour rien ici :
+       sinon le total du message ne serait celui de personne. */
+    if (masques.indexOf(e.id) >= 0) return;
     if (!par[e.id]) par[e.id] = { id: e.id, pseudo: e.pseudo, seconds: 0, sessions: 0 };
     par[e.id].seconds += e.seconds;
     par[e.id].sessions++;
@@ -1668,7 +1672,7 @@ function recapSemaine(board, depuis, jusqua, roster) {
     lignes,
     total: lignes.reduce((n, l) => n + l.seconds, 0),
     services: lignes.reduce((n, l) => n + l.sessions, 0),
-    sous: sousLeSeuil(par, roster, board, depuis)
+    sous: sousLeSeuil(par, effectif && effectif.attendus, board, depuis)
   };
 }
 
@@ -1678,16 +1682,25 @@ const jourDe = d =>
   new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 
 /**
- * Les employés qu'on attend cette semaine, tirés du catalogue quand il est
- * là. Sans lui le serveur ne connaît que ceux qui ont pointé — or zéro heure
- * est justement le cas qu'on veut voir.
+ * L'effectif, tiré du catalogue quand il est là. Sans lui le serveur ne
+ * connaît que ceux qui ont pointé — or zéro heure est justement le cas qu'on
+ * veut voir.
+ *
+ * `attendus` : ceux dont on attend des heures cette semaine.
+ * `masques`  : les comptes masqués — comptes techniques ou d'administration,
+ *              pas des membres de l'atelier. Ils sortent de tous les comptes :
+ *              ni dans les temps, ni dans le total, ni dans les signalements.
  */
-async function rosterRecap() {
+async function effectifRecap() {
   const cat = await lireCatalogue();
   if (!cat) return null;
-  return (cat.users || [])
-    .filter(u => u && u.id && u.active !== false && !u.depart && u.hidden !== true)
-    .map(u => ({ id: String(u.id), pseudo: String(u.pseudo || "?") }));
+  const users = cat.users || [];
+  return {
+    attendus: users
+      .filter(u => u && u.id && u.active !== false && !u.depart && u.hidden !== true)
+      .map(u => ({ id: String(u.id), pseudo: String(u.pseudo || "?") })),
+    masques: users.filter(u => u && u.id && u.hidden === true).map(u => String(u.id))
+  };
 }
 
 /**
@@ -1831,12 +1844,12 @@ async function prepareRecap(maintenant) {
   const fin = maintenant || new Date();
   const debut = debutSemaine(fin);
   const board = nettoyer(await lire()) || VIDE;
-  const roster = await rosterRecap();
+  const effectif = await effectifRecap();
   return {
     semaine: cleSemaine(fin),
     debut: debut.toISOString(),
     fin: fin.toISOString(),
-    recap: recapSemaine(board, debut.getTime(), fin.getTime(), roster)
+    recap: recapSemaine(board, debut.getTime(), fin.getTime(), effectif)
   };
 }
 
