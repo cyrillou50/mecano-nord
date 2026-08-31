@@ -495,7 +495,7 @@
             (u.hidden ? U.etiquette("masqué", "alerte") : "") +
             /* Se voir sans ouvrir l'éditeur : sinon on cherche pourquoi
                quelqu'un manque au récapitulatif du dimanche. */
-            (u.horsRecap && !u.hidden ? U.etiquette("hors comptes") : "") +
+            (u.sansMinimum && !u.hidden ? U.etiquette("sans minimum") : "") +
             (u.pin ? U.etiquette("code d'accès") : "") +
           "</div>" +
         "</div>" +
@@ -1376,13 +1376,12 @@
       '<p class="champ__aide">Masqué, l\'employé n\'apparaît plus dans la liste de gauche, ' +
         "mais son compte reste entier : il se connecte, fait ses bons et pointe son service " +
         "normalement. Le bouton en bas de la liste le réaffiche.</p>" +
-      U.champ({ id: "f-hors", type: "bascule", label: "Sortir des comptes hebdomadaires",
-                valeur: u.horsRecap }) +
-      '<p class="champ__aide">Ses heures ne pèsent plus sur le récapitulatif du dimanche ' +
-        "ni sur le tableau des sept derniers jours, et il n'est jamais signalé pour un " +
-        "minimum non atteint. Ses pointages restent au journal — c'est un relevé, pas un " +
-        "classement." +
-        (u.hidden ? " Ce compte est masqué : il en est déjà sorti de toute façon." : "") +
+      U.champ({ id: "f-hors", type: "bascule", label: "Exempter du minimum hebdomadaire",
+                valeur: u.sansMinimum }) +
+      '<p class="champ__aide">Ses heures restent comptées et affichées comme celles de ' +
+        "tout le monde, dans le récapitulatif du dimanche comme ailleurs. Il n'est " +
+        "simplement jamais signalé pour un minimum non atteint." +
+        (u.hidden ? " Ce compte est masqué : il en est déjà exempté de toute façon." : "") +
         "</p>";
 
     /* On ne se désactive pas soi-même : la case reste bloquée sur « actif ». */
@@ -1436,7 +1435,7 @@
               note: k.querySelector("#f-note").value.trim(),
               active: u.id === moi.uid ? true : k.querySelector("#f-actif").checked,
               hidden: k.querySelector("#f-masq").checked,
-              horsRecap: k.querySelector("#f-hors").checked
+              sansMinimum: k.querySelector("#f-hors").checked
             };
 
             /* On garde la personne à l'écran même si elle vient d'être masquée. */

@@ -699,16 +699,17 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
   }
 
   /**
-   * Certaines personnes ne pèsent sur aucun chiffre : les comptes masqués,
-   * qui sont techniques ou d'administration et non des membres de l'atelier,
-   * et celles qu'un responsable a explicitement sorties des comptes depuis
-   * leur fiche. Leurs pointages restent, eux, dans le journal : un relevé se
-   * doit d'être complet.
+   * Qui n'a pas de minimum d'heures à tenir : les comptes masqués, techniques
+   * ou d'administration plutôt que membres de l'atelier, et ceux qu'un
+   * responsable a exemptés depuis leur fiche.
+   *
+   * Leurs heures comptent et s'affichent comme celles de tout le monde — ce
+   * n'est pas leur temps qu'on écarte, seulement le reproche.
    */
-  function horsComptes(uid) {
+  function sansMinimum(uid) {
     try {
       const u = (MNStore.catalog().users || []).find(x => x.id === uid);
-      return !!(u && (u.hidden || u.horsRecap));
+      return !!(u && (u.hidden || u.sansMinimum));
     } catch (_) {
       return false;
     }
@@ -720,7 +721,6 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
     const by = {};
     board().log.forEach(e => {
       if (!e.out || new Date(e.out).getTime() < since) return;
-      if (horsComptes(e.id)) return;
       if (!by[e.id]) by[e.id] = { id: e.id, pseudo: e.pseudo, roleId: e.roleId, seconds: 0, sessions: 0 };
       by[e.id].seconds += e.seconds;
       by[e.id].sessions++;
@@ -760,7 +760,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
     clockIn, clockOut, forceOut, forceIn, clearLog, removeLog, editLog,
     conges, congesOf, congeOf, congeById, enConge, chevauche,
     setConge, clearConge, jourLocal, nbJours,
-    logOf, secondsFor, weekStart, horsComptes,
+    logOf, secondsFor, weekStart, sansMinimum,
     totals, dur, sinceDur, secBetween, minutesBetween
   };
 })();

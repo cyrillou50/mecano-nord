@@ -670,10 +670,11 @@ window.MNStore = (function () {
         /* Masqué du trombinoscope Équipe, mais compte pleinement fonctionnel :
            la personne se connecte et travaille normalement. */
         hidden: u.hidden === true,
-        /* Hors des comptes hebdomadaires : ses heures ne pèsent ni sur le
-           récapitulatif du dimanche ni sur le tableau des sept derniers jours.
-           Ses pointages, eux, restent au journal. */
-        horsRecap: u.horsRecap === true,
+        /* Exempté du minimum hebdomadaire : ses heures comptent et s'affichent
+           comme celles de tout le monde, mais il n'est jamais signalé pour un
+           minimum non atteint. (`horsRecap` : le nom d'avant, quand le réglage
+           retirait aussi les heures. Relu pour ne rien perdre.) */
+        sansMinimum: u.sansMinimum === true || u.horsRecap === true,
         createdAt,
         /* Date d'embauche (AAAA-MM-JJ), séparée de la création du compte. */
         hiredAt: /^\d{4}-\d{2}-\d{2}$/.test(u.hiredAt) ? u.hiredAt : createdAt.slice(0, 10),

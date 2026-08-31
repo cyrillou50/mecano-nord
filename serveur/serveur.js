@@ -1521,7 +1521,7 @@ function appliquerEquipe(cat, op) {
       if (op.note !== undefined) u.note = texte(op.note, 400);
       if (op.active !== undefined) u.active = op.active === true;
       if (op.hidden !== undefined) u.hidden = op.hidden === true;
-      if (op.horsRecap !== undefined) u.horsRecap = op.horsRecap === true;
+      if (op.sansMinimum !== undefined) u.sansMinimum = op.sansMinimum === true;
       return { ok: true };
     }
 
@@ -1654,15 +1654,11 @@ function dureeCourte(sec) {
  * même chose.
  */
 function recapSemaine(board, depuis, jusqua, effectif) {
-  const masques = (effectif && effectif.masques) || [];
   const par = {};
   (board.log || []).forEach(e => {
     if (!e.out) return;
     const t = new Date(e.out).getTime();
     if (t < depuis || t > jusqua) return;
-    /* Un compte masqué garde ses pointages, mais ne compte pour rien ici :
-       sinon le total du message ne serait celui de personne. */
-    if (masques.indexOf(e.id) >= 0) return;
     if (!par[e.id]) par[e.id] = { id: e.id, pseudo: e.pseudo, seconds: 0, sessions: 0 };
     par[e.id].seconds += e.seconds;
     par[e.id].sessions++;
@@ -1673,7 +1669,7 @@ function recapSemaine(board, depuis, jusqua, effectif) {
     lignes,
     total: lignes.reduce((n, l) => n + l.seconds, 0),
     services: lignes.reduce((n, l) => n + l.sessions, 0),
-    sous: sousLeSeuil(par, effectif && effectif.attendus, board, depuis)
+    sous: sousLeSeuil(par, effectif, board, depuis)
   };
 }
 
@@ -1687,24 +1683,23 @@ const jourDe = d =>
  * connaît que ceux qui ont pointé — or zéro heure est justement le cas qu'on
  * veut voir.
  *
- * `attendus` : ceux dont on attend des heures cette semaine.
- * `masques`  : ceux qui ne pèsent sur aucun chiffre — les comptes masqués,
- *              techniques ou d'administration plutôt que membres de l'atelier,
- *              et ceux qu'un responsable a sortis des comptes depuis leur
- *              fiche. Ni dans les temps, ni dans le total, ni dans les
- *              signalements.
+ * Ceux dont on attend des heures cette semaine. En sortent les comptes
+ * masqués — techniques ou d'administration plutôt que membres de l'atelier —
+ * et ceux qu'un responsable a exemptés depuis leur fiche.
+ *
+ * Ils gardent leur ligne dans « Temps par personne » et pèsent sur le total
+ * de la semaine comme tout le monde : ce n'est pas leur temps qu'on écarte,
+ * seulement le reproche.
  */
 async function effectifRecap() {
   const cat = await lireCatalogue();
   if (!cat) return null;
-  const users = cat.users || [];
-  const hors = u => u.hidden === true || u.horsRecap === true;
-  return {
-    attendus: users
-      .filter(u => u && u.id && u.active !== false && !u.depart && !hors(u))
-      .map(u => ({ id: String(u.id), pseudo: String(u.pseudo || "?") })),
-    masques: users.filter(u => u && u.id && hors(u)).map(u => String(u.id))
-  };
+  /* `horsRecap` : le nom d'avant, quand le réglage retirait aussi les heures.
+     Relu pour ne rien perdre d'un catalogue déjà publié. */
+  const exempte = u => u.hidden === true || u.sansMinimum === true || u.horsRecap === true;
+  return (cat.users || [])
+    .filter(u => u && u.id && u.active !== false && !u.depart && !exempte(u))
+    .map(u => ({ id: String(u.id), pseudo: String(u.pseudo || "?") }));
 }
 
 /**
@@ -1727,12 +1722,16 @@ function congesSemaine(board, uid, jDebut, jFin) {
 /**
  * Ceux qui n'atteignent pas le minimum de la semaine.
  *
- * Deux précautions. Zéro heure est le cas le plus grave, et c'est le seul qui
+ * Trois précautions. Zéro heure est le cas le plus grave, et c'est le seul qui
  * ne laisse aucune trace dans le journal : il faut aller le chercher dans le
- * catalogue. Et un congé posé n'est pas un manquement : personne n'est
- * signalé pour une semaine qu'il avait prévu de ne pas travailler, ne serait-ce
- * qu'en partie. Ces gens-là ne disparaissent pas pour autant — ils passent
- * dans une liste à part, sans reproche.
+ * catalogue. Un congé posé n'est pas un manquement : personne n'est signalé
+ * pour une semaine qu'il avait prévu de ne pas travailler, ne serait-ce qu'en
+ * partie — ces gens-là ne disparaissent pas pour autant, ils passent dans une
+ * liste à part, sans reproche. Enfin les exemptés ne sont jamais ici : ils
+ * n'entrent pas dans `roster`.
+ *
+ * Rien de tout cela ne touche aux heures : elles restent comptées et
+ * affichées pour tout le monde.
  */
 function sousLeSeuil(par, roster, board, depuis) {
   if (!RECAP_MINI) return null;

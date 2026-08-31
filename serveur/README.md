@@ -587,16 +587,17 @@ milieu de semaine signalerait quelqu'un que le message du dimanche épargnera.
 
 Sont écartés de l'effectif attendu les comptes désactivés et archivés.
 
-**Qui ne compte pas.** Deux cas sortent de tous les comptes — « Temps par
-personne », total de la semaine, signalements :
+**Qui n'est jamais signalé.** Deux cas échappent au minimum :
 
 - les **comptes masqués**, techniques ou d'administration plutôt que membres de
   l'atelier ;
-- ceux qu'un responsable a explicitement sortis, avec l'interrupteur **Sortir
-  des comptes hebdomadaires** sur leur fiche (champ `horsRecap`).
+- ceux qu'un responsable a exemptés, avec l'interrupteur **Exempter du minimum
+  hebdomadaire** sur leur fiche (champ `sansMinimum`).
 
-Leurs pointages restent dans le journal, mais ne pèsent sur aucun chiffre. Le
-site applique la même règle au tableau des sept derniers jours.
+Leurs heures restent comptées et affichées comme celles de tout le monde, dans
+« Temps par personne » comme dans le total : ce n'est pas leur temps qu'on
+écarte, seulement le reproche. Sur le site, la page Service ne leur montre pas
+non plus d'objectif à atteindre.
 
 La semaine déjà envoyée est retenue dans `donnees/recap.json`. Sans ce
 repère, un serveur redémarré trois fois dans la soirée enverrait trois fois
