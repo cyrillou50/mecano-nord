@@ -91,26 +91,66 @@
 
   /* ---- Rendu ---------------------------------------------------------------- */
 
-  function render() {
+  /* ---- Onglets ----------------------------------------------------------------
+     La page était une pile de six panneaux qu'il fallait parcourir jusqu'en
+     bas. On pointe cent fois par jour et on consulte l'historique une fois par
+     mois : ils n'ont rien à faire l'un sous l'autre.
+
+     La carte de pointage, elle, reste hors des onglets — c'est le geste qu'on
+     vient faire, il ne doit jamais demander un clic de plus. */
+
+  let onglet = "atelier";
+
+  function onglets(canPoint, canView) {
+    const l = [["atelier", "L'atelier"]];
+    if (canPoint) l.push(["temps", "Mon temps"], ["conges", "Mes congés"]);
+    if (canView) l.push(["equipe", "Congés de l'équipe"], ["histo", "Historique"]);
+    return l;
+  }
+
+  const barreOnglets = l =>
+    '<div class="ptabs">' + l.map(o =>
+      '<button class="ptab' + (onglet === o[0] ? " is-active" : "") +
+        '" data-o="' + o[0] + '">' + esc(o[1]) + "</button>").join("") + "</div>";
+
+  function vue(canView, canManage) {
     const onDuty = MNDuty.board().onDuty;
+    if (onglet === "atelier") {
+      return canView ? boardPanel(onDuty, canManage) : teamCount(onDuty);
+    }
+    if (onglet === "temps") return myTimeCard();
+    if (onglet === "conges") return myLeaveCard();
+    if (onglet === "equipe") return leavePanel(canManage);
+    return statsPanel(canManage);
+  }
+
+  function render() {
     const mine = MNDuty.entryOf(me.uid);
     const canPoint = MNAuth.can("duty");
     const canManage = MNAuth.can("duty_manage");
     const canView = MNAuth.can("duty_view") || canManage;
 
+    /* Un onglet peut disparaître avec un changement de droits : on ne laisse
+       pas la page vide pour autant. */
+    const tabs = onglets(canPoint, canView);
+    if (!tabs.some(o => o[0] === onglet)) onglet = tabs[0][0];
+
     $("#service-root").innerHTML =
       '<h1 class="page-title">Service</h1>' +
       '<p class="page-sub">Pointage de l\'atelier</p>' +
 
-      (canPoint ? myCard(mine) + myTimeCard() + myLeaveCard() : "") +
+      (canPoint ? myCard(mine) : "") +
       (MNDuty.souci()
         ? '<div class="alert alert--err" style="margin-bottom:18px">' + svg("alert") +
           "<span><b>" + esc(MNDuty.souci()) + "</b> Le tableau affiché peut être incomplet. " +
           "Vérifie l'adresse dans le panneau admin (Publier → Pointage de l'équipe).</span></div>"
         : "") +
       (MNDuty.canShare() ? "" : shareWarning()) +
-      (canView ? boardPanel(onDuty, canManage) + leavePanel(canManage) + statsPanel(canManage)
-               : teamCount(onDuty));
+      barreOnglets(tabs) +
+      vue(canView, canManage);
+
+    document.querySelectorAll("[data-o]").forEach(b =>
+      b.addEventListener("click", () => { onglet = b.dataset.o; render(); }));
 
     if (canPoint) $("#d-toggle").addEventListener("click", toggle);
 
@@ -131,7 +171,9 @@
       }));
     document.querySelectorAll("[data-rmconge]").forEach(b =>
       b.addEventListener("click", () => dropLeave(b.dataset.rmconge, b.dataset.pseudo)));
-    $("#d-reload").addEventListener("click", async () => {
+    /* Le bouton vit dans l'onglet de l'atelier : ailleurs, il n'est pas là. */
+    const rl = $("#d-reload");
+    if (rl) rl.addEventListener("click", async () => {
       await MNDuty.load(true); render(); MNUI.toast("Tableau actualisé", "ok");
     });
 
