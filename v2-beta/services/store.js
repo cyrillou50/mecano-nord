@@ -431,6 +431,13 @@ window.MNStore = (function () {
   const usersDeAtelier = atelier =>
     (_catalog.users || []).filter(u => estDeAtelier(u, atelier));
 
+  /** Les heures attendues sur la semaine dans un atelier. 0 = aucun minimum. */
+  const minimumDe = ou => {
+    const m = (_catalog.settings && _catalog.settings.minimum) || {};
+    const v = Number(m[ou || _atelier]);
+    return isNaN(v) ? 0 : v;
+  };
+
   /** Les grades proposés dans un atelier. */
   const rolesDeAtelier = ou =>
     (_catalog.roles || []).filter(r => estDeAtelier(r, ou));
@@ -512,6 +519,18 @@ window.MNStore = (function () {
       /* Chacun peut-il se composer ses propres couleurs ? Vrai par défaut :
          c'est un confort personnel qui n'affecte personne d'autre. */
       themeLibre: s.themeLibre !== false,
+      /* Heures attendues sur la semaine, garage par garage : le Sud n'a pas
+         forcément le même rythme que le Nord. 0 = on ne signale personne.
+         Le récapitulatif du dimanche et la jauge de la page Service lisent
+         tous les deux ce chiffre — un seul endroit à régler. */
+      minimum: (function (m) {
+        const o = {};
+        TOUS_ATELIERS.forEach(id => {
+          const v = m && m[id] !== undefined ? Number(m[id]) : 4;
+          o[id] = Math.max(0, Math.min(168, Math.round(isNaN(v) ? 4 : v)));
+        });
+        return o;
+      })(s.minimum),
       /* Adresse de ton serveur (VPS). Une seule à renseigner : le site en
          déduit /duty.json, /relais, /publier et /sante. Avec elle, personne
          n'a besoin de jeton — ni pour pointer, ni pour publier. */
@@ -1173,7 +1192,7 @@ window.MNStore = (function () {
     topCategories, subCategories, categoryScope, itemLabel, totals, duree,
     ATELIERS, atelierById, nomAtelier, courtAtelier,
     ateliersDe, estDeAtelier, usersDeAtelier, rolesDeAtelier, normAteliers,
-    setAtelier, atelier, roleIdDe, estMasqueIci, estMasquePartout,
+    setAtelier, atelier, roleIdDe, estMasqueIci, estMasquePartout, minimumDe,
     memeNom, soucisHomonyme,
     MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,
     usersActifs, usersArchives,

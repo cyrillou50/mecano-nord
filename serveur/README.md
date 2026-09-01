@@ -557,13 +557,25 @@ Il n'y a rien à installer — pas de `cron`, pas de dépendance. Il suffit que
 | `RECAP` | `on` | `off` pour ne rien envoyer |
 | `RECAP_JOUR` | `0` | jour de l'envoi — 0 = dimanche, 6 = samedi |
 | `RECAP_HEURE` | `20` | heure locale de l'envoi |
-| `RECAP_MINI` | `4` | heures attendues dans la semaine — `0` pour ne rien signaler |
+| `RECAP_MINI` | `4` | heures attendues — **repli seulement**, voir ci-dessous |
 | `TZ` | heure système | fuseau, par exemple `Europe/Paris` |
 
 **Mets `TZ`** dans le service : sans lui, beaucoup de VPS sont en UTC et le
 message partirait deux heures trop tôt l'été.
 
+### Un message par garage
+
+Le Nord et le Sud reçoivent chacun le leur, dans le même salon : les heures,
+les totaux et les signalements ne se mélangent pas. Un garage sans employé
+attendu ni service enregistré se tait — un atelier qui n'existe pas encore n'a
+pas à parler toutes les semaines.
+
 ### Le minimum de la semaine
+
+**Il se règle depuis le site**, garage par garage : Administration → Le site →
+*Heures minimum par semaine*. Le serveur lit ce chiffre dans le catalogue qu'il
+héberge ; `RECAP_MINI` n'est plus qu'un repli, utilisé tant que le catalogue ne
+lui a pas été publié.
 
 Sous `RECAP_MINI` heures, la personne est signalée dans un second champ du
 message. Deux points méritent d'être connus.

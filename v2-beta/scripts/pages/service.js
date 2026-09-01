@@ -63,9 +63,6 @@
       dessiner();
 
       relireSouvent();
-      /* En fond : la page est déjà utilisable sans, l'objectif s'ajoute
-         s'il existe. */
-      lireObjectif();
     }
   });
 
@@ -273,9 +270,10 @@
      voir, et rien du sien à celui qui n'a que le pointage. « Combien j'ai fait
      cette semaine » est pourtant la première question qu'on se pose ici. */
 
-  /* Heures attendues sur la semaine, telles que le serveur les signalera dans
-     le récapitulatif du dimanche. null = pas encore su, 0 = rien à afficher. */
-  let objectif = null;
+  /* Heures attendues sur la semaine, réglées dans l'administration, garage par
+     garage. Elles viennent du catalogue déjà chargé : rien à demander au
+     serveur, et la jauge s'affiche du premier coup. */
+  const objectifIci = () => MNStore.minimumDe(MNAuth.atelier());
 
   const hhmm = d => new Date(d).toLocaleTimeString("fr-FR",
     { hour: "2-digit", minute: "2-digit" });
@@ -294,6 +292,7 @@
 
   /** Où j'en suis des heures attendues cette semaine. */
   function jauge(sec) {
+    const objectif = objectifIci();
     if (!objectif) return "";
     /* Exempté : aucun minimum ne lui est demandé, il n'y a donc pas de reste
        à faire à afficher. */
@@ -369,22 +368,6 @@
       });
   }
 
-  /**
-   * Le seuil du récapitulatif hebdomadaire, demandé au serveur. Sans serveur,
-   * serveur trop ancien ou seuil désactivé, aucun objectif ne s'affiche :
-   * mieux vaut rien qu'un chiffre inventé ici, qui ne vaudrait rien dimanche.
-   */
-  async function lireObjectif() {
-    let u = "";
-    try { u = MNStore.api("sante"); } catch (_) { return; }
-    if (!u) return;
-    try {
-      const r = await fetch(u, { cache: "no-store" });
-      const j = r.ok ? await r.json() : null;
-      const h = j && Number(j.recapMini);
-      if (h > 0) { objectif = h; dessiner(); }
-    } catch (_) { /* pas de serveur : pas d'objectif, et rien de cassé */ }
-  }
 
   /* ---- Congés ------------------------------------------------------------------------ */
 

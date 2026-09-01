@@ -2550,6 +2550,23 @@
             '<input class="input input--num" id="s-days" type="number" min="1" max="365" value="' + Number(s.auth.sessionDays) + '"></div>' +
         "</div></div>" +
 
+      '<div class="panel"><div class="panel__head"><h2>Heures minimum par semaine</h2></div>' +
+        '<div class="panel__body editor">' +
+          '<p class="hint">En dessous de ce nombre d\'heures, la personne est signalée ' +
+            "dans le récapitulatif du dimanche, et la page Service lui montre ce qu'il " +
+            "lui reste à faire. Chaque garage a le sien : le Sud n'a pas forcément le " +
+            "même rythme que le Nord.</p>" +
+          '<div class="editor__grid">' +
+            MNStore.ATELIERS.map(a =>
+              '<div class="field"><label class="label" for="s-min-' + esc(a.id) + '">' +
+                esc(a.nom) + "</label>" +
+                '<input class="input input--num" id="s-min-' + esc(a.id) + '" type="number" ' +
+                  'min="0" max="168" value="' + MNStore.minimumDe(a.id) + '"></div>').join("") +
+          "</div>" +
+          '<p class="hint"><b>0 = personne n\'est signalé.</b> Les congés posés et les ' +
+            "personnes exemptées échappent au minimum de toute façon.</p>" +
+        "</div></div>" +
+
       '<div class="panel"><div class="panel__head"><h2>Zone sensible</h2></div>' +
         '<div class="panel__body editor">' +
           '<p class="hint">Efface le brouillon local et recharge la version actuellement en ligne. ' +
@@ -2574,6 +2591,16 @@
     $("#s-brand").addEventListener("input", () => { if (!logo) paintLogo(); });
 
     $("#s-save").addEventListener("click", () => {
+      /* Un minimum par garage. Ce que le champ n'a pas su lire retombe sur ce
+         qui était réglé : mieux vaut ne rien changer que remettre à zéro. */
+      draft.settings.minimum = draft.settings.minimum || {};
+      MNStore.ATELIERS.forEach(a => {
+        const v = Number($("#s-min-" + a.id).value);
+        draft.settings.minimum[a.id] = isNaN(v)
+          ? MNStore.minimumDe(a.id)
+          : Math.max(0, Math.min(168, Math.round(v)));
+      });
+
       draft.settings.brand.name = $("#s-brand").value.trim() || "Atelier";
       draft.settings.brand.tagline = $("#s-tag").value.trim();
       draft.settings.brand.logo = logo;

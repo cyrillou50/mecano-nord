@@ -1017,9 +1017,8 @@ const serveur = http.createServer(async (req, res) => {
         return repondre(res, 200, {
           ok: true, actif: RECAP_ACTIF, jour: RECAP_JOUR, heure: RECAP_HEURE,
           salonConfigure: !!WEBHOOKS.duty, dejaEnvoyee: etat.derniere === p.semaine,
-          semaine: p.semaine, debut: p.debut, fin: p.fin, mini: RECAP_MINI,
-          total: p.recap.total, services: p.recap.services, lignes: p.recap.lignes,
-          sous: p.recap.sous
+          semaine: p.semaine, debut: p.debut, fin: p.fin, miniDefaut: RECAP_MINI,
+          ateliers: p.ateliers
         }, req);
       }
       if (req.method === "POST") {
@@ -1723,12 +1722,14 @@ function dureeCourte(sec) {
  * Même découpage que le site (MNDuty.totals), pour que les deux disent la
  * même chose.
  */
-function recapSemaine(board, depuis, jusqua, effectif) {
+function recapSemaine(board, depuis, jusqua, effectif, quel, seuilH) {
   const par = {};
   (board.log || []).forEach(e => {
     if (!e.out) return;
     const t = new Date(e.out).getTime();
     if (t < depuis || t > jusqua) return;
+    /* Chaque garage a son message : on ne mélange pas les heures des deux. */
+    if (quel && atelierDe(e) !== quel) return;
     if (!par[e.id]) par[e.id] = { id: e.id, pseudo: e.pseudo, seconds: 0, sessions: 0 };
     par[e.id].seconds += e.seconds;
     par[e.id].sessions++;
@@ -1739,7 +1740,7 @@ function recapSemaine(board, depuis, jusqua, effectif) {
     lignes,
     total: lignes.reduce((n, l) => n + l.seconds, 0),
     services: lignes.reduce((n, l) => n + l.sessions, 0),
-    sous: sousLeSeuil(par, effectif, board, depuis)
+    sous: sousLeSeuil(par, effectif, board, depuis, quel, seuilH)
   };
 }
 
@@ -1761,15 +1762,37 @@ const jourDe = d =>
  * de la semaine comme tout le monde : ce n'est pas leur temps qu'on écarte,
  * seulement le reproche.
  */
-async function effectifRecap() {
+async function effectifRecap(quel) {
   const cat = await lireCatalogue();
   if (!cat) return null;
   /* `horsRecap` : le nom d'avant, quand le réglage retirait aussi les heures.
      Relu pour ne rien perdre d'un catalogue déjà publié. */
   const exempte = u => u.hidden === true || u.sansMinimum === true || u.horsRecap === true;
+  /* Masqué de ce garage-là seulement : ailleurs il travaille normalement. */
+  const masqueIci = u => Array.isArray(u.masques) && u.masques.indexOf(quel) !== -1;
+  const dIci = u => !Array.isArray(u.ateliers) || !u.ateliers.length
+    ? quel === "nord"                      // sans mention : l'atelier d'origine
+    : u.ateliers.indexOf(quel) !== -1;
+
   return (cat.users || [])
-    .filter(u => u && u.id && u.active !== false && !u.depart && !exempte(u))
+    .filter(u => u && u.id && u.active !== false && !u.depart &&
+      !exempte(u) && !masqueIci(u) && dIci(u))
     .map(u => ({ id: String(u.id), pseudo: String(u.pseudo || "?") }));
+}
+
+/**
+ * Les heures attendues sur la semaine dans un garage. Le catalogue fait
+ * autorité — c'est là que le site le règle — et RECAP_MINI ne sert plus que
+ * de repli quand le serveur ne l'a pas encore reçu.
+ */
+async function miniDe(quel) {
+  const cat = await lireCatalogue();
+  const m = cat && cat.settings && cat.settings.minimum;
+  if (m && m[quel] !== undefined) {
+    const v = Math.round(Number(m[quel]));
+    if (!isNaN(v)) return Math.max(0, Math.min(168, v));
+  }
+  return RECAP_MINI;
 }
 
 /**
@@ -1777,8 +1800,9 @@ async function effectifRecap() {
  * jours, "tout" les sept. On compte jour par jour — deux périodes qui se
  * suivent couvrent la semaine aussi sûrement qu'une seule.
  */
-function congesSemaine(board, uid, jDebut, jFin) {
-  const l = (board.conges || []).filter(c => c.id === uid);
+function congesSemaine(board, uid, jDebut, jFin, quel) {
+  const l = (board.conges || [])
+    .filter(c => c.id === uid && (!quel || atelierDe(c) === quel));
   if (!l.length) return "";
   let jours = 0, poses = 0;
   const d = new Date(jDebut + "T12:00:00");
@@ -1803,9 +1827,10 @@ function congesSemaine(board, uid, jDebut, jFin) {
  * Rien de tout cela ne touche aux heures : elles restent comptées et
  * affichées pour tout le monde.
  */
-function sousLeSeuil(par, roster, board, depuis) {
-  if (!RECAP_MINI) return null;
-  const seuil = RECAP_MINI * 3600;
+function sousLeSeuil(par, roster, board, depuis, quel, seuilH) {
+  const mini = seuilH === undefined ? RECAP_MINI : seuilH;
+  if (!mini) return null;
+  const seuil = mini * 3600;
 
   /* La semaine entière, pas seulement jusqu'à maintenant : des congés posés
      pour vendredi comptent déjà le lundi, sinon un aperçu en milieu de semaine
@@ -1820,11 +1845,11 @@ function sousLeSeuil(par, roster, board, depuis) {
       seconds: par[u.id] ? par[u.id].seconds : 0
     }))
     .filter(g => g.seconds < seuil)
-    .map(g => Object.assign(g, { conges: congesSemaine(board, g.id, jDebut, jFin) }))
+    .map(g => Object.assign(g, { conges: congesSemaine(board, g.id, jDebut, jFin, quel) }))
     .sort((a, b) => a.seconds - b.seconds);
 
   return {
-    seuil: RECAP_MINI,
+    seuil: mini,
     /* Faux : on ne voit que ceux qui ont pointé. Le message le dira, plutôt
        que de laisser croire que tous les autres ont fait leur temps. */
     complet: !!roster,
@@ -1917,13 +1942,35 @@ async function prepareRecap(maintenant) {
   const fin = maintenant || new Date();
   const debut = debutSemaine(fin);
   const board = nettoyer(await lire()) || VIDE;
-  const effectif = await effectifRecap();
+
+  /* Un relevé par garage : mélanger les deux donnerait un total qui n'est
+     celui d'aucun atelier, et un minimum qui n'est le leur non plus. */
+  const ateliers = [];
+  for (const quel of ATELIERS_CONNUS) {
+    const effectif = await effectifRecap(quel);
+    ateliers.push({
+      atelier: quel,
+      mini: await miniDe(quel),
+      recap: recapSemaine(board, debut.getTime(), fin.getTime(), effectif,
+        quel, await miniDe(quel))
+    });
+  }
+
   return {
     semaine: cleSemaine(fin),
     debut: debut.toISOString(),
     fin: fin.toISOString(),
-    recap: recapSemaine(board, debut.getTime(), fin.getTime(), effectif)
+    ateliers
   };
+}
+
+/** Le nom d'un garage, tel que le catalogue l'appelle. */
+async function nomAtelier(quel) {
+  const cat = await lireCatalogue();
+  const l = (cat && Array.isArray(cat.ateliers)) ? cat.ateliers : null;
+  const a = l && l.find(x => x && x.id === quel);
+  if (a && a.nom) return String(a.nom).slice(0, 60);
+  return quel === "sud" ? "Mécano Sud" : "Mécano Nord";
 }
 
 /**
@@ -1936,23 +1983,38 @@ async function envoyerRecap(marquer) {
   if (!cible) return { ok: false, error: "Aucun webhook de service configuré" };
 
   const p = await prepareRecap();
-  const r = await fetch(cible, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      content: "**Récapitulatif de la semaine**",
-      embeds: [embedRecap(p.recap, p.debut, p.fin)],
-      allowed_mentions: { parse: [] }
-    })
-  }).catch(e => ({ ok: false, status: 0, _e: e.message }));
 
-  if (!(r.ok || r.status === 204)) {
-    return { ok: false, error: "Discord a répondu " + (r.status || r._e) };
+  /* Un message par garage, dans le même salon : le réglage des webhooks ne
+     change pas. On saute celui qui n'a ni employé attendu ni service — un
+     atelier qui n'existe pas encore n'a pas à parler toutes les semaines. */
+  const aDire = p.ateliers.filter(a =>
+    a.recap.lignes.length || (a.recap.sous && a.recap.sous.attendus));
+
+  if (!aDire.length) return { ok: true, semaine: p.semaine, envoyes: 0, personnes: 0 };
+
+  let personnes = 0;
+  for (const a of aDire) {
+    const nom = await nomAtelier(a.atelier);
+    const r = await fetch(cible, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: "**Récapitulatif de la semaine — " + nom + "**",
+        embeds: [embedRecap(a.recap, p.debut, p.fin)],
+        allowed_mentions: { parse: [] }
+      })
+    }).catch(e => ({ ok: false, status: 0, _e: e.message }));
+
+    if (!(r.ok || r.status === 204)) {
+      return { ok: false, error: "Discord a répondu " + (r.status || r._e) };
+    }
+    personnes += a.recap.lignes.length;
   }
+
   if (marquer) await ecrireRecap({ derniere: p.semaine, envoyeLe: new Date().toISOString() });
   console.log(new Date().toISOString(), "récapitulatif envoyé :", p.semaine,
-    "—", p.recap.lignes.length, "personnes");
-  return { ok: true, semaine: p.semaine, personnes: p.recap.lignes.length };
+    "—", aDire.length, "atelier(s),", personnes, "personnes");
+  return { ok: true, semaine: p.semaine, envoyes: aDire.length, personnes };
 }
 
 /* L'heure est vérifiée souvent plutôt que calculée une fois : un serveur qui
