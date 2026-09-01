@@ -149,10 +149,10 @@
         '<div class="panel__body">' +
           (livret
             ? '<div class="livret">' + enParagraphes(livret) + "</div>"
-            : '<div class="empty">' + svg("file") + "<b>Le livret est vide</b>" +
-              "<p>" + (peutEcrire
-                ? "Écris-le dans l'administration, onglet « Livret »."
-                : "Un responsable doit encore l'écrire.") + "</p></div>") +
+            : '<p class="hint">Le livret n\'a pas encore été écrit. ' +
+              (peutEcrire
+                ? "Tu peux t'en charger dans l'administration, onglet « Livret »."
+                : "Un responsable doit s'en charger.") + "</p>") +
         "</div></div>" +
 
       '<div class="panel"><div class="panel__head"><h2>Une question ?</h2>' +
@@ -222,8 +222,8 @@
             (m.err ? " bulle--err" : "") + '">' +
             (m.moi ? "" : '<span class="bulle__qui">Formateur</span>') +
             "<div>" + enParagraphes(m.texte) + "</div></div>").join("")
-      : '<p class="hint">Pose ta question : les tarifs, les grades, les règles ' +
-        "de service, ce qui est écrit dans le livret.</p>";
+      : '<p class="hint" style="margin:0">Pose ta question : les prestations, ' +
+        "les grades, les règles de service, ce qui est écrit dans le livret.</p>";
     z.scrollTop = z.scrollHeight;
   }
 

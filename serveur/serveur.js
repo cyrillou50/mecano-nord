@@ -1024,6 +1024,7 @@ const serveur = http.createServer(async (req, res) => {
         ok: true, ops: true, images: true, vehicules: true, relais: true, contrats: true,
         calendrier: true, catalogue: true, equipe: true,
         recap: RECAP_ACTIF, recapMini: RECAP_MINI, assistant: !!GEMINI_CLE,
+        assistantModele: _modele || GEMINI_MODELE || "(choisi au premier usage)",
         depuis: Math.round(process.uptime()) + " s"
       }, req);
     }
@@ -1696,11 +1697,43 @@ async function ecrireCatalogue(cat) {
    Reglages (variables d'environnement) :
      GEMINI_CLE=...        la cle d'API. Sans elle, l'assistant est simplement
                            absent : le livret se lit quand meme.
-     GEMINI_MODELE=...     le modele, par defaut gemini-2.0-flash */
+     GEMINI_MODELE=...     un modele impose. Vide, le serveur demande a Google
+                           ce qu'il propose et prend le premier qui repond. */
 
 const GEMINI_CLE = process.env.GEMINI_CLE || process.env.GEMINI_KEY || "";
-const GEMINI_MODELE = process.env.GEMINI_MODELE || "gemini-2.0-flash";
+const GEMINI_MODELE = process.env.GEMINI_MODELE || "";
 const MAX_CONTEXTE = 24000;
+const GEMINI_RACINE = "https://generativelanguage.googleapis.com/v1beta";
+
+/* Le modele qui a repondu. Les noms changent au fil des versions de l'API et
+   tous les comptes n'ont pas acces aux memes : plutot que d'en figer un et de
+   tomber en 404 le jour ou il disparait, on demande a Google ce qu'il propose
+   et on retient celui qui marche. */
+let _modele = "";
+
+/** Les modeles utilisables pour du texte, du plus interessant au moins. */
+async function modelesGemini() {
+  try {
+    const r = await fetch(GEMINI_RACINE + "/models", {
+      headers: { "x-goog-api-key": GEMINI_CLE }
+    });
+    if (!r.ok) return [];
+    const j = await r.json().catch(() => null);
+    const l = ((j && j.models) || [])
+      .filter(m => (m.supportedGenerationMethods || []).indexOf("generateContent") !== -1)
+      .map(m => String(m.name || "").replace(/^models\//, ""))
+      /* Ni images, ni audio, ni vecteurs : on veut repondre par ecrit. */
+      .filter(n => n && !/embedding|aqa|image|vision|tts|audio|video|live/i.test(n));
+
+    /* Un « flash » d'abord : c'est rapide et bon marche, et l'assistant repond
+       a des questions simples. A defaut, n'importe lequel fera l'affaire. */
+    const rang = n => (/flash/i.test(n) ? 0 : /pro/i.test(n) ? 1 : 2) +
+      (/preview|exp/i.test(n) ? 0.5 : 0);
+    return l.sort((a, b) => rang(a) - rang(b));
+  } catch (_) {
+    return [];
+  }
+}
 
 /* La consigne vit ici, pas dans la page : c'est elle qui borne ce que la cle
    peut servir a faire. */
@@ -1720,9 +1753,6 @@ const CONSIGNE = [
 ].join("\n");
 
 async function demanderGemini(question, contexte) {
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/" +
-    encodeURIComponent(GEMINI_MODELE) + ":generateContent";
-
   const corps = {
     system_instruction: { parts: [{ text: CONSIGNE }] },
     contents: [{
@@ -1733,12 +1763,13 @@ async function demanderGemini(question, contexte) {
     generationConfig: { temperature: 0.2, maxOutputTokens: 700 }
   };
 
-  try {
-    /* La cle part en en-tete, pas dans l adresse. Une adresse se retrouve
-       dans les journaux d acces, les traces d erreur et les rapports de
-       proxy ; un en-tete, non. Google accepte les deux, et cette forme-la
-       vaut pour tous les formats de cle. */
-    const r = await fetch(url, {
+  /* La cle part en en-tete, pas dans l adresse. Une adresse se retrouve dans
+     les journaux d acces, les traces d erreur et les rapports de proxy ; un
+     en-tete, non. Google accepte les deux, et cette forme-la vaut pour tous
+     les formats de cle. */
+  const essai = async modele => {
+    const r = await fetch(GEMINI_RACINE + "/models/" +
+      encodeURIComponent(modele) + ":generateContent", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1746,16 +1777,44 @@ async function demanderGemini(question, contexte) {
       },
       body: JSON.stringify(corps)
     });
-    const j = await r.json().catch(() => null);
+    return { r, j: await r.json().catch(() => null) };
+  };
+
+  try {
+    /* Celui qui a deja marche, sinon celui qu'on a regle, sinon on cherche. */
+    let modele = _modele || GEMINI_MODELE;
+    if (!modele) {
+      const l = await modelesGemini();
+      modele = l[0] || "gemini-2.0-flash";
+    }
+
+    let { r, j } = await essai(modele);
+
+    /* 404 : ce modele n'existe pas pour cette cle. On demande la liste et on
+       reessaie une fois — c'est exactement le cas ou l'utilisateur ne peut pas
+       deviner quel nom ecrire. */
+    if (r.status === 404) {
+      const l = (await modelesGemini()).filter(x => x !== modele);
+      if (!l.length) {
+        console.error(new Date().toISOString(), "assistant : aucun modèle disponible");
+        return { ok: false, error: "Aucun modèle de texte n'est disponible pour cette clé." };
+      }
+      modele = l[0];
+      ({ r, j } = await essai(modele));
+    }
 
     if (!r.ok) {
       const m = j && j.error && j.error.message;
-      console.error(new Date().toISOString(), "assistant :", r.status, m || "");
-      /* Le message de Google peut contenir la cle ou des details d'API : on ne
-         renvoie que le necessaire. */
-      return { ok: false, error: r.status === 429
-        ? "Trop de questions d'un coup. Réessaie dans un instant."
-        : "L'assistant n'a pas pu répondre (" + r.status + ")." };
+      console.error(new Date().toISOString(), "assistant :", r.status, modele, m || "");
+      /* Le message de Google peut contenir des details d'API : on ne renvoie
+         que le necessaire, et de quoi agir. */
+      if (r.status === 429) {
+        return { ok: false, error: "Trop de questions d'un coup. Réessaie dans un instant." };
+      }
+      if (r.status === 400 || r.status === 403) {
+        return { ok: false, error: "La clé de l'assistant est refusée par Google." };
+      }
+      return { ok: false, error: "L'assistant n'a pas pu répondre (" + r.status + ")." };
     }
 
     const cand = j && j.candidates && j.candidates[0];
@@ -1765,7 +1824,13 @@ async function demanderGemini(question, contexte) {
     if (!reponse) {
       return { ok: false, error: "L'assistant n'a rien répondu. Reformule ta question." };
     }
-    return { ok: true, reponse, modele: GEMINI_MODELE };
+
+    /* Il a marche : on s'en souvient, les questions suivantes iront droit au but. */
+    if (_modele !== modele) {
+      _modele = modele;
+      console.log(new Date().toISOString(), "assistant : modèle retenu —", modele);
+    }
+    return { ok: true, reponse, modele };
   } catch (e) {
     console.error(new Date().toISOString(), "assistant :", e.message);
     return { ok: false, error: "L'assistant est injoignable." };

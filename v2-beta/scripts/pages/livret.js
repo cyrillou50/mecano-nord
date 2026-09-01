@@ -129,10 +129,10 @@
           : "",
         corps: livret
           ? '<div class="livret">' + enParagraphes(livret) + "</div>"
-          : U.vide({ icone: "contrat", titre: "Le livret est vide",
-                     texte: peutEcrire
-                       ? "Écris-le dans l'administration, onglet « Livret »."
-                       : "Un responsable doit encore l'écrire." })
+          : '<p class="champ__aide">Le livret n\'a pas encore été écrit. ' +
+            (peutEcrire
+              ? "Tu peux t'en charger dans l'administration, onglet « Livret »."
+              : "Un responsable doit s'en charger.") + "</p>"
       }) +
       '<div style="margin-top:var(--e-4)">' +
       U.carte({
@@ -202,8 +202,9 @@
             (m.err ? " bulle--err" : "") + '">' +
             (m.moi ? "" : '<span class="bulle__qui">Formateur</span>') +
             "<div>" + enParagraphes(m.texte) + "</div></div>").join("")
-      : '<p class="champ__aide">Pose ta question : les tarifs, les grades, les ' +
-        "règles de service, ce qui est écrit dans le livret.</p>";
+      : '<p class="champ__aide" style="margin:0">Pose ta question : les ' +
+        "prestations, les grades, les règles de service, ce qui est écrit " +
+        "dans le livret.</p>";
     z.scrollTop = z.scrollHeight;
   }
 
