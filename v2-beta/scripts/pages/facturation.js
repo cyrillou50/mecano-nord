@@ -2,7 +2,7 @@
    Facturation — le catalogue à gauche, le panier à droite.
 
    Reprise fidèle de la V1 : mêmes règles de lot, de plafond et
-   d'incompatibilité, mêmes bons de travail, même envoi Discord. Ce qui change
+   d'incompatibilité, mêmes devis, même envoi Discord. Ce qui change
    est la mise en page — le panier était une barre au ras du bas qui masquait
    le catalogue ; il devient une colonne qui suit le défilement, et un tiroir
    sur téléphone.
@@ -229,7 +229,7 @@
     let q = Math.max(0, Math.round(n) || 0);
     if (it.max > 0 && q > it.max) {
       q = it.max;
-      U.toast("Maximum " + it.max + " par bon de travail", "info");
+      U.toast("Maximum " + it.max + " par devis", "info");
     }
 
     if (q) panier[id] = q; else delete panier[id];
@@ -272,7 +272,7 @@
       : '<p class="champ__aide">Aucune ressource à sortir.</p>';
 
     return U.carte({
-      titre: "Bon de travail",
+      titre: "Devis",
       actions: t.count
         ? U.etiquette(t.count + (t.count > 1 ? " objets" : " objet"), "action")
         : "",
@@ -328,7 +328,7 @@
     const ouvrir = hote.querySelector('[data-a="ouvrir"]');
     if (ouvrir) ouvrir.addEventListener("click", () => {
       const t = MNStore.totals(panier);
-      const m = U.modale({ titre: "Bon de travail", corps: corpsPanier(t, true),
+      const m = U.modale({ titre: "Devis", corps: corpsPanier(t, true),
                            actions: [{ label: "Continuer", onClick: f => f() }] });
       /* La modale contient une copie du panier : on rebranche dedans. */
       m.corps.querySelectorAll("[data-rm]").forEach(b =>
@@ -342,7 +342,7 @@
 
   const nouvelleRef = () => {
     const d = new Date(), p = n => String(n).padStart(2, "0");
-    return "BT-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
+    return "DEVIS-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
       "-" + p(d.getHours()) + p(d.getMinutes());
   };
 
@@ -351,7 +351,7 @@
     if (!t.count) return;
 
     const m = U.modale({
-      titre: "Enregistrer le bon de travail",
+      titre: "Enregistrer le devis",
       corps:
         '<div class="pile">' +
           U.champ({ id: "b-client", label: "Client", repere: "Nom du client", max: 60 }) +
@@ -412,7 +412,7 @@
   function historique() {
     const l = MNStore.getBTs();
     const m = U.modale({
-      titre: "Bons de travail enregistrés", large: true,
+      titre: "Devis enregistrés", large: true,
       corps: l.length
         ? U.tableau(
             [{ nom: "Client", rendu: b => U.esc(b.client || "—") },

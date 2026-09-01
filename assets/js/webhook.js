@@ -93,7 +93,7 @@ window.MNWebhook = (function () {
   }
 
   const COLORS = {
-    bt: 0xff2bd1,        // rose : bon de travail
+    bt: 0xff2bd1,        // rose : devis
     dutyIn: 0xa8ff52,    // vert : prise de service
     dutyOut: 0xffa92e,   // ambre : fin de service
     leaveOn: 0x7fd7e8,   // bleu : congés posés
@@ -182,7 +182,7 @@ window.MNWebhook = (function () {
 
   /* ---- Messages prêts à l'emploi -------------------------------------------- */
 
-  /** Bon de travail terminé. */
+  /** Devis terminé. */
   function sendBT(bt, lines, resources) {
     const fields = [];
     if (bt.client) fields.push({ name: "Client", value: bt.client, inline: true });
@@ -205,7 +205,7 @@ window.MNWebhook = (function () {
     if (bt.note) fields.push({ name: "Note", value: bt.note.slice(0, 1024) });
 
     return send("bt", {
-      title: "Bon de travail " + bt.ref,
+      title: "Devis " + bt.ref,
       description: "Mécano : **" + bt.by + "**",
       color: COLORS.bt,
       fields
@@ -338,7 +338,7 @@ window.MNWebhook = (function () {
   }
 
   const NOMS = {
-    bt: "bons de travail", duty: "services", conges: "congés",
+    bt: "devis", duty: "services", conges: "congés",
     avertissements: "avertissements"
   };
 

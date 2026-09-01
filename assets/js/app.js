@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Page de facturation : catalogue, panier, bons de travail.
+   Page de facturation : catalogue, panier, devis.
    Le « coût » d'un objet, ce sont ses ressources — il n'y a pas d'argent.
    ========================================================================== */
 
@@ -309,7 +309,7 @@
       (blocker ? esc("Incompatible avec « " + blocker.name + " »") : "Clic = +1 · clic droit = −1 · Maj = ±5") + '">' +
       (qty ? '<span class="item__badge">' + qty + "</span>" : "") +
       (it.max > 0 && !blocker
-        ? '<span class="item__cap" title="Maximum ' + it.max + ' par bon de travail">max ' + it.max + "</span>"
+        ? '<span class="item__cap" title="Maximum ' + it.max + ' par devis">max ' + it.max + "</span>"
         : "") +
       (blocker ? '<span class="item__lock">' + svg("lock") + "</span>" : "") +
       '<div class="item__icon">' + mnIcon(it.icon) + "</div>" +
@@ -320,7 +320,7 @@
       /* Dans le flux, sous le nom : les deux coins hauts sont déjà pris par le
          plafond et le compteur, et le bas par les ressources. */
       (it.temps > 0
-        ? '<p class="item__temps" title="Temps de fabrication, cumulé sur le bon de travail">' +
+        ? '<p class="item__temps" title="Temps de fabrication, cumulé sur le devis">' +
           svg("history") + "<span>" + esc(MNStore.duree(it.temps)) + "</span></p>"
         : "") +
       '<div class="stepper">' +
@@ -397,7 +397,7 @@
     const cap = it ? capOf(it) : 999;
 
     if (it && it.max > 0 && asked > it.max) {
-      MNUI.toast(it.name + " : " + it.max + " maximum par bon de travail", "err");
+      MNUI.toast(it.name + " : " + it.max + " maximum par devis", "err");
     }
     setQty(id, Math.min(asked, cap));
   });
@@ -427,7 +427,7 @@
 
     /* On prévient quand la limite bloque réellement une hausse. */
     if (it && it.max > 0 && q === it.max && v > it.max && before < it.max) {
-      MNUI.toast(it.name + " : limité à " + it.max + " par bon de travail", "info");
+      MNUI.toast(it.name + " : limité à " + it.max + " par devis", "info");
     }
     if (q) cart[id] = q; else delete cart[id];
     cart = MNStore.setCart(cart);
@@ -538,7 +538,7 @@
     }
 
     $("#btn-save").disabled = !t.count || !canBT;
-    $("#btn-save").title = canBT ? "" : "Tu n'as pas la permission d'enregistrer des BT.";
+    $("#btn-save").title = canBT ? "" : "Tu n'as pas la permission d'enregistrer des devis.";
     $("#btn-reset").disabled = !t.count;
     syncDockHeight();
   }
@@ -546,7 +546,7 @@
   async function resetCart() {
     const ok = await MNUI.confirm({
       title: "Tout réinitialiser",
-      message: "Le panier en cours sera vidé. L'historique des BT déjà enregistrés n'est pas touché.",
+      message: "Le panier en cours sera vidé. L'historique des devis déjà enregistrés n'est pas touché.",
       confirmLabel: "Vider le panier", danger: true
     });
     if (!ok) return;
@@ -555,11 +555,11 @@
     MNUI.toast("Panier vidé", "ok");
   }
 
-  /* ---- Enregistrement d'un BT ------------------------------------------------ */
+  /* ---- Enregistrement d'un devis ------------------------------------------------ */
 
   function newRef() {
     const d = new Date(), p = n => String(n).padStart(2, "0");
-    return "BT-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes());
+    return "DEVIS-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes());
   }
 
   function openSaveModal() {
@@ -591,7 +591,7 @@
         '<textarea class="textarea" id="f-note" placeholder="Remarques, pièces à commander…" maxlength="400"></textarea></div>';
 
     MNUI.modal({
-      title: "Enregistrer le bon de travail",
+      title: "Enregistrer le devis",
       body: recap + form,
       actions: [
         { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
@@ -621,13 +621,13 @@
       cart = MNStore.setCart({});
       renderTabs(); renderCatalog(); renderDock();
 
-      if (doCopy) MNUI.copy(btToText(bt), "Bon de travail copié — colle-le sur Discord");
-      else MNUI.toast("Bon de travail " + bt.ref + " enregistré", "ok");
+      if (doCopy) MNUI.copy(btToText(bt), "Devis copié — colle-le sur Discord");
+      else MNUI.toast("Devis " + bt.ref + " enregistré", "ok");
 
       /* Envoi Discord si un webhook est configuré — sans bloquer l'interface. */
       if (MNWebhook.has("bt")) {
         MNWebhook.sendBT(bt, bt.lines, bt.resources).then(r => {
-          if (r.ok) MNUI.toast("BT envoyé sur Discord", "ok");
+          if (r.ok) MNUI.toast("Devis envoyé sur Discord", "ok");
           else if (!r.skipped) MNUI.toast("Discord : " + r.error, "err");
         });
       }
@@ -664,14 +664,14 @@
   }
 
   function openHistory() {
-    const m = MNUI.modal({ title: "Historique des bons de travail", body: "", wide: true });
+    const m = MNUI.modal({ title: "Historique des devis", body: "", wide: true });
     paint();
 
     function paint() {
       const list = MNStore.getBTs();
       if (!list.length) {
         m.body.innerHTML = '<div class="empty">' + svg("history") +
-          "<b>Aucun bon de travail</b><p>Les BT que tu enregistres apparaîtront ici.</p></div>";
+          "<b>Aucun devis</b><p>Les devis que tu enregistres apparaîtront ici.</p></div>";
         return;
       }
       m.body.innerHTML =
@@ -699,7 +699,7 @@
       m.body.querySelector("#h-clear").addEventListener("click", async () => {
         const ok = await MNUI.confirm({
           title: "Effacer l'historique",
-          message: "Tous les bons de travail enregistrés dans ce navigateur seront supprimés. C'est définitif.",
+          message: "Tous les devis enregistrés dans ce navigateur seront supprimés. C'est définitif.",
           confirmLabel: "Tout effacer", danger: true
         });
         if (ok) { MNStore.clearBTs(); paint(); MNUI.toast("Historique effacé", "ok"); }
@@ -710,10 +710,10 @@
           const ref = btn.closest(".bt").dataset.ref;
           const bt = MNStore.getBTs().find(x => x.ref === ref);
           if (!bt) return;
-          if (btn.dataset.h === "copy") return void MNUI.copy(btToText(bt), "BT copié");
+          if (btn.dataset.h === "copy") return void MNUI.copy(btToText(bt), "Devis copié");
           if (btn.dataset.h === "view") return void viewBT(bt);
           const ok = await MNUI.confirm({
-            title: "Supprimer ce BT", message: bt.ref + " sera définitivement supprimé.",
+            title: "Supprimer ce devis", message: bt.ref + " sera définitivement supprimé.",
             confirmLabel: "Supprimer", danger: true
           });
           if (ok) { MNStore.removeBT(ref); paint(); }
@@ -729,7 +729,7 @@
       body: '<pre class="bt-preview">' + esc(txt) + "</pre>",
       actions: [
         { label: "Fermer", variant: "btn--ghost", onClick: c => c() },
-        { label: "Copier pour Discord", variant: "btn--primary", icon: "copy", onClick: () => MNUI.copy(txt, "BT copié") }
+        { label: "Copier pour Discord", variant: "btn--primary", icon: "copy", onClick: () => MNUI.copy(txt, "Devis copié") }
       ]
     });
   }

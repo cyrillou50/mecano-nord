@@ -1,7 +1,7 @@
 # Mécano Nord — Day of Decay
 
 Site de facturation d'atelier : on coche les prestations, le site calcule les
-ressources à sortir du stock, et on enregistre un bon de travail prêt à coller
+ressources à sortir du stock, et on enregistre un devis prêt à coller
 sur Discord.
 
 Tout se gère depuis le site lui-même (panneau admin) : objets, catégories,
@@ -49,12 +49,12 @@ La toute première personne qui se connecte devient automatiquement **patron**
 
 | Onglet | À quoi ça sert |
 |---|---|
-| **Objets** | Prestations, coût en ressources, **quantité maximum par BT** |
+| **Objets** | Prestations, coût en ressources, **quantité maximum par devis** |
 | **Catégories** | Les onglets affichés sur la page de facturation |
 | **Ressources** | Plastique, ferraille, charbon… avec icône et couleur |
 | **Employés** | Qui peut se connecter, et avec quel rôle |
 | **Rôles** | Les droits, par rôle : nom, couleur, permissions |
-| **Discord** | Adresses des webhooks (bons de travail, services) |
+| **Discord** | Adresses des webhooks (devis, services) |
 | **Le site** | Nom de l'entreprise, slogan, **logo**, réglages de connexion |
 | **Publier** | Envoyer les modifications en ligne |
 
@@ -67,7 +67,7 @@ d'un rôle les change pour tout le monde d'un coup.
 
 | Clé | Ce que ça autorise |
 |---|---|
-| `bt` | Utiliser la facturation et enregistrer des bons de travail |
+| `bt` | Utiliser la facturation et enregistrer des devis |
 | `duty` | Prendre et quitter son service |
 | `duty_view` | Voir qui est en service et l'historique de l'équipe |
 | `items` | Gérer objets, catégories, ressources et leurs coûts |
@@ -98,7 +98,7 @@ pour les autres, le pointage part sur Discord et le site le signale.
 
 ### Webhooks Discord
 
-Dans **Admin → Discord**, deux adresses : une pour les bons de travail, une
+Dans **Admin → Discord**, deux adresses : une pour les devis, une
 pour les services. Un bouton **Envoyer un test** valide la configuration.
 
 Tu peux aussi donner au bot un **logo** et un **nom** propres (section
@@ -181,8 +181,8 @@ Discord au moindre doute.
 
 ### Limiter les quantités
 
-Dans la fiche d'un objet, **Quantité maximum par BT** : `0` = illimité, `2`
-empêche d'en mettre plus de deux sur un même bon de travail. La carte affiche
+Dans la fiche d'un objet, **Quantité maximum par devis** : `0` = illimité, `2`
+empêche d'en mettre plus de deux sur un même devis. La carte affiche
 un repère « max 2 » et le bouton **+** se désactive une fois la limite atteinte.
 
 Sur la page de facturation, la quantité est un **champ de saisie** : clique
@@ -264,7 +264,7 @@ le dépôt. Chaque personne qui publie met le sien.
 - **Clic droit** sur une carte = −1 · **Maj + clic** = ±5
 - Bouton **Coûts** : affiche les ressources directement sur les cartes
 - La barre du bas additionne les ressources de tout le panier
-- **Sauvegarder le BT** → historique local + bouton « copier pour Discord »
+- **Sauvegarder le devis** → historique local + bouton « copier pour Discord »
 - La poignée au-dessus de la barre du bas la replie
 
 ---
@@ -300,5 +300,5 @@ bloque les curieux, mais quelqu'un qui sait ouvrir la console du navigateur
 peut la contourner. Le fichier `data/catalog.json` est public : n'y mets rien
 de réellement confidentiel.
 
-Les bons de travail enregistrés restent dans le navigateur de chaque mécano
+Les devis enregistrés restent dans le navigateur de chaque mécano
 (ils ne sont pas partagés) — d'où le bouton « copier pour Discord ».

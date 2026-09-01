@@ -36,7 +36,7 @@ window.MN_CONFIG = Object.assign({
    sont libres.
    ========================================================================== */
 window.MN_PERMS = [
-  { key: "bt",        name: "Faire des BT",        desc: "Utiliser la facturation et enregistrer des bons de travail." },
+  { key: "bt",        name: "Faire des devis",        desc: "Utiliser la facturation et enregistrer des devis." },
   { key: "duty",      name: "Pointer son service", desc: "Prendre et quitter son service depuis le site." },
   { key: "duty_view", name: "Voir les services",   desc: "Voir qui est en service et l'historique de l'équipe." },
   { key: "duty_manage", name: "Gérer les services", desc: "Pointer à la place de quelqu'un, clôturer un service oublié, corriger l'historique." },

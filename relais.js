@@ -23,7 +23,7 @@
 
         GH_TOKEN     →  un jeton GitHub fine-grained, dépôt du site,
                         permission « Contents : Read and write »
-        WEBHOOK_BT     →  adresse Discord des bons de travail   (facultatif)
+        WEBHOOK_BT     →  adresse Discord des devis   (facultatif)
         WEBHOOK_DUTY   →  adresse Discord des prises de service (facultatif)
         WEBHOOK_CONGES →  adresse Discord des congés (facultatif ; sans elle,
                           les congés partent dans le salon des services)

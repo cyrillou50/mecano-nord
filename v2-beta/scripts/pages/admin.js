@@ -301,7 +301,7 @@
         "<b>" + U.esc(it.name) + (it.enabled ? "" : " " + U.etiquette("masqué")) + "</b>" +
         '<div class="ad-meta">' +
           "<i>" + U.esc(cat ? cat.name : "?") + "</i>" +
-          (it.max > 0 ? U.etiquette("max " + it.max + " / BT") : "") +
+          (it.max > 0 ? U.etiquette("max " + it.max + " / devis") : "") +
           (it.pack > 1 ? U.etiquette("lot de " + it.pack) : "") +
           (it.temps > 0 ? U.etiquette(MNStore.duree(it.temps)) : "") +
           (it.excludes.length
@@ -379,7 +379,7 @@
         U.champ({ id: "o-max", label: "Quantité maximum par bon", type: "number", min: 0,
                   plafond: 999, valeur: Number(cur.max || 0),
                   aide: "<b>0 = illimité.</b> Mettre 2 empêche d'en prendre plus de deux " +
-                        "sur un même bon de travail." }) +
+                        "sur un même devis." }) +
       "</div>" +
 
       '<div class="cols-2">' +
@@ -1796,7 +1796,7 @@
       }) +
 
       '<div class="pile" style="margin-top:var(--e-4)">' +
-        bloc("bt", "Bons de travail",
+        bloc("bt", "Devis",
           "Chaque bon enregistré est publié dans ce salon : mécano, client, véhicule, " +
           "prestations et ressources.") +
         bloc("duty", "Prises de service",
@@ -1891,7 +1891,7 @@
 
     z.querySelector('[data-a="save"]').addEventListener("click", () => {
       const v = lire();
-      const noms = { bt: "bons de travail", duty: "services", conges: "congés",
+      const noms = { bt: "devis", duty: "services", conges: "congés",
                      avertissements: "avertissements" };
       for (const k of ["bt", "duty", "conges", "avertissements"]) {
         if (v[k] && !MNWebhook.isValid(v[k])) {
@@ -1967,7 +1967,7 @@
                     valeur: s.auth.allowGuests }) +
           '<p class="champ__aide" style="margin:var(--e-3) 0">Désactivé, seuls les pseudos de ' +
             "l'onglet « Employés » peuvent se connecter. Activé, un inconnu entre avec le seul " +
-            "droit de faire des bons de travail.</p>" +
+            "droit de faire des devis.</p>" +
           '<div style="max-width:220px">' +
             U.champ({ id: "s-jours", label: "Durée de session (jours)", type: "number",
                       min: 1, plafond: 365, valeur: Number(s.auth.sessionDays) }) +

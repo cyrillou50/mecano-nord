@@ -1433,7 +1433,7 @@
       '<label class="switch"><input type="checkbox" id="f-hidden"' + (u.hidden ? " checked" : "") + ">" +
         '<span class="switch__box"></span><span>Masquer de l\'onglet Équipe</span></label>' +
       '<p class="hint">Masqué, l\'employé n\'apparaît plus dans la liste de gauche, mais son compte ' +
-        "reste pleinement fonctionnel : il se connecte, fait ses BT et pointe son service normalement. " +
+        "reste pleinement fonctionnel : il se connecte, fait ses devis et pointe son service normalement. " +
         "Les responsables peuvent le réafficher avec le bouton en bas de la liste.</p>" +
 
       '<label class="switch"><input type="checkbox" id="f-hors"' +

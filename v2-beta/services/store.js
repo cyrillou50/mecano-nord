@@ -501,14 +501,14 @@ window.MNStore = (function () {
         icon: it.icon || "i-box",
         enabled: it.enabled !== false,
         note: it.note ? String(it.note) : "",
-        /* Quantité maximale par bon de travail. 0 = illimité. */
+        /* Quantité maximale par devis. 0 = illimité. */
         max: Math.max(0, Math.min(999, Math.round(Number(it.max) || 0))),
         /* Taille du lot : « Pièces détachées » avec pack = 10 s'annonce
            « 10 Pièces détachées », et « 20 » quand on en prend deux. Le coût
            en ressources, lui, reste celui d'un lot. 0 ou 1 = pas de lot. */
         pack: Math.max(0, Math.min(9999, Math.round(Number(it.pack) || 0))),
         /* Temps de fabrication, en secondes. Facultatif : 0 = non renseigné,
-           et l'objet n'ajoute alors rien au total du bon de travail. */
+           et l'objet n'ajoute alors rien au total du devis. */
         temps: Math.max(0, Math.min(86400, Math.round(Number(it.temps) || 0))),
         /* Objets incompatibles : en choisir un bloque les autres. */
         excludes: (Array.isArray(it.excludes) ? it.excludes : [])
@@ -1041,7 +1041,7 @@ window.MNStore = (function () {
     return clean;
   }
 
-  /* ---- Bons de travail --------------------------------------------------- */
+  /* ---- Devis --------------------------------------------------- */
 
   function getBTs() {
     try { return JSON.parse(localStorage.getItem(K_BTS) || "[]") || []; } catch (_) { return []; }

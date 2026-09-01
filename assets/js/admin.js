@@ -305,7 +305,7 @@
       '<div class="trow__main">' +
         "<b>" + esc(it.name) + (it.enabled ? "" : " <span class=\"pill pill--dim\">masqué</span>") + "</b>" +
         '<div class="trow__meta"><i>' + esc(cat ? cat.name : "?") + "</i>" +
-          (it.max > 0 ? '<span class="permtag">max ' + it.max + " / BT</span>" : "") +
+          (it.max > 0 ? '<span class="permtag">max ' + it.max + " / devis</span>" : "") +
           (it.pack > 1 ? '<span class="permtag">lot de ' + it.pack + "</span>" : "") +
           (it.temps > 0 ? '<span class="permtag">' + esc(MNStore.duree(it.temps)) + "</span>" : "") +
           (it.excludes.length
@@ -407,9 +407,9 @@
       '<div class="editor__grid">' +
         '<div class="field"><label class="label" for="e-note">Note (facultatif)</label>' +
           '<input class="input" id="e-note" maxlength="90" value="' + esc(cur.note) + '" placeholder="Précision affichée sous le nom"></div>' +
-        '<div class="field"><label class="label" for="e-max">Quantité maximum par BT</label>' +
+        '<div class="field"><label class="label" for="e-max">Quantité maximum par devis</label>' +
           '<input class="input input--num" id="e-max" type="number" min="0" max="999" value="' + Number(cur.max || 0) + '">' +
-          '<p class="hint"><b>0 = illimité.</b> Mettre 2 empêche d\'en prendre plus de 2 sur un même bon de travail.</p></div>' +
+          '<p class="hint"><b>0 = illimité.</b> Mettre 2 empêche d\'en prendre plus de 2 sur un même devis.</p></div>' +
       "</div>" +
 
       '<div class="editor__grid">' +
@@ -429,7 +429,7 @@
 
       '<div class="fieldset"><span class="label">Objets incompatibles</span>' +
         '<p class="hint" style="margin-bottom:10px">Coche les objets qui ne peuvent pas figurer sur le ' +
-          "même bon de travail que celui-ci. En choisir un bloquera automatiquement les autres, " +
+          "même devis que celui-ci. En choisir un bloquera automatiquement les autres, " +
           "dans les deux sens.</p>" +
         '<div class="iconlist" id="e-excl" style="grid-template-columns:1fr;max-height:190px;gap:2px"></div>' +
       "</div>" +
@@ -2227,8 +2227,8 @@
         "Utilise un salon dédié, sans enjeu — et si tu vois passer n'importe quoi, régénère le webhook " +
         "depuis Discord.</span></div>" +
 
-      block("bt", "Bons de travail",
-        "Chaque BT enregistré est publié dans ce salon : mécano, client, véhicule, prestations et ressources.") +
+      block("bt", "Devis",
+        "Chaque devis enregistré est publié dans ce salon : mécano, client, véhicule, prestations et ressources.") +
 
       block("duty", "Prises de service",
         "Chaque arrivée et chaque départ de l'atelier y est annoncé, avec la durée du service.") +
@@ -2321,7 +2321,7 @@
 
     $("#w-save").addEventListener("click", () => {
       const v = read();
-      const noms = { bt: "BT", duty: "services", conges: "congés", avertissements: "avertissements" };
+      const noms = { bt: "devis", duty: "services", conges: "congés", avertissements: "avertissements" };
       for (const k of ["bt", "duty", "conges", "avertissements"]) {
         if (v[k] && !MNWebhook.isValid(v[k])) {
           return MNUI.toast("Adresse de webhook invalide (" + noms[k] + ")", "err");
@@ -2393,7 +2393,7 @@
           '<label class="switch"><input type="checkbox" id="s-guest"' + (s.auth.allowGuests ? " checked" : "") + ">" +
             '<span class="switch__box"></span><span>Autoriser n\'importe quel nom à entrer</span></label>' +
           '<p class="hint">Désactivé, seuls les pseudos de l\'onglet « Employés » peuvent se connecter. ' +
-            "Activé, un inconnu entre avec les droits « Faire des BT » uniquement.</p>" +
+            "Activé, un inconnu entre avec les droits « Faire des devis » uniquement.</p>" +
           '<div class="field" style="max-width:220px"><label class="label" for="s-days">Durée de session (jours)</label>' +
             '<input class="input input--num" id="s-days" type="number" min="1" max="365" value="' + Number(s.auth.sessionDays) + '"></div>' +
         "</div></div>" +

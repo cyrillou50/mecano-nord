@@ -1941,5 +1941,5 @@ serveur.listen(PORT, HOTE, () => {
   console.log("  données   : " + FICHIER);
   console.log("  origines  : " + ORIGINES.join(", "));
   console.log("  webhooks  : " +
-    (WEBHOOKS.bt ? "BT ✓" : "BT ✗") + "  " + (WEBHOOKS.duty ? "service ✓" : "service ✗"));
+    (WEBHOOKS.bt ? "devis ✓" : "devis ✗") + "  " + (WEBHOOKS.duty ? "service ✓" : "service ✗"));
 });
