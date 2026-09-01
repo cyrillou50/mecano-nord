@@ -509,6 +509,8 @@
             btn.disabled = true;
             const r = await MNRegistre.setContrat({
               id: cur.id || MNStore.uniqueId(titre, R().map(x => x.id)),
+              /* Le garage où on le signe. Un contrat déjà écrit garde le sien. */
+              atelier: cur.atelier || MNAuth.atelier(),
               ref: g("#k-ref") || nouvelleRef(),
               titre, client: g("#k-cl"), note: g("#k-n"),
               type: c.querySelector("#k-ty").value,

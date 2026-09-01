@@ -96,8 +96,18 @@ window.MNRegistre = (function () {
   }
 
   const registre = () => _reg || vide();
-  const contrats = () => registre().contrats;
-  const contratById = id => contrats().find(c => c.id === id) || null;
+
+  /* Tous les contrats des deux garages : ce qu'on écrit. */
+  const tous = () => registre().contrats;
+
+  /* Ce qu'on lit : le seul garage où l'on travaille. Le Nord n'a pas à voir
+     les contrats du Sud, et inversement. */
+  const contrats = () =>
+    tous().filter(c => MNStore.estDeAtelier({ ateliers: [c.atelier] }, MNAuth.atelier()));
+
+  /* Par identifiant, sans filtre : une opération porte sur le registre entier,
+     et un contrat qu'on vient de déplacer doit rester retrouvable. */
+  const contratById = id => tous().find(c => c.id === id) || null;
 
   /** Écrit le registre dans le catalogue. Il faudra publier pour le partager. */
   function versCatalogue() {
@@ -155,7 +165,7 @@ window.MNRegistre = (function () {
   }
 
   return {
-    load, registre, contrats, contratById,
+    load, registre, contrats, tous, contratById,
     setContrat, removeContrat,
     surServeur, estDistant: () => _distant,
     souci: () => _souci

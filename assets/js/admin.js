@@ -1274,7 +1274,7 @@
      l'identifiant du type les relie ici. */
 
   function paneCtypes(host) {
-    const types = draft.contractTypes || [];
+    const types = dIci(draft.contractTypes || []);
     host.innerHTML =
       '<div class="toolbar">' +
         '<span class="subtitle">Les natures de contrat proposées à la rédaction</span>' +
@@ -1307,6 +1307,9 @@
         "d'expiration à la création d'un contrat de ce type. Elle reste modifiable, " +
         "et <b>0</b> ne propose rien.</p>";
 
+    barreAteliers(host, paneCtypes, id =>
+      (draft.contractTypes || []).filter(x => MNStore.estDeAtelier(x, id)).length);
+
     $("#add").addEventListener("click", () => editCtype(null));
     bindRows(host, draft.contractTypes, { edit: t => editCtype(t), del: t => deleteCtype(t) });
   }
@@ -1325,16 +1328,19 @@
         '<input class="input input--num" id="t-jours" type="number" min="0" max="3650" value="' +
           Number(cur.jours || 0) + '">' +
         '<p class="hint"><b>0 = aucune.</b> Sinon, choisir ce type à la création ' +
-          "remplit la date d'expiration du contrat.</p></div>",
+          "remplit la date d'expiration du contrat.</p></div>" +
+        champAteliers("t-at", MNStore.ateliersDe(cur)),
       onSave: (name, icon, close, couleur, body) => {
         const jours = Math.max(0, Math.min(3650,
           Math.round(Number(body.querySelector("#t-jours").value) || 0)));
         if (!draft.contractTypes) draft.contractTypes = [];
+        const ateliers = lireAteliers(body, "t-at", MNStore.ATELIERS.map(a => a.id));
         if (isNew) {
           draft.contractTypes.push({
-            id: MNStore.uniqueId(name, draft.contractTypes.map(x => x.id)), name, icon, jours
+            id: MNStore.uniqueId(name, draft.contractTypes.map(x => x.id)),
+            name, icon, jours, ateliers
           });
-        } else { t.name = name; t.icon = icon; t.jours = jours; }
+        } else { t.name = name; t.icon = icon; t.jours = jours; t.ateliers = ateliers; }
         commit(); close();
         MNUI.toast(isNew ? "Type créé" : "Type mis à jour", "ok");
       }

@@ -599,6 +599,8 @@ function nettoyerContrat(k) {
        connaît pas cette liste et n'a pas à la connaître : il borne, c'est
        tout. Un type supprimé depuis reste écrit sur le contrat signé. */
     type: texte(k.type, 60),
+    /* Le garage qui l'a signe. Muet : le Nord, l'atelier qui existait. */
+    atelier: atelierDe(k),
     note: texte(k.note, 2000),
     etat: ETATS.indexOf(k.etat) !== -1 ? k.etat : "brouillon",
     /* Expiration facultative, en jours pleins comme les congés. */

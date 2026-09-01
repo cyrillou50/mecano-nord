@@ -624,6 +624,10 @@
               ref: g("#k-ref") || nouvelleRef(),
               titre,
               client: g("#k-client"),
+              /* Le garage où on le signe. Un contrat déjà écrit garde le sien :
+                 le déplacer sous prétexte qu'on l'a rouvert ailleurs serait
+                 réécrire l'histoire. */
+              atelier: cur.atelier || MNAuth.atelier(),
               note: g("#k-note"),
               type: body.querySelector("#k-type").value,
               expire: body.querySelector("#k-expire").value || null,

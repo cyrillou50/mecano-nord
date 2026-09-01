@@ -126,6 +126,10 @@ window.MNStore = (function () {
          désigner un type supprimé depuis : on garde la valeur telle quelle,
          l'affichage se débrouillera plutôt que de réécrire un contrat signé. */
       type: String(t.type || "").slice(0, 60),
+      /* Le garage qui l'a signé. Un contrat sans mention est du Nord : c'est
+         l'atelier qui existait, et rien de déjà signé ne change de camp. */
+      atelier: TOUS_ATELIERS.indexOf(String(t.atelier || "")) !== -1
+        ? String(t.atelier) : ATELIER_DEFAUT,
       note: String(t.note || "").slice(0, 2000),
       etat: ETATS.indexOf(t.etat) !== -1 ? t.etat : "brouillon",
       /* Date d'expiration, facultative. Passée, le contrat n'est pas modifié
@@ -683,6 +687,8 @@ window.MNStore = (function () {
         id,
         name: String(t.name || id).slice(0, 60),
         icon: t.icon || "i-box",
+        /* Sans mention, un type est proposé dans les deux garages. */
+        ateliers: normAteliers(t.ateliers, TOUS_ATELIERS),
         /* Durée de validité proposée à la création, en jours. 0 = aucune. */
         jours: Math.max(0, Math.min(3650, Math.round(Number(t.jours) || 0)))
       };
@@ -1175,7 +1181,10 @@ window.MNStore = (function () {
     addAvertissement, leverAvertissement, retirerAvertissement,
     normContrat, contratTotaux, nombre, ETATS_CONTRAT: ETATS,
     contratExpire, joursAvant, jour, jourLocal,
-    contractTypes: () => (_catalog.contractTypes || []).slice(),
+    /* Ceux proposés dans le garage où l'on travaille. `contractTypeById`, lui,
+       reste sans filtre : un contrat déjà signé doit garder le nom de son type
+       même si l'autre garage ne le propose pas. */
+    contractTypes: () => (_catalog.contractTypes || []).filter(t => estDeAtelier(t, _atelier)),
     contractTypeById: id => (_catalog.contractTypes || []).find(t => t.id === id) || null,
     vehicleById, vehicleCatById,
     IMG_TAG, imageName, imageUrl, imagesHebergees,
