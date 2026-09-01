@@ -1514,10 +1514,25 @@ function appliquerEquipe(cat, op) {
     case "promotion": {
       const roleId = texte(op.roleId, 60);
       if (!(cat.roles || []).some(r => r.id === roleId)) return { erreur: "grade inconnu" };
-      u.roleId = roleId;
+
+      /* On promeut là où l'on est. Pour quelqu'un des deux garages, le grade
+         se pose sur ce garage seulement : être promu chef au Nord ne fait pas
+         de vous le chef du Sud. Sans atelier annoncé — un site plus ancien —
+         c'est le grade tout court, comme avant. */
+      const garage = atelierDe(op);
+      const deux = Array.isArray(u.ateliers) && u.ateliers.length > 1;
+      if (op.atelier && deux) {
+        u.grades = Object.assign({}, u.grades);
+        u.grades[garage] = roleId;
+        if (!u.roleId) u.roleId = roleId;
+      } else {
+        u.roleId = roleId;
+      }
+
       u.history = (u.history || []).concat([{
         roleId,
         roleName: texte(op.roleName, 60),
+        atelier: garage,
         at: dateIso(op.at) || new Date().toISOString(),
         by: texte(op.par, 60),
         note: texte(op.note, 200)
@@ -1543,6 +1558,12 @@ function appliquerEquipe(cat, op) {
       if (op.note !== undefined) u.note = texte(op.note, 400);
       if (op.active !== undefined) u.active = op.active === true;
       if (op.hidden !== undefined) u.hidden = op.hidden === true;
+      /* Le masquage se regle garage par garage : une liste, pas un booleen. */
+      if (Array.isArray(op.masques)) {
+        const m = op.masques.map(x => texte(x, 20))
+          .filter(x => ATELIERS_CONNUS.indexOf(x) !== -1);
+        u.masques = ATELIERS_CONNUS.filter(x => m.indexOf(x) !== -1);
+      }
       if (op.sansMinimum !== undefined) u.sansMinimum = op.sansMinimum === true;
       /* Les ateliers ou la personne travaille. Au moins un : une fiche sans
          atelier n existerait plus nulle part. */

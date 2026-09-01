@@ -514,6 +514,7 @@ window.V2Shell = (function () {
 
     /* Le pointage suit l'atelier où l'on travaille. À poser avant que la page
        ne lise quoi que ce soit. */
+    MNStore.setAtelier(MNAuth.atelier());
     if (window.MNDuty) MNDuty.setAtelier(MNAuth.atelier());
     document.title = (o.titre ? o.titre + " · " : "") +
       MNStore.nomAtelier(MNAuth.atelier()) + (V2.VERSION.beta ? " (V2 bêta)" : "");

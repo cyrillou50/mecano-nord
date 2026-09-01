@@ -769,7 +769,9 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
   function sansMinimum(uid) {
     try {
       const u = (MNStore.catalog().users || []).find(x => x.id === uid);
-      return !!(u && (u.hidden || u.sansMinimum));
+      /* Masqué des deux côtés : c'est un compte technique, pas un membre de
+         l'atelier. Masqué d'un seul garage, il travaille bien dans l'autre. */
+      return !!(u && (MNStore.estMasquePartout(u) || u.sansMinimum));
     } catch (_) {
       return false;
     }

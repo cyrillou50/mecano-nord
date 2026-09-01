@@ -114,6 +114,25 @@
         "l'autre d'un clic.</p></div>";
   }
 
+  /* Le masquage se règle garage par garage : un compte utile au Nord peut
+     n'avoir rien à faire dans la liste du Sud. */
+  function champMasques(id, u) {
+    const m = MNStore.normAteliers(u.masques, []);
+    return '<div class="champ"><span class="champ__label">Masquer de l\'onglet Équipe</span>' +
+      '<div class="rang" id="' + id + '">' +
+        MNStore.ATELIERS.map(a =>
+          '<label class="motif"><input type="checkbox" value="' + U.esc(a.id) + '"' +
+            (m.indexOf(a.id) !== -1 ? " checked" : "") + ">" +
+            "<span>" + U.esc(a.nom) + "</span></label>").join("") +
+      "</div>" +
+      '<p class="champ__aide">Le compte reste entier : il se connecte, fait ses ' +
+        "devis et pointe son service. Il n'apparaît simplement plus dans la liste " +
+        "du garage coché.</p></div>";
+  }
+
+  const lireMasques = (hote, id) =>
+    [].slice.call(hote.querySelectorAll("#" + id + " input:checked")).map(i => i.value);
+
   /** Au moins un atelier : sans ça la fiche n'existerait plus nulle part. */
   function lireAteliers(hote, id) {
     const l = [].slice.call(hote.querySelectorAll("#" + id + " input:checked"))
@@ -137,9 +156,9 @@
     ? archives().slice().sort((a, b) =>
         nomFamille(a).localeCompare(nomFamille(b), "fr", { sensitivity: "base" }) ||
         a.pseudo.localeCompare(b.pseudo, "fr", { sensitivity: "base" }))
-    : actifs().filter(u => !u.hidden || (peutEditer && voirMasques)));
+    : actifs().filter(u => !MNStore.estMasqueIci(u) || (peutEditer && voirMasques)));
 
-  const masques = () => actifs().filter(u => u.hidden).length;
+  const masques = () => actifs().filter(u => MNStore.estMasqueIci(u)).length;
 
   /* ---- Index alphabétique --------------------------------------------------
      Les archives grossissent sans jamais rétrécir. Un répertoire par tranches
@@ -378,7 +397,7 @@
           : '<span class="tronque" style="color:' + U.esc(r.color) + '">' +
             U.esc(r.name) + "</span>") +
       "</span>" +
-      (u.hidden ? '<span class="duo__marque" title="Masqué de l\'équipe">' +
+      (MNStore.estMasqueIci(u) ? '<span class="duo__marque" title="Masqué de ce garage">' +
         U.icone("boite") + "</span>" : "") +
       /* Un dossier chargé se voit depuis la liste : chercher fiche par fiche
          qui a été averti n'aurait aucun sens. */
@@ -458,7 +477,7 @@
       /* En les recachant, on ne laisse pas la fiche sur quelqu'un d'invisible. */
       if (!voirMasques) {
         const u = employe(sel);
-        if (u && u.hidden) { const v = visibles()[0]; sel = v ? v.id : null; }
+        if (u && MNStore.estMasqueIci(u)) { const v = visibles()[0]; sel = v ? v.id : null; }
       }
       liste(); fiche();
     });
@@ -523,10 +542,10 @@
             (MNDuty.enConge(u.id) ? U.etiquette("en congés" + retour(u.id), "erreur") : "") +
             (MNStore.estArchive(u) ? U.etiquette("archivé", "erreur") : "") +
             (u.active || MNStore.estArchive(u) ? "" : U.etiquette("désactivé")) +
-            (u.hidden ? U.etiquette("masqué", "alerte") : "") +
+            (MNStore.estMasqueIci(u) ? U.etiquette("masqué ici", "alerte") : "") +
             /* Se voir sans ouvrir l'éditeur : sinon on cherche pourquoi
                quelqu'un manque au récapitulatif du dimanche. */
-            (u.sansMinimum && !u.hidden ? U.etiquette("sans minimum") : "") +
+            (u.sansMinimum && !MNStore.estMasqueIci(u) ? U.etiquette("sans minimum") : "") +
             /* Utile surtout pour ceux des deux garages : on doit voir d'un
                coup d'œil qu'on les retrouvera aussi de l'autre côté. */
             (MNStore.ateliersDe(u).length > 1 ? U.etiquette("Nord + Sud", "info") : "") +
@@ -1035,7 +1054,7 @@
 
             const fiche = {
               id, pseudo, roleId,
-              active: false, hidden: false, pin: null,
+              active: false, hidden: false, masques: [], pin: null,
               createdAt: new Date().toISOString(),
               /* Sans date d'arrivée connue, on prend celle du départ : la
                  fiche affichera une ancienneté nulle, ce qui se lit comme
@@ -1368,9 +1387,9 @@
 
             const r = await appliquer(
               { op: "promotion", uid: u.id, roleId, roleName: vers ? vers.name : roleId,
-                par: moi.pseudo, note, at: quand.toISOString() },
+                par: moi.pseudo, note, at: quand.toISOString(), atelier: ici() },
               () => MNStore.recordPromotion(u, roleId, brouillon.roles, moi.pseudo, note,
-                quand.toISOString()));
+                quand.toISOString(), ici()));
             if (!r.ok) return U.toast("Promotion impossible : " + r.error, "err");
 
             fermer();
@@ -1406,8 +1425,7 @@
                 max: 400, repere: "Remarques, disponibilités…" }) +
       champAteliers("f-at", MNStore.ateliersDe(u)) +
       U.champ({ id: "f-actif", type: "bascule", label: "Compte actif", valeur: u.active }) +
-      U.champ({ id: "f-masq", type: "bascule", label: "Masquer de l'onglet Équipe",
-                valeur: u.hidden }) +
+      champMasques("f-masq", u) +
       '<p class="champ__aide">Masqué, l\'employé n\'apparaît plus dans la liste de gauche, ' +
         "mais son compte reste entier : il se connecte, fait ses bons et pointe son service " +
         "normalement. Le bouton en bas de la liste le réaffiche.</p>" +
@@ -1416,7 +1434,9 @@
       '<p class="champ__aide">Ses heures restent comptées et affichées comme celles de ' +
         "tout le monde, dans le récapitulatif du dimanche comme ailleurs. Il n'est " +
         "simplement jamais signalé pour un minimum non atteint." +
-        (u.hidden ? " Ce compte est masqué : il en est déjà exempté de toute façon." : "") +
+        (MNStore.estMasquePartout(u)
+          ? " Ce compte est masqué des deux garages : il en est déjà exempté."
+          : "") +
         "</p>";
 
     /* On ne se désactive pas soi-même : la case reste bloquée sur « actif ». */
@@ -1469,13 +1489,15 @@
               trainings: formations,
               note: k.querySelector("#f-note").value.trim(),
               active: u.id === moi.uid ? true : k.querySelector("#f-actif").checked,
-              hidden: k.querySelector("#f-masq").checked,
+              masques: lireMasques(k, "f-masq"),
               sansMinimum: k.querySelector("#f-hors").checked,
               ateliers: lireAteliers(k, "f-at")
             };
 
             /* On garde la personne à l'écran même si elle vient d'être masquée. */
-            if (champs.hidden && !voirMasques && peutEditer) voirMasques = true;
+            if (champs.masques.indexOf(ici()) !== -1 && !voirMasques && peutEditer) {
+              voirMasques = true;
+            }
 
             const r = await appliquer(
               Object.assign({ op: "fiche", uid: u.id }, champs),

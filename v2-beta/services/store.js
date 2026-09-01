@@ -392,8 +392,50 @@ window.MNStore = (function () {
     (_catalog.users || []).filter(u => estDeAtelier(u, atelier));
 
   /** Les grades proposés dans un atelier. */
-  const rolesDeAtelier = atelier =>
-    (_catalog.roles || []).filter(r => estDeAtelier(r, atelier));
+  const rolesDeAtelier = ou =>
+    (_catalog.roles || []).filter(r => estDeAtelier(r, ou));
+
+  /* L'atelier où l'on travaille, posé par la page au démarrage. Le magasin en
+     a besoin pour deux choses : le grade que quelqu'un porte ici, et le fait
+     qu'on l'y ait masqué ou non. */
+  let _atelier = ATELIER_DEFAUT;
+  const setAtelier = id => {
+    _atelier = TOUS_ATELIERS.indexOf(id) !== -1 ? id : ATELIER_DEFAUT;
+  };
+  const atelier = () => _atelier;
+
+  /**
+   * Le grade porté dans un atelier : celui qu'on y a fixé, sinon le principal.
+   * Quelqu'un peut être chef au Nord et garagiste au Sud — les hiérarchies des
+   * deux garages ne se commandent pas l'une l'autre.
+   */
+  function roleIdDe(u, ou) {
+    if (!u) return "";
+    const g = u.grades && u.grades[ou || _atelier];
+    return g || u.roleId || "";
+  }
+
+  /** Masqué du trombinoscope de cet atelier ? Le masquage se règle garage par
+      garage : un compte utile au Nord peut n'avoir rien à faire au Sud. */
+  const estMasqueIci = (u, ou) =>
+    normAteliers(u && u.masques, []).indexOf(ou || _atelier) !== -1;
+
+  /** Masqué des deux côtés : c'est la marque d'un compte technique. */
+  const estMasquePartout = u =>
+    TOUS_ATELIERS.every(a => estMasqueIci(u, a));
+
+  /** Les grades par atelier, débarrassés de ce qui n'existe plus. */
+  function normGrades(v, roleIds) {
+    const o = {};
+    if (v && typeof v === "object") {
+      TOUS_ATELIERS.forEach(a => {
+        const id = String(v[a] || "");
+        if (id && roleIds.indexOf(id) !== -1) o[a] = id;
+      });
+    }
+    return o;
+  }
+
 
   function normalize(raw) {
     const c = (raw && typeof raw === "object") ? clone(raw) : {};
@@ -720,8 +762,13 @@ window.MNStore = (function () {
         pin: typeof u.pin === "string" && u.pin.length === 64 ? u.pin : null,
         active: u.active !== false,
         /* Masqué du trombinoscope Équipe, mais compte pleinement fonctionnel :
-           la personne se connecte et travaille normalement. */
+           la personne se connecte et travaille normalement. Le champ est
+           conservé : il dit « masqué partout » pour les fiches d'avant les
+           deux garages, et `masques` prend le relais garage par garage. */
         hidden: u.hidden === true,
+        masques: normAteliers(u.masques, u.hidden === true ? TOUS_ATELIERS : []),
+        /* Un grade par atelier, quand il diffère du principal. */
+        grades: normGrades(u.grades, roleIds),
         /* Sans mention, l'employé est du Nord : l'atelier d'origine. */
         ateliers: normAteliers(u.ateliers, [ATELIER_DEFAUT]),
         /* Exempté du minimum hebdomadaire : ses heures comptent et s'affichent
@@ -748,12 +795,25 @@ window.MNStore = (function () {
    * Ajoute une ligne d'historique quand quelqu'un change de grade.
    * `at` permet de dater la promotion au jour où elle a réellement eu lieu.
    */
-  function recordPromotion(user, newRoleId, roles, byPseudo, note, at) {
+  function recordPromotion(user, newRoleId, roles, byPseudo, note, at, ou) {
     const r = (roles || []).find(x => x.id === newRoleId);
-    user.roleId = newRoleId;
+    const garage = ou || _atelier;
+
+    /* On promeut là où l'on est. Pour quelqu'un des deux garages, le grade se
+       pose sur ce garage-là seulement : être promu chef au Nord ne fait pas de
+       vous le chef du Sud. Pour les autres, c'est leur grade tout court. */
+    if (ateliersDe(user).length > 1) {
+      user.grades = Object.assign({}, user.grades);
+      user.grades[garage] = newRoleId;
+      if (!user.roleId) user.roleId = newRoleId;
+    } else {
+      user.roleId = newRoleId;
+    }
+
     user.history = (user.history || []).concat([{
       roleId: newRoleId,
       roleName: r ? r.name : newRoleId,
+      atelier: garage,
       at: at || new Date().toISOString(),
       by: byPseudo || "",
       note: note || ""
@@ -957,8 +1017,12 @@ window.MNStore = (function () {
   const imagesHebergees = () => !!api("images");
 
   const roleById = id => (_catalog.roles || []).find(r => r.id === id) || null;
-  const roleOf = user => (user && roleById(user.roleId)) ||
-    { id: "", name: "Sans rôle", color: "#6a6280", perms: [] };
+  const SANS_ROLE = { id: "", name: "Sans rôle", color: "#6a6280", perms: [] };
+
+  /* Le grade d'ici d'abord, le principal ensuite : un grade supprimé au Sud ne
+     doit pas priver quelqu'un de ses droits, il retombe sur le sien. */
+  const roleOf = user => (user &&
+    (roleById(roleIdDe(user)) || roleById(user.roleId))) || SANS_ROLE;
   const itemById = id => (_catalog.items || []).find(i => i.id === id) || null;
   const resourceById = id => (_catalog.resources || []).find(r => r.id === id) || null;
   const categoryById = id => (_catalog.categories || []).find(c => c.id === id) || null;
@@ -1067,6 +1131,7 @@ window.MNStore = (function () {
     topCategories, subCategories, categoryScope, itemLabel, totals, duree,
     ATELIERS, atelierById, nomAtelier, courtAtelier,
     ateliersDe, estDeAtelier, usersDeAtelier, rolesDeAtelier, normAteliers,
+    setAtelier, atelier, roleIdDe, estMasqueIci, estMasquePartout,
     MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,
     usersActifs, usersArchives,
     GRAVITES, graviteDe, normAvertissement, avertActif, avertBilan,

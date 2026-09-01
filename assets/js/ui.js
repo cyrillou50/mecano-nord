@@ -495,6 +495,9 @@ window.MNUI = (function () {
        ne lise quoi que ce soit : elle verrait sinon le tableau de l'autre
        garage le temps d'un rendu. Toutes les pages ne chargent pas le module —
        la facturation et l'administration s'en passent. */
+    /* Le magasin en a besoin pour deux choses : le grade qu'on porte ici, et
+       le masquage, qui se règle garage par garage. */
+    MNStore.setAtelier(MNAuth.atelier());
     if (window.MNDuty) MNDuty.setAtelier(MNAuth.atelier());
     document.title = MNStore.nomAtelier(MNAuth.atelier()) + " — " + (opt.title || "Facturation");
 

@@ -168,13 +168,19 @@ window.MNAuth = (function () {
 
     const u = liste.find(x => x.id === s.uid);
     if (!u || u.active === false) { localStorage.removeItem(K_SESSION); return null; }
-    const r = MNStore.roleOf(u);
 
     /* L'atelier retenu doit rester un des siens : on a pu l'en retirer depuis
        sa dernière visite. Dans ce cas on le ramène au premier, sans rien lui
        demander — il verra bien où il se trouve, c'est écrit en haut. */
     const siens = MNStore.ateliersDe(u);
     const atelier = siens.indexOf(s.atelier) !== -1 ? s.atelier : siens[0];
+
+    /* Le magasin doit savoir où l'on est avant qu'on lui demande le grade :
+       c'est le garage qui décide duquel il s'agit, et donc des droits. Sans
+       cette ligne, quelqu'un des deux ateliers garderait partout le grade de
+       son garage principal. */
+    MNStore.setAtelier(atelier);
+    const r = MNStore.roleOf(u);
 
     _session = {
       uid: u.id, pseudo: u.pseudo, guest: false,

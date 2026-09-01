@@ -387,6 +387,55 @@
       "</div></div>";
   }
 
+  /* Le masquage se règle garage par garage : un compte utile au Nord peut
+     n'avoir rien à faire dans la liste du Sud. */
+  function champMasques(id, u) {
+    const m = MNStore.normAteliers(u.masques, []);
+    return '<div class="fieldset"><span class="label">Masquer de l\'onglet Équipe</span>' +
+      '<div class="motifs" id="' + id + '">' +
+        MNStore.ATELIERS.map(a =>
+          '<label class="motif"><input type="checkbox" value="' + esc(a.id) + '"' +
+            (m.indexOf(a.id) !== -1 ? " checked" : "") + ">" +
+            "<span>" + esc(a.nom) + "</span></label>").join("") +
+      "</div>" +
+      '<p class="hint">Le compte reste entier : il se connecte, fait ses devis et ' +
+        "pointe son service. Il n'apparaît simplement plus dans la liste du garage " +
+        "coché.</p></div>";
+  }
+
+  const lireMasques = (hote, id) =>
+    [].slice.call(hote.querySelectorAll("#" + id + " input:checked")).map(i => i.value);
+
+  /* Un grade par garage. « Comme au-dessus » laisse le grade principal : c'est
+     le cas ordinaire, et ça évite d'avoir à répéter le même choix deux fois. */
+  function champGrades(id, u) {
+    const g = (u && u.grades) || {};
+    return '<div class="fieldset" id="' + id + '"><span class="label">Grade par atelier</span>' +
+      '<div class="editor__grid">' +
+        MNStore.ATELIERS.map(a =>
+          '<div class="field"><label class="label" for="' + id + "-" + esc(a.id) + '">' +
+            esc(a.nom) + "</label>" +
+            '<select class="select" data-at="' + esc(a.id) + '" id="' + id + "-" + esc(a.id) + '">' +
+              '<option value="">Comme au-dessus</option>' +
+              MNStore.rolesDeAtelier(a.id).map(r =>
+                '<option value="' + esc(r.id) + '"' +
+                  (g[a.id] === r.id ? " selected" : "") + ">" + esc(r.name) +
+                "</option>").join("") +
+            "</select></div>").join("") +
+      "</div>" +
+      '<p class="hint">Laisse « Comme au-dessus » sauf si la personne n\'a pas le ' +
+        "même grade des deux côtés. Les droits suivent le garage où elle se " +
+        "trouve.</p></div>";
+  }
+
+  function lireGrades(hote, id, principal) {
+    const o = {};
+    hote.querySelectorAll("#" + id + " select[data-at]").forEach(s => {
+      if (s.value && s.value !== principal) o[s.dataset.at] = s.value;
+    });
+    return o;
+  }
+
   function lireAteliers(hote, id, defaut) {
     const l = [].slice.call(hote.querySelectorAll("#" + id + " input:checked"))
       .map(i => i.value);
@@ -1435,6 +1484,7 @@
             esc(r.name) + "</option>").join("") + "</select>" +
           '<p class="hint">Les droits viennent du rôle. Onglet « Rôles » pour les modifier.</p></div>' +
       "</div>" +
+      champGrades("u-g", cur) +
 
       '<div class="fieldset"><span class="label">Droits de ce rôle</span>' +
         '<div class="permtags" id="u-perms"></div></div>' +
@@ -1449,6 +1499,7 @@
         "</div></div>" +
 
       champAteliers("u-at", MNStore.ateliersDe(cur)) +
+      champMasques("u-m", cur) +
       '<label class="switch"><input type="checkbox" id="u-active"' + (cur.active ? " checked" : "") +
         (isMe ? " disabled" : "") + '><span class="switch__box"></span><span>Compte actif</span></label>' +
       (isMe ? '<p class="hint hint--warn">Tu modifies ton propre compte : tu ne peux pas le désactiver, ' +
@@ -1513,6 +1564,8 @@
               draft.users.push({
                 id, pseudo, roleId, active,
                 ateliers: lireAteliers(body, "u-at", [MNAuth.atelier() || "nord"]),
+                masques: lireMasques(body, "u-m"),
+                grades: lireGrades(body, "u-g", roleId),
                 pin: pin ? MNAuth.hashPin(id, pin) : null,
                 createdAt: now,
                 hiredAt: now.slice(0, 10),
@@ -1528,6 +1581,8 @@
               if (roleId !== u.roleId) MNStore.recordPromotion(u, roleId, draft.roles, me.pseudo, "");
               u.active = isMe ? true : active;
               u.ateliers = lireAteliers(body, "u-at", MNStore.ateliersDe(u));
+              u.masques = lireMasques(body, "u-m");
+              u.grades = lireGrades(body, "u-g", roleId);
               if (clearPin) u.pin = null;
               else if (pin) u.pin = MNAuth.hashPin(u.id, pin);
             }
@@ -1930,6 +1985,10 @@
         '<p class="hint">Les pastilles ne sont que des raccourcis : le sélecteur et le code ' +
           "hexadécimal acceptent n'importe quelle couleur, et celle déjà posée sur le grade " +
           "est reprise telle quelle.</p></div>" +
+      champAteliers("r-at", MNStore.ateliersDe(cur)) +
+      '<p class="hint">Un grade coché d\'un seul côté n\'est proposé que là. Les ' +
+        "deux garages peuvent ainsi avoir chacun leur hiérarchie — celle de l'un " +
+        "ne commande pas celle de l'autre.</p>" +
       '<div class="fieldset"><span class="label">Permissions du rôle</span>' +
         '<div class="perms" id="r-perms"></div></div>';
 
@@ -2019,10 +2078,12 @@
             if (isNew) {
               draft.roles.push({
                 id: MNStore.uniqueId(name, draft.roles.map(x => x.id)),
-                name, color: teinte, icon, perms
+                name, color: teinte, icon, perms,
+                ateliers: lireAteliers(body, "r-at", MNStore.ATELIERS.map(a => a.id))
               });
             } else {
               r.name = name; r.color = teinte; r.icon = icon; r.perms = perms;
+              r.ateliers = lireAteliers(body, "r-at", MNStore.ATELIERS.map(a => a.id));
             }
             commit(); close();
             MNUI.toast(isNew ? "Rôle créé" : "Rôle mis à jour", "ok");

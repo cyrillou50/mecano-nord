@@ -360,6 +360,47 @@
       "</div></div>";
   }
 
+  /* Le masquage se règle garage par garage. */
+  function champMasques(id, u) {
+    const m = MNStore.normAteliers(u.masques, []);
+    return '<div class="champ"><span class="champ__label">Masquer de l\'onglet Équipe</span>' +
+      '<div class="rang" id="' + id + '">' +
+        MNStore.ATELIERS.map(a =>
+          '<label class="motif"><input type="checkbox" value="' + U.esc(a.id) + '"' +
+            (m.indexOf(a.id) !== -1 ? " checked" : "") + ">" +
+            "<span>" + U.esc(a.nom) + "</span></label>").join("") +
+      "</div></div>";
+  }
+
+  const lireMasques = (hote, id) =>
+    [].slice.call(hote.querySelectorAll("#" + id + " input:checked")).map(i => i.value);
+
+  /* Un grade par garage. « Comme au-dessus » laisse le grade principal. */
+  function champGrades(id, u) {
+    const g = (u && u.grades) || {};
+    return '<div class="champ" id="' + id + '"><span class="champ__label">Grade par atelier</span>' +
+      '<div class="cols-2">' +
+        MNStore.ATELIERS.map(a =>
+          U.champ({ id: id + "-" + a.id, label: a.nom, type: "liste",
+                    valeur: g[a.id] || "",
+                    options: [{ valeur: "", nom: "Comme au-dessus" }].concat(
+                      MNStore.rolesDeAtelier(a.id).map(r =>
+                        ({ valeur: r.id, nom: r.name }))) })).join("") +
+      "</div>" +
+      '<p class="champ__aide">Laisse « Comme au-dessus » sauf si la personne n\'a ' +
+        "pas le même grade des deux côtés. Les droits suivent le garage où elle " +
+        "se trouve.</p></div>";
+  }
+
+  function lireGrades(hote, id, principal) {
+    const o = {};
+    MNStore.ATELIERS.forEach(a => {
+      const s = hote.querySelector("#" + id + "-" + a.id);
+      if (s && s.value && s.value !== principal) o[a.id] = s.value;
+    });
+    return o;
+  }
+
   function lireAteliers(hote, id, defaut) {
     const l = [].slice.call(hote.querySelectorAll("#" + id + " input:checked"))
       .map(i => i.value);
@@ -1012,6 +1053,8 @@
         "</div></div>" +
 
       champAteliers("u-at", MNStore.ateliersDe(cur)) +
+      champGrades("u-g", cur) +
+      champMasques("u-m", cur) +
       U.champ({ id: "u-actif", type: "bascule", label: "Compte actif", valeur: cur.active }) +
       (cestMoi
         ? '<p class="champ__aide">Tu modifies ton propre compte : tu ne peux ni le désactiver, ' +
@@ -1070,6 +1113,8 @@
               brouillon.users.push({
                 id, pseudo, roleId, active: actif,
                 ateliers: lireAteliers(k, "u-at", [MNAuth.atelier() || "nord"]),
+                masques: lireMasques(k, "u-m"),
+                grades: lireGrades(k, "u-g", roleId),
                 pin: pin ? MNAuth.hashPin(id, pin) : null,
                 createdAt: maintenant,
                 hiredAt: maintenant.slice(0, 10),
@@ -1087,6 +1132,8 @@
               }
               u.active = cestMoi ? true : actif;
               u.ateliers = lireAteliers(k, "u-at", MNStore.ateliersDe(u));
+              u.masques = lireMasques(k, "u-m");
+              u.grades = lireGrades(k, "u-g", roleId);
               if (viderPin) u.pin = null;
               else if (pin) u.pin = MNAuth.hashPin(u.id, pin);
             }
