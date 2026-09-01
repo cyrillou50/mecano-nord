@@ -345,6 +345,27 @@
     U.toast("Objet supprimé", "ok");
   }
 
+  /* ---- Ateliers ----------------------------------------------------------------
+     Employés et objets appartiennent à un garage, à l'autre, ou aux deux. Ce
+     qui n'est coché nulle part n'existerait plus : on retombe alors sur les
+     deux, jamais sur rien. */
+
+  function champAteliers(id, choisis) {
+    return '<div class="champ"><span class="champ__label">Ateliers</span>' +
+      '<div class="rang" id="' + id + '">' +
+        MNStore.ATELIERS.map(a =>
+          '<label class="motif"><input type="checkbox" value="' + U.esc(a.id) + '"' +
+            (choisis.indexOf(a.id) !== -1 ? " checked" : "") + ">" +
+            "<span>" + U.esc(a.nom) + "</span></label>").join("") +
+      "</div></div>";
+  }
+
+  function lireAteliers(hote, id, defaut) {
+    const l = [].slice.call(hote.querySelectorAll("#" + id + " input:checked"))
+      .map(i => i.value);
+    return l.length ? l : defaut.slice();
+  }
+
   function editerObjet(it) {
     const neuf = !it;
     if (neuf && !brouillon.categories.length) {
@@ -402,7 +423,8 @@
       "</div>" +
 
       U.champ({ id: "o-on", type: "bascule", label: "Visible sur la page de facturation",
-                valeur: cur.enabled });
+                valeur: cur.enabled }) +
+      champAteliers("o-at", MNStore.ateliersDe(cur));
 
     /* --- coûts en ressources --- */
     const zCouts = corps.querySelector("#o-couts");
@@ -511,6 +533,7 @@
               pack: borne(k.querySelector("#o-pack").value, 9999),
               temps: borne(k.querySelector("#o-temps").value, 86400),
               enabled: k.querySelector("#o-on").checked,
+              ateliers: lireAteliers(k, "o-at", MNStore.ATELIERS.map(a => a.id)),
               excludes: excl,
               cost
             };
@@ -988,6 +1011,7 @@
             : '<p class="champ__aide">Sans code, il suffit de taper son nom pour entrer.</p>') +
         "</div></div>" +
 
+      champAteliers("u-at", MNStore.ateliersDe(cur)) +
       U.champ({ id: "u-actif", type: "bascule", label: "Compte actif", valeur: cur.active }) +
       (cestMoi
         ? '<p class="champ__aide">Tu modifies ton propre compte : tu ne peux ni le désactiver, ' +
@@ -1045,6 +1069,7 @@
               const maintenant = new Date().toISOString();
               brouillon.users.push({
                 id, pseudo, roleId, active: actif,
+                ateliers: lireAteliers(k, "u-at", [MNAuth.atelier() || "nord"]),
                 pin: pin ? MNAuth.hashPin(id, pin) : null,
                 createdAt: maintenant,
                 hiredAt: maintenant.slice(0, 10),
@@ -1061,6 +1086,7 @@
                 MNStore.recordPromotion(u, roleId, brouillon.roles, moi.pseudo, "");
               }
               u.active = cestMoi ? true : actif;
+              u.ateliers = lireAteliers(k, "u-at", MNStore.ateliersDe(u));
               if (viderPin) u.pin = null;
               else if (pin) u.pin = MNAuth.hashPin(u.id, pin);
             }

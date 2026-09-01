@@ -1345,45 +1345,8 @@ button.calev:hover { filter: brightness(1.25); }
 }
 
 /* Jeton de la barre du haut : ce qui pèse au dossier, toujours sous les yeux. */
-.avchip {
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 7px 13px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--grav) 16%, transparent);
-  border: 1px solid color-mix(in srgb, var(--grav) 50%, transparent);
-  color: var(--grav);
-  font-family: var(--font-display);
-  font-size: 12.5px; font-weight: 700;
-  letter-spacing: .04em;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background .14s;
-}
-.avchip:hover { background: color-mix(in srgb, var(--grav) 26%, transparent); }
-.avchip svg { width: 15px; height: 15px; flex: none; }
-
-/* Passer d'un garage à l'autre. Discret : c'est un déplacement courant, pas
-   une alerte — le nom affiché est celui de la destination. */
-.atchip {
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 7px 13px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, .04);
-  border: 1px solid var(--line);
-  color: var(--muted);
-  font-family: var(--font-display);
-  font-size: 12.5px; font-weight: 700;
-  letter-spacing: .04em;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background .14s, color .14s, border-color .14s;
-}
-.atchip:hover {
-  background: var(--pink-ink);
-  border-color: color-mix(in srgb, var(--pink) 45%, transparent);
-  color: var(--pink-soft);
-}
-.atchip svg { width: 15px; height: 15px; flex: none; }
+/* Les jetons de la barre du haut vivent dans app.css : la barre est
+   commune a toutes les pages, ce fichier ne l'est pas. */
 
 @media (max-width: 760px) { .avchip span { display: none; } .avchip { padding: 7px 9px; } }
 

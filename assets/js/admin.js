@@ -371,6 +371,28 @@
   }
 
   /** Fenêtre de création / modification d'un objet. */
+
+  /* ---- Ateliers ----------------------------------------------------------------
+     Employés et objets appartiennent à un garage, à l'autre, ou aux deux. Ce
+     qui n'est coché nulle part n'existerait plus : on retombe alors sur les
+     deux, jamais sur rien. */
+
+  function champAteliers(id, choisis) {
+    return '<div class="fieldset"><span class="label">Ateliers</span>' +
+      '<div class="motifs" id="' + id + '">' +
+        MNStore.ATELIERS.map(a =>
+          '<label class="motif"><input type="checkbox" value="' + esc(a.id) + '"' +
+            (choisis.indexOf(a.id) !== -1 ? " checked" : "") + ">" +
+            "<span>" + esc(a.nom) + "</span></label>").join("") +
+      "</div></div>";
+  }
+
+  function lireAteliers(hote, id, defaut) {
+    const l = [].slice.call(hote.querySelectorAll("#" + id + " input:checked"))
+      .map(i => i.value);
+    return l.length ? l : defaut.slice();
+  }
+
   function editItem(it) {
     const isNew = !it;
     const cur = it ? MNStore.clone(it) : {
@@ -435,7 +457,8 @@
       "</div>" +
 
       '<label class="switch"><input type="checkbox" id="e-on"' + (cur.enabled ? " checked" : "") + ">" +
-        '<span class="switch__box"></span><span>Visible sur la page de facturation</span></label>';
+        '<span class="switch__box"></span><span>Visible sur la page de facturation</span></label>' +
+      champAteliers("e-at", MNStore.ateliersDe(cur));
 
     const costsHost = body.querySelector("#e-costs");
     const rows = Object.keys(cur.cost).map(rid => ({ rid, qty: cur.cost[rid] }));
@@ -538,6 +561,7 @@
               pack: Math.max(0, Math.min(9999, Math.round(Number(body.querySelector("#e-pack").value) || 0))),
               temps: Math.max(0, Math.min(86400, Math.round(Number(body.querySelector("#e-temps").value) || 0))),
               enabled: body.querySelector("#e-on").checked,
+              ateliers: lireAteliers(body, "e-at", MNStore.ATELIERS.map(a => a.id)),
               excludes: excl,
               cost
             };
@@ -1424,6 +1448,7 @@
             : '<p class="hint">Sans code, il suffit de taper son nom pour entrer.</p>') + "</div>" +
         "</div></div>" +
 
+      champAteliers("u-at", MNStore.ateliersDe(cur)) +
       '<label class="switch"><input type="checkbox" id="u-active"' + (cur.active ? " checked" : "") +
         (isMe ? " disabled" : "") + '><span class="switch__box"></span><span>Compte actif</span></label>' +
       (isMe ? '<p class="hint hint--warn">Tu modifies ton propre compte : tu ne peux pas le désactiver, ' +
@@ -1487,6 +1512,7 @@
               const now = new Date().toISOString();
               draft.users.push({
                 id, pseudo, roleId, active,
+                ateliers: lireAteliers(body, "u-at", [MNAuth.atelier() || "nord"]),
                 pin: pin ? MNAuth.hashPin(id, pin) : null,
                 createdAt: now,
                 hiredAt: now.slice(0, 10),
@@ -1501,6 +1527,7 @@
               /* Un changement de grade laisse une trace dans sa carrière. */
               if (roleId !== u.roleId) MNStore.recordPromotion(u, roleId, draft.roles, me.pseudo, "");
               u.active = isMe ? true : active;
+              u.ateliers = lireAteliers(body, "u-at", MNStore.ateliersDe(u));
               if (clearPin) u.pin = null;
               else if (pin) u.pin = MNAuth.hashPin(u.id, pin);
             }

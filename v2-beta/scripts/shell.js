@@ -60,10 +60,14 @@ window.V2Shell = (function () {
   function boutonAtelier() {
     const s = _session;
     if (!s || (s.ateliers || []).length < 2) return "";
-    const autre = s.ateliers.find(a => a !== s.atelier) || s.ateliers[0];
-    return '<button class="atchip" data-a="atelier" data-vers="' + esc(autre) +
-      '" title="Passer au ' + esc(MNStore.nomAtelier(autre)) + '">' +
-      U().icone("fleche") + "<span>" + esc(MNStore.courtAtelier(autre)) + "</span></button>";
+    return '<div class="atbar" role="group" aria-label="Atelier">' +
+      s.ateliers.map(id =>
+        '<button class="atbar__b' + (id === s.atelier ? " is-on" : "") +
+          '" data-vers="' + esc(id) + '"' +
+          (id === s.atelier ? ' aria-current="true"'
+            : ' title="Passer au ' + esc(MNStore.nomAtelier(id)) + '"') + ">" +
+          esc(MNStore.courtAtelier(id)) + "</button>").join("") +
+    "</div>";
   }
 
   function nav() {
@@ -135,12 +139,12 @@ window.V2Shell = (function () {
     burger.classList.add("burger");
     burger.addEventListener("click", e => { e.stopPropagation(); basculerTiroir(); });
 
-    const bat = app.querySelector('[data-a="atelier"]');
-    if (bat) bat.addEventListener("click", () => {
-      /* Rechargement plutôt que redessin : l'atelier change l'équipe affichée,
-         le tableau de service et la page ouverte. */
-      if (MNAuth.setAtelier(bat.dataset.vers)) location.reload();
-    });
+    /* Rechargement plutôt que redessin : l'atelier change l'équipe affichée,
+       le tableau de service et la page ouverte. */
+    app.querySelectorAll(".atbar__b").forEach(b =>
+      b.addEventListener("click", () => {
+        if (MNAuth.setAtelier(b.dataset.vers)) location.reload();
+      }));
 
     const th = app.querySelector('[data-a="theme"]');
     if (th) th.addEventListener("click", choisirTheme);

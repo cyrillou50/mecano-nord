@@ -29,8 +29,6 @@ window.MNUI = (function () {
     user: '<circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/>',
     box: '<path d="m12 3 8 4.2v9.6L12 21l-8-4.2V7.2z"/><path d="M4 7.2 12 11.5l8-4.3M12 11.5V21"/>',
     layers: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
-    /* Deux flèches en sens inverse : passer d'un atelier à l'autre. */
-    bascule: '<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/>',
     cube: '<rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/>',
     cloud: '<path d="M7 19a4.5 4.5 0 0 1-.4-9 6 6 0 0 1 11.6 1.6A3.9 3.9 0 0 1 17.5 19z"/><path d="M12 16v-5"/><path d="m9.5 13.5 2.5-2.5 2.5 2.5"/>',
     github: '<path d="M9 19c-4.5 1.5-4.5-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12 12 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.4.4-.5.9-.5 1.6V21"/>',
@@ -312,14 +310,19 @@ window.MNUI = (function () {
           '" title="Voir ce qui pèse à ton dossier">' + svg("alert") +
           "<span>" + n + " avertissement" + (n > 1 ? "s" : "") + "</span></button>";
       })() +
-      /* Un clic pour passer d'un garage à l'autre. N'apparaît que pour qui
-         travaille dans les deux : les autres n'ont nulle part où aller. */
+      /* Les deux garages, l'actuel allumé : un coup d'œil pour savoir où l'on
+         est, un clic pour aller à côté. N'apparaît que pour qui travaille dans
+         les deux — les autres n'ont nulle part où aller. */
       (function () {
         if (!s || (s.ateliers || []).length < 2) return "";
-        const autre = s.ateliers.find(a => a !== s.atelier) || s.ateliers[0];
-        return '<button class="atchip" id="btn-atelier" data-vers="' + esc(autre) +
-          '" title="Passer au ' + esc(MNStore.nomAtelier(autre)) + '">' +
-          svg("bascule") + "<span>" + esc(MNStore.courtAtelier(autre)) + "</span></button>";
+        return '<div class="atbar" role="group" aria-label="Atelier">' +
+          s.ateliers.map(id =>
+            '<button class="atbar__b' + (id === s.atelier ? " is-on" : "") +
+              '" data-vers="' + esc(id) + '"' +
+              (id === s.atelier ? ' aria-current="true"'
+                : ' title="Passer au ' + esc(MNStore.nomAtelier(id)) + '"') + ">" +
+              esc(MNStore.courtAtelier(id)) + "</button>").join("") +
+        "</div>";
       })() +
       /* La palette n'apparaît que si chacun a le droit de se choisir une
          apparence — sinon le bouton ne mènerait nulle part. */
@@ -343,13 +346,13 @@ window.MNUI = (function () {
     const av = document.getElementById("btn-av");
     if (av) av.addEventListener("click", () => montrerAvertissements(mesAvertissements(), false));
 
-    const at = document.getElementById("btn-atelier");
-    if (at) at.addEventListener("click", () => {
-      /* Rechargement plutôt que redessin : l'atelier change l'équipe affichée,
-         le tableau de service et la page ouverte. Tout relire est plus sûr que
-         de rafraîchir chaque morceau. */
-      if (MNAuth.setAtelier(at.dataset.vers)) location.reload();
-    });
+    /* Rechargement plutôt que redessin : l'atelier change l'équipe affichée,
+       le tableau de service et la page ouverte. Tout relire est plus sûr que
+       de rafraîchir chaque morceau. */
+    document.querySelectorAll(".atbar__b").forEach(b =>
+      b.addEventListener("click", () => {
+        if (MNAuth.setAtelier(b.dataset.vers)) location.reload();
+      }));
 
     const th = document.getElementById("btn-theme");
     if (th) th.addEventListener("click", themeModal);

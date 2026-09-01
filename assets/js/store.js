@@ -501,6 +501,9 @@ window.MNStore = (function () {
         icon: it.icon || "i-box",
         enabled: it.enabled !== false,
         note: it.note ? String(it.note) : "",
+        /* L'atelier où l'objet est proposé. Sans mention il l'est partout :
+           un catalogue déjà rempli ne doit pas se vider d'un côté. */
+        ateliers: normAteliers(it.ateliers, TOUS_ATELIERS),
         /* Quantité maximale par devis. 0 = illimité. */
         max: Math.max(0, Math.min(999, Math.round(Number(it.max) || 0))),
         /* Taille du lot : « Pièces détachées » avec pack = 10 s'annonce

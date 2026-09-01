@@ -77,7 +77,11 @@
 
   /* ---- Onglets de catégories -------------------------------------------------- */
 
-  const visibleItems = () => MNStore.catalog().items.filter(i => i.enabled);
+  /* Le catalogue suit l'atelier où l'on travaille : un objet réservé au Sud
+     n'a rien à faire sur le devis du Nord. Sans mention, il est proposé
+     partout — un catalogue déjà rempli ne se vide d'aucun côté. */
+  const visibleItems = () => MNStore.catalog().items.filter(i =>
+    i.enabled && MNStore.estDeAtelier(i, MNAuth.atelier()));
 
   /** Les objets visibles d'une catégorie, sous-catégories comprises. */
   const itemsUnder = id => {
