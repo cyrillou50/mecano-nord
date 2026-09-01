@@ -12,7 +12,7 @@
 window.MNDuty = (function () {
   "use strict";
 
-  /* V2 : le tableau de service est celui de la V1, un cran au-dessus. Ce repli
+/* V2 : le tableau de service est celui de la V1, un cran au-dessus. Ce repli
    ne sert que sans serveur configuré — l'atelier en a un. */
 const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
   const K_LOCAL = "mn.duty.local";
@@ -76,6 +76,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
         id: String(e.id || ""),
         pseudo: String(e.pseudo || "?"),
         roleId: String(e.roleId || ""),
+        atelier: atelierDe(e),
         since: e.since || new Date().toISOString()
       })).filter(e => e.id),
       log: (Array.isArray(b.log) ? b.log : []).slice(0, MAX_LOG).map(e => {
@@ -88,6 +89,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
           id: String(e.id || ""),
           pseudo: String(e.pseudo || "?"),
           roleId: String(e.roleId || ""),
+          atelier: atelierDe(e),
           in: e.in || null,
           out: e.out || null,
           seconds: sec,
@@ -109,6 +111,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
           cid: String(e.cid || cidDe(id, from)),
           pseudo: String(e.pseudo || "?"),
           roleId: String(e.roleId || ""),
+          atelier: atelierDe(e),
           from,
           to: jour(e.to),
           note: String(e.note || "").slice(0, 300),
@@ -165,10 +168,54 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
     } else {
       _board = remote || local || empty();
     }
+    _vue = null;
     return _board;
   }
 
-  const board = () => _board || empty();
+  /* ---- Ateliers ---------------------------------------------------------------
+     Deux garages partagent ce fichier, mais pas leur atelier : le Nord ne doit
+     jamais voir qui pointe au Sud. On garde donc un seul tableau — un seul
+     fichier à écrire, une seule synchronisation — et on n'en montre que la
+     part de l'atelier où l'on travaille.
+
+     `brut()` est ce qu'on écrit, `board()` ce qu'on lit. Les lignes de la vue
+     sont les objets du tableau brut, pas des copies : retrouver la vraie
+     position d'une ligne reste possible avec indexOf. */
+
+  let _atelier = "nord";
+  let _vue = null;                  // vue filtrée, refaite quand quelque chose bouge
+
+  /** Une ligne sans atelier vient d'avant les deux garages : c'est le Nord. */
+  const atelierDe = e => String((e && e.atelier) || "nord");
+
+  /** L'atelier où l'on travaille. Le pointage suivra. */
+  function setAtelier(id) {
+    const v = String(id || "") || "nord";
+    if (v === _atelier) return;
+    _atelier = v;
+    _vue = null;
+  }
+  const atelier = () => _atelier;
+
+  /** Le tableau entier, les deux garages mêlés : ce qu'on écrit. */
+  const brut = () => _board || empty();
+
+  /** Ce qu'on lit : le seul atelier courant. */
+  function board() {
+    const b = brut();
+    const cle = b.updatedAt + "|" + _atelier + "|" +
+      b.onDuty.length + "|" + b.log.length + "|" + b.conges.length;
+    if (_vue && _vue._cle === cle && _vue._src === b) return _vue;
+    const dIci = e => atelierDe(e) === _atelier;
+    _vue = {
+      _cle: cle, _src: b,
+      updatedAt: b.updatedAt,
+      onDuty: b.onDuty.filter(dIci),
+      log: b.log.filter(dIci),
+      conges: b.conges.filter(dIci)
+    };
+    return _vue;
+  }
   const entryOf = uid => board().onDuty.find(e => e.id === uid) || null;
   const isOn = uid => !!entryOf(uid);
 
@@ -348,7 +395,8 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
   async function clockIn(session) {
     /* Chemin privilégié : le serveur applique l'opération lui-même. */
     const op = await envoyerOp({
-      op: "in", id: session.uid, pseudo: session.pseudo, roleId: session.roleId || ""
+      op: "in", id: session.uid, pseudo: session.pseudo, roleId: session.roleId || "",
+      atelier: _atelier
     });
     if (op) {
       if (op.deja) return { already: true, shared: true, discord: { skipped: true } };
@@ -357,13 +405,14 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
     }
 
     await load(true);                       // on repart du tableau le plus frais
-    const b = board();
+    const b = brut();
     if (isOn(session.uid)) return { already: true, shared: false, discord: { skipped: true } };
 
     b.onDuty.push({
       id: session.uid,
       pseudo: session.pseudo,
       roleId: session.roleId || "",
+      atelier: _atelier,
       since: new Date().toISOString()
     });
     b.updatedAt = new Date().toISOString();
@@ -384,7 +433,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
     }
 
     await load(true);
-    const b = board();
+    const b = brut();
     const i = b.onDuty.findIndex(e => e.id === session.uid);
     if (i === -1) return { already: true, shared: false, discord: { skipped: true } };
 
@@ -393,7 +442,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
     const seconds = secBetween(e.since, out);
 
     b.log.unshift({
-      id: e.id, pseudo: e.pseudo, roleId: e.roleId,
+      id: e.id, pseudo: e.pseudo, roleId: e.roleId, atelier: e.atelier,
       in: e.since, out, seconds, minutes: Math.round(seconds / 60)
     });
     b.log = b.log.slice(0, MAX_LOG);
@@ -432,7 +481,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
     }
 
     await load(true);
-    const b = board();
+    const b = brut();
     const i = b.onDuty.findIndex(e => e.id === uid);
     if (i === -1) return { already: true };
 
@@ -442,7 +491,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
     const out = (choisie && choisie >= e.since && choisie <= maintenant) ? choisie : maintenant;
     const seconds = secBetween(e.since, out);
     b.log.unshift({
-      id: e.id, pseudo: e.pseudo, roleId: e.roleId,
+      id: e.id, pseudo: e.pseudo, roleId: e.roleId, atelier: e.atelier,
       in: e.since, out, seconds, minutes: Math.round(seconds / 60), forced: true,
       corrigePar: out === maintenant ? "" : byPseudo,
       corrigeLe: out === maintenant ? null : maintenant
@@ -459,7 +508,8 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
   /** Mettre quelqu'un en service à sa place (gérant). */
   async function forceIn(user, byPseudo) {
     const op = await envoyerOp({
-      op: "in", id: user.id, pseudo: user.pseudo, roleId: user.roleId || ""
+      op: "in", id: user.id, pseudo: user.pseudo, roleId: user.roleId || "",
+      atelier: _atelier
     });
     if (op) {
       if (op.deja) return { already: true };
@@ -468,13 +518,14 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
     }
 
     await load(true);
-    const b = board();
+    const b = brut();
     if (isOn(user.id)) return { already: true };
 
     b.onDuty.push({
       id: user.id,
       pseudo: user.pseudo,
       roleId: user.roleId || "",
+      atelier: _atelier,
       since: new Date().toISOString()
     });
     b.updatedAt = new Date().toISOString();
@@ -520,7 +571,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
 
     const entree = {
       id: user.id, cid: cidDe(user.id, a),
-      pseudo: user.pseudo, roleId: user.roleId || "",
+      pseudo: user.pseudo, roleId: user.roleId || "", atelier: _atelier,
       from: a, to: b2, note: String(note || "").slice(0, 300),
       by: by || "", at: new Date().toISOString()
     };
@@ -533,7 +584,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
 
     if (!etat) {
       await load(true);
-      const b = board();
+      const b = brut();
       const i = remplace ? b.conges.findIndex(e => e.cid === remplace) : -1;
       if (i === -1) b.conges.push(entree); else b.conges[i] = entree;
       b.updatedAt = entree.at;
@@ -562,7 +613,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
 
     if (!etat) {
       await load(true);
-      const b = board();
+      const b = brut();
       const i = b.conges.findIndex(e => e.cid === cid);
       if (i === -1) return { already: true };
       b.conges.splice(i, 1);
@@ -579,13 +630,15 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
 
   /** Efface l'historique des pointages terminés (les personnes en service restent). */
   async function clearLog(byPseudo) {
-    const op = await envoyerOp({ op: "clear-log" });
+    const op = await envoyerOp({ op: "clear-log", atelier: _atelier });
     if (op) return { removed: op.retires || 0, shared: op.ok, shareError: op.error };
 
     await load(true);
-    const b = board();
-    const n = b.log.length;
-    b.log = [];
+    const b = brut();
+    const n = board().log.length;
+    /* Seulement l'atelier d'ici : l'autre garage n'a pas demandé qu'on efface
+       le sien. */
+    b.log = b.log.filter(e => atelierDe(e) !== _atelier);
     b.updatedAt = new Date().toISOString();
     saveLocal(b);
     const shared = await push(b, "Historique des services effacé par " + byPseudo);
@@ -594,17 +647,24 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
 
   /** Supprime une ligne d'historique précise. */
   async function removeLog(index, byPseudo) {
+    /* La page compte les lignes de son atelier ; le fichier les contient
+       toutes. On traduit avant d'agir, sinon on effacerait celle d'à côté. */
     const avant = board().log[index];
-    const op = await envoyerOp({ op: "remove-log", index });
+    if (!avant) return { already: true };
+    const vrai = brut().log.indexOf(avant);
+    if (vrai < 0) return { already: true };
+
+    const op = await envoyerOp({ op: "remove-log", index: vrai });
     if (op) {
       if (op.deja) return { already: true };
-      return { shared: op.ok, shareError: op.error, pseudo: avant ? avant.pseudo : "" };
+      return { shared: op.ok, shareError: op.error, pseudo: avant.pseudo };
     }
 
     await load(true);
-    const b = board();
-    if (index < 0 || index >= b.log.length) return { already: true };
-    const e = b.log.splice(index, 1)[0];
+    const b = brut();
+    const i = b.log.indexOf(avant) >= 0 ? b.log.indexOf(avant) : vrai;
+    if (i < 0 || i >= b.log.length) return { already: true };
+    const e = b.log.splice(i, 1)[0];
     b.updatedAt = new Date().toISOString();
     saveLocal(b);
     const shared = await push(b, "Pointage de " + e.pseudo + " retiré par " + byPseudo);
@@ -641,7 +701,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
 
     /* Serveur trop ancien : on réécrit le tableau entier. */
     await load(true);
-    const b = board();
+    const b = brut();
     const j = b.log.findIndex(e => e.id === entree.id && e.in === entree.in);
     if (j === -1) return { ok: false, error: "Ce pointage n'existe plus." };
 
@@ -755,7 +815,8 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
   const sinceDur = (iso, compact) => dur(secBetween(iso, new Date().toISOString()), compact);
 
   return {
-    load, board, isOn, entryOf, canShare, isAuto, relayUrl, baseUrl,
+    load, board, brut, isOn, entryOf, canShare, isAuto, relayUrl, baseUrl,
+    setAtelier, atelier,
     souci: () => _souci,
     clockIn, clockOut, forceOut, forceIn, clearLog, removeLog, editLog,
     conges, congesOf, congeOf, congeById, enConge, chevauche,

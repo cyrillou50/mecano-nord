@@ -348,6 +348,53 @@ window.MNStore = (function () {
   const D = () => window.MN_CONFIG.defaults;
 
   /** Remet un catalogue d'aplomb : champs manquants, doublons, types. */
+  /* ---- Ateliers -----------------------------------------------------------------
+     Deux garages sur le même site. Ce qui les sépare : l'équipe, les grades et
+     le pointage. Le reste — articles, prix, véhicules, contrats — leur est
+     commun : c'est la même enseigne et le même stock.
+
+     Une fiche porte la liste des ateliers où elle vaut. Un employé du Nord
+     seul n'apparaît pas au Sud ; celui qui est dans les deux passe de l'un à
+     l'autre d'un clic, avec les droits de son grade là où il se trouve.
+
+     Les défauts ne sont pas les mêmes des deux côtés, et c'est voulu :
+     l'atelier existant est le Nord, donc un employé sans mention y reste seul,
+     tandis qu'un grade sans mention vaut partout — le Sud démarre avec la même
+     hiérarchie, à charge de l'adapter ensuite. */
+
+  const ATELIERS = [
+    { id: "nord", nom: "Mécano Nord", court: "Nord" },
+    { id: "sud", nom: "Mécano Sud", court: "Sud" }
+  ];
+  const TOUS_ATELIERS = ATELIERS.map(a => a.id);
+  const ATELIER_DEFAUT = "nord";
+
+  const atelierById = id => ATELIERS.find(a => a.id === id) || null;
+  const nomAtelier = id => { const a = atelierById(id); return a ? a.nom : String(id || ""); };
+  const courtAtelier = id => { const a = atelierById(id); return a ? a.court : String(id || ""); };
+
+  /** Liste propre, dans l'ordre des ateliers, sans doublon ni inconnu. */
+  function normAteliers(v, defaut) {
+    const l = (Array.isArray(v) ? v : []).map(String);
+    const gardes = TOUS_ATELIERS.filter(id => l.indexOf(id) !== -1);
+    return gardes.length ? gardes : defaut.slice();
+  }
+
+  /** Les ateliers d'une fiche, quel que soit son âge. */
+  const ateliersDe = x => normAteliers(x && x.ateliers, [ATELIER_DEFAUT]);
+
+  /** Cette fiche vaut-elle dans cet atelier ? Sans atelier donné, oui. */
+  const estDeAtelier = (x, atelier) =>
+    !atelier || ateliersDe(x).indexOf(atelier) !== -1;
+
+  /** Les employés d'un atelier. */
+  const usersDeAtelier = atelier =>
+    (_catalog.users || []).filter(u => estDeAtelier(u, atelier));
+
+  /** Les grades proposés dans un atelier. */
+  const rolesDeAtelier = atelier =>
+    (_catalog.roles || []).filter(r => estDeAtelier(r, atelier));
+
   function normalize(raw) {
     const c = (raw && typeof raw === "object") ? clone(raw) : {};
     c.version = Number(c.version) || 1;
@@ -596,7 +643,9 @@ window.MNStore = (function () {
         name: String(r.name || id),
         color: String(r.color || (window.MN_ROLE_COLORS || ["#ff2bd1"])[i % 10]),
         icon: r.icon || "i-badge",
-        perms: cleanPerms(r.perms)
+        perms: cleanPerms(r.perms),
+        /* Sans mention, un grade vaut dans les deux ateliers. */
+        ateliers: normAteliers(r.ateliers, TOUS_ATELIERS)
       };
     });
 
@@ -670,6 +719,8 @@ window.MNStore = (function () {
         /* Masqué du trombinoscope Équipe, mais compte pleinement fonctionnel :
            la personne se connecte et travaille normalement. */
         hidden: u.hidden === true,
+        /* Sans mention, l'employé est du Nord : l'atelier d'origine. */
+        ateliers: normAteliers(u.ateliers, [ATELIER_DEFAUT]),
         /* Exempté du minimum hebdomadaire : ses heures comptent et s'affichent
            comme celles de tout le monde, mais il n'est jamais signalé pour un
            minimum non atteint. (`horsRecap` : le nom d'avant, quand le réglage
@@ -1011,6 +1062,8 @@ window.MNStore = (function () {
     catalog, published, depot, hasDraft, origin, settings, brand, api,
     roleById, roleOf, itemById, resourceById, categoryById,
     topCategories, subCategories, categoryScope, itemLabel, totals, duree,
+    ATELIERS, atelierById, nomAtelier, courtAtelier,
+    ateliersDe, estDeAtelier, usersDeAtelier, rolesDeAtelier, normAteliers,
     MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,
     usersActifs, usersArchives,
     GRAVITES, graviteDe, normAvertissement, avertActif, avertBilan,

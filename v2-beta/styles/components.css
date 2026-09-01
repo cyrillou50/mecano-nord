@@ -384,6 +384,28 @@
 .onglet.is-actif { background: var(--c-carte); color: var(--c-action-doux); box-shadow: var(--o-1); }
 
 /* Les deux niveaux se tiennent : une catégorie, puis ce qu'elle contient. */
+/* Passer d'un garage à l'autre. Discret : c'est un déplacement courant, pas
+   une alerte — le nom affiché est celui de la destination. */
+.atchip {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  padding: 6px var(--e-3);
+  border-radius: var(--r-plein);
+  background: var(--c-creux);
+  border: 1px solid var(--c-bord);
+  color: var(--c-second);
+  font-family: var(--f-titre);
+  font-size: var(--t-xs); font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--m-vif), color var(--m-vif), border-color var(--m-vif);
+}
+.atchip:hover {
+  background: var(--c-carte);
+  border-color: var(--c-bord-net);
+  color: var(--c-action-doux);
+}
+.atchip svg { width: 15px; height: 15px; flex: none; }
+
 .onglets-nav {
   display: flex; flex-direction: column; gap: var(--e-2);
   margin: var(--e-4) 0;

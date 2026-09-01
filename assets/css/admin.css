@@ -1362,6 +1362,29 @@ button.calev:hover { filter: brightness(1.25); }
 .avchip:hover { background: color-mix(in srgb, var(--grav) 26%, transparent); }
 .avchip svg { width: 15px; height: 15px; flex: none; }
 
+/* Passer d'un garage à l'autre. Discret : c'est un déplacement courant, pas
+   une alerte — le nom affiché est celui de la destination. */
+.atchip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 12.5px; font-weight: 700;
+  letter-spacing: .04em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .14s, color .14s, border-color .14s;
+}
+.atchip:hover {
+  background: var(--pink-ink);
+  border-color: color-mix(in srgb, var(--pink) 45%, transparent);
+  color: var(--pink-soft);
+}
+.atchip svg { width: 15px; height: 15px; flex: none; }
+
 @media (max-width: 760px) { .avchip span { display: none; } .avchip { padding: 7px 9px; } }
 
 /* ---- Archives ---------------------------------------------------------------
@@ -1447,6 +1470,17 @@ button.calev:hover { filter: brightness(1.25); }
 }
 .motif:hover { color: var(--txt); border-color: var(--pink); }
 .motif.is-on { border-color: var(--pink); background: var(--pink-ink); color: var(--pink-soft); }
+
+/* Même allure pour un choix multiple : la case disparaît, c'est l'étiquette
+   qui s'allume. Elle reste atteignable au clavier, seulement invisible. */
+label.motif { display: inline-flex; align-items: center; cursor: pointer; }
+label.motif input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+label.motif:has(input:checked) {
+  border-color: var(--pink);
+  background: var(--pink-ink);
+  color: var(--pink-soft);
+}
+label.motif:has(input:focus-visible) { outline: 2px solid var(--pink); outline-offset: 2px; }
 
 /* Sélecteur compact, dans l'entête d'un panneau. */
 .select--sm {

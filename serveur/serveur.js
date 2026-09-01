@@ -119,6 +119,17 @@ const jour = v => {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s)) ? s : null;
 };
 
+/* ---- Ateliers -----------------------------------------------------------------
+   Deux garages écrivent dans le même tableau, mais ne s'y voient pas : chaque
+   ligne dit d'où elle vient. Une ligne muette est du Nord — c'est l'atelier
+   qui existait avant, et rien de ce qui a été écrit alors ne doit changer de
+   camp. */
+const ATELIERS_CONNUS = ["nord", "sud"];
+const atelierDe = e => {
+  const v = texte(e && e.atelier, 20);
+  return ATELIERS_CONNUS.indexOf(v) !== -1 ? v : "nord";
+};
+
 /** Clé d'une période : une personne, une date de départ. */
 const cidDe = (id, from) => id + "|" + from;
 
@@ -132,6 +143,7 @@ function nettoyerConge(e) {
     cid: texte(e.cid, 130) || cidDe(id, from),
     pseudo: texte(e.pseudo, 60) || "?",
     roleId: texte(e.roleId, 60),
+    atelier: atelierDe(e),
     from, to,
     note: texte(e.note, 300),
     by: texte(e.by, 60),
@@ -156,12 +168,14 @@ function nettoyer(b) {
       id: texte(e.id, 60),
       pseudo: texte(e.pseudo, 60) || "?",
       roleId: texte(e.roleId, 60),
+      atelier: atelierDe(e),
       since: dateIso(e.since) || new Date().toISOString()
     })).filter(e => e.id),
     log: log.map(e => ({
       id: texte(e.id, 60),
       pseudo: texte(e.pseudo, 60) || "?",
       roleId: texte(e.roleId, 60),
+      atelier: atelierDe(e),
       in: dateIso(e.in),
       out: dateIso(e.out),
       seconds: nombre(e.seconds, 0, 31_536_000),
@@ -212,7 +226,7 @@ function appliquer(board, op) {
 
     const sec = secondes(e.since, out);
     b.log.unshift({
-      id: e.id, pseudo: e.pseudo, roleId: e.roleId,
+      id: e.id, pseudo: e.pseudo, roleId: e.roleId, atelier: atelierDe(e),
       in: e.since, out,
       seconds: sec, minutes: Math.round(sec / 60),
       forced: !!force,
@@ -231,6 +245,7 @@ function appliquer(board, op) {
         id,
         pseudo: texte(op.pseudo, 60) || "?",
         roleId: texte(op.roleId, 60),
+        atelier: atelierDe(op),
         since: maintenant
       });
       return { board: b };
@@ -263,9 +278,16 @@ function appliquer(board, op) {
       return { board: b, seconds: sec };
     }
 
-    case "clear-log":
-      b.log = [];
-      return { board: b, retires: board.log.length };
+    case "clear-log": {
+      /* Seulement l atelier qui le demande : l autre garage n a rien demande.
+         Sans atelier precise - un site plus ancien - on efface tout, comme
+         avant. */
+      const quel = texte(op.atelier, 20);
+      if (!quel) { const n = b.log.length; b.log = []; return { board: b, retires: n }; }
+      const avant = b.log.length;
+      b.log = b.log.filter(e => atelierDe(e) !== quel);
+      return { board: b, retires: avant - b.log.length };
+    }
 
     case "remove-log": {
       const n = Math.round(Number(op.index));
@@ -1522,6 +1544,13 @@ function appliquerEquipe(cat, op) {
       if (op.active !== undefined) u.active = op.active === true;
       if (op.hidden !== undefined) u.hidden = op.hidden === true;
       if (op.sansMinimum !== undefined) u.sansMinimum = op.sansMinimum === true;
+      /* Les ateliers ou la personne travaille. Au moins un : une fiche sans
+         atelier n existerait plus nulle part. */
+      if (Array.isArray(op.ateliers)) {
+        const l = op.ateliers.map(x => texte(x, 20))
+          .filter(x => ATELIERS_CONNUS.indexOf(x) !== -1);
+        if (l.length) u.ateliers = ATELIERS_CONNUS.filter(x => l.indexOf(x) !== -1);
+      }
       return { ok: true };
     }
 

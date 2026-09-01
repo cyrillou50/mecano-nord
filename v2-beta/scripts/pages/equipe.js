@@ -87,8 +87,39 @@
      ceux qui sont passés. La bascule est en tête de liste, pas un filtre
      perdu au milieu — on ne consulte pas les archives par accident. */
 
-  const actifs = () => brouillon.users.filter(u => !MNStore.estArchive(u));
-  const archives = () => brouillon.users.filter(MNStore.estArchive);
+  /* On ne voit que l'atelier où l'on travaille — y compris dans les archives :
+     un ancien du Sud n'a rien à faire dans le répertoire du Nord. Le bouton de
+     bascule en haut de page change de garage. */
+  const ici = () => MNAuth.atelier();
+  const dIci = u => MNStore.estDeAtelier(u, ici());
+
+  const actifs = () => brouillon.users.filter(u => !MNStore.estArchive(u) && dIci(u));
+  const archives = () => brouillon.users.filter(u => MNStore.estArchive(u) && dIci(u));
+
+  /* ---- Ateliers ----------------------------------------------------------------
+     Un employé appartient à un garage, à l'autre, ou aux deux. Il n'apparaît
+     que là où il travaille ; celui des deux passe de l'un à l'autre avec le
+     bouton en haut de page, et y garde son grade. */
+
+  function champAteliers(id, choisis) {
+    return '<div class="champ"><span class="champ__label">Ateliers</span>' +
+      '<div class="rang" id="' + id + '">' +
+        MNStore.ATELIERS.map(a =>
+          '<label class="motif"><input type="checkbox" value="' + U.esc(a.id) + '"' +
+            (choisis.indexOf(a.id) !== -1 ? " checked" : "") + ">" +
+            "<span>" + U.esc(a.nom) + "</span></label>").join("") +
+      "</div>" +
+      '<p class="champ__aide">Coche les deux pour quelqu\'un qui travaille dans ' +
+        "les deux garages : il apparaîtra de chaque côté et passera de l'un à " +
+        "l'autre d'un clic.</p></div>";
+  }
+
+  /** Au moins un atelier : sans ça la fiche n'existerait plus nulle part. */
+  function lireAteliers(hote, id) {
+    const l = [].slice.call(hote.querySelectorAll("#" + id + " input:checked"))
+      .map(i => i.value);
+    return l.length ? l : [ici()];
+  }
 
   /**
    * Le nom de famille : le dernier mot du nom complet. C'est par lui qu'on
@@ -496,6 +527,9 @@
             /* Se voir sans ouvrir l'éditeur : sinon on cherche pourquoi
                quelqu'un manque au récapitulatif du dimanche. */
             (u.sansMinimum && !u.hidden ? U.etiquette("sans minimum") : "") +
+            /* Utile surtout pour ceux des deux garages : on doit voir d'un
+               coup d'œil qu'on les retrouvera aussi de l'autre côté. */
+            (MNStore.ateliersDe(u).length > 1 ? U.etiquette("Nord + Sud", "info") : "") +
             (u.pin ? U.etiquette("code d'accès") : "") +
           "</div>" +
         "</div>" +
@@ -1370,6 +1404,7 @@
         "</div></div>" +
       U.champ({ id: "f-note", label: "Note interne", type: "zone", valeur: u.note || "",
                 max: 400, repere: "Remarques, disponibilités…" }) +
+      champAteliers("f-at", MNStore.ateliersDe(u)) +
       U.champ({ id: "f-actif", type: "bascule", label: "Compte actif", valeur: u.active }) +
       U.champ({ id: "f-masq", type: "bascule", label: "Masquer de l'onglet Équipe",
                 valeur: u.hidden }) +
@@ -1435,7 +1470,8 @@
               note: k.querySelector("#f-note").value.trim(),
               active: u.id === moi.uid ? true : k.querySelector("#f-actif").checked,
               hidden: k.querySelector("#f-masq").checked,
-              sansMinimum: k.querySelector("#f-hors").checked
+              sansMinimum: k.querySelector("#f-hors").checked,
+              ateliers: lireAteliers(k, "f-at")
             };
 
             /* On garde la personne à l'écran même si elle vient d'être masquée. */
@@ -1476,7 +1512,8 @@
         U.champ({ id: "n-emb", label: "Date de recrutement", type: "date", valeur: auj }) +
         U.champ({ id: "n-pin", label: "Code d'accès (facultatif)", type: "password",
                   max: 24, clavier: "numeric" }) +
-      "</div>";
+      "</div>" +
+      champAteliers("n-at", [ici()]);
 
     U.modale({
       titre: "Nouvel employé", corps,
@@ -1498,6 +1535,7 @@
 
             const nouveau = {
               id, pseudo, roleId, active: true,
+              ateliers: lireAteliers(k, "n-at"),
               pin: pin ? MNAuth.hashPin(id, pin) : null,
               createdAt: new Date().toISOString(),
               hiredAt: emb,

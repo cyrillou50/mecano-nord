@@ -163,10 +163,17 @@ window.MNAuth = (function () {
     if (!u || u.active === false) { localStorage.removeItem(K_SESSION); return null; }
     const r = MNStore.roleOf(u);
 
+    /* L'atelier retenu doit rester un des siens : on a pu l'en retirer depuis
+       sa dernière visite. Dans ce cas on le ramène au premier, sans rien lui
+       demander — il verra bien où il se trouve, c'est écrit en haut. */
+    const siens = MNStore.ateliersDe(u);
+    const atelier = siens.indexOf(s.atelier) !== -1 ? s.atelier : siens[0];
+
     _session = {
       uid: u.id, pseudo: u.pseudo, guest: false,
       role: r.name, roleId: r.id, roleColor: r.color,
-      perms: effectivePerms(u), user: u
+      perms: effectivePerms(u), user: u,
+      atelier, ateliers: siens
     };
     return _session;
   }
@@ -186,11 +193,45 @@ window.MNAuth = (function () {
     return !!(u && u.pin);
   }
 
+  /* ---- Ateliers -----------------------------------------------------------
+     Deux garages, un seul site. On travaille dans un atelier à la fois : c'est
+     lui qui décide de l'équipe affichée et du tableau de service. */
+
+  /** Les ateliers de ce pseudo — pour proposer le choix avant de se connecter. */
+  function ateliersDe(pseudo) {
+    const u = findByPseudo(pseudo);
+    return u ? MNStore.ateliersDe(u) : [];
+  }
+
+  /** L'atelier courant, ou "" si personne n'est connecté. */
+  function atelier() {
+    const s = session();
+    return s ? (s.atelier || "") : "";
+  }
+
+  /**
+   * Passer d'un atelier à l'autre. Refuse un atelier qui n'est pas le sien :
+   * le bouton ne s'affiche pas dans ce cas, mais rien n'empêche d'appeler.
+   * @returns {boolean} vrai si le changement a eu lieu.
+   */
+  function setAtelier(id) {
+    const s = session();
+    if (!s || !s.uid) return false;
+    if ((s.ateliers || []).indexOf(id) === -1) return false;
+    if (s.atelier === id) return false;
+    const st = readStored();
+    if (!st) return false;
+    st.atelier = id;
+    writeStored(st);
+    _session = null;
+    return true;
+  }
+
   /**
    * Tentative de connexion.
    * @returns {{ok:true}|{ok:false, code:string, message:string}}
    */
-  function login(pseudo, pin) {
+  function login(pseudo, pin, atelier) {
     const clean = String(pseudo || "").trim();
     if (clean.length < 2) return fail("pseudo-court", "Ton nom doit faire au moins 2 caractères.");
     /* 40 comme les fiches employés : plus bas, un « Prénom Nom » un peu long
@@ -214,7 +255,7 @@ window.MNAuth = (function () {
       }];
       MNStore.saveDraft(cat);
       _session = null;
-      writeStored({ uid: id, pseudo: clean });
+      writeStored({ uid: id, pseudo: clean, atelier: MNStore.ATELIERS[0].id });
       return { ok: true, bootstrap: true };
     }
 
@@ -241,9 +282,15 @@ window.MNAuth = (function () {
       if (hashPin(u.id, pin) !== u.pin) return fail("pin-faux", "Code incorrect.");
     }
 
+    /* Un atelier valable, quoi qu'on nous ait passé : celui qu'on a choisi
+       s'il est bien le sien, sinon le premier. Quelqu'un qui n'est que d'un
+       côté n'a de toute façon rien à choisir. */
+    const siens = MNStore.ateliersDe(u);
+    const ou = siens.indexOf(atelier) !== -1 ? atelier : siens[0];
+
     _session = null;
-    writeStored({ uid: u.id, pseudo: u.pseudo });
-    return { ok: true };
+    writeStored({ uid: u.id, pseudo: u.pseudo, atelier: ou });
+    return { ok: true, atelier: ou };
   }
 
   const fail = (code, message) => ({ ok: false, code, message });
@@ -258,6 +305,7 @@ window.MNAuth = (function () {
 
   return {
     sha256, hashPin, users, findByPseudo, effectivePerms, roleOf, allPerms,
-    session, isLogged, can, canAny, needsPin, login, logout, refresh
+    session, isLogged, can, canAny, needsPin, login, logout, refresh,
+    ateliersDe, atelier, setAtelier
   };
 })();

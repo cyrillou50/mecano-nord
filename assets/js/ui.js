@@ -29,6 +29,8 @@ window.MNUI = (function () {
     user: '<circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/>',
     box: '<path d="m12 3 8 4.2v9.6L12 21l-8-4.2V7.2z"/><path d="M4 7.2 12 11.5l8-4.3M12 11.5V21"/>',
     layers: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+    /* Deux flèches en sens inverse : passer d'un atelier à l'autre. */
+    bascule: '<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/>',
     cube: '<rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/>',
     cloud: '<path d="M7 19a4.5 4.5 0 0 1-.4-9 6 6 0 0 1 11.6 1.6A3.9 3.9 0 0 1 17.5 19z"/><path d="M12 16v-5"/><path d="m9.5 13.5 2.5-2.5 2.5 2.5"/>',
     github: '<path d="M9 19c-4.5 1.5-4.5-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12 12 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.4.4-.5.9-.5 1.6V21"/>',
@@ -264,10 +266,14 @@ window.MNUI = (function () {
     const canAdmin = MNAuth.canAny("items", "users", "publish", "theme", "contracts", "admin");
     const mark = brandMark();
 
+    /* L'enseigne dit où l'on se trouve : avec deux garages, « Mécano Nord »
+       tout court laisserait deviner. */
+    const ici = s && s.atelier ? MNStore.nomAtelier(s.atelier) : b.name;
+
     el.innerHTML =
       '<a class="brand" href="index.html">' +
         '<span class="brand__mark' + (mark.custom ? " brand__mark--custom" : "") + '">' + mark.html + "</span>" +
-        '<span class="brand__txt"><b>' + esc(b.name) + "</b><i>" + esc(b.tagline) + "</i></span>" +
+        '<span class="brand__txt"><b>' + esc(ici) + "</b><i>" + esc(b.tagline) + "</i></span>" +
       "</a>" +
       '<nav class="topnav">' +
         '<a class="navlink' + (active === "fact" ? " is-active" : "") + '" href="index.html">Facturation</a>' +
@@ -306,6 +312,15 @@ window.MNUI = (function () {
           '" title="Voir ce qui pèse à ton dossier">' + svg("alert") +
           "<span>" + n + " avertissement" + (n > 1 ? "s" : "") + "</span></button>";
       })() +
+      /* Un clic pour passer d'un garage à l'autre. N'apparaît que pour qui
+         travaille dans les deux : les autres n'ont nulle part où aller. */
+      (function () {
+        if (!s || (s.ateliers || []).length < 2) return "";
+        const autre = s.ateliers.find(a => a !== s.atelier) || s.ateliers[0];
+        return '<button class="atchip" id="btn-atelier" data-vers="' + esc(autre) +
+          '" title="Passer au ' + esc(MNStore.nomAtelier(autre)) + '">' +
+          svg("bascule") + "<span>" + esc(MNStore.courtAtelier(autre)) + "</span></button>";
+      })() +
       /* La palette n'apparaît que si chacun a le droit de se choisir une
          apparence — sinon le bouton ne mènerait nulle part. */
       (MNTheme.libre()
@@ -327,6 +342,14 @@ window.MNUI = (function () {
 
     const av = document.getElementById("btn-av");
     if (av) av.addEventListener("click", () => montrerAvertissements(mesAvertissements(), false));
+
+    const at = document.getElementById("btn-atelier");
+    if (at) at.addEventListener("click", () => {
+      /* Rechargement plutôt que redessin : l'atelier change l'équipe affichée,
+         le tableau de service et la page ouverte. Tout relire est plus sûr que
+         de rafraîchir chaque morceau. */
+      if (MNAuth.setAtelier(at.dataset.vers)) location.reload();
+    });
 
     const th = document.getElementById("btn-theme");
     if (th) th.addEventListener("click", themeModal);
@@ -375,6 +398,17 @@ window.MNUI = (function () {
             '<label class="label" for="g-pin">Code d\'accès' + (first ? " (facultatif)" : "") + "</label>" +
             '<input class="input" id="g-pin" name="pin" type="password" inputmode="numeric" placeholder="••••" autocomplete="off">' +
           "</div>" +
+          /* N'apparaît que pour qui travaille dans les deux garages : les
+             autres n'ont rien à choisir, et une question sans alternative
+             n'est pas une question. */
+          '<div class="field" id="g-ouwrap" hidden>' +
+            '<span class="label">Où travailles-tu aujourd\'hui ?</span>' +
+            '<div class="segbar" id="g-ou" style="margin:0">' +
+              MNStore.ATELIERS.map((a, i) =>
+                '<button class="seg' + (i === 0 ? " is-on" : "") + '" type="button" data-ou="' +
+                  esc(a.id) + '">' + esc(a.nom) + "</button>").join("") +
+            "</div>" +
+          "</div>" +
           '<div id="g-err"></div>' +
           '<button class="btn btn--solid btn--block" type="submit">' + svg("login") + "<span>Entrer dans l'atelier</span></button>" +
         "</form>" +
@@ -395,17 +429,34 @@ window.MNUI = (function () {
       errBox.innerHTML = m ? '<div class="alert alert--err">' + svg("alert") + "<span>" + esc(m) + "</span></div>" : "";
     };
 
-    /* Le champ code n'apparaît que si le pseudo saisi en réclame un. */
+    const ouWrap = gate.querySelector("#g-ouwrap");
+    const ouBar = gate.querySelector("#g-ou");
+    let ou = MNStore.ATELIERS[0].id;
+
+    ouBar.querySelectorAll("[data-ou]").forEach(b => b.addEventListener("click", () => {
+      ou = b.dataset.ou;
+      ouBar.querySelectorAll("[data-ou]").forEach(x =>
+        x.classList.toggle("is-on", x === b));
+    }));
+
+    /* Le champ code n'apparaît que si le pseudo saisi en réclame un, et le
+       choix de l'atelier que si la personne travaille dans les deux. */
     inPseudo.addEventListener("input", () => {
       const need = MNAuth.needsPin(inPseudo.value);
       if (need !== !pinWrap.hidden) pinWrap.hidden = !need;
+
+      const siens = MNAuth.ateliersDe(inPseudo.value);
+      const choix = siens.length > 1;
+      if (choix !== !ouWrap.hidden) ouWrap.hidden = !choix;
+      /* Un seul atelier : c'est le sien qui part, pas celui affiché. */
+      if (!choix && siens.length) ou = siens[0];
       showErr("");
     });
     if (first) pinWrap.hidden = false;
 
     form.addEventListener("submit", e => {
       e.preventDefault();
-      const r = MNAuth.login(inPseudo.value, inPin.value);
+      const r = MNAuth.login(inPseudo.value, inPin.value, ou);
       if (r.ok) { location.reload(); return; }
       if (r.code === "pin-requis") { pinWrap.hidden = false; inPin.focus(); }
       showErr(r.message);
@@ -436,6 +487,13 @@ window.MNUI = (function () {
     syncFavicon();
 
     if (!MNAuth.session()) { showGate(); return; }
+
+    /* Le pointage suit l'atelier où l'on travaille. À poser avant que la page
+       ne lise quoi que ce soit : elle verrait sinon le tableau de l'autre
+       garage le temps d'un rendu. Toutes les pages ne chargent pas le module —
+       la facturation et l'administration s'en passent. */
+    if (window.MNDuty) MNDuty.setAtelier(MNAuth.atelier());
+    document.title = MNStore.nomAtelier(MNAuth.atelier()) + " — " + (opt.title || "Facturation");
 
     const gate = document.getElementById("gate");
     const app = document.getElementById("app");

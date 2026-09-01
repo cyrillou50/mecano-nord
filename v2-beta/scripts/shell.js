@@ -43,11 +43,27 @@ window.V2Shell = (function () {
   function marque() {
     const b = MNStore.brand();
     const logo = b.logo ? mnIcon(b.logo) : esc(U().initiales(b.name));
+    /* Avec deux garages, l'enseigne doit dire lequel : « Mécano Nord » tout
+       court laisserait deviner. */
+    const ici = MNAuth.atelier() ? MNStore.nomAtelier(MNAuth.atelier()) : b.name;
     return '<a class="sidebar__marque" href="index.html">' +
       '<span class="marque__jeton">' + logo + "</span>" +
-      '<span class="marque__txt tronque"><b>' + esc(b.name) + "</b>" +
+      '<span class="marque__txt tronque"><b>' + esc(ici) + "</b>" +
         "<span>" + (V2.VERSION.beta ? "V2 bêta" : esc(b.tagline)) + "</span></span>" +
     "</a>";
+  }
+
+  /* ---- Ateliers ----------------------------------------------------------------
+     Un clic pour passer d'un garage à l'autre. N'apparaît que pour qui
+     travaille dans les deux : les autres n'ont nulle part où aller. */
+
+  function boutonAtelier() {
+    const s = _session;
+    if (!s || (s.ateliers || []).length < 2) return "";
+    const autre = s.ateliers.find(a => a !== s.atelier) || s.ateliers[0];
+    return '<button class="atchip" data-a="atelier" data-vers="' + esc(autre) +
+      '" title="Passer au ' + esc(MNStore.nomAtelier(autre)) + '">' +
+      U().icone("fleche") + "<span>" + esc(MNStore.courtAtelier(autre)) + "</span></button>";
   }
 
   function nav() {
@@ -103,6 +119,7 @@ window.V2Shell = (function () {
                            action: "burger" }) +
           '<h1 class="topbar__titre">' + esc(titre) + "</h1>" +
           '<div class="rang pousse" id="v2-actions"></div>' +
+          boutonAtelier() +
           '<div id="v2-avert"></div>' +
           (MNTheme.libre()
             ? U().bouton("", { icone: "palette", variante: "fantome", titre: "Apparence",
@@ -117,6 +134,13 @@ window.V2Shell = (function () {
     const burger = app.querySelector('[data-a="burger"]');
     burger.classList.add("burger");
     burger.addEventListener("click", e => { e.stopPropagation(); basculerTiroir(); });
+
+    const bat = app.querySelector('[data-a="atelier"]');
+    if (bat) bat.addEventListener("click", () => {
+      /* Rechargement plutôt que redessin : l'atelier change l'équipe affichée,
+         le tableau de service et la page ouverte. */
+      if (MNAuth.setAtelier(bat.dataset.vers)) location.reload();
+    });
 
     const th = app.querySelector('[data-a="theme"]');
     if (th) th.addEventListener("click", choisirTheme);
@@ -483,6 +507,12 @@ window.V2Shell = (function () {
       location.href = "../index.html?v2=" + suite;
       return;
     }
+
+    /* Le pointage suit l'atelier où l'on travaille. À poser avant que la page
+       ne lise quoi que ce soit. */
+    if (window.MNDuty) MNDuty.setAtelier(MNAuth.atelier());
+    document.title = (o.titre ? o.titre + " · " : "") +
+      MNStore.nomAtelier(MNAuth.atelier()) + (V2.VERSION.beta ? " (V2 bêta)" : "");
 
     monter(o.titre || "");
 

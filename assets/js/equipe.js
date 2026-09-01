@@ -201,8 +201,14 @@
      ceux qui sont passés. La bascule est en tête de liste, pas un filtre
      perdu au milieu — on ne consulte pas les archives par accident. */
 
-  const actifs = () => draft.users.filter(u => !MNStore.estArchive(u));
-  const archives = () => draft.users.filter(MNStore.estArchive);
+  /* On ne voit que l'atelier où l'on travaille — y compris dans les archives :
+     un ancien du Sud n'a rien à faire dans le répertoire du Nord. Le bouton
+     de bascule en haut de page change de garage. */
+  const ici = () => MNAuth.atelier();
+  const dIci = u => MNStore.estDeAtelier(u, ici());
+
+  const actifs = () => draft.users.filter(u => !MNStore.estArchive(u) && dIci(u));
+  const archives = () => draft.users.filter(u => MNStore.estArchive(u) && dIci(u));
 
   /** Les personnes masquées ne sortent que si un responsable le demande. */
   const visibleUsers = () => (vueArchives
@@ -474,6 +480,31 @@
     });
   }
 
+  /* ---- Ateliers ----------------------------------------------------------------
+     Un employé appartient à un garage, à l'autre, ou aux deux. Il n'apparaît
+     que là où il travaille ; celui des deux passe de l'un à l'autre avec le
+     bouton en haut de page, et y garde son grade. */
+
+  function champAteliers(id, choisis) {
+    return '<div class="fieldset"><span class="label">Ateliers</span>' +
+      '<div class="motifs" id="' + id + '">' +
+        MNStore.ATELIERS.map(a =>
+          '<label class="motif"><input type="checkbox" value="' + esc(a.id) + '"' +
+            (choisis.indexOf(a.id) !== -1 ? " checked" : "") + ">" +
+            "<span>" + esc(a.nom) + "</span></label>").join("") +
+      "</div>" +
+      '<p class="hint">Coche les deux pour quelqu\'un qui travaille dans les ' +
+        "deux garages : il apparaîtra de chaque côté et passera de l'un à " +
+        "l'autre d'un clic.</p></div>";
+  }
+
+  /** Au moins un atelier : sans ça la fiche n'existerait plus nulle part. */
+  function lireAteliers(hote, id) {
+    const l = [].slice.call(hote.querySelectorAll("#" + id + " input:checked"))
+      .map(i => i.value);
+    return l.length ? l : [ici()];
+  }
+
   /* ---- Fiche ------------------------------------------------------------------ */
 
   function renderCard() {
@@ -506,7 +537,11 @@
               /* Se voir sans ouvrir l'éditeur : sinon on cherche pourquoi
                  quelqu'un manque au récapitulatif du dimanche. */
               (u.sansMinimum && !u.hidden
-                ? ' <span class="pill pill--dim">sans minimum</span>' : "") + "</h2>" +
+                ? ' <span class="pill pill--dim">sans minimum</span>' : "") +
+              /* Utile surtout pour ceux des deux garages : on doit voir d'un
+                 coup d'œil qu'on les retrouvera aussi de l'autre côté. */
+              (MNStore.ateliersDe(u).length > 1
+                ? ' <span class="pill pill--outline">Nord + Sud</span>' : "") + "</h2>" +
             '<span class="rolechip rolechip--ico" style="color:' + esc(r.color) + '">' +
               mnIcon(r.icon) + esc(r.name) + "</span>" +
             (on ? '<span class="pill pill--ok">en service</span>' : "") +
@@ -1392,6 +1427,7 @@
       '<div class="field"><label class="label" for="f-note">Note interne</label>' +
         '<textarea class="textarea" id="f-note" maxlength="400" placeholder="Remarques, disponibilités…">' +
           esc(u.note || "") + "</textarea></div>" +
+      champAteliers("f-at", MNStore.ateliersDe(u)) +
       '<label class="switch"><input type="checkbox" id="f-active"' + (u.active ? " checked" : "") +
         (u.id === me.uid ? " disabled" : "") + '><span class="switch__box"></span><span>Compte actif</span></label>' +
       '<label class="switch"><input type="checkbox" id="f-hidden"' + (u.hidden ? " checked" : "") + ">" +
@@ -1455,7 +1491,8 @@
               note: body.querySelector("#f-note").value.trim(),
               active: u.id === me.uid ? true : body.querySelector("#f-active").checked,
               hidden: body.querySelector("#f-hidden").checked,
-              sansMinimum: body.querySelector("#f-hors").checked
+              sansMinimum: body.querySelector("#f-hors").checked,
+              ateliers: lireAteliers(body, "f-at")
             };
 
             /* On garde la personne à l'écran même si elle vient d'être masquée. */
@@ -1497,7 +1534,8 @@
           '<input class="input" id="n-hired" type="date" value="' + new Date().toISOString().slice(0, 10) + '"></div>' +
         '<div class="field"><label class="label" for="n-pin">Code d\'accès (facultatif)</label>' +
           '<input class="input" id="n-pin" type="password" inputmode="numeric" maxlength="24"></div>' +
-      "</div>";
+      "</div>" +
+      champAteliers("n-at", [ici()]);
 
     MNUI.modal({
       title: "Nouvel employé", body,
@@ -1519,6 +1557,7 @@
 
             const nouveau = {
               id, pseudo, roleId, active: true,
+              ateliers: lireAteliers(body, "n-at"),
               pin: pin ? MNAuth.hashPin(id, pin) : null,
               createdAt: new Date().toISOString(),
               hiredAt,
