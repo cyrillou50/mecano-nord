@@ -107,6 +107,7 @@ Environment=WEBHOOK_BT=https://discord.com/api/webhooks/…
 Environment=WEBHOOK_DUTY=https://discord.com/api/webhooks/…
 Environment=WEBHOOK_CONGES=https://discord.com/api/webhooks/…
 Environment=WEBHOOK_AVERTISSEMENTS=https://discord.com/api/webhooks/…
+Environment=GEMINI_CLE=…
 Environment=GH_TOKEN=github_pat_…
 Environment=GH_OWNER=cyrillou50
 Environment=GH_REPO=mecano-nord
@@ -119,6 +120,12 @@ WantedBy=multi-user.target
 
 `WEBHOOK_CONGES` est facultatif : sans lui, les départs en congés sont
 annoncés dans le salon des prises de service.
+
+`GEMINI_CLE` est la clé d'API Google qui fait vivre l'assistant du livret.
+Facultative : sans elle, le livret se lit normalement, seule la boîte à
+questions se met en sommeil. **Elle ne doit jamais aller dans le catalogue** —
+il est public sur GitHub, l'y mettre reviendrait à la publier. Le modèle se
+choisit avec `GEMINI_MODELE` (par défaut `gemini-2.0-flash`).
 
 `WEBHOOK_AVERTISSEMENTS` est facultatif lui aussi, mais **sans repli** :
 sans salon à eux, les avertissements ne partent nulle part. C'est voulu — une

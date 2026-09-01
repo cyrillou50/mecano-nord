@@ -293,6 +293,10 @@ window.MNUI = (function () {
         /* Les véhicules sont un catalogue de consultation : ouvert à tous. */
         '<a class="navlink' + (active === "vehicules" ? " is-active" : "") +
           '" href="vehicules.html">Véhicules</a>' +
+        /* Le livret s'adresse d'abord à ceux qui arrivent : il est ouvert à
+           tout le monde, sans permission à demander. */
+        '<a class="navlink' + (active === "livret" ? " is-active" : "") +
+          '" href="livret.html">Livret</a>' +
         (canAdmin ? '<a class="navlink' + (active === "admin" ? " is-active" : "") + '" href="admin.html">Admin</a>' : "") +
       "</nav>" +
       '<div class="topbar__spacer"></div>' +

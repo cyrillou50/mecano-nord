@@ -46,7 +46,10 @@ V2.NAV = [
         perm: ["bt"] },
       { id: "contrats", nom: "Contrats", href: "contrats.html", icone: "contrat",
         perm: ["contracts_view", "contracts", "contracts_delete"] },
-      { id: "calendrier", nom: "Calendrier", href: "calendrier.html", icone: "calendrier" }
+      { id: "calendrier", nom: "Calendrier", href: "calendrier.html", icone: "calendrier" },
+      /* Le livret s'adresse d'abord à ceux qui arrivent : ouvert à tous,
+         sans permission à demander. */
+      { id: "livret", nom: "Livret", href: "livret.html", icone: "contrat" }
     ]
   },
   {

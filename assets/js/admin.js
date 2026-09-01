@@ -55,6 +55,7 @@
     { id: "images",  name: "Images",     icon: "file",     perm: "items" },
     { id: "users",   name: "Employés",   icon: "users",    perm: "users", n: () => draft.users.length },
     { id: "roles",   name: "Rôles",      icon: "tag",      perm: "users", n: () => draft.roles.length },
+    { id: "livret",  name: "Livret",     icon: "file",     perm: "items" },
     { id: "theme",   name: "Apparence",  icon: "palette",  perm: "theme" },
     { id: "discord", name: "Discord",    icon: "cloud",    perm: "admin" },
     { id: "site",    name: "Le site",    icon: "settings", perm: "admin" },
@@ -108,7 +109,7 @@
     ({
       items: paneItems, cats: paneCats, res: paneRes, ctypes: paneCtypes, images: paneImages,
       users: paneUsers, roles: paneRoles, discord: paneDiscord,
-      theme: paneTheme, site: paneSite, publish: panePublish
+      livret: paneLivret, theme: paneTheme, site: paneSite, publish: panePublish
     }[tab] || paneItems)($("#pane"));
   }
 
@@ -2185,6 +2186,46 @@
      ensuite en choisir un autre pour lui, depuis la palette de la barre du
      haut — ce choix personnel n'est pas enregistré dans le catalogue.
      ========================================================================= */
+
+  /* ---- Livret ---------------------------------------------------------------
+     Ce qu'un nouveau doit savoir, écrit à la main par l'équipe. Du texte libre :
+     personne n'a envie de remplir un formulaire pour expliquer un métier, et
+     l'assistant s'en accommode très bien. */
+
+  function paneLivret(host) {
+    const t = MNStore.settings().livret || "";
+    host.innerHTML =
+      '<div class="panel"><div class="panel__head"><h2>Livret de l\'atelier</h2>' +
+        '<span class="spacer"></span>' +
+        '<a class="btn btn--ghost btn--sm" href="livret.html">' + svg("ext") +
+          "<span>Voir la page</span></a>" +
+      "</div>" +
+        '<div class="panel__body editor">' +
+          '<p class="hint">Il se lit sur la page « Livret », et c\'est lui que ' +
+            "l'assistant relit pour répondre aux questions des apprentis. Écris-le " +
+            "comme tu le dirais : une ligne vide sépare deux paragraphes, une ligne " +
+            "qui commence par un tiret fait une puce.</p>" +
+          '<div class="field"><textarea class="textarea" id="l-txt" rows="22" ' +
+            'maxlength="20000" placeholder="Ex.\n\nBienvenue à l\'atelier.\n\n' +
+            "- On pointe en arrivant, on dépointe en partant.\n" +
+            '- Un devis par client, jamais deux.">' + esc(t) + "</textarea></div>" +
+          '<div class="row" style="justify-content:space-between;align-items:center">' +
+            '<span class="hint" id="l-n">' + t.length + " / 20000</span>" +
+            '<button class="btn btn--primary" id="l-save">' + svg("save") +
+              "<span>Enregistrer le livret</span></button>" +
+          "</div>" +
+        "</div></div>";
+
+    const zone = $("#l-txt");
+    zone.addEventListener("input", () => {
+      $("#l-n").textContent = zone.value.length + " / 20000";
+    });
+    $("#l-save").addEventListener("click", () => {
+      draft.settings.livret = zone.value.slice(0, 20000);
+      commit();
+      MNUI.toast("Livret enregistré — pense à publier", "ok");
+    });
+  }
 
   function paneTheme(host) {
     const t = MNTheme.normalize(draft.settings.theme);

@@ -519,6 +519,11 @@ window.MNStore = (function () {
       /* Chacun peut-il se composer ses propres couleurs ? Vrai par défaut :
          c'est un confort personnel qui n'affecte personne d'autre. */
       themeLibre: s.themeLibre !== false,
+      /* Le livret de l'atelier : ce qu'un nouveau doit savoir, écrit par
+         l'équipe. Il sert deux fois — il se lit tel quel, et c'est lui que
+         l'assistant relit pour répondre. Commun aux deux garages : c'est le
+         métier qu'il décrit, pas les horaires d'un site. */
+      livret: String(s.livret || "").slice(0, 20000),
       /* Heures attendues sur la semaine, garage par garage : le Sud n'a pas
          forcément le même rythme que le Nord. 0 = on ne signale personne.
          Le récapitulatif du dimanche et la jauge de la page Service lisent

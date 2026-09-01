@@ -991,6 +991,29 @@ const serveur = http.createServer(async (req, res) => {
   }
 
   try {
+    /* --- l'assistant du livret ---
+       La cle Gemini vit ici et nulle part ailleurs. Le site est public : l'y
+       mettre reviendrait a la publier. La page envoie une question et un
+       resume de l'atelier ; la consigne, elle, est ecrite ci-dessous et ne
+       vient jamais du navigateur - sans quoi la cle servirait a tout autre
+       chose qu'a expliquer le metier. */
+    if (chemin === "/assistant") {
+      if (req.method !== "POST") return repondre(res, 405, { error: "Méthode non autorisée" }, req);
+      if (!GEMINI_CLE) {
+        return repondre(res, 503, {
+          error: "L'assistant n'est pas configuré sur ce serveur."
+        }, req);
+      }
+
+      const c = await corpsJson(req).catch(() => ({}));
+      const question = texte(c.question, 600).trim();
+      if (question.length < 3) return repondre(res, 400, { error: "Question trop courte" }, req);
+      const contexte = texte(c.contexte, MAX_CONTEXTE);
+
+      const r = await demanderGemini(question, contexte);
+      return repondre(res, r.ok ? 200 : 502, r, req);
+    }
+
     /* --- santé --- */
     if (chemin === "/sante" && req.method === "GET") {
       /* « ops: true » indique au site qu'il peut envoyer des opérations
@@ -1000,7 +1023,7 @@ const serveur = http.createServer(async (req, res) => {
       return repondre(res, 200, {
         ok: true, ops: true, images: true, vehicules: true, relais: true, contrats: true,
         calendrier: true, catalogue: true, equipe: true,
-        recap: RECAP_ACTIF, recapMini: RECAP_MINI,
+        recap: RECAP_ACTIF, recapMini: RECAP_MINI, assistant: !!GEMINI_CLE,
         depuis: Math.round(process.uptime()) + " s"
       }, req);
     }
@@ -1662,6 +1685,85 @@ async function ecrireCatalogue(cat) {
   const tmp = FICHIER_CAT + ".tmp";
   await fsp.writeFile(tmp, JSON.stringify(cat, null, 2) + "\n", "utf8");
   await fsp.rename(tmp, FICHIER_CAT);
+}
+
+/* ---- Assistant du livret --------------------------------------------------------
+   Un apprenti pose sa question en francais, l'assistant repond avec le livret
+   de l'atelier et les donnees du site sous les yeux. Rien d'autre : il ne sait
+   pas ce qu'il n'a pas lu, et on preferera qu'il le dise plutot qu'il invente
+   un tarif.
+
+   Reglages (variables d'environnement) :
+     GEMINI_CLE=...        la cle d'API. Sans elle, l'assistant est simplement
+                           absent : le livret se lit quand meme.
+     GEMINI_MODELE=...     le modele, par defaut gemini-2.0-flash */
+
+const GEMINI_CLE = process.env.GEMINI_CLE || process.env.GEMINI_KEY || "";
+const GEMINI_MODELE = process.env.GEMINI_MODELE || "gemini-2.0-flash";
+const MAX_CONTEXTE = 24000;
+
+/* La consigne vit ici, pas dans la page : c'est elle qui borne ce que la cle
+   peut servir a faire. */
+const CONSIGNE = [
+  "Tu es le formateur d'un garage de jeu de role GTA RP. Tu reponds a un",
+  "apprenti qui debute dans l'atelier.",
+  "",
+  "Regles :",
+  "- Reponds en francais, tutoie, sois bref et concret : trois a huit phrases.",
+  "- Ne t'appuie QUE sur le livret et les donnees de l'atelier fournis ci-dessous.",
+  "- Si la reponse n'y est pas, dis-le franchement et conseille de demander a un",
+  "  responsable. N'invente jamais un tarif, un droit ni une regle.",
+  "- Cite les prix et les durees exactement comme ils sont ecrits.",
+  "- Pas de mise en forme lourde : du texte, au plus une courte liste.",
+  "- Tu ne parles que du garage et du metier. Toute autre demande, tu la declines",
+  "  poliment en une phrase."
+].join("\n");
+
+async function demanderGemini(question, contexte) {
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/" +
+    encodeURIComponent(GEMINI_MODELE) + ":generateContent?key=" +
+    encodeURIComponent(GEMINI_CLE);
+
+  const corps = {
+    system_instruction: { parts: [{ text: CONSIGNE }] },
+    contents: [{
+      role: "user",
+      parts: [{ text: "=== LIVRET ET DONNEES DE L'ATELIER ===\n" + contexte +
+        "\n\n=== QUESTION DE L'APPRENTI ===\n" + question }]
+    }],
+    generationConfig: { temperature: 0.2, maxOutputTokens: 700 }
+  };
+
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corps)
+    });
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok) {
+      const m = j && j.error && j.error.message;
+      console.error(new Date().toISOString(), "assistant :", r.status, m || "");
+      /* Le message de Google peut contenir la cle ou des details d'API : on ne
+         renvoie que le necessaire. */
+      return { ok: false, error: r.status === 429
+        ? "Trop de questions d'un coup. Réessaie dans un instant."
+        : "L'assistant n'a pas pu répondre (" + r.status + ")." };
+    }
+
+    const cand = j && j.candidates && j.candidates[0];
+    const parts = cand && cand.content && cand.content.parts;
+    const reponse = (parts || []).map(x => x && x.text).filter(Boolean).join("").trim();
+
+    if (!reponse) {
+      return { ok: false, error: "L'assistant n'a rien répondu. Reformule ta question." };
+    }
+    return { ok: true, reponse, modele: GEMINI_MODELE };
+  } catch (e) {
+    console.error(new Date().toISOString(), "assistant :", e.message);
+    return { ok: false, error: "L'assistant est injoignable." };
+  }
 }
 
 /* ---- Récapitulatif hebdomadaire ------------------------------------------------

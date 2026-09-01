@@ -1451,3 +1451,52 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--pink); outline-o
   padding: 6px 30px 6px 10px;
   font-size: 12.5px;
 }
+
+/* ---- Livret ------------------------------------------------------------------
+   Du texte suivi, à lire d'une traite : une largeur de lecture confortable et
+   des paragraphes aérés valent mieux qu'une pleine page dense. */
+
+.livret { max-width: 68ch; font-size: 14.5px; line-height: 1.75; color: var(--txt); }
+.livret p { margin: 0 0 14px; }
+.livret p:last-child { margin-bottom: 0; }
+.livret ul { margin: 0 0 14px; padding-left: 20px; list-style: disc; }
+.livret li { margin-bottom: 5px; }
+
+/* Le fil de l'assistant. Une hauteur bornée : la question suivante doit rester
+   sous les yeux, sans avoir à remonter toute la page. */
+.fil {
+  display: flex; flex-direction: column; gap: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.bulle {
+  max-width: 78%;
+  padding: 11px 14px;
+  border-radius: var(--r);
+  font-size: 14px; line-height: 1.6;
+}
+.bulle p { margin: 0 0 8px; }
+.bulle p:last-child { margin-bottom: 0; }
+.bulle ul { margin: 0; padding-left: 18px; list-style: disc; }
+
+.bulle--moi {
+  align-self: flex-end;
+  background: var(--pink-ink);
+  border: 1px solid color-mix(in srgb, var(--pink) 35%, transparent);
+  color: var(--pink-soft);
+}
+.bulle--lui {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--line);
+}
+.bulle--err { border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.bulle__qui {
+  display: block;
+  margin-bottom: 5px;
+  font-family: var(--font-display);
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim);
+}

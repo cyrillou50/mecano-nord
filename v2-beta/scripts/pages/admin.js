@@ -41,6 +41,7 @@
       n: () => brouillon.users.length },
     { id: "roles",   nom: "Rôles",            icone: "etoile",     perm: "users",
       n: () => brouillon.roles.length },
+    { id: "livret",  nom: "Livret",           icone: "contrat",    perm: "items" },
     { id: "theme",   nom: "Apparence",        icone: "palette",    perm: "theme" },
     { id: "discord", nom: "Discord",          icone: "nuage",      perm: "admin" },
     { id: "site",    nom: "Le site",          icone: "reglages",   perm: "admin" },
@@ -126,8 +127,45 @@
     ({
       objets: vueObjets, cats: vueCats, res: vueRes, ctypes: vueCtypes,
       users: vueUsers, roles: vueRoles, images: vueImages,
+      livret: vueLivret,
       theme: vueTheme, discord: vueDiscord, site: vueSite, publier: vuePublier
     }[onglet] || aVenir)($("#a-vue"));
+  }
+
+  /* ---- Livret ---------------------------------------------------------------
+     Ce qu'un nouveau doit savoir, écrit à la main par l'équipe. Du texte libre :
+     personne n'a envie de remplir un formulaire pour expliquer un métier, et
+     l'assistant s'en accommode très bien. */
+
+  function vueLivret(z) {
+    const t = MNStore.settings().livret || "";
+    z.innerHTML = U.carte({
+      titre: "Livret de l'atelier",
+      actions: '<a class="btn btn--fantome btn--sm" href="livret.html">' +
+        U.icone("fleche") + "<span>Voir la page</span></a>",
+      corps:
+        '<p class="champ__aide">Il se lit sur la page « Livret », et c\'est lui ' +
+          "que l'assistant relit pour répondre aux questions des apprentis. " +
+          "Écris-le comme tu le dirais : une ligne vide sépare deux paragraphes, " +
+          "une ligne qui commence par un tiret fait une puce.</p>" +
+        '<textarea class="saisie" id="l-txt" rows="20" maxlength="20000" ' +
+          'style="width:100%;margin-top:var(--e-3)">' + U.esc(t) + "</textarea>" +
+        '<div class="rang" style="justify-content:space-between;margin-top:var(--e-3)">' +
+          '<span class="champ__aide" id="l-n">' + t.length + " / 20000</span>" +
+          U.bouton("Enregistrer le livret",
+            { variante: "principal", icone: "check", action: "lsave" }) +
+        "</div>"
+    });
+
+    const zone = z.querySelector("#l-txt");
+    zone.addEventListener("input", () => {
+      z.querySelector("#l-n").textContent = zone.value.length + " / 20000";
+    });
+    z.querySelector('[data-a="lsave"]').addEventListener("click", () => {
+      brouillon.settings.livret = zone.value.slice(0, 20000);
+      valider();
+      U.toast("Livret enregistré — pense à publier", "ok");
+    });
   }
 
   /** Onglet pas encore repris : on le dit, et on renvoie là où il marche. */
