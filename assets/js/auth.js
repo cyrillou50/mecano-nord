@@ -159,7 +159,14 @@ window.MNAuth = (function () {
       return _session;
     }
 
-    const u = users().find(x => x.id === s.uid);
+    /* Un catalogue vide n'est pas une liste où l'on ne figure plus : c'est un
+       catalogue qui n'a pas pu être chargé. On refuse la session pour ce
+       chargement, sans l'effacer — sinon une adresse fautive ou un réseau
+       coupé déconnecterait tout le monde, définitivement. */
+    const liste = users();
+    if (!liste.length) return null;
+
+    const u = liste.find(x => x.id === s.uid);
     if (!u || u.active === false) { localStorage.removeItem(K_SESSION); return null; }
     const r = MNStore.roleOf(u);
 

@@ -13,7 +13,11 @@
    Tu n'as normalement jamais besoin de rouvrir ce fichier.
    ========================================================================== */
 
-window.MN_CONFIG = {
+/* On complète, on n'écrase pas. La V2 vit dans un sous-dossier et règle ses
+   chemins avant de charger ce fichier : une affectation sèche les effaçait, et
+   la V2 allait alors chercher son catalogue au mauvais endroit — sans le
+   trouver, donc sans employés, donc en déconnectant tout le monde. */
+window.MN_CONFIG = Object.assign({
 
   /* Fichier de données du site (catalogue + employés + réglages). */
   catalogUrl: "data/catalog.json",
@@ -25,7 +29,7 @@ window.MN_CONFIG = {
     auth: { allowGuests: false, guestPerms: ["bt"], sessionDays: 30, bootstrapFirstUser: true },
     github: { owner: "", repo: "", branch: "main", path: "data/catalog.json" }
   }
-};
+}, window.MN_CONFIG);
 
 /* ==========================================================================
    Permissions disponibles. Les clés sont câblées dans le code, les libellés
