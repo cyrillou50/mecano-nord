@@ -1540,9 +1540,13 @@
             const pseudo = body.querySelector("#u-pseudo").value.trim();
             if (pseudo.length < 2) return MNUI.toast("Nom trop court", "err");
 
-            const clash = draft.users.find(x =>
-              x.pseudo.toLowerCase() === pseudo.toLowerCase() && (isNew || x.id !== u.id));
-            if (clash) return MNUI.toast("Ce nom est déjà pris", "err");
+            /* Les homonymes sont permis — ça arrive — à condition que chacun ait
+               un code : c'est lui qui les distinguera à la connexion. */
+            const codeApres = !!(body.querySelector("#u-pin").value.trim() ||
+              (!isNew && u.pin && !clearPin));
+            const souci = MNStore.soucisHomonyme(
+              draft.users, pseudo, isNew ? "" : u.id, codeApres);
+            if (souci) return MNUI.toast(souci, "err");
 
             const roleId = body.querySelector("#u-role").value;
             const pin = body.querySelector("#u-pin").value.trim();

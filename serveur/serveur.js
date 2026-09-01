@@ -1546,8 +1546,16 @@ function appliquerEquipe(cat, op) {
       if (op.pseudo !== undefined) {
         const p = texte(op.pseudo, 40).trim();
         if (p.length < 2) return { erreur: "nom trop court" };
-        if (users.some(x => x.id !== uid && String(x.pseudo).toLowerCase() === p.toLowerCase())) {
-          return { erreur: "ce nom est déjà pris" };
+        /* Les homonymes sont permis, a condition que chacun ait un code : c'est
+           lui qui les distingue a la connexion. Le site le verifie avant
+           d'envoyer ; on le revoit ici, une operation pouvant arriver d'ailleurs. */
+        const homo = users.filter(x =>
+          x.id !== uid && String(x.pseudo).toLowerCase() === p.toLowerCase());
+        if (homo.length) {
+          if (!u.pin) return { erreur: "ce nom est deja porte : donne un code d'acces a cette fiche" };
+          if (homo.some(x => !x.pin)) {
+            return { erreur: "ce nom est deja porte par quelqu'un sans code d'acces" };
+          }
         }
         u.pseudo = p;
       }

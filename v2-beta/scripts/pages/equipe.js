@@ -160,6 +160,11 @@
 
   const masques = () => actifs().filter(u => MNStore.estMasqueIci(u)).length;
 
+  /* Un même prénom et un même nom, ça arrive. La liste doit alors donner de
+     quoi les distinguer, sinon on ouvre la fiche de l'autre. */
+  const aUnHomonyme = u =>
+    brouillon.users.some(x => x.id !== u.id && MNStore.memeNom(x.pseudo, u.pseudo));
+
   /* ---- Index alphabétique --------------------------------------------------
      Les archives grossissent sans jamais rétrécir. Un répertoire par tranches
      de deux lettres évite de faire défiler tout l'historique de l'atelier
@@ -395,7 +400,9 @@
             U.esc(MNStore.motifDepart(u.depart.motif).court + " · " + jourCourt(u.depart.le)) +
             "</span>"
           : '<span class="tronque" style="color:' + U.esc(r.color) + '">' +
-            U.esc(r.name) + "</span>") +
+            U.esc(r.name) +
+            (aUnHomonyme(u) ? " · entré le " + U.esc(jourCourt(u.hiredAt)) : "") +
+            "</span>") +
       "</span>" +
       (MNStore.estMasqueIci(u) ? '<span class="duo__marque" title="Masqué de ce garage">' +
         U.icone("boite") + "</span>" : "") +
@@ -549,6 +556,7 @@
             /* Utile surtout pour ceux des deux garages : on doit voir d'un
                coup d'œil qu'on les retrouvera aussi de l'autre côté. */
             (MNStore.ateliersDe(u).length > 1 ? U.etiquette("Nord + Sud", "info") : "") +
+            (aUnHomonyme(u) ? U.etiquette("homonyme") : "") +
             (u.pin ? U.etiquette("code d'accès") : "") +
           "</div>" +
         "</div>" +
@@ -1043,7 +1051,9 @@
             /* Le contrôle porte sur tout le monde, archives comprises : deux
                fiches du même nom seraient impossibles à démêler. */
             if (brouillon.users.some(x => x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
-              return U.toast("Ce nom est déjà pris", "err");
+              /* Une fiche d'archive ne se connecte pas : deux homonymes au
+                 répertoire ne gênent personne. */
+              return U.toast("Ce nom est déjà porté par quelqu'un de présent", "err");
             }
 
             const le = k.querySelector("#x-left").value || auj;
@@ -1478,9 +1488,9 @@
           onClick: async (fermer, k) => {
             const pseudo = k.querySelector("#f-pseudo").value.trim();
             if (pseudo.length < 2) return U.toast("Nom trop court", "err");
-            if (brouillon.users.some(x => x.id !== u.id &&
-                x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
-              return U.toast("Ce nom est déjà pris", "err");
+            const souci = MNStore.soucisHomonyme(brouillon.users, pseudo, u.id, !!u.pin);
+            if (souci) {
+              return U.toast(souci + " (le code se règle dans l'administration)", "err");
             }
 
             const champs = {
@@ -1545,13 +1555,14 @@
           onClick: async (fermer, k) => {
             const pseudo = k.querySelector("#n-pseudo").value.trim();
             if (pseudo.length < 2) return U.toast("Nom trop court", "err");
-            if (brouillon.users.some(x => x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
-              return U.toast("Ce nom est déjà pris", "err");
-            }
+            const pin = k.querySelector("#n-pin").value.trim();
+            /* Les homonymes sont permis — ça arrive — à condition que chacun ait
+               un code : c'est lui qui les distinguera à la connexion. */
+            const souci = MNStore.soucisHomonyme(brouillon.users, pseudo, "", !!pin);
+            if (souci) return U.toast(souci, "err");
 
             const id = MNStore.uniqueId(pseudo, brouillon.users.map(x => x.id));
             const roleId = k.querySelector("#n-role").value;
-            const pin = k.querySelector("#n-pin").value.trim();
             const rr = brouillon.roles.find(x => x.id === roleId);
             const emb = k.querySelector("#n-emb").value || auj;
 

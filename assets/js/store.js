@@ -171,6 +171,42 @@ window.MNStore = (function () {
 
   const estArchive = u => !!(u && u.depart);
 
+  /* ---- Homonymes ----------------------------------------------------------------
+     Deux personnes peuvent porter le même prénom et le même nom. Ça arrive, et
+     le site ne doit ni l'interdire ni s'y perdre : c'est le code d'accès qui
+     les départage à la connexion.
+
+     La seule condition est donc qu'ils en aient un — chacun. Sans code, rien ne
+     distingue deux fiches identiques, et celle qu'on croit ouvrir n'est pas
+     forcément celle qui s'ouvre. */
+
+  const memeNom = (a, b) =>
+    String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+
+  /**
+   * Ce qui empêche d'enregistrer une fiche sous ce nom, s'il y a lieu.
+   * @param {Array} liste tous les employés
+   * @param {string} pseudo le nom voulu
+   * @param {string} monId l'identifiant de la fiche modifiée, "" si elle est neuve
+   * @param {boolean} auraUnCode cette fiche aura-t-elle un code après enregistrement
+   * @returns {string} "" si c'est bon, sinon le message à montrer
+   */
+  function soucisHomonyme(liste, pseudo, monId, auraUnCode) {
+    const autres = (liste || []).filter(u => u.id !== monId && memeNom(u.pseudo, pseudo));
+    if (!autres.length) return "";
+
+    if (!auraUnCode) {
+      return "Ce nom est déjà porté. Donne un code d'accès à cette fiche : " +
+        "c'est lui qui distinguera les homonymes à la connexion.";
+    }
+    const sans = autres.filter(u => !u.pin);
+    if (sans.length) {
+      return "Ce nom est déjà porté par quelqu'un qui n'a pas de code d'accès. " +
+        "Donne-lui-en un d'abord, sinon il ne pourrait plus se connecter.";
+    }
+    return "";
+  }
+
   /** Archive quelqu'un : il quitte l'équipe sans rien perdre. */
   function archiverUser(user, info, byPseudo) {
     user.depart = normDepart(Object.assign({ le: jourLocal() }, info, { par: byPseudo || "" }));
@@ -1132,6 +1168,7 @@ window.MNStore = (function () {
     ATELIERS, atelierById, nomAtelier, courtAtelier,
     ateliersDe, estDeAtelier, usersDeAtelier, rolesDeAtelier, normAteliers,
     setAtelier, atelier, roleIdDe, estMasqueIci, estMasquePartout,
+    memeNom, soucisHomonyme,
     MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,
     usersActifs, usersArchives,
     GRAVITES, graviteDe, normAvertissement, avertActif, avertBilan,

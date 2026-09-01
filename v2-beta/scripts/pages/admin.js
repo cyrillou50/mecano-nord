@@ -1089,13 +1089,15 @@
           onClick: (fermer, k) => {
             const pseudo = k.querySelector("#u-pseudo").value.trim();
             if (pseudo.length < 2) return U.toast("Nom trop court", "err");
-            if (brouillon.users.some(x =>
-                x.pseudo.toLowerCase() === pseudo.toLowerCase() && (neuf || x.id !== u.id))) {
-              return U.toast("Ce nom est déjà pris", "err");
-            }
-
             const roleId = k.querySelector("#u-role").value;
             const pin = k.querySelector("#u-pin").value.trim();
+
+            /* Les homonymes sont permis — ça arrive — à condition que chacun ait
+               un code : c'est lui qui les distinguera à la connexion. */
+            const codeApres = !!(pin || (!neuf && u.pin && !viderPin));
+            const souci = MNStore.soucisHomonyme(
+              brouillon.users, pseudo, neuf ? "" : u.id, codeApres);
+            if (souci) return U.toast(souci, "err");
             const actif = k.querySelector("#u-actif").checked;
 
             /* Sécurité anti-blocage : ne pas se priver soi-même de la gestion. */

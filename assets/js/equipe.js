@@ -232,6 +232,11 @@
     nomFamille(a).localeCompare(nomFamille(b), "fr", { sensitivity: "base" }) ||
     a.pseudo.localeCompare(b.pseudo, "fr", { sensitivity: "base" }));
 
+  /* Un même prénom et un même nom, ça arrive. La liste doit alors donner de
+     quoi les distinguer, sinon on ouvre la fiche de l'autre. */
+  const aUnHomonyme = u =>
+    draft.users.some(x => x.id !== u.id && MNStore.memeNom(x.pseudo, u.pseudo));
+
   const hiddenCount = () => actifs().filter(u => MNStore.estMasqueIci(u)).length;
 
   /* ---- Index alphabétique --------------------------------------------------
@@ -358,7 +363,11 @@
               (MNStore.estArchive(u)
                 ? "<i>" + esc(MNStore.motifDepart(u.depart.motif).court) + " · " +
                   esc(jourCourt(u.depart.le)) + "</i>"
-                : '<i style="color:' + esc(r.color) + '">' + esc(r.name) + "</i>") +
+                : '<i style="color:' + esc(r.color) + '">' + esc(r.name) + "</i>" +
+                  (aUnHomonyme(u)
+                    ? '<i title="Un homonyme dans l\'équipe">entré le ' +
+                      esc(jourCourt(u.hiredAt)) + "</i>"
+                    : "")) +
             "</span>" +
             (MNStore.estMasqueIci(u)
               ? '<span class="staffrow__eye" title="Masqué de ce garage">' + svg("lock") + "</span>"
@@ -566,7 +575,10 @@
               /* Utile surtout pour ceux des deux garages : on doit voir d'un
                  coup d'œil qu'on les retrouvera aussi de l'autre côté. */
               (MNStore.ateliersDe(u).length > 1
-                ? ' <span class="pill pill--outline">Nord + Sud</span>' : "") + "</h2>" +
+                ? ' <span class="pill pill--outline">Nord + Sud</span>' : "") +
+              (aUnHomonyme(u)
+                ? ' <span class="pill pill--dim" title="Un homonyme dans l\'équipe">' +
+                  "homonyme</span>" : "") + "</h2>" +
             '<span class="rolechip rolechip--ico" style="color:' + esc(r.color) + '">' +
               mnIcon(r.icon) + esc(r.name) + "</span>" +
             (on ? '<span class="pill pill--ok">en service</span>' : "") +
@@ -1062,7 +1074,9 @@
             /* Le contrôle porte sur tout le monde, archives comprises : deux
                fiches du même nom seraient impossibles à démêler. */
             if (draft.users.some(x => x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
-              return MNUI.toast("Ce nom est déjà pris", "err");
+              /* Une fiche d'archive ne se connecte pas : deux homonymes au
+                 répertoire ne gênent personne. */
+              return MNUI.toast("Ce nom est déjà porté par quelqu'un de présent", "err");
             }
 
             const le = body.querySelector("#x-left").value || auj;
@@ -1501,8 +1515,9 @@
           onClick: async close => {
             const pseudo = body.querySelector("#f-pseudo").value.trim();
             if (pseudo.length < 2) return MNUI.toast("Nom trop court", "err");
-            if (draft.users.some(x => x.id !== u.id && x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
-              return MNUI.toast("Ce nom est déjà pris", "err");
+            const souci = MNStore.soucisHomonyme(draft.users, pseudo, u.id, !!u.pin);
+            if (souci) {
+              return MNUI.toast(souci + " (le code se règle dans l'administration)", "err");
             }
 
             const champs = {
@@ -1567,12 +1582,14 @@
           onClick: async close => {
             const pseudo = body.querySelector("#n-pseudo").value.trim();
             if (pseudo.length < 2) return MNUI.toast("Nom trop court", "err");
-            if (draft.users.some(x => x.pseudo.toLowerCase() === pseudo.toLowerCase())) {
-              return MNUI.toast("Ce nom est déjà pris", "err");
-            }
+            const pin = body.querySelector("#n-pin").value.trim();
+            /* Les homonymes sont permis — ça arrive — à condition que chacun ait
+               un code : c'est lui qui les distinguera à la connexion. */
+            const souci = MNStore.soucisHomonyme(draft.users, pseudo, "", !!pin);
+            if (souci) return MNUI.toast(souci, "err");
+
             const id = MNStore.uniqueId(pseudo, draft.users.map(x => x.id));
             const roleId = body.querySelector("#n-role").value;
-            const pin = body.querySelector("#n-pin").value.trim();
             const rr = draft.roles.find(x => x.id === roleId);
             const hiredAt = body.querySelector("#n-hired").value || new Date().toISOString().slice(0, 10);
 

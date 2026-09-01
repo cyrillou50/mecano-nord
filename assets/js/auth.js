@@ -106,10 +106,13 @@ window.MNAuth = (function () {
 
   const norm = s => String(s || "").trim().toLowerCase();
 
-  function findByPseudo(pseudo) {
+  /** Toutes les fiches portant ce nom — le plus souvent une seule. */
+  function tousParPseudo(pseudo) {
     const n = norm(pseudo);
-    return users().find(u => norm(u.pseudo) === n) || null;
+    return users().filter(u => norm(u.pseudo) === n);
   }
+
+  const findByPseudo = pseudo => tousParPseudo(pseudo)[0] || null;
 
   /** Permissions réellement actives : celles du rôle, « admin » impliquant tout. */
   function effectivePerms(user) {
@@ -200,10 +203,13 @@ window.MNAuth = (function () {
 
   const canAny = (...list) => list.some(can);
 
-  /** Est-ce que ce pseudo réclame un code PIN ? */
+  /**
+   * Est-ce que ce pseudo réclame un code ? Plusieurs homonymes le réclament
+   * toujours : c'est le code qui dit lequel entre.
+   */
   function needsPin(pseudo) {
-    const u = findByPseudo(pseudo);
-    return !!(u && u.pin);
+    const l = tousParPseudo(pseudo);
+    return l.length > 1 || !!(l[0] && l[0].pin);
   }
 
   /* ---- Ateliers -----------------------------------------------------------
@@ -272,9 +278,9 @@ window.MNAuth = (function () {
       return { ok: true, bootstrap: true };
     }
 
-    const u = findByPseudo(clean);
+    const memes = tousParPseudo(clean);
 
-    if (!u) {
+    if (!memes.length) {
       if (authCfg().allowGuests) {
         _session = null;
         writeStored({ guest: true, pseudo: clean });
@@ -282,17 +288,56 @@ window.MNAuth = (function () {
       }
       return fail("inconnu", "Ce nom n'est pas enregistré. Demande à un responsable de t'ajouter.");
     }
-    /* Un compte archivé se distingue d'un compte simplement désactivé : la
-       personne a quitté l'atelier, autant le lui dire plutôt que de laisser
-       croire à une panne de droits. */
-    if (u.depart) {
-      return fail("archive", "Ce compte a été archivé — tu ne fais plus partie de l'atelier. " +
-        "Vois avec un responsable si c'est une erreur.");
+
+    /* On écarte d'abord ce qui n'est plus joignable. Avec un homonyme, ça évite
+       de refuser tout le monde pour le départ d'un seul. */
+    const joignables = memes.filter(x => !x.depart && x.active !== false);
+    if (!joignables.length) {
+      /* Un compte archivé se distingue d'un compte simplement désactivé : la
+         personne a quitté l'atelier, autant le lui dire plutôt que de laisser
+         croire à une panne de droits. */
+      if (memes.some(x => x.depart)) {
+        return fail("archive", "Ce compte a été archivé — tu ne fais plus partie de l'atelier. " +
+          "Vois avec un responsable si c'est une erreur.");
+      }
+      return fail("desactive", "Ce compte a été désactivé.");
     }
-    if (u.active === false) return fail("desactive", "Ce compte a été désactivé.");
-    if (u.pin) {
-      if (!pin) return fail("pin-requis", "Ce compte est protégé par un code.");
-      if (hashPin(u.id, pin) !== u.pin) return fail("pin-faux", "Code incorrect.");
+
+    let u;
+
+    if (joignables.length === 1) {
+      u = joignables[0];
+      if (u.pin) {
+        if (!pin) return fail("pin-requis", "Ce compte est protégé par un code.");
+        if (hashPin(u.id, pin) !== u.pin) return fail("pin-faux", "Code incorrect.");
+      }
+    } else {
+      /* Homonymes : c'est le code qui désigne la personne. Il est haché avec
+         l'identifiant de chacun, donc deux codes identiques donnent deux
+         empreintes différentes — on les essaie une à une. */
+      if (!pin) {
+        return fail("pin-requis",
+          "Plusieurs personnes portent ce nom : entre ton code d'accès.");
+      }
+      const bons = joignables.filter(x => x.pin && hashPin(x.id, pin) === x.pin);
+
+      if (bons.length === 1) {
+        u = bons[0];
+      } else if (!bons.length) {
+        const sans = joignables.filter(x => !x.pin).length;
+        return fail("pin-faux", sans
+          ? "Code incorrect. Attention : parmi les personnes de ce nom, " +
+            (sans > 1 ? sans + " n'ont" : "une n'a") + " pas encore de code — " +
+            "elle ne peut donc pas se connecter tant qu'un responsable ne lui en " +
+            "donne pas un."
+          : "Code incorrect.");
+      } else {
+        /* Même nom et même code : on ne devinera pas, et se tromper de compte
+           serait pire que de refuser. */
+        return fail("homonymes",
+          "Deux personnes de ce nom ont le même code d'accès. Demande à un " +
+          "responsable d'en changer un.");
+      }
     }
 
     /* Un atelier valable, quoi qu'on nous ait passé : celui qu'on a choisi
