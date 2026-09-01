@@ -1703,7 +1703,11 @@ async function ecrireCatalogue(cat) {
 const GEMINI_CLE = process.env.GEMINI_CLE || process.env.GEMINI_KEY || "";
 const GEMINI_MODELE = process.env.GEMINI_MODELE || "";
 const MAX_CONTEXTE = 24000;
-const GEMINI_RACINE = "https://generativelanguage.googleapis.com/v1beta";
+/* L adresse de l API. Reglable pour pouvoir la remplacer par un serveur
+   local pendant les essais : sans ca, verifier le comportement en cas de
+   surcharge demanderait d attendre que Google le soit vraiment. */
+const GEMINI_RACINE = process.env.GEMINI_RACINE ||
+  "https://generativelanguage.googleapis.com/v1beta";
 
 /* Le modele qui a repondu. Les noms changent au fil des versions de l'API et
    tous les comptes n'ont pas acces aux memes : plutot que d'en figer un et de
@@ -1780,41 +1784,67 @@ async function demanderGemini(question, contexte) {
     return { r, j: await r.json().catch(() => null) };
   };
 
+  /* Un modele surcharge (503) ou sature (429) n'est pas une panne : c'est un
+     moment a laisser passer, ou un voisin a essayer. On retente donc, en
+     changeant de modele quand on en a d'autres — la file d'attente de Google
+     n'est pas la meme pour chacun. Trois essais au total : au-dela, mieux vaut
+     rendre la main que faire patienter. */
+  const REESSAYABLE = [429, 500, 502, 503, 504];
+  const pause = ms => new Promise(f => setTimeout(f, ms));
+
   try {
     /* Celui qui a deja marche, sinon celui qu'on a regle, sinon on cherche. */
-    let modele = _modele || GEMINI_MODELE;
-    if (!modele) {
-      const l = await modelesGemini();
-      modele = l[0] || "gemini-2.0-flash";
-    }
+    let liste = [];
+    const premier = _modele || GEMINI_MODELE;
+    if (premier) liste = [premier];
+    if (!liste.length) liste = await modelesGemini();
+    if (!liste.length) liste = ["gemini-2.0-flash"];
 
-    let { r, j } = await essai(modele);
+    let r = null, j = null, modele = "", dernier = 0;
 
-    /* 404 : ce modele n'existe pas pour cette cle. On demande la liste et on
-       reessaie une fois — c'est exactement le cas ou l'utilisateur ne peut pas
-       deviner quel nom ecrire. */
-    if (r.status === 404) {
-      const l = (await modelesGemini()).filter(x => x !== modele);
-      if (!l.length) {
-        console.error(new Date().toISOString(), "assistant : aucun modèle disponible");
-        return { ok: false, error: "Aucun modèle de texte n'est disponible pour cette clé." };
-      }
-      modele = l[0];
+    for (let n = 0; n < 3; n++) {
+      modele = liste[Math.min(n, liste.length - 1)];
       ({ r, j } = await essai(modele));
-    }
 
-    if (!r.ok) {
+      if (r.ok) break;
+      dernier = r.status;
       const m = j && j.error && j.error.message;
       console.error(new Date().toISOString(), "assistant :", r.status, modele, m || "");
-      /* Le message de Google peut contenir des details d'API : on ne renvoie
-         que le necessaire, et de quoi agir. */
-      if (r.status === 429) {
+
+      /* 404 : ce modele n'existe pas pour cette cle. On demande la liste —
+         c'est exactement le cas ou l'on ne peut pas deviner quel nom ecrire. */
+      if (r.status === 404) {
+        const l = (await modelesGemini()).filter(x => x !== modele);
+        if (!l.length) {
+          return { ok: false, error: "Aucun modèle de texte n'est disponible pour cette clé." };
+        }
+        liste = l;
+        continue;
+      }
+
+      if (REESSAYABLE.indexOf(r.status) === -1) break;
+
+      /* On complete la liste si on n'avait qu'un modele en tete : le suivant
+         est peut-etre moins demande. */
+      if (liste.length < 2) {
+        const l = await modelesGemini();
+        if (l.length) liste = [modele].concat(l.filter(x => x !== modele));
+      }
+      await pause(700 * (n + 1));
+    }
+
+    if (!r || !r.ok) {
+      if (dernier === 429) {
         return { ok: false, error: "Trop de questions d'un coup. Réessaie dans un instant." };
       }
-      if (r.status === 400 || r.status === 403) {
+      if (REESSAYABLE.indexOf(dernier) !== -1) {
+        return { ok: false, error: "L'assistant est surchargé chez Google en ce moment. " +
+          "Réessaie dans une minute." };
+      }
+      if (dernier === 400 || dernier === 403) {
         return { ok: false, error: "La clé de l'assistant est refusée par Google." };
       }
-      return { ok: false, error: "L'assistant n'a pas pu répondre (" + r.status + ")." };
+      return { ok: false, error: "L'assistant n'a pas pu répondre (" + dernier + ")." };
     }
 
     const cand = j && j.candidates && j.candidates[0];

@@ -127,6 +127,10 @@ questions se met en sommeil. **Elle ne doit jamais aller dans le catalogue** —
 il est public sur GitHub, l'y mettre reviendrait à la publier. Le modèle se
 choisit avec `GEMINI_MODELE` (par défaut `gemini-2.0-flash`).
 
+Si Google répond « surchargé » (503), le serveur réessaie tout seul, en
+changeant de modèle : la file d'attente n'est pas la même pour chacun. Au bout
+de trois essais il rend la main plutôt que de faire patienter.
+
 Le format de la clé n'a pas d'importance — Google en délivre plusieurs (`AIza…`,
 `AQ.…`) : le serveur ne regarde pas son allure, il la transmet en en-tête.
 
