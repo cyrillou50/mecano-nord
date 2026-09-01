@@ -1721,8 +1721,7 @@ const CONSIGNE = [
 
 async function demanderGemini(question, contexte) {
   const url = "https://generativelanguage.googleapis.com/v1beta/models/" +
-    encodeURIComponent(GEMINI_MODELE) + ":generateContent?key=" +
-    encodeURIComponent(GEMINI_CLE);
+    encodeURIComponent(GEMINI_MODELE) + ":generateContent";
 
   const corps = {
     system_instruction: { parts: [{ text: CONSIGNE }] },
@@ -1735,9 +1734,16 @@ async function demanderGemini(question, contexte) {
   };
 
   try {
+    /* La cle part en en-tete, pas dans l adresse. Une adresse se retrouve
+       dans les journaux d acces, les traces d erreur et les rapports de
+       proxy ; un en-tete, non. Google accepte les deux, et cette forme-la
+       vaut pour tous les formats de cle. */
     const r = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_CLE
+      },
       body: JSON.stringify(corps)
     });
     const j = await r.json().catch(() => null);

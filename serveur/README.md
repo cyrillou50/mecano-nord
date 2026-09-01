@@ -127,6 +127,9 @@ questions se met en sommeil. **Elle ne doit jamais aller dans le catalogue** —
 il est public sur GitHub, l'y mettre reviendrait à la publier. Le modèle se
 choisit avec `GEMINI_MODELE` (par défaut `gemini-2.0-flash`).
 
+Le format de la clé n'a pas d'importance — Google en délivre plusieurs (`AIza…`,
+`AQ.…`) : le serveur ne regarde pas son allure, il la transmet en en-tête.
+
 `WEBHOOK_AVERTISSEMENTS` est facultatif lui aussi, mais **sans repli** :
 sans salon à eux, les avertissements ne partent nulle part. C'est voulu — une
 sanction n'a rien à faire dans le salon où toute l'équipe lit les prises de
