@@ -1500,3 +1500,12 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--pink); outline-o
   letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim);
 }
+
+/* Un nom de page cité devient un lien : souligné en pointillé, il se distingue
+   du texte sans crier — on le remarque en le survolant, pas avant. */
+.lien-page {
+  color: var(--pink-soft);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.lien-page:hover { text-decoration-style: solid; }

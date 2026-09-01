@@ -88,6 +88,14 @@
       });
     }
 
+    /* Les matières premières telles qu'elles s'appellent au stock : sans cette
+       liste, l'assistant n'a que des noms croisés dans les recettes et ne sait
+       pas qu'il les a toutes vues. */
+    if (c.resources.length) {
+      l.push("");
+      l.push("RESSOURCES DE L'ATELIER : " + c.resources.map(r => r.name).join(", "));
+    }
+
     /* Ce que coûte chaque prestation, en ressources : c'est la question la
        plus posée à l'atelier, et celle où une réponse inventée coûte cher. */
     const items = c.items.filter(i => i.enabled && MNStore.estDeAtelier(i, ou));
@@ -107,12 +115,22 @@
           });
           l.push("- " + i.name + " : " +
             (cout.length ? cout.join(", ") : "aucune ressource") +
-            (i.pack > 1 ? " (lot de " + i.pack + ")" : "") +
+            (i.pack > 1 ? " (un lot de " + i.pack + ", ce coût est celui du lot)" : "") +
             (i.max ? " ; maximum " + i.max + " par devis" : "") +
-            (i.temps ? " ; " + MNStore.duree(i.temps) + " de fabrication" : ""));
+            /* Les secondes en plus du texte : une addition sur « 2 min 30 »
+               se trompe une fois sur deux, sur 150 jamais. */
+            (i.temps ? " ; fabrication " + MNStore.duree(i.temps) +
+              " (" + i.temps + " s)" : " ; pas de temps renseigné"));
         });
       });
     }
+
+    l.push("");
+    l.push("COMMENT COMPTER : le coût et le temps d'une prestation se " +
+      "multiplient par la quantité. Trois fois un objet qui demande 2 Ferraille " +
+      "et 90 s, c'est 6 Ferraille et 270 s (4 min 30). Pour plusieurs " +
+      "prestations, on additionne ressource par ressource, et les temps entre " +
+      "eux.");
 
     const types = MNStore.contractTypes();
     if (types.length) {
@@ -179,6 +197,64 @@
     });
   }
 
+
+  /* ---- Les pages citées deviennent des liens --------------------------------
+     « Va dans Facturation » sans lien, c'est une consigne de plus à suivre à la
+     main. Le repérage se fait ici, jamais par l'assistant : un modèle qui écrit
+     lui-même ses adresses en invente, et on se retrouve à cliquer vers nulle
+     part. Ici la liste est courte, connue, et vérifiée.
+
+     Seule la forme capitalisée compte — « la page Service », pas « prendre son
+     service » — et seulement la première fois : un texte tout en liens ne se lit
+     plus. */
+
+  const PAGES = [
+    { nom: "Facturation", href: "index.html" },
+    { nom: "Devis", href: "index.html" },
+    { nom: "Service", href: "service.html" },
+    { nom: "Équipe", href: "equipe.html" },
+    { nom: "Fiches", href: "equipe.html" },
+    { nom: "Contrats", href: "contrats.html" },
+    { nom: "Calendrier", href: "calendrier.html" },
+    { nom: "Véhicules", href: "vehicules.html" },
+    { nom: "Livret", href: "livret.html" },
+    { nom: "Administration", href: "admin.html" },
+    { nom: "Admin", href: "admin.html" }
+  ];
+
+  /** Les pages où la personne a le droit d'aller : les autres ne se lient pas. */
+  function pagesOuvertes() {
+    const ouvert = {
+      "index.html": MNAuth.canAny("bt", "admin"),
+      "service.html": MNAuth.canAny("duty", "duty_view", "duty_manage", "admin"),
+      "equipe.html": MNAuth.canAny("staff", "promote", "users", "admin"),
+      "contrats.html": MNAuth.canAny("contracts_view", "contracts", "contracts_delete", "admin"),
+      "calendrier.html": true,
+      "vehicules.html": true,
+      "livret.html": true,
+      "admin.html": MNAuth.canAny("items", "users", "publish", "theme", "contracts", "admin")
+    };
+    return PAGES.filter(p => ouvert[p.href]);
+  }
+
+  /**
+   * Pose les liens dans du HTML déjà échappé. On travaille sur le texte échappé
+   * exprès : le contenu ne peut plus rien injecter, et les noms de page n'ont
+   * pas de caractère qui s'échappe.
+   */
+  function lier(html) {
+    let out = html;
+    pagesOuvertes().forEach(p => {
+      /* Ni au milieu d'un mot, ni à l'intérieur d'une balise déjà posée. Les
+         adresses sont en minuscules, les noms capitalisés : elles ne peuvent
+         pas se croiser. */
+      const re = new RegExp("(?<![A-Za-zÀ-ÿ<\\/])" + p.nom + "(?![A-Za-zÀ-ÿ])");
+      if (!re.test(out)) return;
+      out = out.replace(re, '<a class="lien-page" href="' + p.href + '">' + p.nom + "</a>");
+    });
+    return out;
+  }
+
   /** Le texte libre du livret, rendu en paragraphes — sans interpréter de HTML. */
   function enParagraphes(t) {
     return esc(t).split(/\n{2,}/).map(bloc => {
@@ -186,9 +262,9 @@
       /* Une suite de lignes commençant par - ou • devient une liste. */
       if (lignes.every(x => /^\s*[-•*]\s+/.test(x))) {
         return "<ul>" + lignes.map(x =>
-          "<li>" + x.replace(/^\s*[-•*]\s+/, "") + "</li>").join("") + "</ul>";
+          "<li>" + lier(x.replace(/^\s*[-•*]\s+/, "")) + "</li>").join("") + "</ul>";
       }
-      return "<p>" + lignes.join("<br>") + "</p>";
+      return "<p>" + lier(lignes.join("<br>")) + "</p>";
     }).join("");
   }
 
