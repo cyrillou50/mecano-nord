@@ -1583,6 +1583,16 @@ function appliquerEquipe(cat, op) {
       return { ok: true };
     }
 
+    /* Le code arrive deja hache : le serveur ne voit jamais celui qu'on tape,
+       et n'aurait rien a en faire. Il verifie seulement la forme. */
+    case "code": {
+      if (op.pin === null) { u.pin = null; return { ok: true }; }
+      const h = texte(op.pin, 64);
+      if (!/^[0-9a-f]{64}$/.test(h)) return { erreur: "empreinte invalide" };
+      u.pin = h;
+      return { ok: true };
+    }
+
     case "depart": {
       const d = op.depart;
       if (!d || !jour(d.le)) return { erreur: "départ invalide" };

@@ -181,10 +181,52 @@
   const plisObjets = MNUI.folds("mn.admin.folds");
   const plisCats = MNUI.folds("mn.admin.catfolds");
 
+  /* ---- Nord ou Sud ---------------------------------------------------------------
+     Trois listes de l'administration appartiennent aux garages : les employés,
+     les grades et les objets. Les afficher mélangées obligeait à lire chaque
+     ligne pour savoir de qui on parle.
+
+     Un sous-onglet les sépare donc, comme sur la page Service. Ce qui vaut des
+     deux côtés apparaît dans les deux — ce n'est pas un doublon, c'est bien la
+     même chose vue de chaque garage. */
+
+  let sousAtelier = "";
+
+  const ouSuisJe = () => sousAtelier || MNAuth.atelier() || MNStore.ATELIERS[0].id;
+
+  /** Ne garde que ce qui vaut dans le garage regardé. */
+  const dIci = l => l.filter(x => MNStore.estDeAtelier(x, ouSuisJe()));
+
+  /**
+   * La barre Nord / Sud, et de quoi la brancher.
+   * @param {Function} redessine ce qu'il faut rappeler après un changement
+   */
+  function barreAteliers(host, redessine, compte) {
+    const ici = ouSuisJe();
+    const html = '<div class="ptabs ptabs--sous" style="margin-bottom:12px">' +
+      MNStore.ATELIERS.map(a => {
+        const n = compte ? compte(a.id) : null;
+        return '<button class="ptab' + (a.id === ici ? " is-active" : "") +
+          '" data-sa="' + esc(a.id) + '">' + esc(a.nom) +
+          (n === null ? "" : ' <span class="tab__n">' + n + "</span>") + "</button>";
+      }).join("") + "</div>";
+
+    host.insertAdjacentHTML("afterbegin", html);
+    host.querySelectorAll("[data-sa]").forEach(b =>
+      b.addEventListener("click", () => {
+        if (b.dataset.sa === ici) return;
+        sousAtelier = b.dataset.sa;
+        redessine(host);
+      }));
+  }
+
   function paneItems(host) {
     const cats = draft.categories;
     const f = filter.toLowerCase();
-    const list = draft.items.filter(i => !f || i.name.toLowerCase().indexOf(f) !== -1);
+    /* Le garage regardé d'abord : mélanger les deux catalogues obligeait à
+       lire chaque ligne pour savoir de quel atelier elle parle. */
+    const list = dIci(draft.items)
+      .filter(i => !f || i.name.toLowerCase().indexOf(f) !== -1);
 
     /* Pendant une recherche, tout est déplié : masquer un résultat trouvé
        serait absurde. L'état enregistré n'est pas touché pour autant. */
@@ -242,6 +284,9 @@
               ).join(""));
           }).join("")
         : '<div class="empty">' + svg("box") + "<b>Aucun objet</b><p>Clique sur « Nouvel objet » pour commencer.</p></div>");
+
+    barreAteliers(host, paneItems,
+      id => draft.items.filter(x => MNStore.estDeAtelier(x, id)).length);
 
     const s = $("#f-search");
     s.addEventListener("input", () => {
@@ -1391,8 +1436,8 @@
       (function () {
         /* L'admin ne gère que l'équipe en poste : les partis se consultent
            sur la page Équipe, onglet Archives. */
-        const vivants = draft.users.filter(x => !MNStore.estArchive(x));
-        const partis = draft.users.length - vivants.length;
+        const vivants = dIci(draft.users).filter(x => !MNStore.estArchive(x));
+        const partis = dIci(draft.users).length - vivants.length;
         return (vivants.length
           ? '<div class="rows">' + vivants.map(u => userRow(u, me)).join("") + "</div>"
         : '<div class="empty">' + svg("users") + "<b>Aucun employé</b>" +
@@ -1407,6 +1452,9 @@
             (partis > 1 ? "s" : "") + ' — voir <a href="equipe.html">Équipe → Archives</a>.</p>'
           : "");
       })();
+
+    barreAteliers(host, paneUsers, id =>
+      draft.users.filter(x => !MNStore.estArchive(x) && MNStore.estDeAtelier(x, id)).length);
 
     $("#add").addEventListener("click", () => editUser(null));
     bindRows(host, draft.users, {
@@ -1912,8 +1960,11 @@
         '<span class="spacer"></span>' +
         '<button class="btn btn--primary" id="add">' + svg("plus") + "<span>Nouveau rôle</span></button>" +
       "</div>" +
-      '<div class="rows">' + draft.roles.map((r, i) => {
-        const n = draft.users.filter(u => u.roleId === r.id).length;
+      '<div class="rows">' + dIci(draft.roles).map(r => {
+        const i = draft.roles.indexOf(r);
+        const n = draft.users.filter(u =>
+          MNStore.roleIdDe(u, ouSuisJe()) === r.id &&
+          MNStore.estDeAtelier(u, ouSuisJe())).length;
         const perms = r.perms.indexOf("admin") !== -1 ? ["admin"] : r.perms;
         const tags = perms.length
           ? (perms[0] === "admin"
@@ -1941,6 +1992,9 @@
             '<button class="btn btn--icon" data-a="del" title="Supprimer">' + svg("trash") + "</button>" +
           "</div></div>";
       }).join("") + "</div>";
+
+    barreAteliers(host, paneRoles,
+      id => draft.roles.filter(x => MNStore.estDeAtelier(x, id)).length);
 
     $("#add").addEventListener("click", () => editRole(null));
     bindRows(host, draft.roles, { edit: r => editRole(r), del: r => deleteRole(r) });

@@ -45,6 +45,7 @@ window.MN_PERMS = [
   /* Sanctionner n'est pas gérer une carrière : on peut vouloir confier les
      promotions sans confier les avertissements, et l'inverse. */
   { key: "warn",      name: "Avertir un employé",  desc: "Poser un avertissement sur une fiche, le lever, le retirer. Chacun voit toujours les siens." },
+  { key: "pin",       name: "Gérer les codes d'accès", desc: "Redonner ou retirer le code d'un employé qui l'a perdu. Un code ne se retrouve pas — il n'est jamais enregistré en clair — il se remplace." },
   { key: "items",     name: "Gérer le catalogue",  desc: "Créer / modifier objets, catégories, ressources et coûts." },
   { key: "vehicles",  name: "Gérer les véhicules", desc: "Modifier et supprimer les véhicules et leurs catégories. Tout le monde peut en proposer et les consulter." },
   { key: "vehicles_validate", name: "Valider les véhicules", desc: "Approuver ou refuser les véhicules proposés par l'équipe. Sans validation, une proposition n'apparaît pas dans le parc." },

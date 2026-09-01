@@ -16,6 +16,7 @@
   let canEdit = false;
   let canSeeNotes = false;
   let canWarn = false;
+  let canCode = false;
   let showHidden = false;
   let vueArchives = false;      /* la liste montre-t-elle les partis ? */
   let tranche = null;           /* tranche du répertoire, en archives */
@@ -35,6 +36,9 @@
     canEdit = MNAuth.canAny("promote", "users");
     canSeeNotes = MNAuth.canAny("staff", "promote", "users");
     canWarn = MNAuth.canAny("warn", "admin");
+    /* La permission dédiée s'ajoute à celles qui géraient déjà les comptes :
+       personne ne perd ce qu'il pouvait faire hier. */
+    canCode = MNAuth.canAny("pin", "users", "admin");
     draft = MNStore.clone(MNStore.catalog());
     const first = visibleUsers()[0];
     sel = first ? first.id : null;
@@ -538,6 +542,65 @@
     return l.length ? l : [ici()];
   }
 
+  /* ---- Code d'accès --------------------------------------------------------------
+     Un code perdu ne se retrouve pas : le site n'en garde qu'une empreinte
+     SHA-256 salée avec l'identifiant, et une empreinte ne se remonte pas. C'est
+     précisément ce qui fait qu'une copie du catalogue ne donne le code de
+     personne — y compris à qui saurait le lire.
+
+     Ce qu'un responsable peut faire, et qui répond au même besoin : en poser un
+     nouveau, et le dire à l'intéressé. */
+
+  function reglerCode(u) {
+    const body = document.createElement("div");
+    body.className = "editor";
+    body.innerHTML =
+      '<div class="field"><label class="label" for="k-pin">Nouveau code</label>' +
+        '<input class="input" id="k-pin" type="text" inputmode="numeric" maxlength="24" ' +
+          'placeholder="Ex. 4242" autocomplete="off"></div>' +
+      '<p class="hint">Note-le : il ne s\'affichera plus. Le site n\'en garde qu\'une ' +
+        "empreinte, impossible à relire — c'est ce qui protège les codes de toute " +
+        "l'équipe si le fichier venait à fuiter." +
+        (u.pin ? "" : " Cette personne n'a pas de code pour l'instant.") + "</p>" +
+      (aUnHomonyme(u)
+        ? '<div class="alert alert--warn">' + svg("alert") +
+          "<span>Quelqu'un porte le même nom : c'est le code qui les distingue à " +
+          "la connexion. Ne lui donne pas celui de son homonyme.</span></div>"
+        : "");
+
+    MNUI.modal({
+      title: "Code d'accès de " + u.pseudo, body,
+      actions: [
+        { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
+        (u.pin && !aUnHomonyme(u)
+          ? {
+              label: "Retirer le code", variant: "btn--ghost", icon: "trash",
+              onClick: async close => {
+                const r = await appliquer({ op: "code", uid: u.id, pin: null },
+                  () => { u.pin = null; });
+                if (!r.ok) return MNUI.toast("Impossible : " + r.error, "err");
+                close();
+                MNUI.toast(u.pseudo + " entrera désormais avec son seul nom" + suite(r), "ok");
+              }
+            }
+          : null),
+        {
+          label: "Enregistrer", variant: "btn--primary", icon: "save",
+          onClick: async close => {
+            const code = body.querySelector("#k-pin").value.trim();
+            if (code.length < 3) return MNUI.toast("Un code d'au moins 3 caractères", "err");
+            const empreinte = MNAuth.hashPin(u.id, code);
+            const r = await appliquer({ op: "code", uid: u.id, pin: empreinte },
+              () => { u.pin = empreinte; });
+            if (!r.ok) return MNUI.toast("Impossible : " + r.error, "err");
+            close();
+            MNUI.toast("Nouveau code posé pour " + u.pseudo + " — donne-le-lui" + suite(r), "ok");
+          }
+        }
+      ].filter(Boolean)
+    });
+  }
+
   /* ---- Fiche ------------------------------------------------------------------ */
 
   function renderCard() {
@@ -608,6 +671,10 @@
                     ? '<button class="btn btn--ghost" id="c-warn">' + svg("alert") +
                       "<span>Avertir</span></button>"
                     : "") +
+                  (canCode
+                    ? '<button class="btn btn--ghost" id="c-code">' + svg("key") +
+                      "<span>Code d'accès</span></button>"
+                    : "") +
                   (canEdit && u.id !== me.uid
                     ? '<button class="btn btn--ghost" id="c-leave">' + svg("logout") +
                       "<span>Archiver</span></button>"
@@ -671,6 +738,7 @@
         "</div>" +
       "</div>";
 
+    const cd = $("#c-code"); if (cd) cd.addEventListener("click", () => reglerCode(u));
     const p = $("#c-promote"); if (p) p.addEventListener("click", () => promote(u));
     const e = $("#c-edit"); if (e) e.addEventListener("click", () => editCard(u));
     const dep = $("#c-leave"); if (dep) dep.addEventListener("click", () => archiver(u));
