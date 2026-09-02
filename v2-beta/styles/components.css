@@ -2085,6 +2085,16 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--c-action); outli
   background: color-mix(in srgb, var(--res, var(--c-bord)) 10%, transparent);
   color: var(--res, var(--c-second));
 }
-.respast svg { width: 14px; height: 14px; flex: none; }
+/* Trois formes possibles derrière une icône — vectorielle, image importée,
+   emoji — et une seule taille à l'écran. */
+.respast svg, .respast img {
+  width: 18px; height: 18px; flex: none;
+  object-fit: contain;
+}
+.respast .mn-emoji {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; flex: none;
+  font-size: 15px; line-height: 1;
+}
 .respast b { font-size: 13.5px; font-variant-numeric: tabular-nums; }
 .respast i { font-style: normal; font-size: 13px; color: var(--c-second); }
