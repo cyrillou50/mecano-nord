@@ -372,6 +372,34 @@ window.MNStore = (function () {
   const remboursementDe = id =>
     REMBOURSEMENTS.find(r => r.id === id) || REMBOURSEMENTS[0];
 
+  /**
+   * Additionne des paniers de ressources.
+   * @param {Array<Object>} paniers  des { idRessource: quantité }
+   * @returns {Object} la somme, ressource par ressource
+   */
+  function sommeRessources(paniers) {
+    const o = {};
+    (paniers || []).forEach(p => {
+      Object.keys(p || {}).forEach(k => { o[k] = (o[k] || 0) + Number(p[k] || 0); });
+    });
+    return o;
+  }
+
+  /**
+   * Un panier de ressources en toutes lettres : « 6 Ferraille, 2 Plastique ».
+   * Une ressource inconnue du catalogue garde son identifiant plutôt que de
+   * disparaître : mieux vaut un nom brut qu'une dette effacée.
+   */
+  function ressourcesEnClair(panier) {
+    return Object.keys(panier || {})
+      .filter(k => panier[k] > 0)
+      .map(k => {
+        const r = resourceById(k);
+        return panier[k] + " " + (r ? r.name : k);
+      })
+      .join(", ");
+  }
+
   const emit = () => {
     /* Le thème du site vit dans le catalogue : dès qu'il change, la page doit
        suivre, sans attendre un rechargement. */
@@ -905,10 +933,20 @@ window.MNStore = (function () {
         nom: String(x.nom || "").slice(0, 60),
         raison: String(x.raison || "").slice(0, 600),
         /* « aucun » quand il n'y a rien à rendre, « du » tant que ce n'est pas
-           fait, « fait » une fois rendu. Le montant reste renseignable même
-           après remboursement : c'est la trace de ce qui a été rendu. */
+           fait, « fait » une fois rendu. Les ressources restent renseignées
+           même après remboursement : c'est la trace de ce qui a été rendu. */
         remboursement: rb,
-        montant: Math.max(0, Math.min(1e9, Math.round(Number(x.montant) || 0))),
+        /* Ce qu'on doit rendre, ressource par ressource — l'atelier ne
+           facture pas en dollars. Même forme que le coût d'un objet : un
+           identifiant de ressource, une quantité. */
+        ressources: (function (v) {
+          const o = {};
+          Object.keys(v && typeof v === "object" ? v : {}).forEach(k => {
+            const q = Math.max(0, Math.min(1e6, Math.round(Number(v[k]) || 0)));
+            if (q > 0) o[k] = q;
+          });
+          return o;
+        })(x.ressources),
         at: x.at || new Date().toISOString(),
         by: String(x.by || "").slice(0, 60),
         levee: x.levee && typeof x.levee === "object"
@@ -1267,7 +1305,7 @@ window.MNStore = (function () {
     setAtelier, atelier, roleIdDe, estMasqueIci, estMasquePartout, minimumDe,
     memeNom, soucisHomonyme,
     MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,
-    REMBOURSEMENTS, remboursementDe,
+    REMBOURSEMENTS, remboursementDe, sommeRessources, ressourcesEnClair,
     usersActifs, usersArchives,
     GRAVITES, graviteDe, normAvertissement, avertActif, avertBilan,
     addAvertissement, leverAvertissement, retirerAvertissement,

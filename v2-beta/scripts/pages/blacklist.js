@@ -14,6 +14,7 @@
   const U = V2UI;
   const $ = s => document.querySelector(s);
   const L = MNListes.bannis;
+  const mnIcon = window.mnIcon;
 
   let hote = null, moi = null;
   let peutGerer = false;
@@ -43,10 +44,25 @@
     return l.filter(x => (x.nom + " " + x.raison).toLowerCase().indexOf(q) !== -1);
   }
 
-  /** Ce qui reste à rendre, tous clients confondus. */
-  const duTotal = () => actives()
-    .filter(x => x.remboursement === "du")
-    .reduce((s, x) => s + x.montant, 0);
+  /** Ce qui reste à rendre, tous clients confondus, ressource par ressource. */
+  const duTotal = () => MNStore.sommeRessources(
+    actives().filter(x => x.remboursement === "du").map(x => x.ressources));
+
+  const rien = o => !Object.keys(o || {}).some(k => o[k] > 0);
+
+  /**
+   * Un panier de ressources, en pastilles colorées.
+   * Une ressource que le catalogue ne connaît plus garde son identifiant :
+   * mieux vaut un nom brut qu'une dette qui disparaît de l'écran.
+   */
+  function pastilles(panier) {
+    return Object.keys(panier || {}).filter(k => panier[k] > 0).map(k => {
+      const r = MNStore.resourceById(k);
+      return '<span class="respast"' + (r ? ' style="--res:' + U.esc(r.color) + '"' : "") + ">" +
+        (r ? mnIcon(r.icon) : "") +
+        "<b>" + panier[k] + "</b><i>" + U.esc(r ? r.name : k) + "</i></span>";
+    }).join("");
+  }
 
   /* ---- Rendu ---------------------------------------------------------------- */
 
@@ -65,10 +81,11 @@
 
         /* Le total dû se voit d'un coup d'œil : c'est de l'argent de l'atelier
            qui dort chez quelqu'un, pas une ligne de plus dans une fiche. */
-        (du
-          ? U.alerte({ ton: "alerte",
-              texte: U.nombre(du) + " $ restent à rembourser, toutes inscriptions confondues." })
-          : "") +
+        (rien(du)
+          ? ""
+          : U.alerte({ ton: "alerte",
+              texte: "Restent à rembourser, toutes inscriptions confondues : " +
+                MNStore.ressourcesEnClair(du) + "." })) +
 
         (toutes().length
           ? U.champ({ id: "bl-q", repere: "Rechercher un nom, une raison…", valeur: filtre }) +
@@ -129,11 +146,17 @@
           "<b>" + U.esc(x.nom) + "</b>" +
           '<span class="pousse"></span>' +
           (x.remboursement !== "aucun"
-            ? U.etiquette(r.nom + (x.montant ? " · " + U.nombre(x.montant) + " $" : ""),
-                          x.remboursement === "du" ? "alerte" : "succes")
+            ? U.etiquette(r.nom, x.remboursement === "du" ? "alerte" : "succes")
             : "") +
         "</div>" +
         '<p class="blraison">' + U.esc(x.raison || "Aucune raison notée.") + "</p>" +
+        (x.remboursement !== "aucun" && !rien(x.ressources)
+          ? '<div class="respaniers">' +
+              '<span class="respaniers__quoi">' +
+                (x.remboursement === "du" ? "À rendre" : "Rendu") + "</span>" +
+              pastilles(x.ressources) +
+            "</div>"
+          : "") +
         '<p class="champ__aide">Inscrit ' + U.ilYA(x.at) +
           (x.by ? " par " + U.esc(x.by) : "") + "." +
           (lev
@@ -197,6 +220,10 @@
 
   function editer(x) {
     const neuf = !x;
+    /* Déclarées avant la modale : son bouton « Enregistrer » les lit. */
+    const lignes = Object.keys((x && x.ressources) || {})
+      .filter(k => x.ressources[k] > 0)
+      .map(k => ({ rid: k, qte: x.ressources[k] }));
 
     const m = U.modale({
       titre: neuf ? "Inscrire quelqu'un" : "Modifier l'inscription",
@@ -206,15 +233,18 @@
         U.champ({ id: "b-raison", type: "zone", label: "Raison", lignes: 4, max: 600,
                   valeur: x ? x.raison : "",
                   repere: "Ce qui s'est passé, en clair. C'est ce que lira celui qui le verra arriver." }) +
-        '<div class="cols-2">' +
-          U.champ({ id: "b-rb", type: "liste", label: "Remboursement",
-                    valeur: x ? x.remboursement : "aucun",
-                    options: MNStore.REMBOURSEMENTS.map(r => ({ valeur: r.id, nom: r.nom })) }) +
-          U.champ({ id: "b-montant", type: "number", label: "Montant ($)", min: 0, pas: 1,
-                    valeur: x && x.montant ? String(x.montant) : "", repere: "0" }) +
+        U.champ({ id: "b-rb", type: "liste", label: "Remboursement",
+                  valeur: x ? x.remboursement : "aucun",
+                  options: MNStore.REMBOURSEMENTS.map(r => ({ valeur: r.id, nom: r.nom })) }) +
+        '<div class="champ" id="b-resbloc">' +
+          '<span class="champ__label">Ce qu\'on doit rendre</span>' +
+          '<div class="pile pile--sm" id="b-res"></div>' +
+          "<div>" + U.bouton("Ajouter une ressource",
+                             { taille: "sm", icone: "plus", action: "res-add" }) + "</div>" +
+          '<p class="champ__aide">L\'atelier facture en ressources : on rend de la ' +
+            "Ferraille, du Plastique, pas des dollars. La liste reste renseignée " +
+            "une fois le remboursement fait — c'est la trace de ce qui a été rendu.</p>" +
         "</div>" +
-        '<p class="champ__aide">Le montant reste renseignable une fois remboursé : ' +
-          "c'est la trace de ce qui a été rendu.</p>" +
       "</div>",
       actions: [
         { label: "Annuler", onClick: f => f() },
@@ -227,12 +257,19 @@
             if (!raison) return U.toast("Dis pourquoi : sans raison, l'inscription ne sert à personne", "erreur");
 
             const rb = corps.querySelector("#b-rb").value;
+            const ressources = {};
+            if (rb !== "aucun") {
+              lignes.forEach(l => {
+                const q = Math.max(0, Math.round(Number(l.qte) || 0));
+                /* Deux lignes sur la même ressource s'additionnent plutôt que
+                   de s'écraser : c'est ce qu'on attend en les ajoutant. */
+                if (q > 0) ressources[l.rid] = (ressources[l.rid] || 0) + q;
+              });
+            }
+
             const entree = Object.assign({}, x || {}, {
               id: x ? x.id : MNStore.uniqueId(nom, toutes().map(y => y.id)),
-              nom, raison, remboursement: rb,
-              montant: rb === "aucun"
-                ? 0
-                : Math.max(0, Math.round(Number(corps.querySelector("#b-montant").value) || 0)),
+              nom, raison, remboursement: rb, ressources,
               at: x ? x.at : new Date().toISOString(),
               by: x ? x.by : moi.pseudo,
               levee: x ? x.levee : null
@@ -245,9 +282,53 @@
       ]
     });
 
-    /* Choisir « Aucun » et laisser un montant n'aurait pas de sens : on grise. */
+    /* ---- Les ressources dues, ligne par ligne ---- */
+
+    const dispo = MNStore.catalog().resources || [];
+    const hote = m.corps.querySelector("#b-res");
+
+    function peindre() {
+      if (!dispo.length) {
+        hote.innerHTML = '<p class="champ__aide">Aucune ressource au catalogue. ' +
+          "Crée-les dans l'administration, onglet « Ressources ».</p>";
+        return;
+      }
+      if (!lignes.length) {
+        hote.innerHTML = '<p class="champ__aide">Rien pour l\'instant — ' +
+          "ajoute une ressource.</p>";
+        return;
+      }
+      hote.innerHTML = lignes.map((l, i) =>
+        '<div class="rang" data-i="' + i + '">' +
+          '<select class="liste" data-k="rid" style="flex:1">' + dispo.map(r =>
+            '<option value="' + U.esc(r.id) + '"' + (r.id === l.rid ? " selected" : "") + ">" +
+            U.esc(r.name) + "</option>").join("") + "</select>" +
+          '<input class="saisie saisie--nombre" type="number" min="0" max="999999" ' +
+            'data-k="qte" style="max-width:110px" value="' + Number(l.qte) + '">' +
+          '<button class="btn btn--icone" type="button" data-k="del" ' +
+            'aria-label="Retirer">' + U.icone("croix") + "</button>" +
+        "</div>").join("");
+
+      hote.querySelectorAll("[data-i]").forEach(row => {
+        const i = Number(row.dataset.i);
+        row.querySelector('[data-k="rid"]').addEventListener("change", e => { lignes[i].rid = e.target.value; });
+        row.querySelector('[data-k="qte"]').addEventListener("input", e => { lignes[i].qte = e.target.value; });
+        row.querySelector('[data-k="del"]').addEventListener("click", () => { lignes.splice(i, 1); peindre(); });
+      });
+    }
+    peindre();
+
+    m.corps.querySelector('[data-a="res-add"]').addEventListener("click", () => {
+      if (!dispo.length) return;
+      const pris = lignes.map(l => l.rid);
+      const libre = dispo.find(r => pris.indexOf(r.id) === -1) || dispo[0];
+      lignes.push({ rid: libre.id, qte: 1 });
+      peindre();
+    });
+
+    /* Rien à rendre : la liste n'a plus lieu d'être affichée. */
     const sync = () => {
-      m.corps.querySelector("#b-montant").disabled =
+      m.corps.querySelector("#b-resbloc").hidden =
         m.corps.querySelector("#b-rb").value === "aucun";
     };
     m.corps.querySelector("#b-rb").addEventListener("change", sync);
@@ -261,10 +342,10 @@
       corps: '<div class="pile">' +
         '<p class="champ__aide">« ' + U.esc(x.nom) + " » sortira de la liste active. " +
           "L'inscription est conservée : on garde la trace de ce qui s'est passé.</p>" +
-        (x.remboursement === "du"
+        (x.remboursement === "du" && !rien(x.ressources)
           ? U.alerte({ ton: "alerte",
-              texte: "Il reste " + U.nombre(x.montant) + " $ à lui rembourser. " +
-                     "Lever l'inscription ne solde pas la dette." })
+              texte: "Il reste " + MNStore.ressourcesEnClair(x.ressources) +
+                     " à lui rendre. Lever l'inscription ne solde pas la dette." })
           : "") +
         U.champ({ id: "b-note", label: "Pourquoi ? (facultatif)", max: 300,
                   repere: "Arrangement trouvé, dette réglée…" }) +
@@ -302,8 +383,9 @@
     if (!x) return;
     const ok = await U.confirmer({
       titre: "Marquer remboursé",
-      message: (x.montant ? U.nombre(x.montant) + " $ ont été rendus à " : "Le remboursement de ") +
-        x.nom + (x.montant ? "." : " est fait.") +
+      message: (rien(x.ressources)
+        ? "Le remboursement de " + x.nom + " est fait."
+        : MNStore.ressourcesEnClair(x.ressources) + " ont été rendus à " + x.nom + ".") +
         " L'inscription reste en place — un remboursement n'efface pas la raison.",
       confirmer: "C'est remboursé"
     });

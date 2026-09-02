@@ -1974,8 +1974,11 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--c-action); outli
   color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
 .emgroupe__tete b { flex: 1; min-width: 0; }
+/* Une <svg> sans dimension prend toute la place qu'on lui laisse : la donner
+   n'est pas une finition, c'est ce qui tient la mise en page. */
 .emgroupe__chev {
   flex: none;
+  width: 18px; height: 18px;
   color: var(--c-faible);
   transition: transform .15s ease;
 }
@@ -2061,3 +2064,27 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--c-action); outli
   font-size: 14.5px; line-height: 1.65;
   white-space: pre-wrap;
 }
+
+/* Ce qu'on doit rendre, ressource par ressource : l'atelier facture en
+   Ferraille et en Plastique, pas en dollars. Chaque pastille prend la couleur
+   de sa ressource — on reconnaît un manque de métal sans lire le nom. */
+.respaniers {
+  display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap;
+  margin: 0 0 var(--e-3);
+}
+.respaniers__quoi {
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--c-faible);
+}
+.respast {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--res, var(--c-bord-net)) 40%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--res, var(--c-bord)) 10%, transparent);
+  color: var(--res, var(--c-second));
+}
+.respast svg { width: 14px; height: 14px; flex: none; }
+.respast b { font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.respast i { font-style: normal; font-size: 13px; color: var(--c-second); }

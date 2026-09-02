@@ -18,7 +18,8 @@
   "use strict";
 
   const $ = s => document.querySelector(s);
-  const svg = MNUI.svg, esc = MNUI.esc, num = MNUI.num;
+  const svg = MNUI.svg, esc = MNUI.esc;
+  const mnIcon = window.mnIcon;
   const L = MNListes.bannis;
 
   let moi = null;
@@ -47,10 +48,25 @@
     return l.filter(x => (x.nom + " " + x.raison).toLowerCase().indexOf(q) !== -1);
   }
 
-  /** Ce qui reste à rendre, tous clients confondus. */
-  const duTotal = () => actives()
-    .filter(x => x.remboursement === "du")
-    .reduce((s, x) => s + x.montant, 0);
+  /** Ce qui reste à rendre, tous clients confondus, ressource par ressource. */
+  const duTotal = () => MNStore.sommeRessources(
+    actives().filter(x => x.remboursement === "du").map(x => x.ressources));
+
+  const rien = o => !Object.keys(o || {}).some(k => o[k] > 0);
+
+  /**
+   * Un panier de ressources, en pastilles colorées.
+   * Une ressource que le catalogue ne connaît plus garde son identifiant :
+   * mieux vaut un nom brut qu'une dette qui disparaît de l'écran.
+   */
+  function pastilles(panier) {
+    return Object.keys(panier || {}).filter(k => panier[k] > 0).map(k => {
+      const r = MNStore.resourceById(k);
+      return '<span class="respast"' + (r ? ' style="--res:' + esc(r.color) + '"' : "") + ">" +
+        (r ? mnIcon(r.icon) : "") +
+        "<b>" + panier[k] + "</b><i>" + esc(r ? r.name : k) + "</i></span>";
+    }).join("");
+  }
 
   /* ---- Rendu ---------------------------------------------------------------- */
 
@@ -80,11 +96,11 @@
 
       /* Le total dû se voit d'un coup d'œil : c'est de l'argent de l'atelier
          qui dort chez quelqu'un, pas une ligne de plus dans une fiche. */
-      (du
-        ? '<div class="alert alert--warn" style="margin-bottom:18px">' + svg("alert") +
-          "<span><b>" + num(du) + " $</b> restent à rembourser, " +
-          "toutes inscriptions confondues.</span></div>"
-        : "") +
+      (rien(du)
+        ? ""
+        : '<div class="alert alert--warn" style="margin-bottom:18px">' + svg("alert") +
+          "<span>Restent à rembourser, toutes inscriptions confondues : " +
+          "<b>" + esc(MNStore.ressourcesEnClair(du)) + "</b>.</span></div>") +
 
       (total ? corps(l, lev) : vide());
 
@@ -161,12 +177,18 @@
         "<h2>" + esc(x.nom) + "</h2>" +
         '<span class="spacer"></span>' +
         (x.remboursement !== "aucun"
-          ? '<span class="blrb blrb--' + x.remboursement + '">' + esc(r.nom) +
-            (x.montant ? " · " + num(x.montant) + " $" : "") + "</span>"
+          ? '<span class="blrb blrb--' + x.remboursement + '">' + esc(r.nom) + "</span>"
           : "") +
       "</div>" +
       '<div class="panel__body">' +
         '<p class="blraison">' + esc(x.raison || "Aucune raison notée.") + "</p>" +
+        (x.remboursement !== "aucun" && !rien(x.ressources)
+          ? '<div class="respaniers">' +
+              '<span class="respaniers__quoi">' +
+                (x.remboursement === "du" ? "À rendre" : "Rendu") + "</span>" +
+              pastilles(x.ressources) +
+            "</div>"
+          : "") +
         '<p class="hint">Inscrit ' + MNUI.ago(x.at) +
           (x.by ? " par " + esc(x.by) : "") + "." +
           (lev
@@ -239,25 +261,75 @@
           '<textarea class="input" id="b-raison" rows="4" maxlength="600" ' +
             'placeholder="Ce qui s\'est passé, en clair. C\'est ce que lira celui qui le verra arriver.">' +
             esc(x ? x.raison : "") + "</textarea></div>" +
-        '<div class="editor__grid">' +
-          '<div class="field"><label class="label" for="b-rb">Remboursement</label>' +
-            '<select class="select" id="b-rb">' +
-              MNStore.REMBOURSEMENTS.map(r =>
-                '<option value="' + r.id + '"' +
-                  (x && x.remboursement === r.id ? " selected" : "") + ">" +
-                  esc(r.nom) + "</option>").join("") +
-            "</select></div>" +
-          '<div class="field"><label class="label" for="b-montant">Montant ($)</label>' +
-            '<input class="input" id="b-montant" type="number" min="0" step="1" value="' +
-              (x && x.montant ? x.montant : "") + '" placeholder="0"></div>' +
+        '<div class="field"><label class="label" for="b-rb">Remboursement</label>' +
+          '<select class="select" id="b-rb">' +
+            MNStore.REMBOURSEMENTS.map(r =>
+              '<option value="' + r.id + '"' +
+                (x && x.remboursement === r.id ? " selected" : "") + ">" +
+                esc(r.nom) + "</option>").join("") +
+          "</select></div>" +
+        '<div class="field" id="b-resbloc">' +
+          '<label class="label">Ce qu\'on doit rendre</label>' +
+          '<div class="costs" id="b-res"></div>' +
+          '<div><button class="btn btn--ghost btn--sm" id="b-res-add" type="button">' +
+            svg("plus") + "<span>Ajouter une ressource</span></button></div>" +
+          '<p class="hint">L\'atelier facture en ressources : on rend de la ' +
+            "Ferraille, du Plastique, pas des dollars. La liste reste renseignée " +
+            "une fois le remboursement fait — c'est la trace de ce qui a été rendu.</p>" +
         "</div>" +
-        '<p class="hint">Le montant reste renseignable une fois remboursé : ' +
-          "c'est la trace de ce qui a été rendu.</p>" +
       "</div>";
 
-    /* Choisir « Aucun » et laisser un montant n'aurait pas de sens : on grise. */
+    /* ---- Les ressources dues, ligne par ligne ---- */
+
+    const dispo = MNStore.catalog().resources || [];
+    const lignes = Object.keys((x && x.ressources) || {})
+      .filter(k => x.ressources[k] > 0)
+      .map(k => ({ rid: k, qte: x.ressources[k] }));
+
+    const hote = body.querySelector("#b-res");
+
+    function peindre() {
+      if (!dispo.length) {
+        hote.innerHTML = '<p class="hint hint--warn">Aucune ressource au catalogue. ' +
+          "Crée-les dans l'administration, onglet « Ressources ».</p>";
+        return;
+      }
+      if (!lignes.length) {
+        hote.innerHTML = '<p class="hint">Rien pour l\'instant — ajoute une ressource.</p>';
+        return;
+      }
+      hote.innerHTML = lignes.map((l, i) =>
+        '<div class="cost" data-i="' + i + '">' +
+          '<select class="select" data-k="rid">' + dispo.map(r =>
+            '<option value="' + esc(r.id) + '"' + (r.id === l.rid ? " selected" : "") + ">" +
+            esc(r.name) + "</option>").join("") + "</select>" +
+          '<input class="input input--num" type="number" min="0" max="999999" data-k="qte" value="' +
+            Number(l.qte) + '">' +
+          '<button class="btn btn--icon" data-k="del" type="button" aria-label="Retirer">' +
+            svg("x") + "</button>" +
+        "</div>").join("");
+
+      hote.querySelectorAll(".cost").forEach(row => {
+        const i = Number(row.dataset.i);
+        row.querySelector('[data-k="rid"]').addEventListener("change", e => { lignes[i].rid = e.target.value; });
+        row.querySelector('[data-k="qte"]').addEventListener("input", e => { lignes[i].qte = e.target.value; });
+        row.querySelector('[data-k="del"]').addEventListener("click", () => { lignes.splice(i, 1); peindre(); });
+      });
+    }
+    peindre();
+
+    body.querySelector("#b-res-add").addEventListener("click", () => {
+      if (!dispo.length) return;
+      const pris = lignes.map(l => l.rid);
+      const libre = dispo.find(r => pris.indexOf(r.id) === -1) || dispo[0];
+      lignes.push({ rid: libre.id, qte: 1 });
+      peindre();
+    });
+
+    /* Rien à rendre : la liste n'a plus lieu d'être affichée. */
     const sync = () => {
-      body.querySelector("#b-montant").disabled = body.querySelector("#b-rb").value === "aucun";
+      body.querySelector("#b-resbloc").hidden =
+        body.querySelector("#b-rb").value === "aucun";
     };
     body.querySelector("#b-rb").addEventListener("change", sync);
     sync();
@@ -276,12 +348,19 @@
             if (!raison) return MNUI.toast("Dis pourquoi : sans raison, l'inscription ne sert à personne", "err");
 
             const rb = body.querySelector("#b-rb").value;
+            const ressources = {};
+            if (rb !== "aucun") {
+              lignes.forEach(l => {
+                const q = Math.max(0, Math.round(Number(l.qte) || 0));
+                /* Deux lignes sur la même ressource s'additionnent plutôt que
+                   de s'écraser : c'est ce qu'on attend en les ajoutant. */
+                if (q > 0) ressources[l.rid] = (ressources[l.rid] || 0) + q;
+              });
+            }
+
             const entree = Object.assign({}, x || {}, {
               id: x ? x.id : MNStore.uniqueId(nom, toutes().map(y => y.id)),
-              nom, raison, remboursement: rb,
-              montant: rb === "aucun"
-                ? 0
-                : Math.max(0, Math.round(Number(body.querySelector("#b-montant").value) || 0)),
+              nom, raison, remboursement: rb, ressources,
               at: x ? x.at : new Date().toISOString(),
               by: x ? x.by : moi.pseudo,
               levee: x ? x.levee : null
@@ -302,10 +381,10 @@
       '<div class="editor">' +
         '<p class="hint">« ' + esc(x.nom) + " » sortira de la liste active. " +
           "L'inscription est conservée : on garde la trace de ce qui s'est passé.</p>" +
-        (x.remboursement === "du"
+        (x.remboursement === "du" && !rien(x.ressources)
           ? '<div class="alert alert--warn">' + svg("alert") +
-            "<span>Il reste <b>" + num(x.montant) + " $</b> à lui rembourser. " +
-            "Lever l'inscription ne solde pas la dette.</span></div>"
+            "<span>Il reste <b>" + esc(MNStore.ressourcesEnClair(x.ressources)) +
+            "</b> à lui rendre. Lever l'inscription ne solde pas la dette.</span></div>"
           : "") +
         '<div class="field"><label class="label" for="b-note">Pourquoi ? (facultatif)</label>' +
           '<input class="input" id="b-note" maxlength="300" placeholder="Arrangement trouvé, dette réglée…"></div>' +
@@ -346,8 +425,9 @@
     if (!x) return;
     const ok = await MNUI.confirm({
       title: "Marquer remboursé",
-      message: (x.montant ? num(x.montant) + " $ ont été rendus à " : "Le remboursement de ") +
-        x.nom + (x.montant ? "." : " est fait.") +
+      message: (rien(x.ressources)
+        ? "Le remboursement de " + x.nom + " est fait."
+        : MNStore.ressourcesEnClair(x.ressources) + " ont été rendus à " + x.nom + ".") +
         " L'inscription reste en place — un remboursement n'efface pas la raison.",
       confirmLabel: "C'est remboursé"
     });

@@ -70,6 +70,48 @@
     dessiner();
   }
 
+  /* ---- Nord ou Sud ---------------------------------------------------------------
+     Quatre listes de l'administration appartiennent aux garages : les objets,
+     les types de contrat, les employés et les grades. Les afficher mélangées
+     obligeait à lire chaque ligne pour savoir de qui on parle.
+
+     Un sous-onglet les sépare donc, comme sur la page Service et comme en V1.
+     Ce qui vaut des deux côtés apparaît dans les deux — ce n'est pas un
+     doublon, c'est bien la même chose vue de chaque garage. */
+
+  let sousAtelier = "";
+
+  const ouSuisJe = () => sousAtelier || MNAuth.atelier() || MNStore.ATELIERS[0].id;
+
+  /** Ne garde que ce qui vaut dans le garage regardé. */
+  const dIci = l => l.filter(x => MNStore.estDeAtelier(x, ouSuisJe()));
+
+  /**
+   * Pose la barre Nord / Sud en tête d'une vue.
+   * @param {Element} z          l'hôte de la vue, déjà dessinée
+   * @param {Function} redessine la vue à rappeler quand on change de garage
+   * @param {Function} [compte]  combien d'entrées dans tel garage
+   */
+  function barreAteliers(z, redessine, compte) {
+    const ici = ouSuisJe();
+    z.insertAdjacentHTML("afterbegin",
+      '<div class="onglets onglets--sous" style="margin-bottom:var(--e-4)">' +
+        MNStore.ATELIERS.map(a => {
+          const n = compte ? compte(a.id) : null;
+          return '<button class="onglet' + (a.id === ici ? " is-actif" : "") +
+            '" type="button" data-sa="' + U.esc(a.id) + '">' + U.esc(a.nom) +
+            (n === null ? "" : ' <span class="onglet__n">' + n + "</span>") + "</button>";
+        }).join("") +
+      "</div>");
+
+    z.querySelectorAll("[data-sa]").forEach(b =>
+      b.addEventListener("click", () => {
+        if (b.dataset.sa === ici) return;
+        sousAtelier = b.dataset.sa;
+        redessine(z);
+      }));
+  }
+
   /* ---- Replis mémorisés ----------------------------------------------------
      Un atelier qui a quinze catégories ne veut pas les replier à chaque
      visite : l'état tient dans le navigateur, pas dans les données. */
@@ -226,7 +268,10 @@
   function vueObjets(z) {
     const cats = brouillon.categories;
     const f = filtre.toLowerCase();
-    const l = brouillon.items.filter(i => !f || i.name.toLowerCase().indexOf(f) !== -1);
+    /* Le garage regardé d'abord : mélanger les deux catalogues obligeait à
+       lire chaque ligne pour savoir de quel atelier elle parle. */
+    const l = dIci(brouillon.items)
+      .filter(i => !f || i.name.toLowerCase().indexOf(f) !== -1);
 
     /* Pendant une recherche, tout est déplié : masquer un résultat trouvé
        serait absurde. L'état enregistré n'est pas touché pour autant. */
@@ -278,6 +323,9 @@
           }).join("")
         : U.vide({ icone: "boite", titre: "Aucun objet",
                    texte: "Clique sur « Nouvel objet » pour commencer." }));
+
+    barreAteliers(z, vueObjets,
+      id => brouillon.items.filter(x => MNStore.estDeAtelier(x, id)).length);
 
     brancherRecherche(z, "#a-cherche", () => vueObjets(z));
     z.querySelector('[data-a="add"]').addEventListener("click", () => editerObjet(null));
@@ -881,7 +929,7 @@
      l'identifiant du type les relie ici. */
 
   function vueCtypes(z) {
-    const types = brouillon.contractTypes || [];
+    const types = dIci(brouillon.contractTypes || []);
     z.innerHTML =
       outils("Les natures de contrat proposées à la rédaction",
         U.bouton("Nouveau type", { variante: "principal", icone: "plus", action: "add" })) +
@@ -908,6 +956,9 @@
       '<p class="champ__aide" style="margin-top:var(--e-4)">La durée proposée remplit la ' +
         "date d'expiration à la création d'un contrat de ce type. Elle reste modifiable, " +
         "et <b>0</b> ne propose rien.</p>";
+
+    barreAteliers(z, vueCtypes,
+      id => (brouillon.contractTypes || []).filter(x => MNStore.estDeAtelier(x, id)).length);
 
     z.querySelector('[data-a="add"]').addEventListener("click", () => editerCtype(null));
     brancherLignes(z, brouillon.contractTypes || [], {
@@ -979,8 +1030,8 @@
       /* L'administration ne gère que l'équipe en poste : les partis se
          consultent sur la page Équipe, onglet Archives. */
       (function () {
-        const vivants = brouillon.users.filter(x => !MNStore.estArchive(x));
-        const partis = brouillon.users.length - vivants.length;
+        const vivants = dIci(brouillon.users.filter(x => !MNStore.estArchive(x)));
+        const partis = brouillon.users.filter(MNStore.estArchive).length;
         return (vivants.length
           ? '<div class="pile pile--sm">' + vivants.map(ligneUser).join("") + "</div>"
           : U.vide({ icone: "equipe", titre: "Aucun employé",
@@ -997,6 +1048,9 @@
             ' — voir <a href="equipe.html">Équipe → Archives</a>.</p>'
           : "");
       })();
+
+    barreAteliers(z, vueUsers, id => brouillon.users.filter(
+      x => !MNStore.estArchive(x) && MNStore.estDeAtelier(x, id)).length);
 
     z.querySelector('[data-a="add"]').addEventListener("click", () => editerUser(null));
     brancherLignes(z, brouillon.users, {
@@ -1204,7 +1258,7 @@
     z.innerHTML =
       outils("Les droits sont portés par le rôle, pas par la personne",
         U.bouton("Nouveau rôle", { variante: "principal", icone: "plus", action: "add" })) +
-      '<div class="pile pile--sm">' + brouillon.roles.map((r, i) => {
+      '<div class="pile pile--sm">' + dIci(brouillon.roles).map((r, i) => {
         const n = brouillon.users.filter(u => u.roleId === r.id).length;
         return '<div class="ad-ligne" data-ligne="' + U.esc(r.id) + '">' +
           fleches(i, brouillon.roles.length) +
@@ -1222,6 +1276,9 @@
                            titre: "Supprimer", action: "del" }) +
           "</div></div>";
       }).join("") + "</div>";
+
+    barreAteliers(z, vueRoles,
+      id => brouillon.roles.filter(x => MNStore.estDeAtelier(x, id)).length);
 
     z.querySelector('[data-a="add"]').addEventListener("click", () => editerRole(null));
     brancherLignes(z, brouillon.roles, { edit: r => editerRole(r), del: r => supprimerRole(r) });

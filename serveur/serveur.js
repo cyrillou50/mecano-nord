@@ -688,11 +688,24 @@ const LISTES = {
         by: texte(x.levee.by, 60),
         note: texte(x.levee.note, 300)
       } : null;
+      /* Ce qu'on doit rendre se compte en ressources, pas en dollars :
+         l'atelier facture en Ferraille et en Plastique. Le serveur ne connaît
+         pas la liste des ressources et n'a pas à la connaître — il vérifie la
+         forme, le catalogue vérifie le sens. */
+      const ressources = {};
+      if (rb !== "aucun" && x.ressources && typeof x.ressources === "object") {
+        Object.keys(x.ressources).slice(0, 20).forEach(k => {
+          if (!/^[A-Za-z0-9_.:@+-]{1,60}$/.test(k)) return;
+          const q = nombre(x.ressources[k], 0, 1e6);
+          if (q > 0) ressources[k] = q;
+        });
+      }
+
       return {
         id, nom,
         raison: texte(x.raison, 600),
         remboursement: rb,
-        montant: rb === "aucun" ? 0 : nombre(x.montant, 0, 1e9),
+        ressources,
         at: dateIso(x.at) || new Date().toISOString(),
         by: texte(x.by, 60),
         levee
