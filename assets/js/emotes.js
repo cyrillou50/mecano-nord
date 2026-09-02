@@ -9,6 +9,9 @@
    Ouverte à tous en lecture. La permission « emotes » ouvre l'ajout, la
    correction et la suppression. La liste vit sur le serveur (voir
    listes.js) : l'écrire ne demande pas le droit de publier le site.
+
+   Chaque garage a la sienne. On ne voit ici que celles du garage où l'on
+   travaille — le bouton Nord / Sud de la barre du haut change les deux.
    ========================================================================== */
 
 (function () {
@@ -38,7 +41,14 @@
 
   /* ---- Lecture ------------------------------------------------------------- */
 
-  const toutes = () => L.liste();
+  /* Tout ce que le serveur tient, les deux garages confondus. Les écritures
+     partent de là : n'envoyer que ce qu'on voit effacerait l'autre côté. */
+  const brut = () => L.liste();
+
+  const ici = () => MNAuth.atelier();
+
+  /** Celles du garage où l'on travaille. */
+  const toutes = () => brut().filter(e => MNStore.estDeAtelier(e, ici()));
 
   function liste() {
     const q = filtre.trim().toLowerCase();
@@ -76,8 +86,8 @@
 
     $("#emotes-root").innerHTML =
       '<h1 class="page-title">Émotes</h1>' +
-      '<p class="page-sub">Les animations du serveur de jeu. ' +
-        "Clique sur une commande pour la copier.</p>" +
+      '<p class="page-sub">Les animations du serveur de jeu au ' +
+        esc(MNStore.nomAtelier(ici())) + ". Clique sur une commande pour la copier.</p>" +
 
       (peutGerer || total
         ? '<div class="row row--wrap" style="margin-bottom:18px">' +
@@ -201,7 +211,24 @@
     "</div>";
   }
 
-  const trouver = id => toutes().find(e => e.id === id) || null;
+  const trouver = id => brut().find(e => e.id === id) || null;
+
+  /* ---- Le garage où vaut une entrée ------------------------------------------
+     Même contrôle que dans l'administration : des cases, une par garage. Une
+     émote peut valoir des deux côtés — beaucoup le font. */
+
+  function champAteliers(id, choisis) {
+    return '<div class="fieldset"><span class="label">Ateliers</span>' +
+      '<div class="motifs" id="' + id + '">' +
+        MNStore.ATELIERS.map(a =>
+          '<label class="motif"><input type="checkbox" value="' + esc(a.id) + '"' +
+            (choisis.indexOf(a.id) !== -1 ? " checked" : "") + ">" +
+            "<span>" + esc(a.nom) + "</span></label>").join("") +
+      "</div></div>";
+  }
+
+  const lireAteliers = id => [...document.querySelectorAll("#" + id + " input:checked")]
+    .map(x => x.value);
 
   /* ---- Écriture -------------------------------------------------------------
      Le serveur applique l'opération sur la liste qu'il relit : deux personnes
@@ -247,6 +274,7 @@
         '<div class="field"><label class="label" for="e-note">Note</label>' +
           '<input class="input" id="e-note" maxlength="200" placeholder="Quand l\'utiliser, ce qu\'elle montre…" value="' +
             esc(e ? e.note : "") + '"></div>' +
+        champAteliers("e-at", e ? MNStore.ateliersDe(e) : [ici()]) +
       "</div>";
 
     MNUI.modal({
@@ -262,16 +290,20 @@
             if (!nom && !cmd) return MNUI.toast("Il faut au moins un nom ou une commande", "err");
             if (cmd && cmd[0] !== "/") cmd = "/" + cmd;
 
+            const ats = lireAteliers("e-at");
+            if (!ats.length) return MNUI.toast("Choisis au moins un garage", "err");
+
             const entree = {
-              id: e ? e.id : MNStore.uniqueId(nom || cmd, toutes().map(x => x.id)),
+              id: e ? e.id : MNStore.uniqueId(nom || cmd, brut().map(x => x.id)),
               nom: nom || cmd,
               commande: cmd,
               categorie: body.querySelector("#e-cat").value.trim(),
-              note: body.querySelector("#e-note").value.trim()
+              note: body.querySelector("#e-note").value.trim(),
+              ateliers: ats
             };
 
             /* Ce que la liste doit devenir, pour le repli sans serveur. */
-            const l = MNStore.clone(toutes());
+            const l = MNStore.clone(brut());
             const i = l.findIndex(x => x.id === entree.id);
             if (i === -1) l.push(entree); else l[i] = entree;
 
@@ -291,7 +323,7 @@
       confirmLabel: "Supprimer", danger: true
     });
     if (!ok) return;
-    ecrire({ op: "remove", id: e.id }, toutes().filter(x => x.id !== e.id), "Émote supprimée");
+    ecrire({ op: "remove", id: e.id }, brut().filter(x => x.id !== e.id), "Émote supprimée");
   }
 
   /* ---- Import en masse --------------------------------------------------------
@@ -374,29 +406,54 @@
             if (!lues.length) return MNUI.toast("Rien à importer", "err");
 
             const vider = body.querySelector("#i-vider").checked;
+            const ou = ici();
+
+            /* « Remplacer » ne remplace que le garage regardé. Ce qui ne le
+               concerne pas voyage avec l'envoi, sans quoi l'autre côté serait
+               effacé. Et une émote partagée n'est pas « d'ailleurs » : vider
+               ici lui retire ce garage, ça ne la supprime pas chez le voisin. */
+            const ailleurs = [];
+            brut().forEach(x => {
+              const ats = MNStore.ateliersDe(x);
+              if (ats.indexOf(ou) === -1) return ailleurs.push(x);
+              if (!vider) return;                    // gardée dans la liste d'ici
+              const reste = ats.filter(a => a !== ou);
+              if (reste.length) ailleurs.push(Object.assign({}, x, { ateliers: reste }));
+            });
+
             const l = vider ? [] : MNStore.clone(toutes());
             let ajout = 0, maj = 0;
 
             lues.forEach(e => {
+              e.ateliers = [ou];
               /* La commande fait l'identité : c'est elle qu'on tape, et deux
                  émotes ne peuvent pas partager la même. À défaut, le nom. */
               const memeQue = x => e.commande
                 ? x.commande === e.commande
                 : x.nom.toLowerCase() === e.nom.toLowerCase();
               const deja = l.find(memeQue);
-              if (deja) { Object.assign(deja, e, { id: deja.id }); maj++; }
-              else {
-                l.push(Object.assign({ id: MNStore.uniqueId(e.nom || e.commande, l.map(x => x.id)) }, e));
+              if (deja) {
+                /* Une émote déjà partagée le reste : l'import ne la retire pas
+                   du garage d'à côté. */
+                Object.assign(deja, e, { id: deja.id, ateliers: MNStore.ateliersDe(deja) });
+                maj++;
+              } else {
+                l.push(Object.assign({
+                  id: MNStore.uniqueId(e.nom || e.commande, brut().map(x => x.id))
+                }, e));
                 ajout++;
               }
             });
 
+            const complet = ailleurs.concat(l);
+
             fermer();
             /* Un import remplace la liste d'un bloc : entrée par entrée, ce
                serait trois cents allers-retours pour un seul geste. */
-            ecrire({ op: "remplacer", entrees: l }, l,
+            ecrire({ op: "remplacer", entrees: complet }, complet,
                    ajout + " ajoutée" + (ajout > 1 ? "s" : "") +
-                   (maj ? ", " + maj + " mise" + (maj > 1 ? "s" : "") + " à jour" : ""));
+                   (maj ? ", " + maj + " mise" + (maj > 1 ? "s" : "") + " à jour" : "") +
+                   " au " + MNStore.nomAtelier(ou));
           }
         }
       ]

@@ -5,7 +5,8 @@
    « blacklist », et une inscription levée garde sa trace au lieu de
    disparaître. La liste vit sur le serveur (voir listes.js) : inscrire
    quelqu'un est le geste de celui qui tient le comptoir, pas de celui qui
-   publie le site. Ce qui change, c'est la mise en page.
+   publie le site. Chaque garage tient sa liste. Ce qui change, c'est la mise
+   en page.
    ========================================================================== */
 
 (function () {
@@ -34,7 +35,14 @@
 
   /* ---- Lecture ------------------------------------------------------------- */
 
-  const toutes = () => L.liste();
+  /* Tout ce que le serveur tient, les deux garages confondus. Les écritures
+     partent de là : n'envoyer que ce qu'on voit effacerait l'autre côté. */
+  const brut = () => L.liste();
+
+  const ici = () => MNAuth.atelier();
+
+  /** Celles du garage où l'on travaille. */
+  const toutes = () => brut().filter(x => MNStore.estDeAtelier(x, ici()));
   const actives = () => toutes().filter(x => !x.levee);
   const levees = () => toutes().filter(x => x.levee);
 
@@ -195,7 +203,23 @@
     par("del", supprimer);
   }
 
-  const trouver = id => toutes().find(x => x.id === id) || null;
+  const trouver = id => brut().find(x => x.id === id) || null;
+
+  /* ---- Le garage où vaut une inscription -------------------------------------
+     Des cases, une par garage. Un client peut être refusé des deux côtés. */
+
+  function champAteliers(id, choisis) {
+    return '<div class="champ"><span class="champ__label">Ateliers</span>' +
+      '<div class="rang" id="' + id + '">' +
+        MNStore.ATELIERS.map(a =>
+          U.champ({ id: id + "-" + a.id, type: "bascule", label: a.nom,
+                    valeur: choisis.indexOf(a.id) !== -1 })).join("") +
+      "</div></div>";
+  }
+
+  const lireAteliers = id => MNStore.ATELIERS
+    .filter(a => { const c = document.getElementById(id + "-" + a.id); return c && c.checked; })
+    .map(a => a.id);
 
   /* ---- Écriture -------------------------------------------------------------
      Le serveur applique l'opération sur la liste qu'il relit : deux personnes
@@ -212,7 +236,7 @@
 
   /** Envoie une entrée modifiée, et la liste correspondante pour le repli. */
   function poser(entree, message) {
-    const l = MNStore.clone(toutes());
+    const l = MNStore.clone(brut());
     const i = l.findIndex(x => x.id === entree.id);
     if (i === -1) l.unshift(entree); else l[i] = entree;
     ecrire({ op: "set", entree }, l, message);
@@ -236,6 +260,7 @@
         U.champ({ id: "b-rb", type: "liste", label: "Remboursement",
                   valeur: x ? x.remboursement : "aucun",
                   options: MNStore.REMBOURSEMENTS.map(r => ({ valeur: r.id, nom: r.nom })) }) +
+        champAteliers("b-at", x ? MNStore.ateliersDe(x) : [ici()]) +
         '<div class="champ" id="b-resbloc">' +
           '<span class="champ__label">Ce qu\'on doit rendre</span>' +
           '<div class="pile pile--sm" id="b-res"></div>' +
@@ -256,6 +281,9 @@
             const raison = corps.querySelector("#b-raison").value.trim();
             if (!raison) return U.toast("Dis pourquoi : sans raison, l'inscription ne sert à personne", "erreur");
 
+            const ats = lireAteliers("b-at");
+            if (!ats.length) return U.toast("Choisis au moins un garage", "erreur");
+
             const rb = corps.querySelector("#b-rb").value;
             const ressources = {};
             if (rb !== "aucun") {
@@ -268,8 +296,8 @@
             }
 
             const entree = Object.assign({}, x || {}, {
-              id: x ? x.id : MNStore.uniqueId(nom, toutes().map(y => y.id)),
-              nom, raison, remboursement: rb, ressources,
+              id: x ? x.id : MNStore.uniqueId(nom, brut().map(y => y.id)),
+              nom, raison, remboursement: rb, ressources, ateliers: ats,
               at: x ? x.at : new Date().toISOString(),
               by: x ? x.by : moi.pseudo,
               levee: x ? x.levee : null
@@ -402,6 +430,6 @@
       confirmer: "Supprimer", danger: true
     });
     if (!ok) return;
-    ecrire({ op: "remove", id: x.id }, toutes().filter(y => y.id !== x.id), "Inscription supprimée");
+    ecrire({ op: "remove", id: x.id }, brut().filter(y => y.id !== x.id), "Inscription supprimée");
   }
 })();

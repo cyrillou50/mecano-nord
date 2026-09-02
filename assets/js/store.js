@@ -471,6 +471,13 @@ window.MNStore = (function () {
     (_catalog.users || []).filter(u => estDeAtelier(u, atelier));
 
   /** Les heures attendues sur la semaine dans un atelier. 0 = aucun minimum. */
+  /** Le livret du garage demandé, ou de celui où l'on travaille. */
+  const livretDe = ou => {
+    const l = settings().livret;
+    const id = TOUS_ATELIERS.indexOf(ou) !== -1 ? ou : _atelier;
+    return (l && typeof l === "object" ? l[id] : "") || "";
+  };
+
   const minimumDe = ou => {
     const m = (_catalog.settings && _catalog.settings.minimum) || {};
     const v = Number(m[ou || _atelier]);
@@ -558,11 +565,22 @@ window.MNStore = (function () {
       /* Chacun peut-il se composer ses propres couleurs ? Vrai par défaut :
          c'est un confort personnel qui n'affecte personne d'autre. */
       themeLibre: s.themeLibre !== false,
-      /* Le livret de l'atelier : ce qu'un nouveau doit savoir, écrit par
-         l'équipe. Il sert deux fois — il se lit tel quel, et c'est lui que
-         l'assistant relit pour répondre. Commun aux deux garages : c'est le
-         métier qu'il décrit, pas les horaires d'un site. */
-      livret: String(s.livret || "").slice(0, 20000),
+      /* Le livret : ce qu'un nouveau doit savoir, écrit par l'équipe. Il sert
+         deux fois — il se lit tel quel, et c'est lui que l'assistant relit
+         pour répondre.
+
+         Un par garage : les deux ateliers n'ont ni les mêmes horaires, ni les
+         mêmes habitudes, ni les mêmes gens à qui s'adresser. Un livret écrit
+         avant la séparation était unique — on le recopie des deux côtés
+         plutôt que de choisir à qui l'enlever. */
+      livret: (function (v) {
+        const o = {};
+        const ancien = typeof v === "string" ? v.slice(0, 20000) : "";
+        TOUS_ATELIERS.forEach(id => {
+          o[id] = String((v && typeof v === "object" ? v[id] : "") || ancien).slice(0, 20000);
+        });
+        return o;
+      })(s.livret),
       /* Heures attendues sur la semaine, garage par garage : le Sud n'a pas
          forcément le même rythme que le Nord. 0 = on ne signale personne.
          Le récapitulatif du dimanche et la jauge de la page Service lisent
@@ -898,8 +916,8 @@ window.MNStore = (function () {
        liste, parce qu'elle vit ailleurs et que personne ne la retient. Un nom
        en clair, la commande à taper, et de quoi ranger.
 
-       Commune aux deux garages : ce sont les émotes du jeu, pas celles d'un
-       site. */
+       Chaque garage a la sienne. Sans mention, une émote vaut des deux côtés :
+       une liste écrite avant la séparation ne doit disparaître nulle part. */
     const seenE = [];
     c.emotes = (Array.isArray(c.emotes) ? c.emotes : []).map(e => {
       const id = uniqueId(e.id || e.nom || e.name, seenE); seenE.push(id);
@@ -914,7 +932,8 @@ window.MNStore = (function () {
         })(e.commande || e.cmd),
         /* Texte libre : « Mécanique », « Accueil »… Vide = « Sans catégorie ». */
         categorie: String(e.categorie || e.cat || "").trim().slice(0, 40),
-        note: String(e.note || "").slice(0, 200)
+        note: String(e.note || "").slice(0, 200),
+        ateliers: normAteliers(e.ateliers, TOUS_ATELIERS)
       };
     }).filter(e => e.nom || e.commande);
 
@@ -923,7 +942,9 @@ window.MNStore = (function () {
        supprimée : elle sort de la liste active mais garde sa trace, comme un
        avertissement. On doit pouvoir dire qu'elle a existé et qui l'a levée.
 
-       Commune aux deux garages : un client refusé au Nord l'est au Sud. */
+       Chaque garage tient la sienne — un client peut avoir un compte à régler
+       d'un côté seulement. Sans mention, l'inscription vaut des deux côtés :
+       ce qui était écrit avant la séparation ne s'efface nulle part. */
     const seenB = [];
     c.blacklist = (Array.isArray(c.blacklist) ? c.blacklist : []).map(x => {
       const id = uniqueId(x.id || x.nom || String(Date.now()), seenB); seenB.push(id);
@@ -947,6 +968,7 @@ window.MNStore = (function () {
           });
           return o;
         })(x.ressources),
+        ateliers: normAteliers(x.ateliers, TOUS_ATELIERS),
         at: x.at || new Date().toISOString(),
         by: String(x.by || "").slice(0, 60),
         levee: x.levee && typeof x.levee === "object"
@@ -1302,7 +1324,7 @@ window.MNStore = (function () {
     topCategories, subCategories, categoryScope, itemLabel, totals, duree,
     ATELIERS, atelierById, nomAtelier, courtAtelier,
     ateliersDe, estDeAtelier, usersDeAtelier, rolesDeAtelier, normAteliers,
-    setAtelier, atelier, roleIdDe, estMasqueIci, estMasquePartout, minimumDe,
+    setAtelier, atelier, roleIdDe, estMasqueIci, estMasquePartout, minimumDe, livretDe,
     memeNom, soucisHomonyme,
     MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,
     REMBOURSEMENTS, remboursementDe, sommeRessources, ressourcesEnClair,

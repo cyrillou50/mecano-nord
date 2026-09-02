@@ -12,6 +12,10 @@
 
    La liste vit sur le serveur (voir listes.js) : inscrire quelqu'un est le
    geste de celui qui tient le comptoir, pas celui de qui publie le site.
+
+   Chaque garage tient la sienne. On ne voit ici que les inscriptions du
+   garage où l'on travaille — un client peut avoir un compte à régler d'un
+   côté seulement. Le bouton Nord / Sud de la barre du haut change de liste.
    ========================================================================== */
 
 (function () {
@@ -38,7 +42,14 @@
 
   /* ---- Lecture ------------------------------------------------------------- */
 
-  const toutes = () => L.liste();
+  /* Tout ce que le serveur tient, les deux garages confondus. Les écritures
+     partent de là : n'envoyer que ce qu'on voit effacerait l'autre côté. */
+  const brut = () => L.liste();
+
+  const ici = () => MNAuth.atelier();
+
+  /** Celles du garage où l'on travaille. */
+  const toutes = () => brut().filter(x => MNStore.estDeAtelier(x, ici()));
   const actives = () => toutes().filter(x => !x.levee);
   const levees = () => toutes().filter(x => x.levee);
 
@@ -78,7 +89,8 @@
 
     $("#blacklist-root").innerHTML =
       '<h1 class="page-title">Blacklist</h1>' +
-      '<p class="page-sub">Les clients qu\'on ne sert plus, et pourquoi</p>' +
+      '<p class="page-sub">Les clients qu\'on ne sert plus au ' +
+        esc(MNStore.nomAtelier(ici())) + ", et pourquoi</p>" +
 
       (peutGerer || total
         ? '<div class="row row--wrap" style="margin-bottom:18px">' +
@@ -227,7 +239,24 @@
     par("del", supprimer);
   }
 
-  const trouver = id => toutes().find(x => x.id === id) || null;
+  const trouver = id => brut().find(x => x.id === id) || null;
+
+  /* ---- Le garage où vaut une inscription -------------------------------------
+     Même contrôle que dans l'administration : des cases, une par garage. Un
+     client peut être refusé des deux côtés — c'est même le cas courant. */
+
+  function champAteliers(id, choisis) {
+    return '<div class="fieldset"><span class="label">Ateliers</span>' +
+      '<div class="motifs" id="' + id + '">' +
+        MNStore.ATELIERS.map(a =>
+          '<label class="motif"><input type="checkbox" value="' + esc(a.id) + '"' +
+            (choisis.indexOf(a.id) !== -1 ? " checked" : "") + ">" +
+            "<span>" + esc(a.nom) + "</span></label>").join("") +
+      "</div></div>";
+  }
+
+  const lireAteliers = id => [...document.querySelectorAll("#" + id + " input:checked")]
+    .map(x => x.value);
 
   /* ---- Écriture -------------------------------------------------------------
      Le serveur applique l'opération sur la liste qu'il relit : deux personnes
@@ -243,7 +272,7 @@
 
   /** Envoie une entrée modifiée, et la liste correspondante pour le repli. */
   function poser(entree, message) {
-    const l = MNStore.clone(toutes());
+    const l = MNStore.clone(brut());
     const i = l.findIndex(x => x.id === entree.id);
     if (i === -1) l.unshift(entree); else l[i] = entree;
     ecrire({ op: "set", entree }, l, message);
@@ -268,6 +297,7 @@
                 (x && x.remboursement === r.id ? " selected" : "") + ">" +
                 esc(r.nom) + "</option>").join("") +
           "</select></div>" +
+        champAteliers("b-at", x ? MNStore.ateliersDe(x) : [ici()]) +
         '<div class="field" id="b-resbloc">' +
           '<label class="label">Ce qu\'on doit rendre</label>' +
           '<div class="costs" id="b-res"></div>' +
@@ -347,6 +377,9 @@
             const raison = body.querySelector("#b-raison").value.trim();
             if (!raison) return MNUI.toast("Dis pourquoi : sans raison, l'inscription ne sert à personne", "err");
 
+            const ats = lireAteliers("b-at");
+            if (!ats.length) return MNUI.toast("Choisis au moins un garage", "err");
+
             const rb = body.querySelector("#b-rb").value;
             const ressources = {};
             if (rb !== "aucun") {
@@ -359,8 +392,8 @@
             }
 
             const entree = Object.assign({}, x || {}, {
-              id: x ? x.id : MNStore.uniqueId(nom, toutes().map(y => y.id)),
-              nom, raison, remboursement: rb, ressources,
+              id: x ? x.id : MNStore.uniqueId(nom, brut().map(y => y.id)),
+              nom, raison, remboursement: rb, ressources, ateliers: ats,
               at: x ? x.at : new Date().toISOString(),
               by: x ? x.by : moi.pseudo,
               levee: x ? x.levee : null
@@ -444,6 +477,6 @@
       confirmLabel: "Supprimer", danger: true
     });
     if (!ok) return;
-    ecrire({ op: "remove", id: x.id }, toutes().filter(y => y.id !== x.id), "Inscription supprimée");
+    ecrire({ op: "remove", id: x.id }, brut().filter(y => y.id !== x.id), "Inscription supprimée");
   }
 })();

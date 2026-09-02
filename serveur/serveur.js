@@ -646,6 +646,14 @@ function nettoyerRegistre(r) {
 
 const LISTE_VIDE = { updatedAt: new Date(0).toISOString(), entrees: [] };
 
+/* Les garages où vaut une entrée. Sans mention, elle vaut partout : une liste
+   écrite avant la séparation ne doit disparaître nulle part. */
+function ateliersDe(v) {
+  const l = (Array.isArray(v) ? v : []).map(String)
+    .filter(x => ATELIERS_CONNUS.indexOf(x) !== -1);
+  return l.length ? ATELIERS_CONNUS.filter(x => l.indexOf(x) !== -1) : ATELIERS_CONNUS.slice();
+}
+
 /* Chaque liste dit comment nettoyer une de ses entrées. Le serveur ne fait
    pas confiance à ce qui arrive : il ne garde que les champs qu'il connaît,
    à la longueur qu'il accepte. */
@@ -667,7 +675,8 @@ const LISTES = {
            recopiant la liste du jeu. */
         commande: cmd && cmd[0] !== "/" ? "/" + cmd : cmd,
         categorie: texte(e.categorie, 40).trim(),
-        note: texte(e.note, 200)
+        note: texte(e.note, 200),
+        ateliers: ateliersDe(e.ateliers)
       };
     }
   },
@@ -706,6 +715,7 @@ const LISTES = {
         raison: texte(x.raison, 600),
         remboursement: rb,
         ressources,
+        ateliers: ateliersDe(x.ateliers),
         at: dateIso(x.at) || new Date().toISOString(),
         by: texte(x.by, 60),
         levee

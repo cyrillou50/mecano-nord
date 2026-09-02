@@ -2201,9 +2201,11 @@
      l'assistant s'en accommode très bien. */
 
   function paneLivret(host) {
-    const t = MNStore.settings().livret || "";
+    const ou = ouSuisJe();
+    const t = (draft.settings.livret && draft.settings.livret[ou]) || "";
     host.innerHTML =
-      '<div class="panel"><div class="panel__head"><h2>Livret de l\'atelier</h2>' +
+      '<div class="panel"><div class="panel__head"><h2>Livret — ' +
+        esc(MNStore.nomAtelier(ou)) + "</h2>" +
         '<span class="spacer"></span>' +
         '<a class="btn btn--ghost btn--sm" href="livret.html">' + svg("ext") +
           "<span>Voir la page</span></a>" +
@@ -2213,6 +2215,9 @@
             "l'assistant relit pour répondre aux questions des apprentis. Écris-le " +
             "comme tu le dirais : une ligne vide sépare deux paragraphes, une ligne " +
             "qui commence par un tiret fait une puce.</p>" +
+          '<p class="hint">' +
+            "Chaque garage a le sien : celui-ci ne se lit qu'au " +
+            esc(MNStore.nomAtelier(ou)) + ".</p>" +
           '<div class="field"><textarea class="textarea" id="l-txt" rows="22" ' +
             'maxlength="20000" placeholder="Ex.\n\nBienvenue à l\'atelier.\n\n' +
             "- On pointe en arrivant, on dépointe en partant.\n" +
@@ -2224,14 +2229,21 @@
           "</div>" +
         "</div></div>";
 
+    /* La barre se pose après le dessin : c'est elle qui rappellera la vue.
+       Le compteur dit lequel des deux est déjà écrit. */
+    barreAteliers(host, paneLivret,
+      id => ((draft.settings.livret && draft.settings.livret[id]) || "").trim() ? 1 : 0);
+
     const zone = $("#l-txt");
     zone.addEventListener("input", () => {
       $("#l-n").textContent = zone.value.length + " / 20000";
     });
     $("#l-save").addEventListener("click", () => {
-      draft.settings.livret = zone.value.slice(0, 20000);
+      /* On n'écrit que le garage regardé : l'autre garde le sien. */
+      draft.settings.livret = Object.assign({}, draft.settings.livret,
+        { [ou]: zone.value.slice(0, 20000) });
       commit();
-      MNUI.toast("Livret enregistré" +
+      MNUI.toast("Livret du " + MNStore.nomAtelier(ou) + " enregistré" +
         (MNGitHub.autoActif() ? "" : " — pense à publier"), "ok");
     });
   }

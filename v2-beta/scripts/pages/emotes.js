@@ -3,7 +3,8 @@
 
    Même liste et mêmes règles que la V1 : le site ne joue rien, il tient le
    mémo, et ce mémo vit sur le serveur (voir listes.js) — l'écrire ne demande
-   pas le droit de publier. Ce qui change, c'est la mise en page.
+   pas le droit de publier. Chaque garage a sa liste. Ce qui change, c'est la
+   mise en page.
    ========================================================================== */
 
 (function () {
@@ -48,7 +49,14 @@
 
   /* ---- Lecture ------------------------------------------------------------- */
 
-  const toutes = () => L.liste();
+  /* Tout ce que le serveur tient, les deux garages confondus. Les écritures
+     partent de là : n'envoyer que ce qu'on voit effacerait l'autre côté. */
+  const brut = () => L.liste();
+
+  const ici = () => MNAuth.atelier();
+
+  /** Celles du garage où l'on travaille. */
+  const toutes = () => brut().filter(e => MNStore.estDeAtelier(e, ici()));
 
   function liste() {
     const q = filtre.trim().toLowerCase();
@@ -175,7 +183,23 @@
     "</div>";
   }
 
-  const trouver = id => toutes().find(e => e.id === id) || null;
+  const trouver = id => brut().find(e => e.id === id) || null;
+
+  /* ---- Le garage où vaut une entrée ------------------------------------------
+     Des cases, une par garage. Une émote peut valoir des deux côtés. */
+
+  function champAteliers(id, choisis) {
+    return '<div class="champ"><span class="champ__label">Ateliers</span>' +
+      '<div class="rang" id="' + id + '">' +
+        MNStore.ATELIERS.map(a =>
+          U.champ({ id: id + "-" + a.id, type: "bascule", label: a.nom,
+                    valeur: choisis.indexOf(a.id) !== -1 })).join("") +
+      "</div></div>";
+  }
+
+  const lireAteliers = id => MNStore.ATELIERS
+    .filter(a => { const c = document.getElementById(id + "-" + a.id); return c && c.checked; })
+    .map(a => a.id);
 
   /** Le presse-papier, avec le repli des navigateurs qui le refusent. */
   async function copier(texte) {
@@ -234,6 +258,7 @@
         U.champ({ id: "e-note", label: "Note", max: 200,
                   repere: "Quand l'utiliser, ce qu'elle montre…",
                   valeur: e ? e.note : "" }) +
+        champAteliers("e-at", e ? MNStore.ateliersDe(e) : [ici()]) +
       "</div>",
       actions: [
         { label: "Annuler", onClick: f => f() },
@@ -245,16 +270,20 @@
             if (!nom && !cmd) return U.toast("Il faut au moins un nom ou une commande", "erreur");
             if (cmd && cmd[0] !== "/") cmd = "/" + cmd;
 
+            const ats = lireAteliers("e-at");
+            if (!ats.length) return U.toast("Choisis au moins un garage", "erreur");
+
             const entree = {
-              id: e ? e.id : MNStore.uniqueId(nom || cmd, toutes().map(x => x.id)),
+              id: e ? e.id : MNStore.uniqueId(nom || cmd, brut().map(x => x.id)),
               nom: nom || cmd,
               commande: cmd,
               categorie: corps.querySelector("#e-cat").value.trim(),
-              note: corps.querySelector("#e-note").value.trim()
+              note: corps.querySelector("#e-note").value.trim(),
+              ateliers: ats
             };
 
             /* Ce que la liste doit devenir, pour le repli sans serveur. */
-            const l = MNStore.clone(toutes());
+            const l = MNStore.clone(brut());
             const i = l.findIndex(x => x.id === entree.id);
             if (i === -1) l.push(entree); else l[i] = entree;
 
@@ -274,7 +303,7 @@
       confirmer: "Supprimer", danger: true
     });
     if (!ok) return;
-    ecrire({ op: "remove", id: e.id }, toutes().filter(x => x.id !== e.id), "Émote supprimée");
+    ecrire({ op: "remove", id: e.id }, brut().filter(x => x.id !== e.id), "Émote supprimée");
   }
 
   /* ---- Import en masse --------------------------------------------------------
@@ -334,29 +363,53 @@
             if (!lues.length) return U.toast("Rien à importer", "erreur");
 
             const vider = corps.querySelector("#i-vider").checked;
+            const ou = ici();
+
+            /* « Remplacer » ne remplace que le garage regardé. Ce qui ne le
+               concerne pas voyage avec l'envoi, sans quoi l'autre côté serait
+               effacé. Et une émote partagée n'est pas « d'ailleurs » : vider
+               ici lui retire ce garage, ça ne la supprime pas chez le voisin. */
+            const ailleurs = [];
+            brut().forEach(x => {
+              const ats = MNStore.ateliersDe(x);
+              if (ats.indexOf(ou) === -1) return ailleurs.push(x);
+              if (!vider) return;                    // gardée dans la liste d'ici
+              const reste = ats.filter(a => a !== ou);
+              if (reste.length) ailleurs.push(Object.assign({}, x, { ateliers: reste }));
+            });
+
             const l = vider ? [] : MNStore.clone(toutes());
             let ajout = 0, maj = 0;
 
             lues.forEach(e => {
+              e.ateliers = [ou];
               /* La commande fait l'identité : c'est elle qu'on tape, et deux
                  émotes ne peuvent pas partager la même. À défaut, le nom. */
               const memeQue = x => e.commande
                 ? x.commande === e.commande
                 : x.nom.toLowerCase() === e.nom.toLowerCase();
               const deja = l.find(memeQue);
-              if (deja) { Object.assign(deja, e, { id: deja.id }); maj++; }
-              else {
-                l.push(Object.assign({ id: MNStore.uniqueId(e.nom || e.commande, l.map(x => x.id)) }, e));
+              if (deja) {
+                /* Une émote déjà partagée le reste : l'import ne la retire pas
+                   du garage d'à côté. */
+                Object.assign(deja, e, { id: deja.id, ateliers: MNStore.ateliersDe(deja) });
+                maj++;
+              } else {
+                l.push(Object.assign({
+                  id: MNStore.uniqueId(e.nom || e.commande, brut().map(x => x.id))
+                }, e));
                 ajout++;
               }
             });
 
+            const complet = ailleurs.concat(l);
             fermer();
             /* Un import remplace la liste d'un bloc : entrée par entrée, ce
                serait trois cents allers-retours pour un seul geste. */
-            ecrire({ op: "remplacer", entrees: l }, l,
+            ecrire({ op: "remplacer", entrees: complet }, complet,
                    ajout + " ajoutée" + (ajout > 1 ? "s" : "") +
-                   (maj ? ", " + maj + " mise" + (maj > 1 ? "s" : "") + " à jour" : ""));
+                   (maj ? ", " + maj + " mise" + (maj > 1 ? "s" : "") + " à jour" : "") +
+                   " au " + MNStore.nomAtelier(ou));
           }
         }
       ]

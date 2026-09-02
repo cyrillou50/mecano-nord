@@ -167,9 +167,10 @@
      l'assistant s'en accommode très bien. */
 
   function vueLivret(z) {
-    const t = MNStore.settings().livret || "";
+    const ou = ouSuisJe();
+    const t = (brouillon.settings.livret && brouillon.settings.livret[ou]) || "";
     z.innerHTML = U.carte({
-      titre: "Livret de l'atelier",
+      titre: "Livret — " + MNStore.nomAtelier(ou),
       actions: '<a class="btn btn--fantome btn--sm" href="livret.html">' +
         U.icone("fleche") + "<span>Voir la page</span></a>",
       corps:
@@ -177,6 +178,8 @@
           "que l'assistant relit pour répondre aux questions des apprentis. " +
           "Écris-le comme tu le dirais : une ligne vide sépare deux paragraphes, " +
           "une ligne qui commence par un tiret fait une puce.</p>" +
+        '<p class="champ__aide">Chaque garage a le sien : celui-ci ne se lit ' +
+          "qu'au " + MNStore.nomAtelier(ou) + ".</p>" +
         '<textarea class="saisie" id="l-txt" rows="20" maxlength="20000" ' +
           'style="width:100%;margin-top:var(--e-3)">' + U.esc(t) + "</textarea>" +
         '<div class="rang" style="justify-content:space-between;margin-top:var(--e-3)">' +
@@ -186,14 +189,21 @@
         "</div>"
     });
 
+    /* La barre se pose après le dessin : c'est elle qui rappellera la vue.
+       Le compteur dit lequel des deux est déjà écrit. */
+    barreAteliers(z, vueLivret,
+      id => ((brouillon.settings.livret && brouillon.settings.livret[id]) || "").trim() ? 1 : 0);
+
     const zone = z.querySelector("#l-txt");
     zone.addEventListener("input", () => {
       z.querySelector("#l-n").textContent = zone.value.length + " / 20000";
     });
     z.querySelector('[data-a="lsave"]').addEventListener("click", () => {
-      brouillon.settings.livret = zone.value.slice(0, 20000);
+      /* On n'écrit que le garage regardé : l'autre garde le sien. */
+      brouillon.settings.livret = Object.assign({}, brouillon.settings.livret,
+        { [ou]: zone.value.slice(0, 20000) });
       valider();
-      U.toast("Livret enregistré" +
+      U.toast("Livret du " + MNStore.nomAtelier(ou) + " enregistré" +
         (MNGitHub.autoActif() ? "" : " — pense à publier"), "ok");
     });
   }

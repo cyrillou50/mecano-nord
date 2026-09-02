@@ -124,7 +124,7 @@
       l.push("TYPES DE CONTRAT : " + types.map(t => t.name).join(", "));
     }
 
-    const livret = (MNStore.settings().livret || "").trim();
+    const livret = MNStore.livretDe(MNAuth.atelier()).trim();
     l.push("");
     l.push("LIVRET DE L'ATELIER :");
     l.push(livret || "(aucun livret n'a encore été écrit)");
@@ -135,7 +135,7 @@
   /* ---- Rendu ---- */
 
   function dessiner() {
-    const livret = (MNStore.settings().livret || "").trim();
+    const livret = MNStore.livretDe(MNAuth.atelier()).trim();
     const peutEcrire = V2Shell.peut("admin", "items");
 
     hote.innerHTML =
