@@ -252,7 +252,9 @@
                                desactive: planSemaine >= 0 }),
       corps:
         '<div class="grille grille--sm" style="margin-bottom:var(--e-4)">' +
-          U.tuile({ label: "Heures tenues", valeur: tenu + " / " + t.total }) +
+          U.tuile({ label: "Heures tenues", valeur: tenu + " / " + t.total,
+                    pied: planSemaine === 0 ? "sur les heures déjà écoulées"
+                                            : "sur la semaine" }) +
           U.tuile({ label: "Heures sans personne", valeur: String(t.vides),
                     ton: t.vides ? "alerte" : "" }) +
           U.tuile({ label: "Plus long trou", valeur: t.pire + " h" }) +

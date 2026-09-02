@@ -2192,6 +2192,12 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
 /* Les degrés de présence. Un seul mécano n'est pas la même chose que trois :
    la couleur le dit sans qu'on lise le chiffre. */
 .plan__c--trou  { background: rgba(255, 59, 92, .16); color: rgba(255, 130, 150, .85); }
+/* Une heure à venir n'est pas un trou : elle reste neutre, on n'a rien à en
+   dire. La rayer en rouge ferait paraître déserte toute semaine en cours. */
+.plan__c--futur {
+  background: repeating-linear-gradient(135deg,
+    transparent 0 5px, rgb(255 255 255 / .022) 5px 10px);
+}
 .plan__c--un    { background: rgb(var(--accent-rgb) / .18); color: var(--c-action-doux); }
 .plan__c--deux  { background: rgb(var(--accent-rgb) / .34); color: var(--c-action-doux); }
 .plan__c--plein { background: rgb(var(--accent-rgb) / .55); color: var(--c-sur-action); font-weight: 700; }

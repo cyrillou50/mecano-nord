@@ -178,7 +178,8 @@
       "</div>" +
       '<div class="panel__body">' +
         '<div class="statgrid" style="margin-bottom:14px">' +
-          stat("Heures tenues", tenu + " / " + t.total) +
+          stat("Heures tenues", tenu + " / " + t.total, false, "",
+            planSemaine === 0 ? "sur les heures déjà écoulées" : "sur la semaine") +
           stat("Heures sans personne", String(t.vides)) +
           stat("Plus long trou", t.pire + " h") +
         "</div>" +

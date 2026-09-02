@@ -35,6 +35,27 @@ window.MNPlanning = (function () {
 
   const minuit = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
+  /**
+   * Une case est-elle derrière nous ? Une heure ne compte qu'une fois
+   * terminée : celle qui court n'est ni tenue ni manquée, elle se joue.
+   *
+   * « setHours » normalise le passage à minuit comme le changement d'heure —
+   * ajouter 3 600 000 ms se tromperait deux fois par an.
+   */
+  function passee(debut, j, h) {
+    const d = new Date(debut);
+    d.setDate(d.getDate() + j);
+    d.setHours(h + 1, 0, 0, 0);
+    return d.getTime() <= Date.now();
+  }
+
+  /** Le jour a-t-il commencé ? */
+  function commence(debut, j) {
+    const d = new Date(debut);
+    d.setDate(d.getDate() + j);
+    return d.getTime() <= Date.now();
+  }
+
   const jjmm = d => String(d.getDate()).padStart(2, "0") + "/" +
     String(d.getMonth() + 1).padStart(2, "0");
 
@@ -127,21 +148,35 @@ window.MNPlanning = (function () {
         (j === auj ? " is-auj" : "") + '" type="button" data-jour="' + j + '">' +
         '<span class="plan__c plan__c--jour"><b>' + esc(nom) + "</b>" +
           "<i>" + jjmm(d) + "</i></span>" +
-        s.cases[j].map((l, h) =>
-          '<span class="plan__c ' + classeCase(l.length) + '" title="' +
-            esc(nom + " " + h + "h — " + phrase(l, s.gens)) + '">' +
-            (l.length || "") + "</span>").join("") +
+        s.cases[j].map((l, h) => {
+          const eue = passee(s.debut, j, h);
+          return '<span class="plan__c ' +
+            (eue ? classeCase(l.length) : "plan__c--futur") + '" title="' +
+            esc(nom + " " + h + "h — " + (eue ? phrase(l, s.gens) : "pas encore")) +
+            '">' + (l.length || "") + "</span>";
+        }).join("") +
         '<span class="plan__c plan__c--tot">' + heuresTenues + " h</span>" +
       "</button>";
     }).join("");
 
-    /* Combien de jours, sur les sept, cette heure a-t-elle été tenue. */
+    /* Combien de jours, sur ceux déjà venus, cette heure a-t-elle été tenue.
+       Comparer à sept un mardi ferait passer toute semaine en cours pour
+       une semaine creuse. */
+    const joursEus = JOURS.filter((_, j) => commence(s.debut, j)).length;
+
     const couverture = '<div class="plan__l plan__l--pied">' +
-      '<span class="plan__c plan__c--jour"><b>Jours tenus</b><i>sur 7</i></span>' +
+      '<span class="plan__c plan__c--jour"><b>Jours tenus</b><i>sur ' +
+        joursEus + "</i></span>" +
       HEURES.map(h => {
-        const n = JOURS.reduce((acc, _, j) => acc + (s.cases[j][h].length ? 1 : 0), 0);
-        return '<span class="plan__c ' + (n ? "plan__c--pied" : "plan__c--trou") + '">' +
-          (n || "—") + "</span>";
+        let eus = 0, tenus = 0;
+        JOURS.forEach((_, j) => {
+          if (!passee(s.debut, j, h)) return;
+          eus++;
+          if (s.cases[j][h].length) tenus++;
+        });
+        if (!eus) return '<span class="plan__c plan__c--futur"></span>';
+        return '<span class="plan__c ' + (tenus ? "plan__c--pied" : "plan__c--trou") + '">' +
+          (tenus || "—") + "</span>";
       }).join("") +
       '<span class="plan__c plan__c--tot"></span>' +
     "</div>";
@@ -168,8 +203,10 @@ window.MNPlanning = (function () {
     }));
 
     if (!presents.length) {
-      return '<div class="plan__vide">Personne n\'a pointé le ' +
-        esc(JOURS[j].toLowerCase()) + " " + jjmm(d) + ".</div>";
+      return '<div class="plan__vide">' + (commence(s.debut, j)
+        ? "Personne n'a pointé le " + esc(JOURS[j].toLowerCase()) + " " + jjmm(d) + "."
+        : "Le " + esc(JOURS[j].toLowerCase()) + " " + jjmm(d) +
+          " n'est pas encore arrivé.") + "</div>";
     }
 
     const entete = '<div class="plan__c plan__c--tete">' + esc(JOURS[j]) + "</div>" +
@@ -183,8 +220,10 @@ window.MNPlanning = (function () {
         '<span class="plan__c plan__c--jour" title="' + esc(qui) + '">' +
           "<b>" + esc(qui) + "</b></span>" +
         s.cases[j].map((l, h) =>
-          '<span class="plan__c ' + (l.indexOf(uid) !== -1 ? "plan__c--on" : "") +
-            '" title="' + esc((s.gens[uid] || uid) + " — " + h + "h") + '"></span>').join("") +
+          '<span class="plan__c ' +
+            (l.indexOf(uid) !== -1 ? "plan__c--on"
+              : passee(s.debut, j, h) ? "" : "plan__c--futur") +
+            '" title="' + esc(qui + " — " + h + "h") + '"></span>').join("") +
         '<span class="plan__c plan__c--tot">' + n + " h</span>" +
       "</div>";
     }).join("");
@@ -195,17 +234,23 @@ window.MNPlanning = (function () {
     "</div></div>";
   }
 
-  /** Combien de cases vides sur la semaine, et la plus longue d'affilée. */
+  /**
+   * Combien de cases vides, et la plus longue série d'affilée.
+   * Seules les heures écoulées comptent : une semaine en cours n'a pas de
+   * trou le jeudi si l'on est mardi, elle a un jeudi qui n'est pas arrivé.
+   */
   function trous(s) {
-    let vides = 0, pire = 0, suite = 0;
+    let vides = 0, pire = 0, suite = 0, total = 0;
     for (let j = 0; j < 7; j++) {
       for (let h = 0; h < 24; h++) {
+        if (!passee(s.debut, j, h)) { suite = 0; continue; }
+        total++;
         if (s.cases[j][h].length) { suite = 0; continue; }
         vides++; suite++;
         if (suite > pire) pire = suite;
       }
     }
-    return { vides, pire, total: 7 * 24 };
+    return { vides, pire, total };
   }
 
   /* ---- Petites aides ------------------------------------------------------- */
@@ -233,5 +278,6 @@ window.MNPlanning = (function () {
       (offset === 0 ? " (cette semaine)" : "");
   }
 
-  return { JOURS, HEURES, lundi, semaine, grilleSemaine, grilleJour, trous, titre };
+  return { JOURS, HEURES, lundi, semaine, grilleSemaine, grilleJour, trous, titre,
+           passee, commence };
 })();
