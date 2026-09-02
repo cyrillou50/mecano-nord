@@ -57,6 +57,8 @@ window.MN_PERMS = [
   /* Le calendrier se lit sans droit particulier : savoir ce qui est prévu
      n'est pas une faveur. Y écrire, si. */
   { key: "calendar",  name: "Gérer le calendrier", desc: "Poser, modifier et supprimer des évènements. Tout le monde peut les consulter." },
+  { key: "emotes",    name: "Gérer les émotes",    desc: "Ajouter, corriger et supprimer les émotes du serveur de jeu. Tout le monde peut les consulter." },
+  { key: "blacklist", name: "Gérer la blacklist",  desc: "Inscrire un client, dire pourquoi, suivre le remboursement et lever une inscription. Tout le monde peut la lire — c'est au comptoir qu'elle sert." },
   { key: "users",     name: "Gérer l'équipe",      desc: "Ajouter des employés, créer des rôles et régler leurs droits." },
   { key: "publish",   name: "Publier en ligne",    desc: "Envoyer les modifications sur le site public." },
   { key: "theme",     name: "Gérer l'apparence",   desc: "Choisir le thème et les couleurs de tout le site, et décider si chacun peut se faire les siennes." },

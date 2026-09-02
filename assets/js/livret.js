@@ -217,6 +217,8 @@
     { nom: "Contrats", href: "contrats.html" },
     { nom: "Calendrier", href: "calendrier.html" },
     { nom: "Véhicules", href: "vehicules.html" },
+    { nom: "Émotes", href: "emotes.html" },
+    { nom: "Blacklist", href: "blacklist.html" },
     { nom: "Livret", href: "livret.html" },
     { nom: "Administration", href: "admin.html" },
     { nom: "Admin", href: "admin.html" }
@@ -231,6 +233,8 @@
       "contrats.html": MNAuth.canAny("contracts_view", "contracts", "contracts_delete", "admin"),
       "calendrier.html": true,
       "vehicules.html": true,
+      "emotes.html": true,
+      "blacklist.html": true,
       "livret.html": true,
       "admin.html": MNAuth.canAny("items", "users", "publish", "theme", "contracts", "admin")
     };

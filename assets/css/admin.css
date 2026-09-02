@@ -1509,3 +1509,118 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--pink); outline-o
   text-underline-offset: 3px;
 }
 .lien-page:hover { text-decoration-style: solid; }
+
+/* ==========================================================================
+   ÉMOTES
+   Une liste longue, lue en diagonale : on cherche un nom, on emporte une
+   commande. Les catégories se replient, les commandes sont en évidence —
+   c'est le seul élément cliquable de la page pour la plupart des gens.
+   ========================================================================== */
+
+.emgroupe { margin-bottom: 14px; }
+
+/* La tête de groupe est un bouton : elle doit s'en oublier. */
+.emgroupe__tete {
+  width: 100%;
+  background: none; border: 0; border-bottom: 1px solid var(--line);
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.emgroupe__tete:hover { background: rgb(var(--accent-rgb) / .05); }
+.emgroupe__tete svg { flex: none; color: var(--dim); }
+
+.emgrille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+}
+
+.emote {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raise);
+}
+.emote__txt { flex: 1; min-width: 0; }
+.emote__txt b { display: block; font-size: 14px; }
+.emote__txt i {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px; font-style: normal; color: var(--dim);
+}
+
+/* La commande : monospace, et elle a l'air de ce qu'elle est — à emporter. */
+.emote__cmd {
+  display: inline-flex; align-items: center; gap: 7px; flex: none;
+  max-width: 45%;
+  padding: 5px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--sunk);
+  color: var(--pink-soft);
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 12.5px;
+  cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.emote__cmd svg { flex: none; width: 14px; height: 14px; opacity: .55; }
+.emote__cmd:hover { border-color: var(--pink); color: var(--pink); }
+.emote__cmd:hover svg { opacity: 1; }
+.emote__cmd--vide {
+  color: var(--dim); font-style: italic; cursor: default;
+  font-family: inherit;
+}
+.emote__cmd--vide:hover { border-color: var(--line-2); color: var(--dim); }
+
+.emote__act { flex: none; gap: 4px; }
+
+@media (max-width: 560px) {
+  .emote { flex-wrap: wrap; }
+  .emote__cmd { max-width: 100%; }
+}
+
+/* ==========================================================================
+   BLACKLIST
+   Chaque inscription est une carte : le nom, la raison en clair, et l'état du
+   remboursement là où l'œil tombe. Une inscription levée s'efface sans
+   disparaître — elle reste lisible, elle ne réclame plus rien.
+   ========================================================================== */
+
+.blentree { margin-bottom: 14px; }
+.blentree .panel__head h2 { text-transform: none; letter-spacing: .04em; font-size: 16px; }
+
+/* Le point rouge dit « actif » sans avoir à l'écrire. */
+.blpoint {
+  width: 9px; height: 9px; flex: none;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 10px var(--danger);
+}
+.blentree--levee { opacity: .62; }
+.blentree--levee .blpoint { background: var(--dim); box-shadow: none; }
+
+.blraison {
+  margin: 0 0 10px;
+  font-size: 14.5px; line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+/* L'état du remboursement : dû en ambre, rendu en vert. */
+.blrb {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.blrb--du {
+  color: var(--amber);
+  background: rgba(255, 169, 46, .12);
+  border: 1px solid rgba(255, 169, 46, .3);
+}
+.blrb--fait {
+  color: var(--toxic);
+  background: rgba(168, 255, 82, .1);
+  border: 1px solid rgba(168, 255, 82, .28);
+}

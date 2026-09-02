@@ -362,6 +362,16 @@ window.MNStore = (function () {
 
   const listeners = [];
   const onChange = fn => listeners.push(fn);
+  /* Un client blacklisté a parfois payé quelque chose qu'il n'a pas eu. Trois
+     états suffisent : rien à rendre, à rendre, rendu. */
+  const REMBOURSEMENTS = [
+    { id: "aucun", nom: "Aucun", court: "—" },
+    { id: "du", nom: "Remboursement dû", court: "dû" },
+    { id: "fait", nom: "Remboursé", court: "remboursé" }
+  ];
+  const remboursementDe = id =>
+    REMBOURSEMENTS.find(r => r.id === id) || REMBOURSEMENTS[0];
+
   const emit = () => {
     /* Le thème du site vit dans le catalogue : dès qu'il change, la page doit
        suivre, sans attendre un rechargement. */
@@ -855,6 +865,62 @@ window.MNStore = (function () {
       };
     });
 
+    /* --- émotes ---
+       Les animations du serveur de jeu. Le site ne les joue pas : il tient la
+       liste, parce qu'elle vit ailleurs et que personne ne la retient. Un nom
+       en clair, la commande à taper, et de quoi ranger.
+
+       Commune aux deux garages : ce sont les émotes du jeu, pas celles d'un
+       site. */
+    const seenE = [];
+    c.emotes = (Array.isArray(c.emotes) ? c.emotes : []).map(e => {
+      const id = uniqueId(e.id || e.nom || e.name, seenE); seenE.push(id);
+      return {
+        id,
+        nom: String(e.nom || e.name || id).slice(0, 60),
+        /* La commande telle qu'on la tape en jeu. Le slash est remis s'il
+           manque : on l'oublie une fois sur deux en la recopiant. */
+        commande: (function (v) {
+          const t = String(v || "").trim().slice(0, 80);
+          return t && t[0] !== "/" ? "/" + t : t;
+        })(e.commande || e.cmd),
+        /* Texte libre : « Mécanique », « Accueil »… Vide = « Sans catégorie ». */
+        categorie: String(e.categorie || e.cat || "").trim().slice(0, 40),
+        note: String(e.note || "").slice(0, 200)
+      };
+    }).filter(e => e.nom || e.commande);
+
+    /* --- blacklist ---
+       Les clients qu'on ne sert plus, et pourquoi. Une entrée levée n'est pas
+       supprimée : elle sort de la liste active mais garde sa trace, comme un
+       avertissement. On doit pouvoir dire qu'elle a existé et qui l'a levée.
+
+       Commune aux deux garages : un client refusé au Nord l'est au Sud. */
+    const seenB = [];
+    c.blacklist = (Array.isArray(c.blacklist) ? c.blacklist : []).map(x => {
+      const id = uniqueId(x.id || x.nom || String(Date.now()), seenB); seenB.push(id);
+      const rb = REMBOURSEMENTS.some(r => r.id === x.remboursement) ? x.remboursement : "aucun";
+      return {
+        id,
+        nom: String(x.nom || "").slice(0, 60),
+        raison: String(x.raison || "").slice(0, 600),
+        /* « aucun » quand il n'y a rien à rendre, « du » tant que ce n'est pas
+           fait, « fait » une fois rendu. Le montant reste renseignable même
+           après remboursement : c'est la trace de ce qui a été rendu. */
+        remboursement: rb,
+        montant: Math.max(0, Math.min(1e9, Math.round(Number(x.montant) || 0))),
+        at: x.at || new Date().toISOString(),
+        by: String(x.by || "").slice(0, 60),
+        levee: x.levee && typeof x.levee === "object"
+          ? { at: x.levee.at || new Date().toISOString(),
+              by: String(x.levee.by || "").slice(0, 60),
+              note: String(x.levee.note || "").slice(0, 300) }
+          : null
+      };
+    }).filter(x => x.nom)
+      .sort((a, b) => new Date(b.at) - new Date(a.at))
+      .slice(0, 500);
+
     return c;
   }
 
@@ -1201,6 +1267,11 @@ window.MNStore = (function () {
     setAtelier, atelier, roleIdDe, estMasqueIci, estMasquePartout, minimumDe,
     memeNom, soucisHomonyme,
     MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,
+    REMBOURSEMENTS, remboursementDe,
+    emotes: () => (_catalog.emotes || []),
+    /* Les entrées encore en vigueur, puis celles qu'on a levées. */
+    blacklist: () => (_catalog.blacklist || []).filter(x => !x.levee),
+    blacklistLevee: () => (_catalog.blacklist || []).filter(x => x.levee),
     usersActifs, usersArchives,
     GRAVITES, graviteDe, normAvertissement, avertActif, avertBilan,
     addAvertissement, leverAvertissement, retirerAvertissement,

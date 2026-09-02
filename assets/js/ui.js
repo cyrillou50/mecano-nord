@@ -293,6 +293,13 @@ window.MNUI = (function () {
         /* Les véhicules sont un catalogue de consultation : ouvert à tous. */
         '<a class="navlink' + (active === "vehicules" ? " is-active" : "") +
           '" href="vehicules.html">Véhicules</a>' +
+        /* Les émotes du serveur de jeu : un mémo, ouvert à tous. */
+        '<a class="navlink' + (active === "emotes" ? " is-active" : "") +
+          '" href="emotes.html">Émotes</a>' +
+        /* La blacklist se lit au comptoir, par celui qui reçoit le client.
+           La réserver aux responsables reviendrait à ne pas l'avoir. */
+        '<a class="navlink' + (active === "blacklist" ? " is-active" : "") +
+          '" href="blacklist.html">Blacklist</a>' +
         /* Le livret s'adresse d'abord à ceux qui arrivent : il est ouvert à
            tout le monde, sans permission à demander. */
         '<a class="navlink' + (active === "livret" ? " is-active" : "") +

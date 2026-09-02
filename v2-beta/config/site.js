@@ -68,6 +68,16 @@ V2.NAV = [
     ]
   },
   {
+    groupe: "Comptoir",
+    entrees: [
+      /* Les émotes du serveur de jeu : un mémo, ouvert à tous. */
+      { id: "emotes", nom: "Émotes", href: "emotes.html", icone: "etoile" },
+      /* La blacklist se lit par celui qui reçoit le client. La réserver aux
+         responsables reviendrait à ne pas l'avoir. */
+      { id: "blacklist", nom: "Blacklist", href: "blacklist.html", icone: "alerte" }
+    ]
+  },
+  {
     groupe: "Réglages",
     entrees: [
       { id: "admin", nom: "Administration", href: "admin.html", icone: "reglages",

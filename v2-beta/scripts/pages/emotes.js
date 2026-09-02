@@ -1,0 +1,368 @@
+/* ==========================================================================
+   Émotes du serveur de jeu — V2.
+
+   Même liste et mêmes règles que la V1 : le site ne joue rien, il tient le
+   mémo. Ce qui change, c'est la mise en page.
+   ========================================================================== */
+
+(function () {
+  "use strict";
+
+  const U = V2UI;
+  const $ = s => document.querySelector(s);
+
+  const SANS_CAT = "Sans catégorie";
+
+  let hote = null;
+  let peutGerer = false;
+  let filtre = "";
+
+  /* Un serveur de jeu en a des centaines : les catégories se replient, et
+     l'état tient dans le navigateur — c'est un confort de lecture. */
+  const plis = {
+    lire() {
+      try { return JSON.parse(localStorage.getItem("mn.emotes.folds")) || []; }
+      catch (_) { return []; }
+    },
+    a(k) { return this.lire().indexOf(k) !== -1; },
+    basculer(k) {
+      const l = this.lire(), i = l.indexOf(k);
+      if (i === -1) l.push(k); else l.splice(i, 1);
+      try { localStorage.setItem("mn.emotes.folds", JSON.stringify(l.slice(0, 400))); }
+      catch (_) { /* quota : le repliage n'est pas vital */ }
+    }
+  };
+
+  V2Shell.demarrer({
+    page: "emotes",
+    titre: "Émotes",
+    pret: function (session, h) {
+      hote = h;
+      peutGerer = V2Shell.peut("emotes", "items", "admin");
+      dessiner();
+      MNStore.onChange(() => { if (hote && hote.isConnected) dessiner(); });
+    }
+  });
+
+  /* ---- Lecture ------------------------------------------------------------- */
+
+  const toutes = () => MNStore.emotes();
+
+  function liste() {
+    const q = filtre.trim().toLowerCase();
+    if (!q) return toutes();
+    return toutes().filter(e =>
+      (e.nom + " " + e.commande + " " + e.categorie + " " + e.note)
+        .toLowerCase().indexOf(q) !== -1);
+  }
+
+  function groupes() {
+    const l = liste();
+    const noms = [];
+    l.forEach(e => {
+      const c = e.categorie || SANS_CAT;
+      if (noms.indexOf(c) === -1) noms.push(c);
+    });
+    noms.sort((a, b) => {
+      /* « Sans catégorie » en dernier : c'est le fourre-tout, pas une rubrique. */
+      if (a === SANS_CAT) return 1;
+      if (b === SANS_CAT) return -1;
+      return a.localeCompare(b, "fr");
+    });
+    return noms.map(c => ({
+      nom: c,
+      emotes: l.filter(e => (e.categorie || SANS_CAT) === c)
+        .sort((x, y) => x.nom.localeCompare(y.nom, "fr"))
+    }));
+  }
+
+  /* ---- Rendu ---------------------------------------------------------------- */
+
+  function dessiner() {
+    const total = toutes().length;
+
+    hote.innerHTML =
+      '<div class="pile">' +
+        (peutGerer
+          ? '<div class="rang">' +
+              U.bouton("Ajouter", { variante: "principal", icone: "plus", action: "add" }) +
+              U.bouton("Importer une liste", { icone: "contrat", action: "import" }) +
+            "</div>"
+          : "") +
+
+        (total
+          ? U.champ({ id: "em-q", label: "", repere: "Rechercher une émote…", valeur: filtre }) +
+            '<div id="em-liste"></div>'
+          : U.vide({
+              icone: "etoile",
+              titre: "Aucune émote enregistrée",
+              texte: peutGerer
+                ? "Ajoute-les une à une, ou colle la liste du serveur d'un coup."
+                : "Un responsable les ajoutera depuis cette page."
+            })) +
+      "</div>";
+
+    const q = $("#em-q");
+    if (q) q.addEventListener("input", () => {
+      filtre = q.value;
+      dessinerListe();
+    });
+
+    const add = hote.querySelector('[data-a="add"]');
+    if (add) add.addEventListener("click", () => editer(null));
+    const imp = hote.querySelector('[data-a="import"]');
+    if (imp) imp.addEventListener("click", importer);
+
+    if (total) dessinerListe();
+  }
+
+  function dessinerListe() {
+    const z = $("#em-liste");
+    if (!z) return;
+    const gs = groupes();
+
+    if (!gs.length) {
+      z.innerHTML = U.vide({ icone: "recherche", titre: "Rien ne correspond",
+                             texte: "Aucune émote ne contient « " + filtre + " »." });
+      return;
+    }
+
+    z.innerHTML = '<div class="pile">' + gs.map(g => {
+      const ouvert = !plis.a(g.nom);
+      return U.carte({
+        classe: "emgroupe",
+        corps:
+          '<button class="emgroupe__tete" type="button" data-pli="' + U.esc(g.nom) + '">' +
+            U.icone("chevron", ouvert ? "emgroupe__chev" : "emgroupe__chev emgroupe__chev--ferme") +
+            "<b>" + U.esc(g.nom) + "</b>" +
+            '<span class="etiq">' + g.emotes.length + "</span>" +
+          "</button>" +
+          (ouvert ? '<div class="emgrille">' + g.emotes.map(ligne).join("") + "</div>" : "")
+      });
+    }).join("") + "</div>";
+
+    z.querySelectorAll("[data-pli]").forEach(b =>
+      b.addEventListener("click", () => { plis.basculer(b.dataset.pli); dessinerListe(); }));
+
+    z.querySelectorAll("[data-cmd]").forEach(b =>
+      b.addEventListener("click", () => copier(b.dataset.cmd)));
+
+    z.querySelectorAll("[data-edit]").forEach(b =>
+      b.addEventListener("click", () => editer(trouver(b.dataset.edit))));
+
+    z.querySelectorAll("[data-del]").forEach(b =>
+      b.addEventListener("click", () => supprimer(trouver(b.dataset.del))));
+  }
+
+  function ligne(e) {
+    return '<div class="emote">' +
+      '<div class="emote__txt"><b>' + U.esc(e.nom) + "</b>" +
+        (e.note ? "<i>" + U.esc(e.note) + "</i>" : "") + "</div>" +
+      (e.commande
+        ? '<button class="emote__cmd" type="button" data-cmd="' + U.esc(e.commande) + '" ' +
+          'title="Copier la commande">' + U.esc(e.commande) + U.icone("contrat") + "</button>"
+        : '<span class="emote__cmd emote__cmd--vide">commande non renseignée</span>') +
+      (peutGerer
+        ? '<div class="rang emote__act">' +
+            '<button class="btn btn--sm btn--icone" type="button" data-edit="' + U.esc(e.id) +
+              '" aria-label="Modifier ' + U.esc(e.nom) + '">' + U.icone("crayon") + "</button>" +
+            '<button class="btn btn--sm btn--icone" type="button" data-del="' + U.esc(e.id) +
+              '" aria-label="Supprimer ' + U.esc(e.nom) + '">' + U.icone("poubelle") + "</button>" +
+          "</div>"
+        : "") +
+    "</div>";
+  }
+
+  const trouver = id => toutes().find(e => e.id === id) || null;
+
+  /** Le presse-papier, avec le repli des navigateurs qui le refusent. */
+  async function copier(texte) {
+    try {
+      await navigator.clipboard.writeText(texte);
+      U.toast("« " + texte + " » copiée", "ok");
+    } catch (_) {
+      const ta = document.createElement("textarea");
+      ta.value = texte;
+      ta.style.cssText = "position:fixed;opacity:0";
+      document.body.appendChild(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { /* rien */ }
+      ta.remove();
+      U.toast(ok ? "Copiée" : "Copie impossible — sélectionne le texte", ok ? "ok" : "erreur");
+    }
+  }
+
+  /* ---- Écriture -------------------------------------------------------------
+     Les émotes vivent dans le catalogue. On l'écrit, et l'envoi part tout
+     seul — il n'y a plus rien à publier à la main. */
+
+  function ecrire(emotes, message) {
+    const c = MNStore.clone(MNStore.catalog());
+    c.emotes = emotes;
+    MNStore.saveDraft(c);
+    dessiner();
+    V2Shell.brouillon(dessiner);
+    if (message) U.toast(message, "ok");
+  }
+
+  function catsConnues() {
+    const l = [];
+    toutes().forEach(e => {
+      if (e.categorie && l.indexOf(e.categorie) === -1) l.push(e.categorie);
+    });
+    return l.sort((a, b) => a.localeCompare(b, "fr"));
+  }
+
+  function editer(e) {
+    const neuf = !e;
+    const cats = catsConnues();
+
+    U.modale({
+      titre: neuf ? "Nouvelle émote" : "Modifier l'émote",
+      corps: '<div class="pile">' +
+        U.champ({ id: "e-nom", label: "Nom", max: 60, repere: "Réparer le moteur",
+                  valeur: e ? e.nom : "" }) +
+        U.champ({ id: "e-cmd", label: "Commande", max: 80, repere: "/e mechanic2",
+                  valeur: e ? e.commande : "",
+                  aide: "Telle qu'on la tape en jeu. Le « / » est ajouté s'il manque." }) +
+        U.champ({ id: "e-cat", label: "Catégorie", max: 40, repere: "Mécanique",
+                  valeur: e ? e.categorie : "",
+                  aide: "Facultatif. Vide = « " + SANS_CAT + " »." +
+                    (cats.length ? " Déjà utilisées : " + U.esc(cats.join(", ")) + "." : "") }) +
+        U.champ({ id: "e-note", label: "Note", max: 200,
+                  repere: "Quand l'utiliser, ce qu'elle montre…",
+                  valeur: e ? e.note : "" }) +
+      "</div>",
+      actions: [
+        { label: "Annuler", onClick: f => f() },
+        {
+          label: neuf ? "Ajouter" : "Enregistrer", variante: "principal",
+          onClick: (fermer, corps) => {
+            const nom = corps.querySelector("#e-nom").value.trim();
+            const cmd = corps.querySelector("#e-cmd").value.trim();
+            if (!nom && !cmd) return U.toast("Il faut au moins un nom ou une commande", "erreur");
+
+            const l = MNStore.clone(toutes());
+            const donnees = {
+              nom: nom || cmd,
+              commande: cmd,
+              categorie: corps.querySelector("#e-cat").value.trim(),
+              note: corps.querySelector("#e-note").value.trim()
+            };
+
+            if (neuf) {
+              l.push(Object.assign({ id: MNStore.uniqueId(donnees.nom, l.map(x => x.id)) }, donnees));
+            } else {
+              Object.assign(l.find(x => x.id === e.id), donnees);
+            }
+            fermer();
+            ecrire(l, neuf ? "Émote ajoutée" : "Émote modifiée");
+          }
+        }
+      ]
+    });
+  }
+
+  async function supprimer(e) {
+    if (!e) return;
+    const ok = await U.confirmer({
+      titre: "Supprimer l'émote",
+      message: "« " + e.nom + " » sera retirée de la liste.",
+      confirmer: "Supprimer", danger: true
+    });
+    if (!ok) return;
+    ecrire(toutes().filter(x => x.id !== e.id), "Émote supprimée");
+  }
+
+  /* ---- Import en masse --------------------------------------------------------
+     Un serveur de jeu en publie des centaines d'un bloc. Les saisir une à une
+     serait une soirée perdue — et la liste resterait vide.
+
+     Une ligne par émote, les champs séparés par « | », une tabulation ou un
+     point-virgule. Une ligne d'un seul champ est une commande. */
+
+  function lireLignes(texte, ordreNom) {
+    const out = [];
+    String(texte || "").split(/\r?\n/).forEach(brut => {
+      const l = brut.trim();
+      if (!l || l[0] === "#") return;                 // vide ou commentée
+      const ch = l.split(/\s*[|;\t]\s*/).filter(x => x !== "");
+      if (!ch.length) return;
+
+      let nom = "", cmd = "", cat = "";
+      if (ch.length === 1) {
+        cmd = ch[0]; nom = ch[0];
+      } else if (ordreNom) {
+        nom = ch[0]; cmd = ch[1]; cat = ch[2] || "";
+      } else {
+        cmd = ch[0]; nom = ch[1]; cat = ch[2] || "";
+      }
+      out.push({ nom: nom.trim(), commande: cmd.trim(), categorie: cat.trim(), note: "" });
+    });
+    return out;
+  }
+
+  function importer() {
+    const m = U.modale({
+      titre: "Importer une liste d'émotes", large: true,
+      corps: '<div class="pile">' +
+        '<p class="champ__aide">Une émote par ligne. Sépare les champs par ' +
+          "<code>|</code>, une tabulation ou un point-virgule. Une ligne d'un " +
+          "seul champ est prise pour une commande.</p>" +
+        U.champ({ id: "i-ordre", type: "liste", label: "Ordre des colonnes", valeur: "cmd",
+                  options: [{ valeur: "cmd", nom: "Commande | Nom | Catégorie" },
+                            { valeur: "nom", nom: "Nom | Commande | Catégorie" }] }) +
+        U.champ({ id: "i-txt", type: "zone", label: "La liste", lignes: 10,
+                  repere: "/e mechanic2 | Réparer le moteur | Mécanique" }) +
+        U.champ({ id: "i-vider", type: "bascule", label: "Remplacer la liste actuelle" }) +
+        '<p class="champ__aide">Décoché, l\'import s\'ajoute à ce qui existe. Une ' +
+          "commande déjà présente est mise à jour plutôt que dupliquée.</p>" +
+        '<div id="i-apercu"></div>' +
+      "</div>",
+      actions: [
+        { label: "Annuler", onClick: f => f() },
+        {
+          label: "Importer", variante: "principal",
+          onClick: (fermer, corps) => {
+            const lues = lireLignes(corps.querySelector("#i-txt").value,
+                                    corps.querySelector("#i-ordre").value === "nom");
+            if (!lues.length) return U.toast("Rien à importer", "erreur");
+
+            const vider = corps.querySelector("#i-vider").checked;
+            const l = vider ? [] : MNStore.clone(toutes());
+            let ajout = 0, maj = 0;
+
+            lues.forEach(e => {
+              /* La commande fait l'identité : c'est elle qu'on tape, et deux
+                 émotes ne peuvent pas partager la même. À défaut, le nom. */
+              const memeQue = x => e.commande
+                ? x.commande === e.commande
+                : x.nom.toLowerCase() === e.nom.toLowerCase();
+              const deja = l.find(memeQue);
+              if (deja) { Object.assign(deja, e, { id: deja.id }); maj++; }
+              else {
+                l.push(Object.assign({ id: MNStore.uniqueId(e.nom || e.commande, l.map(x => x.id)) }, e));
+                ajout++;
+              }
+            });
+
+            fermer();
+            ecrire(l, ajout + " ajoutée" + (ajout > 1 ? "s" : "") +
+                      (maj ? ", " + maj + " mise" + (maj > 1 ? "s" : "") + " à jour" : ""));
+          }
+        }
+      ]
+    });
+
+    const apercu = () => {
+      const l = lireLignes(m.corps.querySelector("#i-txt").value,
+                           m.corps.querySelector("#i-ordre").value === "nom");
+      m.corps.querySelector("#i-apercu").innerHTML = l.length
+        ? U.alerte({ ton: "ok", texte: l.length + " émote" + (l.length > 1 ? "s lues" : " lue") +
+            " — la première : " + l[0].nom + " " + l[0].commande })
+        : "";
+    };
+    m.corps.querySelector("#i-txt").addEventListener("input", apercu);
+    m.corps.querySelector("#i-ordre").addEventListener("change", apercu);
+  }
+})();

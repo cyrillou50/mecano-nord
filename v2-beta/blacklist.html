@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<meta name="robots" content="noindex">
+<title>Blacklist · Mécano Nord (V2 bêta)</title>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ffa92e'/%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700;800&family=Inter:wght@400;500;600&display=swap">
+
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/base.css">
+<link rel="stylesheet" href="styles/components.css">
+<link rel="stylesheet" href="styles/layout.css">
+</head>
+<body>
+
+<div class="app" id="app"></div>
+
+<!-- Configuration d'abord : les services la lisent au chargement. -->
+<script src="config/site.js"></script>
+
+<!-- Couche données, reprise de la V1 sans modification de comportement. -->
+<script src="services/config.js"></script>
+<script src="services/icons.js"></script>
+<script src="services/theme.js"></script>
+<script src="services/catalog.seed.js"></script>
+<script src="services/store.js"></script>
+<script src="services/auth.js"></script>
+<script src="services/github.js"></script>
+<script src="services/webhook.js"></script>
+<script src="services/duty.js"></script>
+<script src="services/parc.js"></script>
+<script src="services/registre.js"></script>
+<script src="services/agenda.js"></script>
+<script src="services/imagier.js"></script>
+
+<!-- Interface V2 -->
+<script src="components/ui.js"></script>
+<script src="scripts/shell.js"></script>
+<script src="scripts/pages/blacklist.js"></script>
+</body>
+</html>
