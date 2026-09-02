@@ -38,6 +38,7 @@
     { id: "moi",      cat: "moi",     nom: "Mes congés",         droit: "point" },
     { id: "equipe",   cat: "equipe",  nom: "Congés",             droit: "voir" },
     { id: "eqtemps",  cat: "equipe",  nom: "Temps de service",   droit: "voir" },
+    { id: "plan",     cat: "equipe",  nom: "Planning",           droit: "voir" },
     { id: "histo",    cat: "equipe",  nom: "Derniers pointages", droit: "voir" }
   ];
 
@@ -220,7 +221,68 @@
     if (onglet === "moi") return mesConges(z);
     if (onglet === "equipe") return congesEquipe(z);
     if (onglet === "eqtemps") return tempsEquipe(z);
+    if (onglet === "plan") return planning(z);
     return pointages(z);
+  }
+
+  /* ---- Planning ---------------------------------------------------------------
+     Le pointage dit qui a travaillé et combien ; il ne dit pas quand. C'est
+     pourtant la question qu'on se pose en ouvrant : y a-t-il quelqu'un à 14 h
+     le mardi, et qui tient les nuits.
+
+     Deux grilles, parce qu'elles répondent à deux questions. La semaine
+     montre les trous ; le jour montre qui les aurait tenus. */
+
+  let planSemaine = 0;      // 0 = semaine en cours, -1 = la précédente
+  let planJour = null;      // le jour déplié, ou null
+
+  function planning(z) {
+    const b = MNDuty.board();
+    const s = MNPlanning.semaine(b.log, b.onDuty, planSemaine);
+    const t = MNPlanning.trous(s);
+    const tenu = t.total - t.vides;
+
+    z.innerHTML = U.carte({
+      titre: "Planning",
+      actions:
+        U.bouton("Précédente", { taille: "sm", icone: "chevron", action: "sem-1" }) +
+        '<span class="champ__aide" style="min-width:160px;text-align:center">' +
+          U.esc(MNPlanning.titre(planSemaine)) + "</span>" +
+        U.bouton("Suivante", { taille: "sm", icone: "chevron", action: "sem1",
+                               desactive: planSemaine >= 0 }),
+      corps:
+        '<div class="grille grille--sm" style="margin-bottom:var(--e-4)">' +
+          U.tuile({ label: "Heures tenues", valeur: tenu + " / " + t.total }) +
+          U.tuile({ label: "Heures sans personne", valeur: String(t.vides),
+                    ton: t.vides ? "alerte" : "" }) +
+          U.tuile({ label: "Plus long trou", valeur: t.pire + " h" }) +
+        "</div>" +
+        '<p class="champ__aide" style="margin-bottom:var(--e-2)">Le chiffre ' +
+          "d'une case, c'est le nombre de personnes en service à cette heure-là. " +
+          "Clique un jour pour voir qui.</p>" +
+        MNPlanning.grilleSemaine(s, planJour) +
+        (planJour === null
+          ? ""
+          : '<h4 style="margin:var(--e-4) 0 var(--e-2)">' +
+            U.esc(MNPlanning.JOURS[planJour]) + " — qui était là</h4>" +
+            MNPlanning.grilleJour(s, planJour))
+    });
+
+    z.querySelectorAll('[data-a^="sem"]').forEach(x =>
+      x.addEventListener("click", () => {
+        const n = planSemaine + (x.dataset.a === "sem1" ? 1 : -1);
+        /* Pas de semaine à venir : personne n'y a encore pointé. */
+        if (n > 0) return;
+        planSemaine = n;
+        planJour = null;
+        planning(z);
+      }));
+
+    z.querySelectorAll("[data-jour]").forEach(x =>
+      x.addEventListener("click", () => {
+        planJour = planJour === Number(x.dataset.jour) ? null : Number(x.dataset.jour);
+        planning(z);
+      }));
   }
 
   function atelier(z) {

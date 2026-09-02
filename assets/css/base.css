@@ -223,10 +223,23 @@ ul { margin: 0; padding: 0; list-style: none; }
   color: var(--pink); opacity: .85;
 }
 
-.topnav { display: flex; gap: 4px; margin-left: 10px; }
+/* La barre a fini par porter dix entrées : Émotes et Blacklist l'ont fait
+   déborder, et c'est toute la page qui se mettait à défiler de côté. La
+   navigation se laisse donc rétrécir et défile en son sein ; la marque, le
+   garage et le compte gardent leur place. */
+.topnav {
+  display: flex; gap: 4px;
+  margin-left: 10px;
+  flex: 0 1 auto; min-width: 0;
+  overflow-x: auto;
+  /* La barre de défilement traverserait les liens sur 34 px de haut. */
+  scrollbar-width: none;
+}
+.topnav::-webkit-scrollbar { display: none; }
 
 .navlink {
-  padding: 8px 14px;
+  flex: none; white-space: nowrap;
+  padding: 8px 11px;
   border-radius: var(--r-sm);
   font-family: var(--font-display);
   font-size: 13.5px; font-weight: 700;

@@ -438,7 +438,6 @@ function nettoyerVehicule(v, catIds) {
     coffre: libre(v.coffre, 40),
     litres: stat(v.litres, 9999),
     /* Peut-il être tracté ? Une case cochée ou non, sans troisième état. */
-    remorquable: v.remorquable === true,
     note: texte(v.note, 300),
     /* Modification en attente d'approbation, rangée à côté du véhicule sans
        le changer. Même bornage que les champs qu'elle remplacera. */
@@ -456,7 +455,6 @@ function nettoyerVehicule(v, catIds) {
           places: stat(c.places, 99),
           coffre: libre(c.coffre, 40),
           litres: stat(c.litres, 9999),
-          remorquable: c.remorquable === true,
           note: texte(c.note, 300)
         }
       };

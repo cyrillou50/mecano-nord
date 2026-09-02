@@ -95,7 +95,6 @@
     { k: "litres", nom: "réservoir", lisible: v => volume(v) },
     /* `lisible` est indispensable ici : sans lui, un booléen faux s'écrirait
        « — » dans la comparaison, comme un champ vide. */
-    { k: "remorquable", nom: "remorquable", lisible: v => (v === true ? "oui" : "non") },
     { k: "note", nom: "note" }
   ];
 
@@ -514,12 +513,6 @@
             boite("Places", v.places) +
             boite("Coffre", poids(v.coffre)) +
             boite("Réservoir", volume(v.litres)) +
-            /* Toujours renseigné — une case cochée ou non — donc jamais le
-               tiret des cases vides : « non » est une réponse. */
-            '<div class="vbox"><span class="vbox__l">Remorquable</span>' +
-              '<b class="vrem vrem--' + (v.remorquable ? "oui" : "non") + '">' +
-                svg(v.remorquable ? "check" : "x") +
-                "<span>" + (v.remorquable ? "Oui" : "Non") + "</span></b></div>" +
           "</div>" +
 
           (manque.length
@@ -612,7 +605,7 @@
       : {
           name: "", category: P().cats[0].id, image: "",
           carburant: "", places: 0, coffre: "", litres: 0,
-          remorquable: false, note: ""
+          note: ""
         };
 
     const body = document.createElement("div");
@@ -667,10 +660,6 @@
           '<input class="input" id="e-vnote" maxlength="120" value="' + esc(cur.note) + '"></div>' +
       "</div>" +
 
-      '<label class="switch"><input type="checkbox" id="e-vrem"' +
-        (cur.remorquable ? " checked" : "") + ">" +
-        '<span class="switch__box"></span><span>Remorquable</span></label>' +
-
       '<p class="hint" style="margin-top:12px">Écris <b>N/A</b> dans une case ' +
         "qui ne s'applique pas — un bateau sans coffre, un vélo sans réservoir. " +
         "La fiche compte alors comme complète et perd son étoile.</p>";
@@ -714,7 +703,6 @@
               places: g("#e-vp"),
               coffre: g("#e-vk"),
               litres: g("#e-vt"),
-              remorquable: body.querySelector("#e-vrem").checked,
               note: g("#e-vnote")
             });
 

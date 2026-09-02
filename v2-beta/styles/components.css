@@ -798,10 +798,6 @@
 .v-photo img { width: 100%; height: 100%; object-fit: contain; }
 .v-photo svg { width: 76px; height: 76px; stroke-width: 1.2; }
 
-.v-rem { display: inline-flex; align-items: center; gap: var(--e-2); font-size: var(--t-lg); }
-.v-rem svg { width: 17px; height: 17px; }
-.v-rem--oui { color: var(--c-succes); }
-.v-rem--non { color: var(--c-faible); }
 
 .v-manque {
   display: flex; align-items: center; gap: var(--e-2);
@@ -2114,3 +2110,85 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--c-action); outli
 .emote__img svg { width: 20px; height: 20px; color: var(--c-faible); }
 .emote__img img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
 .emote__img .mn-emoji { font-size: 22px; line-height: 1; }
+
+/* ==========================================================================
+   PLANNING
+   Une grille de 24 colonnes : on la lit d'un coup d'œil, pas ligne à ligne.
+   Le vide est ce qu'on vient y chercher — c'est donc lui qui se voit le
+   plus, en rouge, et non l'inverse.
+   ========================================================================== */
+
+/* Vingt-quatre colonnes ne tiennent pas sur un téléphone : la grille défile
+   dans son cadre plutôt que d'écraser la page. */
+.plan__cadre { overflow-x: auto; padding-bottom: 4px; }
+
+.plan {
+  --col: 30px;
+  min-width: max-content;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan__l {
+  display: grid;
+  grid-template-columns: 116px repeat(var(--h), var(--col)) 56px;
+  align-items: stretch;
+  width: 100%;
+  padding: 0; margin: 0;
+  border: 0; background: none; color: inherit; font: inherit;
+  text-align: left;
+}
+button.plan__l { cursor: pointer; }
+button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
+
+.plan__c {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 26px;
+  font-size: 12px;
+  border-right: 1px solid var(--c-bord);
+  border-bottom: 1px solid var(--c-bord);
+}
+.plan__c--tete {
+  font-size: 10.5px; letter-spacing: .04em;
+  color: var(--c-faible);
+  background: var(--c-creux);
+}
+
+/* La colonne des noms : à gauche, lisible, et elle ne bouge pas. */
+.plan__c--jour {
+  flex-direction: column; align-items: flex-start; justify-content: center;
+  gap: 1px;
+  padding: 4px 10px;
+  position: sticky; left: 0; z-index: 1;
+  background: var(--c-carte);
+  border-right: 1px solid var(--c-bord-net);
+}
+.plan__c--jour b { font-size: 12.5px; }
+.plan__c--jour i { font-style: normal; font-size: 10.5px; color: var(--c-faible); }
+
+/* Les degrés de présence. Un seul mécano n'est pas la même chose que trois :
+   la couleur le dit sans qu'on lise le chiffre. */
+.plan__c--trou  { background: rgba(255, 59, 92, .16); color: rgba(255, 130, 150, .85); }
+.plan__c--un    { background: rgb(var(--accent-rgb) / .18); color: var(--c-action-doux); }
+.plan__c--deux  { background: rgb(var(--accent-rgb) / .34); color: var(--c-action-doux); }
+.plan__c--plein { background: rgb(var(--accent-rgb) / .55); color: var(--c-sur-action); font-weight: 700; }
+
+/* La grille du jour : présent ou absent, sans chiffre à lire. */
+.plan__c--on { background: var(--c-succes); box-shadow: inset 0 0 0 1px var(--c-fond); }
+
+.plan__c--tot { color: var(--c-second); font-size: 11.5px; }
+.plan__c--pied { color: var(--c-second); }
+
+.plan__l--tete .plan__c { border-bottom: 1px solid var(--c-bord-net); }
+.plan__l--pied .plan__c { background: var(--c-creux); border-bottom: 0; }
+.plan__l--pied .plan__c--trou { background: rgba(255, 59, 92, .2); }
+
+.plan__l.is-ouvert .plan__c--jour { color: var(--c-action); }
+.plan__l.is-auj .plan__c--jour b::after {
+  content: " ·"; color: var(--c-succes);
+}
+
+.plan__vide {
+  padding: 22px; text-align: center;
+  color: var(--c-faible); font-size: 13.5px;
+  border: 1px dashed var(--c-bord-net); border-radius: var(--r-2);
+}

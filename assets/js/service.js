@@ -116,6 +116,7 @@
     { id: "conges",   cat: "moi",     nom: "Mes congés",         droit: "point" },
     { id: "eqconges", cat: "equipe",  nom: "Congés",             droit: "voir" },
     { id: "eqtemps",  cat: "equipe",  nom: "Temps de service",   droit: "voir" },
+    { id: "eqplan",   cat: "equipe",  nom: "Planning",           droit: "voir" },
     { id: "eqlog",    cat: "equipe",  nom: "Derniers pointages", droit: "voir" }
   ];
 
@@ -141,7 +142,59 @@
     if (id === "conges") return myLeaveCard();
     if (id === "eqconges") return leavePanel(canManage);
     if (id === "eqtemps") return statsPanel();
+    if (id === "eqplan") return planPanel();
     return logPanel(canManage);
+  }
+
+  /* ---- Planning ---------------------------------------------------------------
+     Le pointage dit qui a travaillé et combien ; il ne dit pas quand. C'est
+     pourtant la question qu'on se pose en ouvrant : y a-t-il quelqu'un à
+     14 h le mardi, et qui tient les nuits.
+
+     Deux grilles, parce qu'elles répondent à deux questions. La semaine
+     montre les trous ; le jour montre qui les aurait tenus. */
+
+  let planSemaine = 0;      // 0 = semaine en cours, -1 = la précédente
+  let planJour = null;      // le jour déplié, ou null
+
+  function planPanel() {
+    const b = MNDuty.board();
+    const s = MNPlanning.semaine(b.log, b.onDuty, planSemaine);
+    const t = MNPlanning.trous(s);
+    const tenu = t.total - t.vides;
+
+    return '<div class="panel"><div class="panel__head">' + svg("calendar") +
+        "<h2>Planning</h2>" +
+        '<span class="spacer"></span>' +
+        '<div class="row">' +
+          '<button class="btn btn--ghost btn--sm" data-sem="-1">' + svg("chevUp") +
+            "<span>Semaine précédente</span></button>" +
+          '<span class="hint" style="min-width:170px;text-align:center">' +
+            esc(MNPlanning.titre(planSemaine)) + "</span>" +
+          '<button class="btn btn--ghost btn--sm" data-sem="1"' +
+            (planSemaine >= 0 ? " disabled" : "") + ">" + svg("chevDown") +
+            "<span>Suivante</span></button>" +
+        "</div>" +
+      "</div>" +
+      '<div class="panel__body">' +
+        '<div class="statgrid" style="margin-bottom:14px">' +
+          stat("Heures tenues", tenu + " / " + t.total) +
+          stat("Heures sans personne", String(t.vides)) +
+          stat("Plus long trou", t.pire + " h") +
+        "</div>" +
+
+        '<p class="hint" style="margin-bottom:10px">Le chiffre d\'une case, ' +
+          "c'est le nombre de personnes en service à cette heure-là. " +
+          "Clique un jour pour voir qui.</p>" +
+
+        MNPlanning.grilleSemaine(s, planJour) +
+
+        (planJour === null
+          ? ""
+          : '<h3 class="section-subtitle" style="margin:18px 0 10px">' +
+            esc(MNPlanning.JOURS[planJour]) + " — qui était là</h3>" +
+            MNPlanning.grilleJour(s, planJour)) +
+      "</div></div>";
   }
 
   function render() {
@@ -191,6 +244,21 @@
       b.addEventListener("click", () => {
         if (b.dataset.vue === vueActive) return;
         vueActive = b.dataset.vue;
+        render();
+      }));
+
+    document.querySelectorAll("[data-sem]").forEach(b =>
+      b.addEventListener("click", () => {
+        /* Pas de semaine à venir : personne n'y a encore pointé. */
+        const n = planSemaine + Number(b.dataset.sem);
+        if (n > 0) return;
+        planSemaine = n;
+        planJour = null;
+        render();
+      }));
+    document.querySelectorAll("[data-jour]").forEach(b =>
+      b.addEventListener("click", () => {
+        planJour = planJour === Number(b.dataset.jour) ? null : Number(b.dataset.jour);
         render();
       }));
 
@@ -554,7 +622,8 @@
         ? '<button class="btn btn--ghost btn--sm" id="d-token" style="flex:none" ' +
           'title="Solution de dépannage : utiliser un jeton sur cet appareil">' + svg("key") +
           "<span>Jeton</span></button>"
-        : "");
+        : "") +
+      "</div>";
   }
 
   /** Enregistre le jeton d'équipe sur cet appareil. */

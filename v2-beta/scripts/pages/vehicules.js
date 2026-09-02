@@ -227,10 +227,6 @@
           boite("Places", v.places) +
           boite("Coffre", avecUnite(v.coffre, "KG", /kgs?\s*$/i)) +
           boite("Réservoir", avecUnite(v.litres, "L", /(l|litres?)\s*$/i)) +
-          '<div class="tuile"><span class="tuile__label">Remorquable</span>' +
-            '<span class="tuile__val v-rem v-rem--' + (v.remorquable ? "oui" : "non") + '">' +
-              U.icone(v.remorquable ? "check" : "croix") +
-              (v.remorquable ? "Oui" : "Non") + "</span></div>" +
         "</div>" +
 
         (m.length
@@ -262,7 +258,6 @@
     { k: "places", nom: "places" },
     { k: "coffre", nom: "coffre" },
     { k: "litres", nom: "réservoir" },
-    { k: "remorquable", nom: "remorquable", lisible: v => (v === true ? "oui" : "non") },
     { k: "note", nom: "note" }
   ];
 
@@ -337,7 +332,7 @@
     const cur = v
       ? Object.assign(MNStore.clone(v), v.propose ? v.propose.champs : {})
       : { name: "", category: P().cats[0].id, image: "", carburant: "",
-          places: "", coffre: "", litres: "", remorquable: false, note: "" };
+          places: "", coffre: "", litres: "", note: "" };
 
     const corps = document.createElement("div");
     corps.className = "pile";
@@ -375,9 +370,6 @@
         U.champ({ id: "e-note", label: "Note (facultatif)", valeur: cur.note, max: 120 }) +
       "</div>" +
 
-      U.champ({ id: "e-rem", type: "bascule", valeur: cur.remorquable,
-        label: "Remorquable" }) +
-
       '<p class="champ__aide">Écris <b>N/A</b> dans une case qui ne s\'applique pas — ' +
         "un bateau sans coffre, un vélo sans réservoir. La fiche compte alors comme " +
         "complète et perd son étoile.</p>";
@@ -413,7 +405,6 @@
               places: g("#e-pl"),
               coffre: g("#e-co"),
               litres: g("#e-li"),
-              remorquable: c.querySelector("#e-rem").checked,
               note: g("#e-note")
             });
 
