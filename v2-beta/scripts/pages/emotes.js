@@ -158,6 +158,12 @@
     z.querySelectorAll("[data-cmd]").forEach(b =>
       b.addEventListener("click", () => copier(b.dataset.cmd)));
 
+    z.querySelectorAll("[data-img]").forEach(b =>
+      b.addEventListener("click", () => U.modale({
+        titre: b.dataset.nom,
+        corps: '<div class="emote__grand">' + mnIcon(b.dataset.img) + "</div>"
+      })));
+
     z.querySelectorAll("[data-edit]").forEach(b =>
       b.addEventListener("click", () => editer(trouver(b.dataset.edit))));
 
@@ -167,7 +173,11 @@
 
   function ligne(e) {
     return '<div class="emote">' +
-      (e.image ? '<span class="emote__img">' + mnIcon(e.image) + "</span>" : "") +
+      (e.image
+        ? '<button class="emote__img" type="button" data-img="' + U.esc(e.image) +
+          '" data-nom="' + U.esc(e.nom) + '" title="Voir en grand">' +
+          mnIcon(e.image) + "</button>"
+        : "") +
       '<div class="emote__txt"><b>' + U.esc(e.nom) + "</b>" +
         (e.note ? "<i>" + U.esc(e.note) + "</i>" : "") + "</div>" +
       (e.commande

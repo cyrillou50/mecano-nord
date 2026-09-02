@@ -186,6 +186,12 @@
       b.addEventListener("click", () =>
         MNUI.copy(b.dataset.cmd, "« " + b.dataset.cmd + " » copiée")));
 
+    host.querySelectorAll("[data-img]").forEach(b =>
+      b.addEventListener("click", () => MNUI.modal({
+        title: b.dataset.nom,
+        body: '<div class="emote__grand">' + mnIcon(b.dataset.img) + "</div>"
+      })));
+
     host.querySelectorAll("[data-edit]").forEach(b =>
       b.addEventListener("click", () => editer(trouver(b.dataset.edit))));
 
@@ -195,7 +201,11 @@
 
   function ligne(e) {
     return '<div class="emote">' +
-      (e.image ? '<span class="emote__img">' + mnIcon(e.image) + "</span>" : "") +
+      (e.image
+        ? '<button class="emote__img" type="button" data-img="' + esc(e.image) +
+          '" data-nom="' + esc(e.nom) + '" title="Voir en grand">' +
+          mnIcon(e.image) + "</button>"
+        : "") +
       '<div class="emote__txt"><b>' + esc(e.nom) + "</b>" +
         (e.note ? "<i>" + esc(e.note) + "</i>" : "") + "</div>" +
       (e.commande
