@@ -2,8 +2,9 @@
    Publication en ligne — écrit data/catalog.json directement dans le dépôt
    GitHub via l'API, depuis le navigateur.
 
-   Résultat : on modifie tout depuis le panneau admin, on clique « Publier »,
-   et le site public est à jour ~1 minute plus tard. Aucun fichier à toucher.
+   Résultat : on modifie, et c'est en ligne. Rien à cliquer, rien à toucher —
+   l'envoi se programme tout seul à chaque écriture du brouillon (voir « Envoi
+   automatique » plus bas).
 
    Le jeton GitHub reste dans le navigateur de la personne qui publie
    (localStorage) — il n'est jamais écrit dans le dépôt.
@@ -404,6 +405,18 @@ window.MNGitHub = (function () {
    * Renvoie faux si ce serveur ne connaît pas encore la route — auquel cas
    * l'appelant reprend le chemin GitHub plutôt que d'échouer.
    */
+  /* null = pas encore demandé, false = ce serveur est d'une version qui ne
+     connaît pas la route. Une fois la réponse connue, inutile de reposer la
+     question à chaque envoi. */
+  let _prendCatalogue = null;
+
+  /* L'adresse déjà déposée dans le dépôt pendant cette session. `MNStore.depot()`
+     garde la copie du dépôt telle qu'elle a été lue au démarrage, et ne bouge
+     plus : sans ce repère, on réécrirait l'amorçage à chaque envoi — un commit
+     à chaque fois, là où l'on cherche précisément à n'en faire aucun. */
+  let _adresseDeposee = null;
+  const serveurPrendCatalogue = () => _prendCatalogue;
+
   async function versServeurCatalogue(json) {
     const base = catalogueUrl();
     if (!base) return false;
@@ -412,15 +425,27 @@ window.MNGitHub = (function () {
       headers: { "Content-Type": "application/json" },
       body: json
     });
-    if (r.status === 404 || r.status === 405) return false;   // serveur trop ancien
+    if (r.status === 404 || r.status === 405) {
+      _prendCatalogue = false;                                // serveur trop ancien
+      return false;
+    }
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       throw err("server", d.error || "Le serveur a répondu " + r.status);
     }
+    _prendCatalogue = true;
     return true;
   }
 
-  async function publish(json, message) {
+  /**
+   * @param {string} json     le catalogue complet
+   * @param {string} [message] message de commit, si commit il y a
+   * @param {{sansDepot?:boolean}} [opt]  sansDepot : ne pas se rabattre sur un
+   *        commit si le serveur ne prend pas le catalogue. Écrire dans le
+   *        dépôt à la place d'un serveur qui existe, c'est empiler des commits
+   *        pour rien et cacher ce qu'il y a à réparer.
+   */
+  async function publish(json, message, opt) {
     const c = repoConfig();
     const msg = message || "Mise à jour du catalogue depuis le panneau admin";
 
@@ -437,10 +462,11 @@ window.MNGitHub = (function () {
         const depot = MNStore.depot();
         const avant = depot && depot.settings && depot.settings.serveur;
         const apres = MNStore.settings().serveur;
-        if (depot && avant !== apres) {
+        if (depot && avant !== apres && _adresseDeposee !== apres) {
           await (serveurUrl()
             ? viaServeur(c.path, json, "Adresse du serveur mise à jour", false)
             : putFile(c.path, b64(json), "Adresse du serveur mise à jour"));
+          _adresseDeposee = apres;
           secours = "adresse";
         }
       } catch (e) {
@@ -453,6 +479,13 @@ window.MNGitHub = (function () {
                      serveur: true, secours };
       localStorage.setItem(K_LAST, JSON.stringify(info));
       return info;
+    }
+
+    if (opt && opt.sansDepot) {
+      throw err("serveur-ancien",
+        "Ton serveur ne sait pas encore garder le catalogue. Recopie " +
+        "serveur/serveur.js sur le VPS et redémarre-le : tout passera par lui, " +
+        "sans le moindre commit.");
     }
 
     /* Sinon le chemin d'avant : le serveur commite pour nous s'il sait le
@@ -475,11 +508,227 @@ window.MNGitHub = (function () {
     try { return JSON.parse(localStorage.getItem(K_LAST) || "null"); } catch (_) { return null; }
   }
 
+  /* ---- Envoi automatique -------------------------------------------------------
+     Un bouton « Publier » demande à quelqu'un de s'en souvenir. C'est la seule
+     chose que le site ne fasse pas tout seul, et donc la seule qui s'oublie :
+     une fiche corrigée, une voiture ajoutée, et l'équipe lit l'ancienne
+     version pendant deux jours sans savoir pourquoi.
+
+     Alors on l'enlève. Toute écriture du brouillon programme son propre envoi,
+     depuis n'importe quelle page, sans rien à cliquer. Le bouton ne
+     réapparaît que là où l'automatique ne peut rien : pas le droit de
+     publier, ni serveur ni jeton, ou un envoi qui a échoué.
+
+     Et surtout : l'automatique passe par le serveur. GitHub héberge les
+     pages, le serveur détient les données — ce qui change tous les jours n'a
+     rien à faire dans l'historique d'un dépôt. Une écriture au serveur est
+     immédiate et ne coûte rien ; un commit fait reconstruire le site entier
+     pour un numéro de téléphone corrigé.
+
+     Trois cas, donc :
+       • le serveur détient le catalogue — la voie normale, deux secondes de
+         regroupement et aucun commit ;
+       • aucun serveur configuré — le dépôt est la seule voie, on y va, mais en
+         groupant largement : chaque envoi y coûte une reconstruction ;
+       • un serveur configuré qui ne prend pas le catalogue (version trop
+         ancienne) — on ne commite pas à sa place. Ce serait remplir le dépôt
+         d'envois qui n'ont pas lieu d'être, et masquer ce qu'il suffit de
+         réparer une fois. Le bandeau le dit et laisse la main. */
+
+  const K_STAMP = "mn.gh.stamp";
+  const DELAI_SERVEUR = 2000;
+  /* Une minute paraît long ; elle ne l'est pas au regard de la reconstruction
+     de GitHub Pages, qui prend autant. Ce qu'on y gagne, c'est un commit au
+     lieu de dix pour une séance de corrections. */
+  const DELAI_DEPOT = 60000;
+  /* Un réseau qui cligne ne doit pas réclamer un clic ; un dépôt mal réglé,
+     si. Un seul rattrapage, puis on rend la main. */
+  const RATTRAPAGE = 30000;
+
+  let minuterie = null;
+  let enCours = false;
+  let echec = null;
+  let rattrape = false;
+
+  const veilleurs = [];
+
+  /** Prévient les bandeaux : ils affichent un état, pas un instant. */
+  const onAuto = fn => veilleurs.push(fn);
+
+  function prevenir() {
+    const e = etatAuto();
+    veilleurs.forEach(fn => { try { fn(e); } catch (err) { console.error(err); } });
+  }
+
+  /** Le brouillon en attente est-il déjà parti ? */
+  function dejaEnvoye() {
+    try {
+      return MNStore.hasDraft() &&
+        localStorage.getItem(K_STAMP) === MNStore.catalog().updatedAt;
+    } catch (_) { return false; }
+  }
+
+  /** Quelqu'un est là, il a le droit, et il y a une voie de sortie. */
+  function autoPossible() {
+    try { return !!(MNAuth.session() && MNAuth.can("publish") && canPublish()); }
+    catch (_) { return false; }
+  }
+
+  /**
+   * Par où l'envoi automatique doit passer.
+   * @returns {"serveur"|"depot"|""}  "" = ne pas partir tout seul.
+   */
+  function voieAuto() {
+    if (!autoPossible()) return "";
+    if (!catalogueUrl()) return "depot";
+    return _prendCatalogue === false ? "" : "serveur";
+  }
+
+  const autoActif = () => !!voieAuto();
+
+  /** De quoi écrire un bandeau sans avoir à deviner. */
+  function etatAuto() {
+    let attente = false;
+    try { attente = MNStore.hasDraft(); } catch (_) { /* magasin pas encore prêt */ }
+    const voie = voieAuto();
+    return {
+      voie,
+      actif: !!voie,
+      immediat: voie === "serveur",
+      /* Un serveur est là, il a le droit de publier, mais ce serveur ne prend
+         pas encore le catalogue : le seul cas où l'on s'arrête volontairement. */
+      serveurAncien: autoPossible() && !!catalogueUrl() && _prendCatalogue === false,
+      attente,
+      programme: !!minuterie,
+      enCours,
+      envoye: dejaEnvoye(),
+      echec
+    };
+  }
+
+  /** Replanifie l'envoi : chaque nouvelle modification repousse le départ. */
+  function programmer() {
+    clearTimeout(minuterie);
+    minuterie = null;
+    const voie = voieAuto();
+    if (voie && !dejaEnvoye()) {
+      let attente = false;
+      try { attente = MNStore.hasDraft(); } catch (_) { /* rien à envoyer */ }
+      if (attente) {
+        minuterie = setTimeout(partir, voie === "serveur" ? DELAI_SERVEUR : DELAI_DEPOT);
+      }
+    }
+    prevenir();
+  }
+
+  /**
+   * Envoie le brouillon tout de suite.
+   * @param {boolean} [forcerDepot]  autorise le commit même si un serveur est
+   *        configuré. Réservé au geste humain : c'est une chose de refuser de
+   *        committer tout seul derrière un serveur en panne, c'en est une
+   *        autre d'empêcher quelqu'un de mettre son site à jour.
+   * @returns {Promise<object|null>} le résultat, ou null s'il n'y avait rien à
+   *          envoyer ou si l'envoi a échoué — l'erreur est alors dans
+   *          `etatAuto().echec`, pour que le bandeau la montre sans qu'un
+   *          minuteur ait à attraper une exception que personne n'écoute.
+   */
+  async function partir(forcerDepot) {
+    clearTimeout(minuterie);
+    minuterie = null;
+    if (enCours || !autoPossible() || !MNStore.hasDraft()) { prevenir(); return null; }
+
+    const cat = MNStore.catalog();
+    const marque = cat.updatedAt;
+    let qui = "le site";
+    try { qui = (MNAuth.session() || {}).pseudo || qui; } catch (_) { /* invité */ }
+
+    enCours = true;
+    echec = null;
+    prevenir();
+
+    try {
+      const info = await publish(MNStore.toJSON(cat), "Catalogue mis à jour par " + qui,
+        { sansDepot: !forcerDepot && !!catalogueUrl() });
+      localStorage.setItem(K_STAMP, marque);
+      rattrape = false;
+      return info;
+    } catch (e) {
+      /* Un serveur d'une version trop ancienne n'est pas une panne : c'est un
+         état, que le bandeau sait déjà nommer. Le répéter en rouge et
+         réessayer toutes les trente secondes n'apprendrait rien. */
+      if (e && e.code === "serveur-ancien") return null;
+
+      echec = { message: String((e && e.message) || e), at: Date.now() };
+      /* Une panne passagère se rattrape toute seule ; deux de suite veulent
+         dire qu'il y a quelque chose à régler, et là il faut quelqu'un. */
+      if (!rattrape) {
+        rattrape = true;
+        minuterie = setTimeout(partir, RATTRAPAGE);
+      }
+      return null;
+    } finally {
+      enCours = false;
+      prevenir();
+      /* Le brouillon a encore bougé pendant l'envoi ? On repart pour un tour. */
+      if (!echec && !dejaEnvoye()) programmer();
+    }
+  }
+
+  /**
+   * L'état de l'envoi, dit en français, pour les bandeaux.
+   * Renvoie null quand l'automatique ne peut rien faire : à la page, alors, de
+   * dire ce qu'elle disait avant — elle seule sait de quoi elle parle.
+   * @returns {{ton:string, titre:string, detail:string, bouton:string}|null}
+   */
+  function motAuto() {
+    const e = etatAuto();
+    if (!e.attente) return null;
+
+    if (e.enCours) {
+      return { ton: "ok", titre: "Mise en ligne…", detail: "", bouton: "" };
+    }
+    if (e.echec) {
+      return { ton: "err", titre: "La mise en ligne a échoué.",
+               detail: e.echec.message + " Rien n'est perdu : tes modifications " +
+                 "sont gardées, il suffit de réessayer.",
+               bouton: "reessayer" };
+    }
+    if (e.envoye) {
+      return e.immediat
+        ? { ton: "ok", titre: "En ligne.", detail: "", bouton: "" }
+        : { ton: "ok", titre: "Envoyé.",
+            detail: "GitHub met le site à jour, compte une minute environ.",
+            bouton: "verifier" };
+    }
+    if (e.actif) {
+      return { ton: "ok", titre: "Enregistré.",
+               detail: e.immediat
+                 ? "La mise en ligne part toute seule dans quelques secondes."
+                 : "Sans serveur, la mise en ligne passe par un commit : les " +
+                   "modifications partent groupées, d'ici une minute.",
+               bouton: "" };
+    }
+    if (e.serveurAncien) {
+      return { ton: "warn", titre: "Ton serveur ne prend pas encore le catalogue.",
+               detail: "Recopie serveur/serveur.js sur le VPS et redémarre-le : " +
+                 "tout passera par lui, sans commit. En attendant, tu peux " +
+                 "publier sur GitHub à la main.",
+               bouton: "publier" };
+    }
+    return null;
+  }
+
+  /* Toute écriture du catalogue passe par là, d'où qu'elle vienne : c'est le
+     seul endroit où s'abonner pour n'en manquer aucune. */
+  try { MNStore.onChange(programmer); } catch (_) { /* magasin absent */ }
+
   return {
     getToken, setToken, hasToken, forgetToken,
     detect, repoConfig, isConfigured,
     check, publish, lastPublish,
     putFile, putText, putFiles, listDir, uploadImage, imageBrute, getFile, deleteFile, renameFile,
-    serveurUrl, catalogueUrl, canPublish
+    serveurUrl, catalogueUrl, canPublish,
+    autoActif, voieAuto, serveurPrendCatalogue, etatAuto, motAuto, onAuto,
+    reveiller: programmer, publierMaintenant: () => partir(true)
   };
 })();

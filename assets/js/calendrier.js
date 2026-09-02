@@ -37,6 +37,10 @@
     await MNDuty.load(false).catch(() => {});
     render();
 
+    /* Le bandeau suit l'envoi automatique, qui part sans passer par ici. */
+    MNGitHub.onAuto(renderDraftbar);
+
+
     /* Un agenda se remplit à plusieurs : on relit régulièrement. */
     MNUI.autoRefresh(async () => {
       await MNAgenda.load(true).catch(() => {});
@@ -170,11 +174,31 @@
 
     bar.hidden = !MNStore.hasDraft();
     if (bar.hidden) return;
+
+    /* Sans serveur, ces données vivent dans le catalogue, et le catalogue part
+       tout seul. Reste à dire où en est ce départ. */
+    const mot = MNGitHub.motAuto();
+    if (mot) {
+      const c = mot.ton === "err" ? "var(--danger)"
+        : mot.ton === "warn" ? "var(--amber)" : "var(--toxic)";
+      bar.innerHTML =
+        '<span class="draftbar__dot" style="background:' + c +
+          ";box-shadow:0 0 12px " + c + '"></span>' +
+        '<span class="draftbar__txt"><b>' + esc(mot.titre) + "</b>" +
+          (mot.detail ? " <span>" + esc(mot.detail) + "</span>" : "") + "</span>" +
+        (mot.bouton
+          ? '<a class="btn btn--primary btn--sm" href="admin.html">' + svg("cloud") +
+            "<span>Voir</span></a>"
+          : "");
+      return;
+    }
+
     bar.innerHTML =
       '<span class="draftbar__dot"></span>' +
-      '<span class="draftbar__txt"><b>Agenda non publié</b> ' +
-        "<span>— sans serveur configuré, il vit dans le catalogue : personne ne le verra " +
-        "tant qu'il n'est pas publié.</span></span>" +
+      '<span class="draftbar__txt">' +
+        "<b>L'agenda n'est enregistré que sur cet appareil.</b> " +
+        "<span>Sans serveur configuré, il vit dans le catalogue, " +
+        "et il faut le mettre en ligne pour que l'équipe le voie.</span></span>" +
       (MNAuth.can("publish")
         ? '<a class="btn btn--primary btn--sm" href="admin.html">' + svg("cloud") + "<span>Publier</span></a>"
         : "");

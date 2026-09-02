@@ -274,15 +274,21 @@ window.V2Shell = (function () {
     if (a) a.outerHTML = marque();
   }
 
-  /* ---- Modifications non publiées ------------------------------------------
+  /* ---- Ce qui n'est pas encore en ligne -------------------------------------
      Le catalogue ne s'écrit pas en direct : on travaille sur un brouillon
-     gardé dans le navigateur, qu'un responsable publie ensuite. Le bandeau
-     vit dans le squelette et non dans chaque page — toutes celles qui
+     gardé dans le navigateur. Il ne reste plus à personne de penser à le
+     publier — MNGitHub l'envoie tout seul, sur le serveur quand celui-ci
+     détient le catalogue. Le bandeau n'est donc plus un rappel, c'est un
+     compte rendu.
+
+     Il vit dans le squelette et non dans chaque page : toutes celles qui
      touchent au catalogue en ont besoin, et il doit rester au même endroit
      quand on passe de l'une à l'autre.
 
-     @param {Function} [apres] rappelé après une publication réussie, pour
-                               que la page se redessine. */
+     @param {Function} [apres] rappelé après un envoi manuel réussi, pour que
+                               la page se redessine. */
+
+  const TONS_ENVOI = { ok: "var(--toxic)", warn: "var(--amber)", err: "var(--danger)" };
 
   function brouillon(apres) {
     const z = document.getElementById("v2-brouillon");
@@ -290,40 +296,57 @@ window.V2Shell = (function () {
     if (!MNStore.hasDraft()) { z.innerHTML = ""; return; }
 
     const peut = MNAuth.can("publish") && MNGitHub.canPublish();
-    z.innerHTML =
-      '<div class="brouillon" role="status">' +
-        '<span class="brouillon__point"></span>' +
-        '<div class="brouillon__txt"><b>Modifications non publiées.</b> ' +
-          "<span>" + (peut
-            ? "Publie-les pour que l'équipe les voie."
-            : "Un responsable devra les publier.") + "</span></div>" +
-        (peut
-          ? U().bouton("Publier", { variante: "principal", taille: "sm",
-                                    icone: "nuage", action: "pub" })
-          : "") +
-      "</div>";
+    const mot = MNGitHub.motAuto();
+
+    if (!mot) {
+      z.innerHTML =
+        '<div class="brouillon" role="status">' +
+          '<span class="brouillon__point"></span>' +
+          '<div class="brouillon__txt"><b>Modifications enregistrées ici seulement.</b> ' +
+            "<span>" + (peut
+              ? "Publie-les pour que l'équipe les voie."
+              : "Un responsable les mettra en ligne.") + "</span></div>" +
+          (peut
+            ? U().bouton("Publier", { variante: "principal", taille: "sm",
+                                      icone: "nuage", action: "pub" })
+            : "") +
+        "</div>";
+    } else {
+      const c = TONS_ENVOI[mot.ton] || TONS_ENVOI.ok;
+      z.innerHTML =
+        '<div class="brouillon" role="status">' +
+          '<span class="brouillon__point" style="background:' + c +
+            ";box-shadow:0 0 12px " + c + '"></span>' +
+          '<div class="brouillon__txt"><b>' + U().esc(mot.titre) + "</b>" +
+            (mot.detail ? " <span>" + U().esc(mot.detail) + "</span>" : "") + "</div>" +
+          (mot.bouton && peut
+            ? U().bouton(mot.bouton === "reessayer" ? "Réessayer" : "Publier sur GitHub",
+                { variante: "principal", taille: "sm", icone: "nuage", action: "pub" })
+            : "") +
+        "</div>";
+    }
 
     const b = z.querySelector('[data-a="pub"]');
     if (!b) return;
     b.addEventListener("click", async () => {
       b.disabled = true;
-      b.innerHTML = U().icone("rafraichir") + "<span>Publication…</span>";
-      const cat = MNStore.catalog();
-      try {
-        const info = await MNGitHub.publish(MNStore.toJSON(cat),
-          "Catalogue mis à jour par " + _session.pseudo);
-        /* Le repère sert à la V1 pour savoir que ce brouillon est parti. */
-        localStorage.setItem("mn.gh.stamp", cat.updatedAt);
-        U().toast(info && info.serveur
-          ? "Publié — en ligne tout de suite"
-          : "Publié — en ligne dans une minute environ", "ok");
-      } catch (e) {
-        U().toast("Publication impossible : " + (e && e.message || e), "err");
+      b.innerHTML = U().icone("rafraichir") + "<span>Mise en ligne…</span>";
+      const info = await MNGitHub.publierMaintenant();
+      if (info) {
+        U().toast(info.serveur
+          ? "En ligne tout de suite"
+          : "Envoyé — en ligne dans une minute environ", "ok");
+      } else {
+        const echec = MNGitHub.etatAuto().echec;
+        if (echec) U().toast("Mise en ligne impossible : " + echec.message, "err");
       }
       brouillon(apres);
       if (apres) apres();
     });
   }
+
+  /* Le bandeau suit l'envoi, qui part sans passer par les pages. */
+  try { MNGitHub.onAuto(() => brouillon()); } catch (_) { /* module absent */ }
 
   /* ---- Apparence -----------------------------------------------------------
      Le moteur de thèmes est celui de l'atelier : on ne fait qu'en présenter
@@ -520,6 +543,11 @@ window.V2Shell = (function () {
       MNStore.nomAtelier(MNAuth.atelier()) + (V2.VERSION.beta ? " (V2 bêta)" : "");
 
     monter(o.titre || "");
+
+    /* Un brouillon peut attendre depuis la visite d'hier — un onglet fermé
+       trop tôt, une connexion coupée. On ne sait qu'ici qui est là et ce
+       qu'il a le droit de faire : c'est le moment de le faire partir. */
+    if (window.MNGitHub) MNGitHub.reveiller();
 
     const hote = document.getElementById("v2-contenu");
     try {

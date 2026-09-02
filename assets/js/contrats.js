@@ -53,6 +53,10 @@
     sel = first ? first.id : null;
     render();
 
+    /* Le bandeau suit l'envoi automatique, qui part sans passer par ici. */
+    MNGitHub.onAuto(renderDraftbar);
+
+
     /* Un contrat se modifie à plusieurs : on relit régulièrement, plus vite
        tant que la page est regardée. */
     MNUI.autoRefresh(async () => {
@@ -129,11 +133,31 @@
 
     bar.hidden = !MNStore.hasDraft();
     if (bar.hidden) return;
+
+    /* Sans serveur, ces données vivent dans le catalogue, et le catalogue part
+       tout seul. Reste à dire où en est ce départ. */
+    const mot = MNGitHub.motAuto();
+    if (mot) {
+      const c = mot.ton === "err" ? "var(--danger)"
+        : mot.ton === "warn" ? "var(--amber)" : "var(--toxic)";
+      bar.innerHTML =
+        '<span class="draftbar__dot" style="background:' + c +
+          ";box-shadow:0 0 12px " + c + '"></span>' +
+        '<span class="draftbar__txt"><b>' + esc(mot.titre) + "</b>" +
+          (mot.detail ? " <span>" + esc(mot.detail) + "</span>" : "") + "</span>" +
+        (mot.bouton
+          ? '<a class="btn btn--primary btn--sm" href="admin.html">' + svg("cloud") +
+            "<span>Voir</span></a>"
+          : "");
+      return;
+    }
+
     bar.innerHTML =
       '<span class="draftbar__dot"></span>' +
-      '<span class="draftbar__txt"><b>Contrats non publiés</b> ' +
-        "<span>— sans serveur configuré, ils vivent dans le catalogue : personne ne les verra " +
-        "tant qu'ils ne sont pas publiés.</span></span>" +
+      '<span class="draftbar__txt">' +
+        "<b>Les contrats ne sont enregistrés que sur cet appareil.</b> " +
+        "<span>Sans serveur configuré, ils vivent dans le catalogue, " +
+        "et il faut le mettre en ligne pour que l'équipe les voie.</span></span>" +
       (MNAuth.can("publish")
         ? '<a class="btn btn--primary btn--sm" href="admin.html">' + svg("cloud") + "<span>Publier</span></a>"
         : "");

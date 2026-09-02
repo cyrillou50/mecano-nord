@@ -6,7 +6,8 @@
      resources · categories · items · users
 
    Le panneau admin travaille sur un brouillon local (localStorage), puis le
-   bouton « Publier » réécrit data/catalog.json directement sur GitHub.
+   catalogue part sur le serveur de l'atelier — ou, à défaut, dans
+   data/catalog.json sur GitHub. Voir « Envoi automatique » dans github.js.
    ========================================================================== */
 
 window.MNStore = (function () {

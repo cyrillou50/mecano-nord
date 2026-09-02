@@ -325,7 +325,8 @@
 
   function rendu(r, msg) {
     dessiner();
-    if (!r || r.ok) U.toast(msg + (r && r.local ? " — pense à publier" : ""), "ok");
+    if (!r || r.ok) U.toast(msg +
+      (r && r.local && !MNGitHub.autoActif() ? " — pense à publier" : ""), "ok");
     else U.toast("Enregistrement impossible : " + (r.error || "échec"), "err");
   }
 

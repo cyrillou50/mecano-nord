@@ -254,7 +254,8 @@
   }
 
   /** Rien à ajouter si c'est déjà en ligne ; sinon on rappelle la publication. */
-  const suite = r => r.parServeur ? "" : " — pense à publier";
+  /** Le serveur l'a pris tout de suite, ou bien l'envoi suivra tout seul. */
+  const suite = r => (r.parServeur || MNGitHub.autoActif()) ? "" : " — pense à publier";
 
   /* ---- Congés -----------------------------------------------------------------
      La fiche ne montre que l'absence du jour ; les périodes à venir se

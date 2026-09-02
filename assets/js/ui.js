@@ -513,6 +513,11 @@ window.MNUI = (function () {
     document.body.dataset.page = opt.page || "";
     mountTopbar(opt.page);
 
+    /* Un brouillon peut attendre depuis la visite d'hier — un onglet fermé
+       trop tôt, une connexion coupée. On ne sait qu'ici qui est là et ce
+       qu'il a le droit de faire : c'est le moment de le faire partir. */
+    if (window.MNGitHub) MNGitHub.reveiller();
+
     /* Une page dont l'initialisation échoue doit le dire, pas rester figée
        sur un écran de chargement. */
     try {

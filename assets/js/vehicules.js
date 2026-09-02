@@ -42,6 +42,9 @@
     const first = liste()[0];
     sel = first ? first.id : null;
     render();
+
+    /* Le bandeau suit l'envoi automatique, qui part sans passer par ici. */
+    MNGitHub.onAuto(renderDraftbar);
   }
 
   /* ---- Données ---------------------------------------------------------- */
@@ -137,7 +140,8 @@
   function rendu(r, message) {
     render();
     if (!r || r.ok) {
-      MNUI.toast(message + (r && r.local ? " — pense à publier" : ""), "ok");
+      MNUI.toast(message +
+        (r && r.local && !MNGitHub.autoActif() ? " — pense à publier" : ""), "ok");
     } else {
       MNUI.toast("Enregistrement impossible : " + (r.error || "échec"), "err");
     }
@@ -193,11 +197,31 @@
 
     bar.hidden = !MNStore.hasDraft();
     if (bar.hidden) return;
+
+    /* Sans serveur, ces données vivent dans le catalogue, et le catalogue part
+       tout seul. Reste à dire où en est ce départ. */
+    const mot = MNGitHub.motAuto();
+    if (mot) {
+      const c = mot.ton === "err" ? "var(--danger)"
+        : mot.ton === "warn" ? "var(--amber)" : "var(--toxic)";
+      bar.innerHTML =
+        '<span class="draftbar__dot" style="background:' + c +
+          ";box-shadow:0 0 12px " + c + '"></span>' +
+        '<span class="draftbar__txt"><b>' + esc(mot.titre) + "</b>" +
+          (mot.detail ? " <span>" + esc(mot.detail) + "</span>" : "") + "</span>" +
+        (mot.bouton
+          ? '<a class="btn btn--primary btn--sm" href="admin.html">' + svg("cloud") +
+            "<span>Voir</span></a>"
+          : "");
+      return;
+    }
+
     bar.innerHTML =
       '<span class="draftbar__dot"></span>' +
-      '<span class="draftbar__txt"><b>Parc non publié</b> ' +
-        "<span>— sans serveur configuré, il vit dans le catalogue : personne ne le verra " +
-        "tant qu'il n'est pas publié.</span></span>" +
+      '<span class="draftbar__txt">' +
+        "<b>Le parc n'est enregistré que sur cet appareil.</b> " +
+        "<span>Sans serveur configuré, il vit dans le catalogue, " +
+        "et il faut le mettre en ligne pour que l'équipe le voie.</span></span>" +
       (MNAuth.can("publish")
         ? '<a class="btn btn--primary btn--sm" href="admin.html">' + svg("cloud") + "<span>Publier</span></a>"
         : "");

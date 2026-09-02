@@ -46,6 +46,10 @@
     await MNDuty.load(false).catch(() => {});
     render();
 
+    /* Le bandeau suit l'envoi automatique, qui part sans passer par ici. */
+    MNGitHub.onAuto(renderDraftbar);
+
+
     /* Les compteurs de service de la personne en cours avancent à la seconde. */
     clearInterval(ticker);
     ticker = setInterval(tick, 1000);
@@ -117,37 +121,61 @@
     return { ok: true, parServeur: false };
   }
 
-  /** « … et l'équipe le voit » ou « … pense à publier », selon le chemin. */
-  const suite = r => r.parServeur ? "" : " — pense à publier";
+  /** Le serveur l'a pris tout de suite, ou bien l'envoi suivra tout seul. */
+  const suite = r => (r.parServeur || MNGitHub.autoActif()) ? "" : " — pense à publier";
+
+  const TONS = { ok: "var(--toxic)", warn: "var(--amber)", err: "var(--danger)" };
 
   function renderDraftbar() {
     const bar = $("#draftbar");
     if (!MNStore.hasDraft()) { bar.hidden = true; return; }
     bar.hidden = false;
 
+    const mot = MNGitHub.motAuto();
     const canPub = MNAuth.can("publish") && MNGitHub.canPublish();
-    bar.innerHTML =
-      '<span class="draftbar__dot"></span>' +
-      '<div class="draftbar__txt"><b>Modifications non publiées.</b> ' +
-        "<span>" + (canPub
-          ? "Clique sur Publier pour que l'équipe les voie."
-          : "Un responsable devra les publier depuis le panneau admin.") + "</span></div>" +
-      (canPub ? '<button class="btn btn--solid btn--sm" id="sb-pub">' + svg("cloud") +
-        "<span>Publier</span></button>" : "");
 
+    /* Pas de mot : l'envoi automatique ne peut rien faire d'ici. */
+    if (!mot) {
+      bar.innerHTML =
+        '<span class="draftbar__dot"></span>' +
+        '<div class="draftbar__txt"><b>Modifications enregistrées ici seulement.</b> ' +
+          "<span>" + (canPub
+            ? "Clique sur Publier pour que l'équipe les voie."
+            : "Un responsable devra les mettre en ligne.") + "</span></div>" +
+        (canPub ? '<button class="btn btn--solid btn--sm" id="sb-pub">' + svg("cloud") +
+          "<span>Publier</span></button>" : "");
+      brancher();
+      return;
+    }
+
+    const c = TONS[mot.ton] || TONS.ok;
+    bar.innerHTML =
+      '<span class="draftbar__dot" style="background:' + c +
+        ";box-shadow:0 0 12px " + c + '"></span>' +
+      '<div class="draftbar__txt"><b>' + esc(mot.titre) + "</b>" +
+        (mot.detail ? " <span>" + esc(mot.detail) + "</span>" : "") + "</div>" +
+      (mot.bouton && canPub
+        ? '<button class="btn btn--solid btn--sm" id="sb-pub">' + svg("cloud") +
+          "<span>" + (mot.bouton === "reessayer" ? "Réessayer" : "Publier sur GitHub") +
+          "</span></button>"
+        : "");
+    brancher();
+  }
+
+  function brancher() {
     const b = $("#sb-pub");
-    if (b) b.addEventListener("click", async () => {
+    if (!b) return;
+    b.addEventListener("click", async () => {
       b.disabled = true;
-      b.innerHTML = svg("refresh") + "<span>Publication…</span>";
-      try {
-        const info = await MNGitHub.publish(MNStore.toJSON(draft),
-          "Fiches équipe mises à jour par " + me.pseudo);
-        localStorage.setItem("mn.gh.stamp", draft.updatedAt);
-        MNUI.toast(info && info.serveur
-          ? "Publié — en ligne tout de suite"
-          : "Publié — en ligne dans ~1 minute", "ok");
-      } catch (e) {
-        MNUI.toast("Publication impossible : " + e.message, "err");
+      b.innerHTML = svg("refresh") + "<span>Mise en ligne…</span>";
+      const info = await MNGitHub.publierMaintenant();
+      if (info) {
+        MNUI.toast(info.serveur
+          ? "En ligne tout de suite"
+          : "Envoyé — en ligne dans ~1 minute", "ok");
+      } else {
+        const echec = MNGitHub.etatAuto().echec;
+        if (echec) MNUI.toast("Mise en ligne impossible : " + echec.message, "err");
       }
       render();
     });

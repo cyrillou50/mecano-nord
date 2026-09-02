@@ -2,7 +2,9 @@
    Panneau administratif : objets, catégories, ressources, employés,
    réglages du site et publication en ligne.
 
-   Tout est modifié dans un brouillon local, puis envoyé sur GitHub d'un clic.
+   Tout est modifié dans un brouillon local, qui part tout seul — sur le
+   serveur quand il détient le catalogue, sinon dans le dépôt. Voir « Envoi
+   automatique » dans github.js.
    ========================================================================== */
 
 (function () {
@@ -12,17 +14,9 @@
   const svg = MNUI.svg, esc = MNUI.esc, num = MNUI.num;
   const K_STAMP = "mn.gh.stamp";
 
-  const K_AUTO = "mn.gh.auto";
-  /* Chaque commit déclenche une reconstruction GitHub Pages, et elles se font
-     à la queue leu leu : quinze secondes d'attente en regroupent beaucoup, et
-     ne coûtent rien puisque la mise en ligne prend de toute façon plus. */
-  const AUTO_DELAY = 15000;
-
   let draft = null;
   let tab = "items";
   let filter = "";
-  let publishing = false;
-  let autoTimer = null;
 
   MNUI.start({ page: "admin", title: "Panneau admin", onReady: init });
 
@@ -32,6 +26,11 @@
     if (!MNAuth.canAny("items", "users", "publish", "theme", "admin")) return denied();
     draft = MNStore.clone(MNStore.catalog());
     tab = firstAllowedTab();
+    MNGitHub.onAuto(() => {
+      if (!$("#draftbar")) return;          // page pas encore dessinée
+      renderDraftbar();
+      if (tab === "publish" && $("#pane")) panePublish($("#pane"));
+    });
     render();
   }
 
@@ -59,7 +58,7 @@
     { id: "theme",   name: "Apparence",  icon: "palette",  perm: "theme" },
     { id: "discord", name: "Discord",    icon: "cloud",    perm: "admin" },
     { id: "site",    name: "Le site",    icon: "settings", perm: "admin" },
-    { id: "publish", name: "Publier",    icon: "github",   perm: "publish" }
+    { id: "publish", name: "Mise en ligne", icon: "github", perm: "publish" }
   ];
 
   const allowed = () => TABS.filter(t => MNAuth.can(t.perm));
@@ -70,20 +69,7 @@
   function commit() {
     draft = MNStore.saveDraft(draft);
     MNAuth.refresh();
-    queueAutoPublish();
     render();
-  }
-
-  /* ---- Publication automatique ---------------------------------------------- */
-
-  const autoReady = () =>
-    localStorage.getItem(K_AUTO) === "1" && MNAuth.can("publish") && MNGitHub.canPublish();
-
-  /** Replanifie un envoi : chaque nouvelle modif repousse le départ. */
-  function queueAutoPublish() {
-    clearTimeout(autoTimer);
-    if (!autoReady()) return;
-    autoTimer = setTimeout(() => publishNow(true), AUTO_DELAY);
   }
 
   /* ---- Rendu général -------------------------------------------------------- */
@@ -113,51 +99,70 @@
     }[tab] || paneItems)($("#pane"));
   }
 
+  /* Le bandeau ne demande plus rien : il raconte. MNGitHub sait où en est
+     l'envoi ; cette page sait, en plus, qu'on peut tout annuler. */
+
+  const TONS = { ok: "var(--toxic)", warn: "var(--amber)", err: "var(--danger)" };
+
+  const btAnnuler = () =>
+    '<button class="btn btn--ghost btn--sm" id="db-discard">' + svg("trash") +
+    "<span>Annuler</span></button>";
+
   function renderDraftbar() {
     const bar = $("#draftbar");
-    const stamp = localStorage.getItem(K_STAMP);
-    const dirty = MNStore.hasDraft();
-    const sent = dirty && stamp && stamp === draft.updatedAt;
+    if (!bar) return;
 
-    if (!dirty) { bar.hidden = true; return; }
+    if (!MNStore.hasDraft()) { bar.hidden = true; return; }
     bar.hidden = false;
 
-    if (publishing) {
+    const etat = MNGitHub.etatAuto();
+    const mot = MNGitHub.motAuto();
+    const annulable = !etat.envoye && !etat.enCours;
+
+    /* Pas de mot : l'automatique ne peut rien — ni droit de publier, ni
+       serveur, ni jeton. C'est le seul cas où il reste un bouton à cliquer. */
+    if (!mot) {
       bar.innerHTML =
-        '<span class="draftbar__dot" style="background:var(--pink);box-shadow:0 0 12px var(--pink)"></span>' +
-        '<div class="draftbar__txt"><b>Envoi vers GitHub…</b></div>';
+        '<span class="draftbar__dot"></span>' +
+        '<div class="draftbar__txt"><b>Modifications enregistrées ici seulement.</b> ' +
+          "<span>" + (MNAuth.can("publish")
+            ? "Renseigne l'adresse du serveur dans « Mise en ligne » pour qu'elles partent seules."
+            : "Un responsable les mettra en ligne.") + "</span></div>" +
+        btAnnuler() +
+        (MNAuth.can("publish")
+          ? '<button class="btn btn--solid btn--sm" id="db-publish">' + svg("cloud") +
+            "<span>Publier</span></button>"
+          : "");
+      brancherDraftbar();
       return;
     }
 
-    if (sent) {
-      const last = MNGitHub.lastPublish();
-      bar.innerHTML =
-        '<span class="draftbar__dot" style="background:var(--toxic);box-shadow:0 0 12px var(--toxic)"></span>' +
-        '<div class="draftbar__txt"><b>Publié' + (last && last.commit ? " (" + esc(last.commit) + ")" : "") + ".</b> " +
-        "<span>GitHub met le site en ligne, compte ~1 minute. Cette bannière disparaîtra toute seule.</span></div>" +
-        '<button class="btn btn--ghost btn--sm" id="db-reload">' + svg("refresh") + "<span>Vérifier</span></button>";
-      const r = $("#db-reload");
-      if (r) r.addEventListener("click", () => location.reload());
-      return;
-    }
-
-    const auto = autoReady();
+    const c = TONS[mot.ton] || TONS.ok;
     bar.innerHTML =
-      '<span class="draftbar__dot"></span>' +
-      '<div class="draftbar__txt"><b>Modifications non publiées.</b> ' +
-        "<span>" + (auto
-          ? "Envoi automatique dans quelques secondes."
-          : "Elles ne sont visibles que par toi tant que tu n'as pas publié.") + "</span></div>" +
-      '<button class="btn btn--ghost btn--sm" id="db-discard">' + svg("trash") + "<span>Annuler</span></button>" +
-      (MNAuth.can("publish")
-        ? '<button class="btn btn--solid btn--sm" id="db-publish">' + svg("cloud") +
-          "<span>" + (auto ? "Publier maintenant" : "Publier") + "</span></button>"
-        : "");
+      '<span class="draftbar__dot" style="background:' + c +
+        ";box-shadow:0 0 12px " + c + '"></span>' +
+      '<div class="draftbar__txt"><b>' + esc(mot.titre) + "</b>" +
+        (mot.detail ? " <span>" + esc(mot.detail) + "</span>" : "") + "</div>" +
+      (annulable ? btAnnuler() : "") +
+      (mot.bouton === "reessayer"
+        ? '<button class="btn btn--solid btn--sm" id="db-publish">' + svg("refresh") +
+          "<span>Réessayer</span></button>"
+        : mot.bouton === "publier"
+          ? '<button class="btn btn--solid btn--sm" id="db-publish">' + svg("cloud") +
+            "<span>Publier sur GitHub</span></button>"
+          : mot.bouton === "verifier"
+            ? '<button class="btn btn--ghost btn--sm" id="db-reload">' + svg("refresh") +
+              "<span>Vérifier</span></button>"
+            : "");
+    brancherDraftbar();
+  }
 
-    $("#db-discard").addEventListener("click", async () => {
+  function brancherDraftbar() {
+    const jeter = $("#db-discard");
+    if (jeter) jeter.addEventListener("click", async () => {
       const ok = await MNUI.confirm({
         title: "Annuler les modifications",
-        message: "Tout ce que tu as changé depuis la dernière publication sera perdu.",
+        message: "Tout ce que tu as changé depuis la dernière mise en ligne sera perdu.",
         confirmLabel: "Tout annuler", danger: true
       });
       if (!ok) return;
@@ -170,7 +175,10 @@
     });
 
     const pb = $("#db-publish");
-    if (pb) pb.addEventListener("click", () => publishNow(false));
+    if (pb) pb.addEventListener("click", () => publishNow());
+
+    const r = $("#db-reload");
+    if (r) r.addEventListener("click", () => location.reload());
   }
 
   /* =========================================================================
@@ -946,7 +954,7 @@
       if (!refs.length) {
         imgs.innerHTML = '<p class="hint">Aucune image trouvée. Clique sur <b>Ajouter une image</b>' +
           (surServeur() ? "." : ", ou dépose tes fichiers dans <code>" + IMG_DIR + "/</code> sur GitHub." +
-            (MNGitHub.hasToken() ? "" : " (Configure le jeton GitHub dans l'onglet « Publier » " +
+            (MNGitHub.hasToken() ? "" : " (Configure le jeton GitHub dans l'onglet « Mise en ligne » " +
               "pour que la liste se mette à jour toute seule.)")) + "</p>";
         return;
       }
@@ -1724,7 +1732,7 @@
       (ready || surServeur() ? "" :
         '<div class="alert alert--warn">' + svg("alert") +
         "<span>Sans jeton GitHub sur cet appareil, tu peux consulter les images mais pas les " +
-        "renommer ni les supprimer. Configure-le dans l'onglet « Publier ».</span></div>") +
+        "renommer ni les supprimer. Configure-le dans l'onglet « Mise en ligne ».</span></div>") +
       '<div id="i-list"><p class="hint">Lecture du dossier…</p></div>';
 
     $("#i-refresh").addEventListener("click", () => { imgCache = null; paneImages(host); });
@@ -2223,7 +2231,8 @@
     $("#l-save").addEventListener("click", () => {
       draft.settings.livret = zone.value.slice(0, 20000);
       commit();
-      MNUI.toast("Livret enregistré — pense à publier", "ok");
+      MNUI.toast("Livret enregistré" +
+        (MNGitHub.autoActif() ? "" : " — pense à publier"), "ok");
     });
   }
 
@@ -2674,47 +2683,60 @@
     const gh = draft.settings.github;
     const det = MNGitHub.detect();
     const last = MNGitHub.lastPublish();
-    const dirty = MNStore.hasDraft();
-    const stamp = localStorage.getItem(K_STAMP);
-    const sent = dirty && stamp === draft.updatedAt;
-    const ready = MNGitHub.hasToken() && MNGitHub.isConfigured();
+    const etat = MNGitHub.etatAuto();
+    const enRoute = etat.attente && !etat.envoye;
 
-    const state = !MNGitHub.hasToken()
-      ? { cls: "off", ico: "lock", t: "Publication automatique non configurée",
-          s: "Suis les 4 étapes ci-dessous une seule fois, puis tu publieras d'un clic." }
-      : sent
-        ? { cls: "ok", ico: "cloud", t: "Publié — déploiement en cours",
-            s: "GitHub reconstruit le site. Compte environ une minute." +
-               (last ? " Dernier envoi " + MNUI.ago(last.at) + "." : "") }
-        : dirty
-          ? { cls: "warn", ico: "alert", t: "Modifications non publiées",
-              s: "Ce que tu as changé n'est visible que dans ton navigateur." }
-          : { cls: "ok", ico: "check", t: "Tout est en ligne",
-              s: last ? "Dernière publication " + MNUI.ago(last.at) + "." : "Aucune modification en attente." };
+    const state = etat.enCours
+      ? { cls: "ok", ico: "cloud", t: "Mise en ligne…", s: "" }
+      : etat.serveurAncien
+        ? { cls: "warn", ico: "alert", t: "Ton serveur ne prend pas encore le catalogue",
+            s: "Recopie serveur/serveur.js sur le VPS et redémarre-le : tout passera " +
+               "par lui, sans le moindre commit." }
+        : etat.echec
+          ? { cls: "warn", ico: "alert", t: "La dernière mise en ligne a échoué",
+              s: etat.echec.message }
+          : !etat.actif
+            ? { cls: "off", ico: "lock", t: "Mise en ligne non configurée",
+                s: "Renseigne l'adresse du serveur dans « Le site » — ou, à défaut, " +
+                   "un jeton GitHub ci-dessous." }
+            : enRoute
+              ? { cls: "ok", ico: "refresh", t: "Enregistré — départ imminent",
+                  s: etat.immediat
+                    ? "L'envoi part tout seul dans quelques secondes."
+                    : "Groupé avec les suivantes, d'ici une minute." }
+              : { cls: "ok", ico: "check", t: "Tout est en ligne",
+                  s: last ? "Dernière mise en ligne " + MNUI.ago(last.at) + "."
+                          : "Rien n'attend." };
 
     host.innerHTML =
       '<div class="pubstate pubstate--' + state.cls + '">' +
         '<div class="pubstate__ico">' + svg(state.ico) + "</div>" +
         '<div class="pubstate__txt"><b>' + esc(state.t) + "</b><span>" + esc(state.s) + "</span></div>" +
-        '<button class="btn btn--solid" id="p-go"' + (dirty && !sent ? "" : " disabled") + ">" +
+        '<button class="btn btn--solid" id="p-go"' + (enRoute ? "" : " disabled") + ">" +
           svg("cloud") + "<span>Publier maintenant</span></button>" +
       "</div>" +
 
-      '<div class="panel"><div class="panel__head">' + svg("refresh") + "<h2>Publication automatique</h2></div>" +
+      '<div class="panel"><div class="panel__head">' + svg("cloud") + "<h2>Où vivent les données</h2></div>" +
         '<div class="panel__body editor">' +
-          '<label class="switch"><input type="checkbox" id="p-auto"' +
-            (localStorage.getItem(K_AUTO) === "1" ? " checked" : "") +
-            (ready ? "" : " disabled") + ">" +
-            '<span class="switch__box"></span>' +
-            "<span>Envoyer sur GitHub à chaque modification</span></label>" +
-          '<p class="hint">Activé, tu n\'as plus rien à cliquer : quelques secondes après ta dernière ' +
-            "modification, le catalogue part tout seul sur GitHub. Les changements rapprochés sont " +
-            "regroupés en un seul envoi, pour ne pas créer un commit par clic." +
-            (ready ? "" : " <b>À configurer d'abord " +
-              (!MNGitHub.hasToken() ? "ton jeton" : "le propriétaire et le nom du dépôt") +
-              " ci-dessous.</b>") + "</p>" +
-          '<p class="hint">Le réglage est propre à ce navigateur : chaque personne décide pour elle. ' +
-            "Tu peux toujours forcer un envoi avec « Publier maintenant ».</p>" +
+          '<p class="hint">GitHub héberge les <b>pages</b> — le HTML, les styles, les scripts. ' +
+            "Ça ne bouge qu'à chaque version du site, et c'est très bien là.</p>" +
+          '<p class="hint">Les <b>données</b>, elles, bougent tous les jours : fiches, contrats, ' +
+            "véhicules, agenda, pointage, catalogue. Leur place est sur le serveur, où " +
+            "l'écriture est immédiate. Un commit pour un numéro de téléphone corrigé ferait " +
+            "reconstruire le site entier, et l'historique du dépôt finirait en journal de bord.</p>" +
+          '<p class="hint">' + (etat.immediat
+            ? "<b>C'est le cas ici.</b> Le catalogue est sur ton serveur : le dépôt ne reçoit " +
+              "plus rien, sinon l'adresse du serveur le jour où elle change."
+            : etat.serveurAncien
+              ? "<b>Pas encore ici.</b> Ton serveur répond, mais il est d'une version qui ne " +
+                "connaît pas le catalogue. Recopie <code>serveur/serveur.js</code> sur le VPS " +
+                "et redémarre-le. En attendant, l'envoi automatique s'abstient : committer à " +
+                "la place du serveur remplirait le dépôt pour rien."
+              : "<b>Pas encore ici.</b> Aucun serveur n'est configuré : renseigne son adresse " +
+                "dans l'onglet « Le site ». D'ici là chaque mise en ligne est un commit, alors " +
+                "elles partent groupées, une minute après la dernière modification.") + "</p>" +
+          '<p class="hint">Plus rien à cocher ni à cliquer : le brouillon part tout seul, ' +
+            "depuis n'importe quelle page. « Publier maintenant » ne sert qu'à forcer.</p>" +
         "</div></div>" +
 
       '<div class="panel"><div class="panel__head">' + svg("github") + "<h2>Dépôt GitHub</h2></div>" +
@@ -2777,7 +2799,7 @@
 
     bindPointage();
 
-    $("#p-go").addEventListener("click", () => publishNow(false));
+    $("#p-go").addEventListener("click", () => publishNow());
 
     const share = $("#p-share");
     if (share) share.addEventListener("click", () => {
@@ -2791,18 +2813,6 @@
         "Garde-le pour toi, ne le partage avec personne.",
         "Message copié — envoie-le en privé, jamais dans un salon public"
       );
-    });
-
-    $("#p-auto").addEventListener("change", e => {
-      localStorage.setItem(K_AUTO, e.target.checked ? "1" : "0");
-      if (e.target.checked) {
-        MNUI.toast("Publication automatique activée", "ok");
-        if (MNStore.hasDraft()) queueAutoPublish();
-      } else {
-        clearTimeout(autoTimer);
-        MNUI.toast("Publication automatique désactivée", "info");
-      }
-      renderDraftbar();
     });
 
     $("#p-save-repo").addEventListener("click", () => {
@@ -3169,17 +3179,19 @@
   /* ---- Envoi vers GitHub ------------------------------------------------------ */
 
   /**
-   * @param {boolean} auto  true = déclenché par la publication automatique
-   *                        (pas de fenêtre d'erreur bloquante).
+   * Le geste manuel : il ne sert plus qu'à forcer la main, quand
+   * l'automatique s'est arrêté volontairement ou qu'il a échoué. À la
+   * différence de l'envoi automatique, il a le droit de committer dans le
+   * dépôt même si un serveur est configuré — c'est une chose de refuser de
+   * committer tout seul derrière un serveur en panne, c'en est une autre
+   * d'empêcher quelqu'un de mettre son site à jour.
    */
-  async function publishNow(auto) {
-    if (publishing) return;
-    clearTimeout(autoTimer);
+  async function publishNow() {
+    if (MNGitHub.etatAuto().enCours) return;
 
     if (!MNAuth.can("publish")) return MNUI.toast("Tu n'as pas la permission de publier", "err");
 
     if (!MNGitHub.canPublish()) {
-      if (auto) return;                       // rien à signaler, l'auto est simplement inactif
       tab = "publish"; render();
       MNUI.toast(MNGitHub.hasToken()
         ? "Renseigne le propriétaire et le nom du dépôt"
@@ -3187,31 +3199,26 @@
       return;
     }
 
-    const stamp = draft.updatedAt;
-    publishing = true;
-    renderDraftbar();
+    /* L'envoi porte le brouillon du magasin ; celui de cette page est le
+       même objet depuis le dernier commit(), mais autant l'y remettre plutôt
+       que de le supposer. */
+    if (draft.updatedAt !== MNStore.catalog().updatedAt) MNStore.saveDraft(draft);
 
-    try {
-      const me = MNAuth.session();
-      const info = await MNGitHub.publish(
-        MNStore.toJSON(draft),
-        "Catalogue mis à jour par " + me.pseudo + (auto ? " (publication automatique)" : "")
-      );
-      localStorage.setItem(K_STAMP, stamp);
+    const info = await MNGitHub.publierMaintenant();
+
+    if (info) {
       /* Par le serveur c'est immédiat ; par GitHub il faut attendre la
          reconstruction. Autant dire lequel des deux vient de se passer. */
-      MNUI.toast((auto ? "Envoyé automatiquement" : "Publié !") +
-        (info.serveur
-          ? " En ligne tout de suite."
-          : " Le site sera à jour dans ~1 minute" +
-            (info.commit ? " (" + info.commit + ")" : "")), "ok");
-    } catch (e) {
-      if (auto) {
-        MNUI.toast("Envoi automatique impossible : " + e.message, "err");
-      } else {
+      MNUI.toast("Publié !" + (info.serveur
+        ? " En ligne tout de suite."
+        : " Le site sera à jour dans ~1 minute" +
+          (info.commit ? " (" + info.commit + ")" : "")), "ok");
+    } else {
+      const echec = MNGitHub.etatAuto().echec;
+      if (echec) {
         /* Le conseil dépend de ce qui a échoué : inutile d'envoyer quelqu'un
            vérifier son jeton quand c'est le serveur qui est en cause. */
-        const m = String(e.message || "");
+        const m = String(echec.message || "");
         let piste;
         if (/Chemin inconnu/i.test(m)) {
           piste = "Ton serveur tourne avec une <b>version trop ancienne</b> : il ne connaît pas " +
@@ -3227,7 +3234,8 @@
           piste = "Le serveur refuse d'écrire ce fichier. C'est volontaire : il n'autorise que " +
             "le catalogue et les images.";
         } else {
-          piste = "Vérifie le jeton et les infos du dépôt dans l'onglet « Publier », puis réessaie.";
+          piste = "Vérifie le jeton et les infos du dépôt dans l'onglet " +
+            "« Mise en ligne », puis réessaie.";
         }
 
         MNUI.modal({
@@ -3239,11 +3247,8 @@
           actions: [{ label: "Compris", variant: "btn--primary", onClick: c => c() }]
         });
       }
-    } finally {
-      publishing = false;
-      /* Le brouillon a encore bougé pendant l'envoi ? On repart pour un tour. */
-      if (draft.updatedAt !== localStorage.getItem(K_STAMP)) queueAutoPublish();
-      if (tab === "publish") render(); else renderDraftbar();
     }
+
+    if (tab === "publish") render(); else renderDraftbar();
   }
 })();

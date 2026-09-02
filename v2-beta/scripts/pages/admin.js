@@ -1,9 +1,9 @@
 /* ==========================================================================
    Administration.
 
-   Tout se modifie dans un brouillon gardé par le navigateur, puis part en
-   ligne d'un clic. Le bandeau du squelette dit en permanence s'il reste
-   quelque chose à publier.
+   Tout se modifie dans un brouillon gardé par le navigateur, qui part en
+   ligne tout seul — sur le serveur quand il détient le catalogue, sinon dans
+   le dépôt. Le bandeau du squelette dit en permanence où en est cet envoi.
 
    Le panneau est vaste : il se reprend onglet par onglet. Ceux qui ne sont
    pas encore repris renvoient vers la V1, qui reste complète.
@@ -15,17 +15,10 @@
   const U = V2UI;
   const $ = s => document.querySelector(s);
 
-  const K_AUTO = "mn.gh.auto";
-  /* Chaque envoi déclenche une reconstruction du site, et elles se font à la
-     queue leu leu : quinze secondes d'attente en regroupent beaucoup, et ne
-     coûtent rien puisque la mise en ligne prend de toute façon plus. */
-  const DELAI_AUTO = 15000;
-
   let hote = null, moi = null;
   let brouillon = null;
   let onglet = "";
   let filtre = "";
-  let minuterie = null;
 
   const ONGLETS = [
     { id: "objets",  nom: "Objets",           icone: "boite",      perm: "items",
@@ -45,7 +38,7 @@
     { id: "theme",   nom: "Apparence",        icone: "palette",    perm: "theme" },
     { id: "discord", nom: "Discord",          icone: "nuage",      perm: "admin" },
     { id: "site",    nom: "Le site",          icone: "reglages",   perm: "admin" },
-    { id: "publier", nom: "Publier",          icone: "nuage",      perm: "publish" }
+    { id: "publier", nom: "Mise en ligne",    icone: "nuage",      perm: "publish" }
   ];
 
   const permis = () => ONGLETS.filter(o => MNAuth.can(o.perm));
@@ -60,27 +53,21 @@
       }
       brouillon = MNStore.clone(MNStore.catalog());
       onglet = (permis()[0] || { id: "objets" }).id;
+      /* L'onglet « Mise en ligne » montre l'état de l'envoi : il doit suivre. */
+      MNGitHub.onAuto(() => { if (onglet === "publier") dessiner(); });
       dessiner();
     }
   });
 
   /* ---- Enregistrement --------------------------------------------------------- */
 
+  /* Écrire le brouillon suffit : MNGitHub écoute le magasin et fait partir
+     l'envoi tout seul, d'ici comme des autres pages. */
+
   function valider() {
     brouillon = MNStore.saveDraft(brouillon);
     MNAuth.refresh();
-    programmerEnvoi();
     dessiner();
-  }
-
-  const autoPret = () =>
-    localStorage.getItem(K_AUTO) === "1" && MNAuth.can("publish") && MNGitHub.canPublish();
-
-  /** Replanifie un envoi : chaque nouvelle modification repousse le départ. */
-  function programmerEnvoi() {
-    clearTimeout(minuterie);
-    if (!autoPret()) return;
-    minuterie = setTimeout(() => publier(true), DELAI_AUTO);
   }
 
   /* ---- Replis mémorisés ----------------------------------------------------
@@ -164,7 +151,8 @@
     z.querySelector('[data-a="lsave"]').addEventListener("click", () => {
       brouillon.settings.livret = zone.value.slice(0, 20000);
       valider();
-      U.toast("Livret enregistré — pense à publier", "ok");
+      U.toast("Livret enregistré" +
+        (MNGitHub.autoActif() ? "" : " — pense à publier"), "ok");
     });
   }
 
@@ -1457,7 +1445,7 @@
       (jeton || surServeur() ? "" : U.alerte({
         ton: "alerte",
         texte: "Sans jeton GitHub sur cet appareil, tu peux consulter les images mais " +
-               "pas les renommer ni les supprimer. Configure-le dans l'onglet « Publier »."
+               "pas les renommer ni les supprimer. Configure-le dans l'onglet « Mise en ligne »."
       })) +
       '<div id="i-liste" style="margin-top:var(--e-3)">' +
         '<p class="champ__aide">Lecture du dossier…</p></div>';
@@ -2148,24 +2136,30 @@
     const gh = brouillon.settings.github;
     const devine = MNGitHub.detect();
     const dernier = MNGitHub.lastPublish();
-    const sale = MNStore.hasDraft();
-    const parti = sale && localStorage.getItem("mn.gh.stamp") === brouillon.updatedAt;
-    const pret = MNGitHub.hasToken() && MNGitHub.isConfigured();
+    const envoi = MNGitHub.etatAuto();
+    const enRoute = envoi.attente && !envoi.envoye;
 
-    const etat = !MNGitHub.canPublish()
-      ? { ton: "attente", ico: "alerte", t: "Publication non configurée",
-          s: "Renseigne l'adresse de ton serveur, ou suis les quatre étapes ci-dessous " +
-             "une seule fois." }
-      : parti
-        ? { ton: "ok", ico: "nuage", t: "Publié — déploiement en cours",
-            s: "Le site se reconstruit. Compte environ une minute." +
-               (dernier ? " Dernier envoi " + U.ilYA(dernier.at) + "." : "") }
-        : sale
-          ? { ton: "attente", ico: "alerte", t: "Modifications non publiées",
-              s: "Ce que tu as changé n'est visible que dans ton navigateur." }
-          : { ton: "ok", ico: "check", t: "Tout est en ligne",
-              s: dernier ? "Dernière publication " + U.ilYA(dernier.at) + "."
-                         : "Aucune modification en attente." };
+    const etat = envoi.enCours
+      ? { ton: "ok", ico: "nuage", t: "Mise en ligne…", s: "" }
+      : envoi.serveurAncien
+        ? { ton: "attente", ico: "alerte", t: "Ton serveur ne prend pas encore le catalogue",
+            s: "Recopie serveur/serveur.js sur le VPS et redémarre-le : tout passera " +
+               "par lui, sans le moindre commit." }
+        : envoi.echec
+          ? { ton: "attente", ico: "alerte", t: "La dernière mise en ligne a échoué",
+              s: envoi.echec.message }
+          : !envoi.actif
+            ? { ton: "attente", ico: "alerte", t: "Mise en ligne non configurée",
+                s: "Renseigne l'adresse de ton serveur, ou suis les quatre étapes " +
+                   "ci-dessous une seule fois." }
+            : enRoute
+              ? { ton: "ok", ico: "rafraichir", t: "Enregistré — départ imminent",
+                  s: envoi.immediat
+                    ? "L'envoi part tout seul dans quelques secondes."
+                    : "Groupé avec les suivantes, d'ici une minute." }
+              : { ton: "ok", ico: "check", t: "Tout est en ligne",
+                  s: dernier ? "Dernière mise en ligne " + U.ilYA(dernier.at) + "."
+                             : "Rien n'attend." };
 
     z.innerHTML =
       '<div class="ad-etatpub ad-etatpub--' + etat.ton + '">' +
@@ -2173,22 +2167,32 @@
         '<div class="ad-etatpub__txt"><b>' + U.esc(etat.t) + "</b>" +
           "<span>" + U.esc(etat.s) + "</span></div>" +
         U.bouton("Publier maintenant", { variante: "principal", icone: "nuage",
-                                         action: "go", desactive: !(sale && !parti) }) +
+                                         action: "go", desactive: !enRoute }) +
       "</div>" +
 
       '<div class="pile" style="margin-top:var(--e-4)">' +
-        U.carte({ titre: "Publication automatique", corps:
-          U.champ({ id: "p-auto", type: "bascule",
-                    label: "Envoyer à chaque modification",
-                    valeur: localStorage.getItem(K_AUTO) === "1" }) +
-          '<p class="champ__aide" style="margin-top:var(--e-3)">Activé, tu n\'as plus rien à ' +
-            "cliquer : quelques secondes après ta dernière modification, le catalogue part " +
-            "tout seul. Les changements rapprochés sont regroupés en un seul envoi." +
-            (MNGitHub.canPublish() ? "" :
-              " <b>À configurer d'abord ci-dessous.</b>") + "</p>" +
-          '<p class="champ__aide" style="margin-top:var(--e-2)">Le réglage est propre à ce ' +
-            "navigateur : chacun décide pour lui. Tu peux toujours forcer un envoi avec " +
-            "« Publier maintenant ».</p>"
+        U.carte({ titre: "Où vivent les données", corps:
+          '<p class="champ__aide">GitHub héberge les <b>pages</b> — le HTML, les styles, ' +
+            "les scripts. Ça ne bouge qu'à chaque version du site, et c'est très bien là.</p>" +
+          '<p class="champ__aide" style="margin-top:var(--e-3)">Les <b>données</b>, elles, ' +
+            "bougent tous les jours : fiches, contrats, véhicules, agenda, pointage, " +
+            "catalogue. Leur place est sur le serveur, où l'écriture est immédiate. Un " +
+            "commit pour un numéro de téléphone corrigé ferait reconstruire le site " +
+            "entier, et l'historique du dépôt finirait en journal de bord.</p>" +
+          '<p class="champ__aide" style="margin-top:var(--e-3)">' + (envoi.immediat
+            ? "<b>C'est le cas ici.</b> Le catalogue est sur ton serveur : le dépôt ne " +
+              "reçoit plus rien, sinon l'adresse du serveur le jour où elle change."
+            : envoi.serveurAncien
+              ? "<b>Pas encore ici.</b> Ton serveur répond, mais il est d'une version qui " +
+                "ne connaît pas le catalogue. Recopie <code>serveur/serveur.js</code> sur " +
+                "le VPS et redémarre-le. En attendant, l'envoi automatique s'abstient : " +
+                "committer à la place du serveur remplirait le dépôt pour rien."
+              : "<b>Pas encore ici.</b> Aucun serveur n'est configuré : renseigne son " +
+                "adresse ci-dessous. D'ici là chaque mise en ligne est un commit, alors " +
+                "elles partent groupées, une minute après la dernière modification.") + "</p>" +
+          '<p class="champ__aide" style="margin-top:var(--e-3)">Plus rien à cocher ni à ' +
+            "cliquer : le brouillon part tout seul, depuis n'importe quelle page. " +
+            "« Publier maintenant » ne sert qu'à forcer.</p>"
         }) +
 
         blocServeur() +
@@ -2255,18 +2259,7 @@
 
     brancherServeur(z);
 
-    z.querySelector('[data-a="go"]').addEventListener("click", () => publier(false));
-
-    z.querySelector("#p-auto").addEventListener("change", e => {
-      localStorage.setItem(K_AUTO, e.target.checked ? "1" : "0");
-      if (e.target.checked) {
-        U.toast("Publication automatique activée", "ok");
-        if (MNStore.hasDraft()) programmerEnvoi();
-      } else {
-        clearTimeout(minuterie);
-        U.toast("Publication automatique désactivée", "info");
-      }
-    });
+    z.querySelector('[data-a="go"]').addEventListener("click", () => publier());
 
     const lireDepot = () => ({
       owner: z.querySelector("#p-owner").value.trim(),
@@ -2598,47 +2591,45 @@
 
   /* ---- Envoi ------------------------------------------------------------------------ */
 
-  let envoiEnCours = false;
-
   /**
-   * @param {boolean} auto true = déclenché par la publication automatique,
-   *                       donc sans fenêtre d'erreur bloquante.
+   * Le geste manuel : il ne sert plus qu'à forcer la main, quand l'envoi
+   * automatique s'est arrêté volontairement ou qu'il a échoué. À la
+   * différence de l'automatique, il a le droit de committer dans le dépôt
+   * même si un serveur est configuré — c'est une chose de refuser de
+   * committer tout seul derrière un serveur en panne, c'en est une autre
+   * d'empêcher quelqu'un de mettre son site à jour.
    */
-  async function publier(auto) {
-    if (envoiEnCours) return;
-    clearTimeout(minuterie);
+  async function publier() {
+    if (MNGitHub.etatAuto().enCours) return;
 
     if (!MNAuth.can("publish")) return U.toast("Tu n'as pas la permission de publier", "err");
 
     if (!MNGitHub.canPublish()) {
-      if (auto) return;                  // rien à signaler : l'auto est simplement inactif
       onglet = "publier"; dessiner();
       return U.toast(MNGitHub.hasToken()
         ? "Renseigne le propriétaire et le nom du dépôt"
         : "Renseigne l'adresse de ton serveur, ou un jeton GitHub", "err");
     }
 
-    const repere = brouillon.updatedAt;
-    envoiEnCours = true;
+    /* L'envoi porte le brouillon du magasin ; celui de cette page est le même
+       depuis le dernier valider(), mais autant l'y remettre que le supposer. */
+    if (brouillon.updatedAt !== MNStore.catalog().updatedAt) MNStore.saveDraft(brouillon);
 
-    try {
-      const info = await MNGitHub.publish(MNStore.toJSON(brouillon),
-        "Catalogue mis à jour par " + moi.pseudo + (auto ? " (publication automatique)" : ""));
-      localStorage.setItem("mn.gh.stamp", repere);
+    const info = await MNGitHub.publierMaintenant();
+
+    if (info) {
       /* Par le serveur c'est immédiat ; par GitHub il faut attendre la
          reconstruction. Autant dire lequel des deux vient de se passer. */
-      U.toast((auto ? "Envoyé automatiquement" : "Publié !") +
-        (info && info.serveur
-          ? " En ligne tout de suite."
-          : " Le site sera à jour dans une minute environ" +
-            (info && info.commit ? " (" + info.commit + ")" : "")), "ok");
-    } catch (e) {
-      const m = String(e && e.message || e);
-      if (auto) {
-        U.toast("Envoi automatique impossible : " + m, "err");
-      } else {
+      U.toast("Publié !" + (info.serveur
+        ? " En ligne tout de suite."
+        : " Le site sera à jour dans une minute environ" +
+          (info.commit ? " (" + info.commit + ")" : "")), "ok");
+    } else {
+      const echec = MNGitHub.etatAuto().echec;
+      if (echec) {
         /* Le conseil dépend de ce qui a échoué : inutile d'envoyer quelqu'un
            vérifier son jeton quand c'est le serveur qui est en cause. */
+        const m = String(echec.message || "");
         let piste;
         if (/Chemin inconnu/i.test(m)) {
           piste = "Ton serveur tourne avec une <b>version trop ancienne</b> : il ne connaît " +
@@ -2658,20 +2649,17 @@
         }
 
         U.modale({
-          titre: "La publication a échoué",
+          titre: "La mise en ligne a échoué",
           corps: U.alerte({ ton: "erreur", texte: m }) +
             '<p class="champ__aide" style="margin-top:var(--e-3)">' + piste + "</p>" +
-            '<p class="champ__aide" style="margin-top:var(--e-2)">Rien n\'est perdu : tes ' +
-              "modifications sont toujours dans le brouillon.</p>",
+            '<p class="champ__aide" style="margin-top:var(--e-2)">' +
+              "Rien n'est perdu : tes modifications sont toujours dans le brouillon.</p>",
           actions: [{ label: "Compris", variante: "principal", onClick: f => f() }]
         });
       }
-    } finally {
-      envoiEnCours = false;
-      /* Le brouillon a encore bougé pendant l'envoi ? On repart pour un tour. */
-      if (brouillon.updatedAt !== localStorage.getItem("mn.gh.stamp")) programmerEnvoi();
-      if (onglet === "publier") dessiner(); else V2Shell.brouillon(dessiner);
     }
+
+    if (onglet === "publier") dessiner(); else V2Shell.brouillon(dessiner);
   }
 
   /** Marche à suivre numérotée. */
