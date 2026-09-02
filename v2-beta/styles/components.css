@@ -2128,6 +2128,9 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--c-action); outli
   --col: 30px;
   --lab: 116px;   /* la colonne des noms */
   --tot: 56px;    /* celle des totaux */
+  /* Deux lignes dans la colonne de gauche : le jour et sa date. Moins que ça
+     et le nom du jour se fait rogner. */
+  --ligne: 42px;
   /* En dessous de cette largeur la grille ne se lit plus : le cadre défile
      plutôt que d'écraser les colonnes. */
   min-width: calc(var(--lab) + var(--h) * var(--col) + var(--tot));
@@ -2149,7 +2152,9 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
 
 .plan__c {
   display: flex; align-items: center; justify-content: center;
-  min-height: 26px;
+  /* Une hauteur, pas un minimum : sans elle, un nom qui passe à la ligne
+     grandit sa rangée et ses cases ne ressemblent plus à celles d'à côté. */
+  height: var(--ligne);
   font-size: 12px;
   border-right: 1px solid var(--c-bord);
   border-bottom: 1px solid var(--c-bord);
@@ -2169,8 +2174,20 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
   background: var(--c-carte);
   border-right: 1px solid var(--c-bord-net);
 }
-.plan__c--jour b { font-size: 12.5px; }
-.plan__c--jour i { font-style: normal; font-size: 10.5px; color: var(--c-faible); }
+.plan__c--jour b {
+  font-size: 12.5px; line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* La grille du jour n'a qu'une ligne de nom : ses rangées sont plus basses,
+   et toutes de la même hauteur quel que soit le nom. */
+.plan--jour { --ligne: 30px; --lab: 170px; }
+.plan--jour .plan__c--jour { justify-content: center; }
+.plan__c--jour i {
+  font-style: normal; font-size: 10.5px; line-height: 1.2;
+  color: var(--c-faible);
+}
 
 /* Les degrés de présence. Un seul mécano n'est pas la même chose que trois :
    la couleur le dit sans qu'on lise le chiffre. */

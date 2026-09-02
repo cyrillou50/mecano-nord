@@ -178,8 +178,10 @@ window.MNPlanning = (function () {
 
     const lignes = presents.map(uid => {
       const n = s.cases[j].filter(l => l.indexOf(uid) !== -1).length;
+      const qui = s.gens[uid] || uid;
       return '<div class="plan__l">' +
-        '<span class="plan__c plan__c--jour"><b>' + esc(s.gens[uid] || uid) + "</b></span>" +
+        '<span class="plan__c plan__c--jour" title="' + esc(qui) + '">' +
+          "<b>" + esc(qui) + "</b></span>" +
         s.cases[j].map((l, h) =>
           '<span class="plan__c ' + (l.indexOf(uid) !== -1 ? "plan__c--on" : "") +
             '" title="' + esc((s.gens[uid] || uid) + " — " + h + "h") + '"></span>').join("") +
@@ -187,7 +189,8 @@ window.MNPlanning = (function () {
       "</div>";
     }).join("");
 
-    return '<div class="plan__cadre"><div class="plan" style="--h:' + HEURES.length + '">' +
+    return '<div class="plan__cadre"><div class="plan plan--jour" style="--h:' +
+      HEURES.length + '">' +
       '<div class="plan__l plan__l--tete">' + entete + "</div>" + lignes +
     "</div></div>";
   }
