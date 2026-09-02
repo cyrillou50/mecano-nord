@@ -2,7 +2,8 @@
    Émotes du serveur de jeu — V2.
 
    Même liste et mêmes règles que la V1 : le site ne joue rien, il tient le
-   mémo. Ce qui change, c'est la mise en page.
+   mémo, et ce mémo vit sur le serveur (voir listes.js) — l'écrire ne demande
+   pas le droit de publier. Ce qui change, c'est la mise en page.
    ========================================================================== */
 
 (function () {
@@ -10,6 +11,7 @@
 
   const U = V2UI;
   const $ = s => document.querySelector(s);
+  const L = MNListes.emotes;
 
   const SANS_CAT = "Sans catégorie";
 
@@ -36,17 +38,17 @@
   V2Shell.demarrer({
     page: "emotes",
     titre: "Émotes",
-    pret: function (session, h) {
+    pret: async function (session, h) {
       hote = h;
       peutGerer = V2Shell.peut("emotes", "items", "admin");
+      await L.load(true).catch(e => console.error(e));
       dessiner();
-      MNStore.onChange(() => { if (hote && hote.isConnected) dessiner(); });
     }
   });
 
   /* ---- Lecture ------------------------------------------------------------- */
 
-  const toutes = () => MNStore.emotes();
+  const toutes = () => L.liste();
 
   function liste() {
     const q = filtre.trim().toLowerCase();
@@ -193,16 +195,16 @@
   }
 
   /* ---- Écriture -------------------------------------------------------------
-     Les émotes vivent dans le catalogue. On l'écrit, et l'envoi part tout
-     seul — il n'y a plus rien à publier à la main. */
+     Le serveur applique l'opération sur la liste qu'il relit : deux personnes
+     qui ajoutent une émote en même temps ne s'écrasent plus. Sans serveur, on
+     retombe dans le catalogue — et là il faudra publier. */
 
-  function ecrire(emotes, message) {
-    const c = MNStore.clone(MNStore.catalog());
-    c.emotes = emotes;
-    MNStore.saveDraft(c);
+  async function ecrire(op, listeVoulue, message) {
+    const r = await L.envoyer(op, listeVoulue);
     dessiner();
     V2Shell.brouillon(dessiner);
-    if (message) U.toast(message, "ok");
+    if (!r.ok) return U.toast("Enregistrement impossible : " + (r.error || "échec"), "erreur");
+    U.toast(message + (r.local && !MNGitHub.autoActif() ? " — pense à publier" : ""), "ok");
   }
 
   function catsConnues() {
@@ -239,24 +241,25 @@
           label: neuf ? "Ajouter" : "Enregistrer", variante: "principal",
           onClick: (fermer, corps) => {
             const nom = corps.querySelector("#e-nom").value.trim();
-            const cmd = corps.querySelector("#e-cmd").value.trim();
+            let cmd = corps.querySelector("#e-cmd").value.trim();
             if (!nom && !cmd) return U.toast("Il faut au moins un nom ou une commande", "erreur");
+            if (cmd && cmd[0] !== "/") cmd = "/" + cmd;
 
-            const l = MNStore.clone(toutes());
-            const donnees = {
+            const entree = {
+              id: e ? e.id : MNStore.uniqueId(nom || cmd, toutes().map(x => x.id)),
               nom: nom || cmd,
               commande: cmd,
               categorie: corps.querySelector("#e-cat").value.trim(),
               note: corps.querySelector("#e-note").value.trim()
             };
 
-            if (neuf) {
-              l.push(Object.assign({ id: MNStore.uniqueId(donnees.nom, l.map(x => x.id)) }, donnees));
-            } else {
-              Object.assign(l.find(x => x.id === e.id), donnees);
-            }
+            /* Ce que la liste doit devenir, pour le repli sans serveur. */
+            const l = MNStore.clone(toutes());
+            const i = l.findIndex(x => x.id === entree.id);
+            if (i === -1) l.push(entree); else l[i] = entree;
+
             fermer();
-            ecrire(l, neuf ? "Émote ajoutée" : "Émote modifiée");
+            ecrire({ op: "set", entree }, l, neuf ? "Émote ajoutée" : "Émote modifiée");
           }
         }
       ]
@@ -271,7 +274,7 @@
       confirmer: "Supprimer", danger: true
     });
     if (!ok) return;
-    ecrire(toutes().filter(x => x.id !== e.id), "Émote supprimée");
+    ecrire({ op: "remove", id: e.id }, toutes().filter(x => x.id !== e.id), "Émote supprimée");
   }
 
   /* ---- Import en masse --------------------------------------------------------
@@ -297,7 +300,9 @@
       } else {
         cmd = ch[0]; nom = ch[1]; cat = ch[2] || "";
       }
-      out.push({ nom: nom.trim(), commande: cmd.trim(), categorie: cat.trim(), note: "" });
+      cmd = cmd.trim();
+      if (cmd && cmd[0] !== "/") cmd = "/" + cmd;
+      out.push({ nom: nom.trim(), commande: cmd, categorie: cat.trim(), note: "" });
     });
     return out;
   }
@@ -347,8 +352,11 @@
             });
 
             fermer();
-            ecrire(l, ajout + " ajoutée" + (ajout > 1 ? "s" : "") +
-                      (maj ? ", " + maj + " mise" + (maj > 1 ? "s" : "") + " à jour" : ""));
+            /* Un import remplace la liste d'un bloc : entrée par entrée, ce
+               serait trois cents allers-retours pour un seul geste. */
+            ecrire({ op: "remplacer", entrees: l }, l,
+                   ajout + " ajoutée" + (ajout > 1 ? "s" : "") +
+                   (maj ? ", " + maj + " mise" + (maj > 1 ? "s" : "") + " à jour" : ""));
           }
         }
       ]

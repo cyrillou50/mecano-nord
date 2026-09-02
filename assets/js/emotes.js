@@ -7,7 +7,8 @@
    dans le presse-papier : c'est tout ce qu'on demande à un mémo.
 
    Ouverte à tous en lecture. La permission « emotes » ouvre l'ajout, la
-   correction et la suppression.
+   correction et la suppression. La liste vit sur le serveur (voir
+   listes.js) : l'écrire ne demande pas le droit de publier le site.
    ========================================================================== */
 
 (function () {
@@ -15,6 +16,7 @@
 
   const $ = s => document.querySelector(s);
   const svg = MNUI.svg, esc = MNUI.esc;
+  const L = MNListes.emotes;
 
   const SANS_CAT = "Sans catégorie";
 
@@ -28,16 +30,15 @@
 
   MNUI.start({ page: "emotes", title: "Émotes", onReady: init });
 
-  function init() {
+  async function init() {
     peutGerer = MNAuth.canAny("emotes", "items", "admin");
+    await L.load(true).catch(e => console.error(e));
     render();
-    /* La liste vit dans le catalogue : elle change quand quelqu'un publie. */
-    MNStore.onChange(() => { if ($("#emotes-root")) render(); });
   }
 
   /* ---- Lecture ------------------------------------------------------------- */
 
-  const toutes = () => MNStore.emotes();
+  const toutes = () => L.liste();
 
   function liste() {
     const q = filtre.trim().toLowerCase();
@@ -72,27 +73,31 @@
 
   function render() {
     const total = toutes().length;
+
     $("#emotes-root").innerHTML =
       '<h1 class="page-title">Émotes</h1>' +
       '<p class="page-sub">Les animations du serveur de jeu. ' +
         "Clique sur une commande pour la copier.</p>" +
 
-      (peutGerer
+      (peutGerer || total
         ? '<div class="row row--wrap" style="margin-bottom:18px">' +
-            '<button class="btn btn--primary" id="em-add">' + svg("plus") +
-              "<span>Ajouter</span></button>" +
-            '<button class="btn btn--ghost" id="em-import">' + svg("upload") +
-              "<span>Importer une liste</span></button>" +
+            (peutGerer
+              ? '<button class="btn btn--primary" id="em-add">' + svg("plus") +
+                  "<span>Ajouter</span></button>" +
+                '<button class="btn btn--ghost" id="em-import">' + svg("upload") +
+                  "<span>Importer une liste</span></button>" +
+                '<span class="spacer"></span>'
+              : "") +
+            (total
+              ? '<input class="input" id="em-q" style="max-width:300px" ' +
+                'placeholder="Rechercher une émote…" value="' + esc(filtre) + '">'
+              : "") +
           "</div>"
         : "") +
 
-      (total
-        ? '<div class="row" style="margin-bottom:18px">' +
-            '<input class="input" id="em-q" placeholder="Rechercher une émote…" value="' +
-              esc(filtre) + '">' +
-          "</div>" +
-          '<div id="em-liste"></div>'
-        : vide());
+      (total ? '<div id="em-liste"></div>' : vide());
+
+    renderDraftbar();
 
     const q = $("#em-q");
     if (q) q.addEventListener("input", () => {
@@ -111,15 +116,30 @@
     if (total) renderListe();
   }
 
+  /* Un serveur muet ou trop ancien change ce que vaut la page : on le dit en
+     haut plutôt que de laisser croire que tout est déjà partagé. */
+  function renderDraftbar() {
+    const bar = $("#draftbar");
+    if (!bar) return;
+    const s = L.souci();
+    if (!s) { bar.hidden = true; return; }
+    bar.hidden = false;
+    bar.innerHTML =
+      '<span class="draftbar__dot" style="background:var(--amber);' +
+        'box-shadow:0 0 12px var(--amber)"></span>' +
+      '<span class="draftbar__txt"><b>' + esc(s) + "</b> " +
+        "<span>Les émotes affichées viennent du catalogue ; les modifier " +
+        "demandera le droit de publier.</span></span>";
+  }
+
   function vide() {
-    return '<div class="panel"><div class="panel__body" style="text-align:center;padding:40px 20px">' +
-      svg("star") +
-      "<h2 style=\"margin:12px 0 6px\">Aucune émote enregistrée</h2>" +
-      '<p class="hint">' + (peutGerer
+    return '<div class="empty">' + svg("star") +
+      "<b>Aucune émote enregistrée</b>" +
+      "<span>" + (peutGerer
         ? "Ajoute-les une à une, ou colle la liste du serveur d'un coup avec " +
           "« Importer une liste »."
-        : "Un responsable les ajoutera depuis cette page.") + "</p>" +
-      "</div></div>";
+        : "Un responsable les ajoutera depuis cette page.") + "</span>" +
+    "</div>";
   }
 
   function renderListe() {
@@ -128,7 +148,9 @@
     const gs = groupes();
 
     if (!gs.length) {
-      host.innerHTML = '<p class="hint">Rien ne correspond à « ' + esc(filtre) + " ».</p>";
+      host.innerHTML = '<div class="empty">' + svg("search") +
+        "<b>Rien ne correspond</b><span>Aucune émote ne contient « " +
+        esc(filtre) + " ».</span></div>";
       return;
     }
 
@@ -182,15 +204,15 @@
   const trouver = id => toutes().find(e => e.id === id) || null;
 
   /* ---- Écriture -------------------------------------------------------------
-     Les émotes vivent dans le catalogue. On l'écrit, et l'envoi part tout
-     seul — il n'y a plus rien à publier à la main. */
+     Le serveur applique l'opération sur la liste qu'il relit : deux personnes
+     qui ajoutent une émote en même temps ne s'écrasent plus. Sans serveur, on
+     retombe dans le catalogue — et là il faudra publier. */
 
-  function ecrire(emotes, message) {
-    const c = MNStore.clone(MNStore.catalog());
-    c.emotes = emotes;
-    MNStore.saveDraft(c);
+  async function ecrire(op, listeVoulue, message) {
+    const r = await L.envoyer(op, listeVoulue);
     render();
-    if (message) MNUI.toast(message, "ok");
+    if (!r.ok) return MNUI.toast("Enregistrement impossible : " + (r.error || "échec"), "err");
+    MNUI.toast(message + (r.local && !MNGitHub.autoActif() ? " — pense à publier" : ""), "ok");
   }
 
   /** Les catégories déjà utilisées, pour ne pas les retaper à la lettre près. */
@@ -236,24 +258,25 @@
           label: neuf ? "Ajouter" : "Enregistrer", variant: "btn--primary", icon: "save",
           onClick: fermer => {
             const nom = body.querySelector("#e-nom").value.trim();
-            const cmd = body.querySelector("#e-cmd").value.trim();
+            let cmd = body.querySelector("#e-cmd").value.trim();
             if (!nom && !cmd) return MNUI.toast("Il faut au moins un nom ou une commande", "err");
+            if (cmd && cmd[0] !== "/") cmd = "/" + cmd;
 
-            const l = MNStore.clone(toutes());
-            const donnees = {
+            const entree = {
+              id: e ? e.id : MNStore.uniqueId(nom || cmd, toutes().map(x => x.id)),
               nom: nom || cmd,
               commande: cmd,
               categorie: body.querySelector("#e-cat").value.trim(),
               note: body.querySelector("#e-note").value.trim()
             };
 
-            if (neuf) {
-              l.push(Object.assign({ id: MNStore.uniqueId(donnees.nom, l.map(x => x.id)) }, donnees));
-            } else {
-              Object.assign(l.find(x => x.id === e.id), donnees);
-            }
+            /* Ce que la liste doit devenir, pour le repli sans serveur. */
+            const l = MNStore.clone(toutes());
+            const i = l.findIndex(x => x.id === entree.id);
+            if (i === -1) l.push(entree); else l[i] = entree;
+
             fermer();
-            ecrire(l, neuf ? "Émote ajoutée" : "Émote modifiée");
+            ecrire({ op: "set", entree }, l, neuf ? "Émote ajoutée" : "Émote modifiée");
           }
         }
       ]
@@ -268,7 +291,7 @@
       confirmLabel: "Supprimer", danger: true
     });
     if (!ok) return;
-    ecrire(toutes().filter(x => x.id !== e.id), "Émote supprimée");
+    ecrire({ op: "remove", id: e.id }, toutes().filter(x => x.id !== e.id), "Émote supprimée");
   }
 
   /* ---- Import en masse --------------------------------------------------------
@@ -284,7 +307,7 @@
     const out = [];
     String(texte || "").split(/\r?\n/).forEach(brut => {
       const l = brut.trim();
-      if (!l || l[0] === "#") return;                 // vide ou commenté
+      if (!l || l[0] === "#") return;                 // vide ou commentée
       const ch = l.split(/\s*[|;\t]\s*/).filter(x => x !== "");
       if (!ch.length) return;
 
@@ -296,7 +319,9 @@
       } else {
         cmd = ch[0]; nom = ch[1]; cat = ch[2] || "";
       }
-      out.push({ nom: nom.trim(), commande: cmd.trim(), categorie: cat.trim(), note: "" });
+      cmd = cmd.trim();
+      if (cmd && cmd[0] !== "/") cmd = "/" + cmd;
+      out.push({ nom: nom.trim(), commande: cmd, categorie: cat.trim(), note: "" });
     });
     return out;
   }
@@ -367,8 +392,11 @@
             });
 
             fermer();
-            ecrire(l, ajout + " ajoutée" + (ajout > 1 ? "s" : "") +
-                      (maj ? ", " + maj + " mise" + (maj > 1 ? "s" : "") + " à jour" : ""));
+            /* Un import remplace la liste d'un bloc : entrée par entrée, ce
+               serait trois cents allers-retours pour un seul geste. */
+            ecrire({ op: "remplacer", entrees: l }, l,
+                   ajout + " ajoutée" + (ajout > 1 ? "s" : "") +
+                   (maj ? ", " + maj + " mise" + (maj > 1 ? "s" : "") + " à jour" : ""));
           }
         }
       ]

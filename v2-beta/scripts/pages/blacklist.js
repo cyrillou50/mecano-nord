@@ -3,7 +3,9 @@
 
    Mêmes règles que la V1 : lecture ouverte, écriture derrière la permission
    « blacklist », et une inscription levée garde sa trace au lieu de
-   disparaître. Ce qui change, c'est la mise en page.
+   disparaître. La liste vit sur le serveur (voir listes.js) : inscrire
+   quelqu'un est le geste de celui qui tient le comptoir, pas de celui qui
+   publie le site. Ce qui change, c'est la mise en page.
    ========================================================================== */
 
 (function () {
@@ -11,6 +13,7 @@
 
   const U = V2UI;
   const $ = s => document.querySelector(s);
+  const L = MNListes.bannis;
 
   let hote = null, moi = null;
   let peutGerer = false;
@@ -20,19 +23,19 @@
   V2Shell.demarrer({
     page: "blacklist",
     titre: "Blacklist",
-    pret: function (session, h) {
+    pret: async function (session, h) {
       hote = h; moi = session;
       peutGerer = V2Shell.peut("blacklist", "admin");
+      await L.load(true).catch(e => console.error(e));
       dessiner();
-      MNStore.onChange(() => { if (hote && hote.isConnected) dessiner(); });
     }
   });
 
   /* ---- Lecture ------------------------------------------------------------- */
 
-  const actives = () => MNStore.blacklist();
-  const levees = () => MNStore.blacklistLevee();
-  const toutes = () => MNStore.catalog().blacklist || [];
+  const toutes = () => L.liste();
+  const actives = () => toutes().filter(x => !x.levee);
+  const levees = () => toutes().filter(x => x.levee);
 
   function filtrer(l) {
     const q = filtre.trim().toLowerCase();
@@ -172,29 +175,24 @@
   const trouver = id => toutes().find(x => x.id === id) || null;
 
   /* ---- Écriture -------------------------------------------------------------
-     La blacklist vit dans le catalogue. On l'écrit, et l'envoi part tout seul.
+     Le serveur applique l'opération sur la liste qu'il relit : deux personnes
+     qui inscrivent quelqu'un en même temps ne s'écrasent plus. Sans serveur,
+     on retombe dans le catalogue — et là il faudra publier. */
 
-     Une réserve honnête : deux personnes qui inscrivent quelqu'un à la même
-     seconde, chacune de son côté, s'écrasent — c'est tout le catalogue qui
-     part, pas la ligne. Sur une liste où l'on ajoute une entrée par semaine,
-     le risque est théorique ; s'il devient réel, il faudra une route dédiée
-     sur le serveur, comme pour les contrats. */
-
-  function ecrire(l, message) {
-    const c = MNStore.clone(MNStore.catalog());
-    c.blacklist = l;
-    MNStore.saveDraft(c);
+  async function ecrire(op, listeVoulue, message) {
+    const r = await L.envoyer(op, listeVoulue);
     dessiner();
     V2Shell.brouillon(dessiner);
-    if (message) U.toast(message, "ok");
+    if (!r.ok) return U.toast("Enregistrement impossible : " + (r.error || "échec"), "erreur");
+    U.toast(message + (r.local && !MNGitHub.autoActif() ? " — pense à publier" : ""), "ok");
   }
 
-  function majUne(id, changements, message) {
+  /** Envoie une entrée modifiée, et la liste correspondante pour le repli. */
+  function poser(entree, message) {
     const l = MNStore.clone(toutes());
-    const e = l.find(x => x.id === id);
-    if (!e) return;
-    Object.assign(e, changements);
-    ecrire(l, message);
+    const i = l.findIndex(x => x.id === entree.id);
+    if (i === -1) l.unshift(entree); else l[i] = entree;
+    ecrire({ op: "set", entree }, l, message);
   }
 
   function editer(x) {
@@ -229,26 +227,19 @@
             if (!raison) return U.toast("Dis pourquoi : sans raison, l'inscription ne sert à personne", "erreur");
 
             const rb = corps.querySelector("#b-rb").value;
-            const donnees = {
+            const entree = Object.assign({}, x || {}, {
+              id: x ? x.id : MNStore.uniqueId(nom, toutes().map(y => y.id)),
               nom, raison, remboursement: rb,
               montant: rb === "aucun"
                 ? 0
-                : Math.max(0, Math.round(Number(corps.querySelector("#b-montant").value) || 0))
-            };
+                : Math.max(0, Math.round(Number(corps.querySelector("#b-montant").value) || 0)),
+              at: x ? x.at : new Date().toISOString(),
+              by: x ? x.by : moi.pseudo,
+              levee: x ? x.levee : null
+            });
 
-            const l = MNStore.clone(toutes());
-            if (neuf) {
-              l.unshift(Object.assign({
-                id: MNStore.uniqueId(nom, l.map(y => y.id)),
-                at: new Date().toISOString(),
-                by: moi.pseudo,
-                levee: null
-              }, donnees));
-            } else {
-              Object.assign(l.find(y => y.id === x.id), donnees);
-            }
             fermer();
-            ecrire(l, neuf ? "Inscrit sur la blacklist" : "Inscription modifiée");
+            poser(entree, neuf ? "Inscrit sur la blacklist" : "Inscription modifiée");
           }
         }
       ]
@@ -285,9 +276,9 @@
           onClick: (fermer, corps) => {
             const note = corps.querySelector("#b-note").value.trim();
             fermer();
-            majUne(x.id, {
+            poser(Object.assign({}, x, {
               levee: { at: new Date().toISOString(), by: moi.pseudo, note }
-            }, "Inscription levée");
+            }), "Inscription levée");
           }
         }
       ]
@@ -302,7 +293,9 @@
       confirmer: "Réinscrire"
     });
     if (!ok) return;
-    majUne(x.id, { levee: null, at: new Date().toISOString(), by: moi.pseudo }, "Réinscrit");
+    poser(Object.assign({}, x, {
+      levee: null, at: new Date().toISOString(), by: moi.pseudo
+    }), "Réinscrit");
   }
 
   async function rembourse(x) {
@@ -315,7 +308,7 @@
       confirmer: "C'est remboursé"
     });
     if (!ok) return;
-    majUne(x.id, { remboursement: "fait" }, "Marqué remboursé");
+    poser(Object.assign({}, x, { remboursement: "fait" }), "Marqué remboursé");
   }
 
   async function supprimer(x) {
@@ -327,6 +320,6 @@
       confirmer: "Supprimer", danger: true
     });
     if (!ok) return;
-    ecrire(toutes().filter(y => y.id !== x.id), "Inscription supprimée");
+    ecrire({ op: "remove", id: x.id }, toutes().filter(y => y.id !== x.id), "Inscription supprimée");
   }
 })();

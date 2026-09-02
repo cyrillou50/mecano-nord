@@ -1268,10 +1268,6 @@ window.MNStore = (function () {
     memeNom, soucisHomonyme,
     MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,
     REMBOURSEMENTS, remboursementDe,
-    emotes: () => (_catalog.emotes || []),
-    /* Les entrées encore en vigueur, puis celles qu'on a levées. */
-    blacklist: () => (_catalog.blacklist || []).filter(x => !x.levee),
-    blacklistLevee: () => (_catalog.blacklist || []).filter(x => x.levee),
     usersActifs, usersArchives,
     GRAVITES, graviteDe, normAvertissement, avertActif, avertBilan,
     addAvertissement, leverAvertissement, retirerAvertissement,

@@ -57,6 +57,11 @@ const FICHIER_VEH = path.join(DOSSIER, "vehicules.json");
 const FICHIER_CT = path.join(DOSSIER, "contrats.json");
 /* Et l'agenda de l'atelier, pour la même raison. */
 const FICHIER_AG = path.join(DOSSIER, "agenda.json");
+/* Les émotes du serveur de jeu et la blacklist des clients. Même motif : on
+   les écrit depuis le comptoir, par des gens qui n'ont aucune raison d'avoir
+   le droit de publier le site. */
+const FICHIER_EM = path.join(DOSSIER, "emotes.json");
+const FICHIER_BL = path.join(DOSSIER, "blacklist.json");
 /* Le catalogue lui-même : objets, grades, employés, réglages. Tant qu'il
    vivait dans le dépôt, chaque modification coûtait un commit et une minute
    de reconstruction ; ici elle est en ligne aussitôt. La copie du dépôt reste
@@ -623,6 +628,143 @@ function nettoyerRegistre(r) {
   };
 }
 
+/* ---- Listes simples : émotes et blacklist -----------------------------------
+   Deux listes de la même forme — une suite d'enregistrements identifiés, sans
+   hiérarchie ni relation. Elles pourraient vivre dans le catalogue ; elles
+   n'y sont pas, pour deux raisons.
+
+   La première est le droit. Inscrire un client sur la blacklist, c'est le
+   geste de celui qui tient le comptoir. Écrire le catalogue, c'est publier le
+   site. Confondre les deux obligerait à donner le second pour permettre le
+   premier — et un mécano à qui l'on refuse « publier » ne pourrait rien
+   inscrire du tout.
+
+   La seconde est la concurrence. Le catalogue s'écrit en entier : deux
+   personnes qui inscrivent quelqu'un en même temps s'écrasent. Ici le serveur
+   applique une opération sur une liste qu'il relit, dans la file d'attente
+   qui sérialise les écritures — personne ne perd la sienne. */
+
+const LISTE_VIDE = { updatedAt: new Date(0).toISOString(), entrees: [] };
+
+/* Chaque liste dit comment nettoyer une de ses entrées. Le serveur ne fait
+   pas confiance à ce qui arrive : il ne garde que les champs qu'il connaît,
+   à la longueur qu'il accepte. */
+const LISTES = {
+  emotes: {
+    fichier: FICHIER_EM,
+    max: 2000,
+    /* Une émote : un nom, la commande à taper, un rangement, une note. */
+    nettoyer(e) {
+      if (!e || typeof e !== "object") return null;
+      const id = texte(e.id, 60).trim();
+      const nom = texte(e.nom, 60).trim();
+      const cmd = texte(e.commande, 80).trim();
+      if (!id || (!nom && !cmd)) return null;
+      return {
+        id,
+        nom: nom || cmd,
+        /* Le slash est remis s'il manque : on l'oublie une fois sur deux en
+           recopiant la liste du jeu. */
+        commande: cmd && cmd[0] !== "/" ? "/" + cmd : cmd,
+        categorie: texte(e.categorie, 40).trim(),
+        note: texte(e.note, 200)
+      };
+    }
+  },
+  blacklist: {
+    fichier: FICHIER_BL,
+    max: 500,
+    /* Une inscription : qui, pourquoi, ce qu'on doit encore, et la levée
+       éventuelle — qui ne supprime pas l'entrée, elle la range. */
+    nettoyer(x) {
+      if (!x || typeof x !== "object") return null;
+      const id = texte(x.id, 60).trim();
+      const nom = texte(x.nom, 60).trim();
+      if (!id || !nom) return null;
+      const rb = ["aucun", "du", "fait"].indexOf(x.remboursement) !== -1
+        ? x.remboursement : "aucun";
+      const levee = x.levee && typeof x.levee === "object" ? {
+        at: dateIso(x.levee.at) || new Date().toISOString(),
+        by: texte(x.levee.by, 60),
+        note: texte(x.levee.note, 300)
+      } : null;
+      return {
+        id, nom,
+        raison: texte(x.raison, 600),
+        remboursement: rb,
+        montant: rb === "aucun" ? 0 : nombre(x.montant, 0, 1e9),
+        at: dateIso(x.at) || new Date().toISOString(),
+        by: texte(x.by, 60),
+        levee
+      };
+    }
+  }
+};
+
+function nettoyerListe(quel, r) {
+  if (!r || typeof r !== "object") return null;
+  const spec = LISTES[quel];
+  const brut = Array.isArray(r.entrees) ? r.entrees : [];
+  return {
+    updatedAt: dateIso(r.updatedAt) || new Date().toISOString(),
+    entrees: brut.map(spec.nettoyer).filter(Boolean).slice(0, spec.max)
+  };
+}
+
+/**
+ * Applique une opération à une liste.
+ * « set » porte l'entrée entière : ces enregistrements sont minuscules, et il
+ * n'y a aucune fusion champ par champ à arbitrer. « remplacer » sert à l'import
+ * en masse, qui remplace la liste d'un bloc plutôt qu'entrée par entrée.
+ */
+function appliquerListe(quel, liste, op) {
+  const spec = LISTES[quel];
+  const r = { updatedAt: new Date().toISOString(), entrees: liste.entrees.slice() };
+
+  switch (op.op) {
+    case "set": {
+      const e = spec.nettoyer(op.entree);
+      if (!e) return { erreur: "entrée invalide" };
+      const i = r.entrees.findIndex(x => x.id === e.id);
+      if (i === -1) r.entrees.unshift(e); else r.entrees[i] = e;
+      return { liste: r };
+    }
+
+    case "remove": {
+      const id = texte(op.id, 60);
+      const i = r.entrees.findIndex(x => x.id === id);
+      if (i === -1) return { liste: r, deja: true };
+      r.entrees.splice(i, 1);
+      return { liste: r };
+    }
+
+    case "remplacer": {
+      if (!Array.isArray(op.entrees)) return { erreur: "liste manquante" };
+      r.entrees = op.entrees.map(spec.nettoyer).filter(Boolean).slice(0, spec.max);
+      return { liste: r };
+    }
+
+    default:
+      return { erreur: "opération inconnue : " + op.op };
+  }
+}
+
+async function lireListe(quel) {
+  try {
+    return nettoyerListe(quel, JSON.parse(await fsp.readFile(LISTES[quel].fichier, "utf8")))
+      || LISTE_VIDE;
+  } catch (_) {
+    return LISTE_VIDE;
+  }
+}
+
+async function ecrireListe(quel, liste) {
+  await fsp.mkdir(DOSSIER, { recursive: true });
+  const tmp = LISTES[quel].fichier + ".tmp";
+  await fsp.writeFile(tmp, JSON.stringify(liste, null, 2) + "\n", "utf8");
+  await fsp.rename(tmp, LISTES[quel].fichier);
+}
+
 function appliquerRegistre(reg, op) {
   const r = { updatedAt: new Date().toISOString(), contrats: reg.contrats.slice() };
 
@@ -1022,7 +1164,7 @@ const serveur = http.createServer(async (req, res) => {
          qu'il sait aller chercher une image sur un autre domaine. */
       return repondre(res, 200, {
         ok: true, ops: true, images: true, vehicules: true, relais: true, contrats: true,
-        calendrier: true, catalogue: true, equipe: true,
+        calendrier: true, catalogue: true, equipe: true, emotes: true, blacklist: true,
         recap: RECAP_ACTIF, recapMini: RECAP_MINI, assistant: !!GEMINI_CLE,
         assistantModele: _modele || GEMINI_MODELE || "(choisi au premier usage)",
         depuis: Math.round(process.uptime()) + " s"
@@ -1203,6 +1345,39 @@ const serveur = http.createServer(async (req, res) => {
         console.log(new Date().toISOString(), "parc :", op.op, "—",
           r.parc.vehicles.length, "véhicules");
         return repondre(res, 200, { ok: true, parc: r.parc, deja: !!r.deja }, req);
+      }
+      return repondre(res, 405, { error: "Méthode non autorisée" }, req);
+    }
+
+    /* --- émotes et blacklist ---
+       Une seule route pour deux listes de même forme. */
+    if (chemin === "/emotes" || chemin === "/blacklist") {
+      const quel = chemin.slice(1);
+
+      if (req.method === "GET") return repondre(res, 200, await lireListe(quel), req);
+
+      if (req.method === "POST") {
+        const op = await corpsJson(req);
+        if (!op || !op.op) return repondre(res, 400, { error: "Opération manquante" }, req);
+
+        const r = await enFile(async () => {
+          const actuel = await lireListe(quel);
+          /* Premier écrit : le site peut joindre ce qu'il a déjà dans le
+             catalogue, pour ne pas repartir d'une liste vide. */
+          if (!actuel.entrees.length && Array.isArray(op.depart)) {
+            const d = nettoyerListe(quel, { entrees: op.depart });
+            if (d) actuel.entrees = d.entrees;
+          }
+          const res2 = appliquerListe(quel, actuel, op);
+          if (res2.erreur) return res2;
+          await ecrireListe(quel, res2.liste);
+          return res2;
+        });
+
+        if (r.erreur) return repondre(res, 400, { error: r.erreur }, req);
+        console.log(new Date().toISOString(), quel + " :", op.op, "—",
+          r.liste.entrees.length, "entrées");
+        return repondre(res, 200, { ok: true, liste: r.liste, deja: !!r.deja }, req);
       }
       return repondre(res, 405, { error: "Méthode non autorisée" }, req);
     }

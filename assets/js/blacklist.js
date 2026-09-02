@@ -9,6 +9,9 @@
    Une inscription levée n'est pas supprimée — elle sort de la liste active et
    garde sa trace, comme un avertissement. On doit pouvoir dire qu'elle a
    existé, et qui l'a levée.
+
+   La liste vit sur le serveur (voir listes.js) : inscrire quelqu'un est le
+   geste de celui qui tient le comptoir, pas celui de qui publie le site.
    ========================================================================== */
 
 (function () {
@@ -16,6 +19,7 @@
 
   const $ = s => document.querySelector(s);
   const svg = MNUI.svg, esc = MNUI.esc, num = MNUI.num;
+  const L = MNListes.bannis;
 
   let moi = null;
   let peutGerer = false;
@@ -24,25 +28,23 @@
 
   MNUI.start({ page: "blacklist", title: "Blacklist", onReady: init });
 
-  function init(session) {
+  async function init(session) {
     moi = session;
     peutGerer = MNAuth.canAny("blacklist", "admin");
+    await L.load(true).catch(e => console.error(e));
     render();
-    /* La liste vit dans le catalogue : elle change quand quelqu'un publie. */
-    MNStore.onChange(() => { if ($("#blacklist-root")) render(); });
   }
 
   /* ---- Lecture ------------------------------------------------------------- */
 
-  const actives = () => MNStore.blacklist();
-  const levees = () => MNStore.blacklistLevee();
-  const toutes = () => MNStore.catalog().blacklist || [];
+  const toutes = () => L.liste();
+  const actives = () => toutes().filter(x => !x.levee);
+  const levees = () => toutes().filter(x => x.levee);
 
   function filtrer(l) {
     const q = filtre.trim().toLowerCase();
     if (!q) return l;
-    return l.filter(x =>
-      (x.nom + " " + x.raison).toLowerCase().indexOf(q) !== -1);
+    return l.filter(x => (x.nom + " " + x.raison).toLowerCase().indexOf(q) !== -1);
   }
 
   /** Ce qui reste à rendre, tous clients confondus. */
@@ -56,15 +58,23 @@
     const l = filtrer(actives());
     const lev = filtrer(levees());
     const du = duTotal();
+    const total = toutes().length;
 
     $("#blacklist-root").innerHTML =
       '<h1 class="page-title">Blacklist</h1>' +
       '<p class="page-sub">Les clients qu\'on ne sert plus, et pourquoi</p>' +
 
-      (peutGerer
+      (peutGerer || total
         ? '<div class="row row--wrap" style="margin-bottom:18px">' +
-            '<button class="btn btn--primary" id="bl-add">' + svg("plus") +
-              "<span>Inscrire quelqu'un</span></button>" +
+            (peutGerer
+              ? '<button class="btn btn--primary" id="bl-add">' + svg("plus") +
+                  "<span>Inscrire quelqu'un</span></button>" +
+                '<span class="spacer"></span>'
+              : "") +
+            (total
+              ? '<input class="input" id="bl-q" style="max-width:300px" ' +
+                'placeholder="Rechercher un nom, une raison…" value="' + esc(filtre) + '">'
+              : "") +
           "</div>"
         : "") +
 
@@ -76,14 +86,9 @@
           "toutes inscriptions confondues.</span></div>"
         : "") +
 
-      (toutes().length
-        ? '<div class="row" style="margin-bottom:18px">' +
-            '<input class="input" id="bl-q" placeholder="Rechercher un nom, une raison…" value="' +
-              esc(filtre) + '">' +
-          "</div>"
-        : "") +
+      (total ? corps(l, lev) : vide());
 
-      (toutes().length ? corps(l, lev) : vide());
+    renderDraftbar();
 
     const q = $("#bl-q");
     if (q) q.addEventListener("input", () => {
@@ -102,12 +107,29 @@
     brancher();
   }
 
+  /* Un serveur muet ou trop ancien change ce que vaut la page : on le dit en
+     haut plutôt que de laisser croire que tout est déjà partagé. */
+  function renderDraftbar() {
+    const bar = $("#draftbar");
+    if (!bar) return;
+    const s = L.souci();
+    if (!s) { bar.hidden = true; return; }
+    bar.hidden = false;
+    bar.innerHTML =
+      '<span class="draftbar__dot" style="background:var(--amber);' +
+        'box-shadow:0 0 12px var(--amber)"></span>' +
+      '<span class="draftbar__txt"><b>' + esc(s) + "</b> " +
+        "<span>La blacklist affichée vient du catalogue et peut être " +
+        "incomplète ; l'écrire demandera le droit de publier.</span></span>";
+  }
+
   function corps(l, lev) {
     return (l.length
       ? l.map(carte).join("")
-      : '<p class="hint">' + (filtre
-          ? "Rien ne correspond à « " + esc(filtre) + " »."
-          : "Personne n'est inscrit en ce moment.") + "</p>") +
+      : '<div class="empty">' + svg(filtre ? "search" : "check") +
+        "<b>" + (filtre ? "Rien ne correspond" : "Personne n'est inscrit en ce moment") + "</b>" +
+        (filtre ? "<span>Aucune inscription ne contient « " + esc(filtre) + " ».</span>" : "") +
+        "</div>") +
 
       (lev.length
         ? '<div style="margin-top:24px">' +
@@ -121,13 +143,12 @@
   }
 
   function vide() {
-    return '<div class="panel"><div class="panel__body" style="text-align:center;padding:40px 20px">' +
-      svg("check") +
-      '<h2 style="margin:12px 0 6px">Personne sur la blacklist</h2>' +
-      '<p class="hint">' + (peutGerer
+    return '<div class="empty">' + svg("check") +
+      "<b>Personne sur la blacklist</b>" +
+      "<span>" + (peutGerer
         ? "Tant mieux. Si ça se gâte, « Inscrire quelqu'un »."
-        : "Tant mieux.") + "</p>" +
-      "</div></div>";
+        : "Tant mieux.") + "</span>" +
+    "</div>";
   }
 
   function carte(x) {
@@ -187,29 +208,23 @@
   const trouver = id => toutes().find(x => x.id === id) || null;
 
   /* ---- Écriture -------------------------------------------------------------
-     La blacklist vit dans le catalogue. On l'écrit, et l'envoi part tout seul.
+     Le serveur applique l'opération sur la liste qu'il relit : deux personnes
+     qui inscrivent quelqu'un en même temps ne s'écrasent plus. Sans serveur,
+     on retombe dans le catalogue — et là il faudra publier. */
 
-     Une réserve honnête : deux personnes qui inscrivent quelqu'un à la même
-     seconde, chacune de son côté, s'écrasent — c'est tout le catalogue qui
-     part, pas la ligne. Sur une liste où l'on ajoute une entrée par semaine,
-     le risque est théorique ; s'il devient réel, il faudra une route dédiée
-     sur le serveur, comme pour les contrats. */
-
-  function ecrire(l, message) {
-    const c = MNStore.clone(MNStore.catalog());
-    c.blacklist = l;
-    MNStore.saveDraft(c);
+  async function ecrire(op, listeVoulue, message) {
+    const r = await L.envoyer(op, listeVoulue);
     render();
-    if (message) MNUI.toast(message, "ok");
+    if (!r.ok) return MNUI.toast("Enregistrement impossible : " + (r.error || "échec"), "err");
+    MNUI.toast(message + (r.local && !MNGitHub.autoActif() ? " — pense à publier" : ""), "ok");
   }
 
-  /** Remplace une entrée par la même, modifiée. */
-  function majUne(id, changements, message) {
+  /** Envoie une entrée modifiée, et la liste correspondante pour le repli. */
+  function poser(entree, message) {
     const l = MNStore.clone(toutes());
-    const e = l.find(x => x.id === id);
-    if (!e) return;
-    Object.assign(e, changements);
-    ecrire(l, message);
+    const i = l.findIndex(x => x.id === entree.id);
+    if (i === -1) l.unshift(entree); else l[i] = entree;
+    ecrire({ op: "set", entree }, l, message);
   }
 
   function editer(x) {
@@ -242,8 +257,7 @@
 
     /* Choisir « Aucun » et laisser un montant n'aurait pas de sens : on grise. */
     const sync = () => {
-      const rb = body.querySelector("#b-rb").value;
-      body.querySelector("#b-montant").disabled = rb === "aucun";
+      body.querySelector("#b-montant").disabled = body.querySelector("#b-rb").value === "aucun";
     };
     body.querySelector("#b-rb").addEventListener("change", sync);
     sync();
@@ -262,26 +276,19 @@
             if (!raison) return MNUI.toast("Dis pourquoi : sans raison, l'inscription ne sert à personne", "err");
 
             const rb = body.querySelector("#b-rb").value;
-            const donnees = {
-              nom,
-              raison,
-              remboursement: rb,
-              montant: rb === "aucun" ? 0 : Math.max(0, Math.round(Number(body.querySelector("#b-montant").value) || 0))
-            };
+            const entree = Object.assign({}, x || {}, {
+              id: x ? x.id : MNStore.uniqueId(nom, toutes().map(y => y.id)),
+              nom, raison, remboursement: rb,
+              montant: rb === "aucun"
+                ? 0
+                : Math.max(0, Math.round(Number(body.querySelector("#b-montant").value) || 0)),
+              at: x ? x.at : new Date().toISOString(),
+              by: x ? x.by : moi.pseudo,
+              levee: x ? x.levee : null
+            });
 
-            const l = MNStore.clone(toutes());
-            if (neuf) {
-              l.unshift(Object.assign({
-                id: MNStore.uniqueId(nom, l.map(y => y.id)),
-                at: new Date().toISOString(),
-                by: moi.pseudo,
-                levee: null
-              }, donnees));
-            } else {
-              Object.assign(l.find(y => y.id === x.id), donnees);
-            }
             fermer();
-            ecrire(l, neuf ? "Inscrit sur la blacklist" : "Inscription modifiée");
+            poser(entree, neuf ? "Inscrit sur la blacklist" : "Inscription modifiée");
           }
         }
       ]
@@ -311,14 +318,11 @@
         {
           label: "Lever", variant: "btn--primary", icon: "check",
           onClick: fermer => {
+            const note = body.querySelector("#b-note").value.trim();
             fermer();
-            majUne(x.id, {
-              levee: {
-                at: new Date().toISOString(),
-                by: moi.pseudo,
-                note: body.querySelector("#b-note").value.trim()
-              }
-            }, "Inscription levée");
+            poser(Object.assign({}, x, {
+              levee: { at: new Date().toISOString(), by: moi.pseudo, note }
+            }), "Inscription levée");
           }
         }
       ]
@@ -333,7 +337,9 @@
       confirmLabel: "Réinscrire"
     });
     if (!ok) return;
-    majUne(x.id, { levee: null, at: new Date().toISOString(), by: moi.pseudo }, "Réinscrit");
+    poser(Object.assign({}, x, {
+      levee: null, at: new Date().toISOString(), by: moi.pseudo
+    }), "Réinscrit");
   }
 
   async function rembourse(x) {
@@ -346,7 +352,7 @@
       confirmLabel: "C'est remboursé"
     });
     if (!ok) return;
-    majUne(x.id, { remboursement: "fait" }, "Marqué remboursé");
+    poser(Object.assign({}, x, { remboursement: "fait" }), "Marqué remboursé");
   }
 
   async function supprimer(x) {
@@ -358,6 +364,6 @@
       confirmLabel: "Supprimer", danger: true
     });
     if (!ok) return;
-    ecrire(toutes().filter(y => y.id !== x.id), "Inscription supprimée");
+    ecrire({ op: "remove", id: x.id }, toutes().filter(y => y.id !== x.id), "Inscription supprimée");
   }
 })();
