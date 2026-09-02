@@ -238,7 +238,11 @@
     "</span>";
 
   /** Écouteurs communs des lignes. Un gestionnaire explicite prime. */
-  function brancherLignes(z, tableau, gestes) {
+  /**
+   * @param {Array} [vues] les entrées affichées, quand la liste est filtrée.
+   *        Sans elle, on suppose que tout le tableau est à l'écran.
+   */
+  function brancherLignes(z, tableau, gestes, vues) {
     z.querySelectorAll("[data-ligne]").forEach(ligne => {
       const id = ligne.dataset.ligne;
       ligne.querySelectorAll("[data-a]").forEach(b => b.addEventListener("click", e => {
@@ -247,16 +251,35 @@
         if (!obj) return;
         const a = b.dataset.a;
         if (gestes[a]) return gestes[a](obj);
-        if (a === "up" || a === "down") return deplacer(tableau, id, a === "up" ? -1 : 1);
+        if (a === "up" || a === "down") {
+          return deplacer(tableau, id, a === "up" ? -1 : 1,
+                          typeof vues === "function" ? vues(obj) : vues);
+        }
       }));
     });
   }
 
-  function deplacer(tableau, id, sens) {
+  /**
+   * Déplace une entrée d'un cran en la faisant passer par-dessus sa voisine
+   * VISIBLE, et non par-dessus la suivante du tableau.
+   *
+   * On échange les deux places au lieu de retirer puis réinsérer : les deux
+   * lignes ne sont pas forcément côte à côte dans le tableau, et tout ce qui
+   * les sépare doit rester où c'est.
+   *
+   * @param {Array} [vues] les entrées affichées, quand la liste est filtrée.
+   */
+  function deplacer(tableau, id, sens, vues) {
+    const l = vues || tableau;
+    const v = l.findIndex(x => x.id === id);
+    const cible = v === -1 ? null : l[v + sens];
+    if (!cible) return;
+
     const i = tableau.findIndex(x => x.id === id);
-    const j = i + sens;
-    if (i < 0 || j < 0 || j >= tableau.length) return;
-    tableau.splice(j, 0, tableau.splice(i, 1)[0]);
+    const j = tableau.findIndex(x => x.id === cible.id);
+    if (i < 0 || j < 0) return;
+
+    const tmp = tableau[i]; tableau[i] = tableau[j]; tableau[j] = tmp;
     valider();
   }
 
@@ -326,10 +349,10 @@
             if (!total) return "";
 
             return bloc("ad-bloc", "cat", "cat:" + p.id, p.name, total,
-              (directs.length ? directs.map(it => ligneObjet(it, p)).join("") : "") +
+              (directs.length ? directs.map(it => ligneObjet(it, p, directs)).join("") : "") +
               sous.map(x => bloc("ad-bloc ad-bloc--sous", "sous", "sub:" + x.s.id,
                 x.s.name, x.items.length,
-                x.items.map(it => ligneObjet(it, x.s)).join(""))).join(""));
+                x.items.map(it => ligneObjet(it, x.s, x.items)).join(""))).join(""));
           }).join("")
         : U.vide({ icone: "boite", titre: "Aucun objet",
                    texte: "Clique sur « Nouvel objet » pour commencer." }));
@@ -361,16 +384,21 @@
       });
     });
 
+    /* Les objets s'affichent groupés par catégorie : la voisine à l'écran
+       est la suivante du même bloc, pas du tableau. */
     brancherLignes(z, brouillon.items, {
       edit: it => editerObjet(it),
       dup: it => dupliquerObjet(it),
       del: it => supprimerObjet(it),
       bascule: it => { it.enabled = !it.enabled; valider(); }
-    });
+    }, o => dIci(brouillon.items).filter(x => x.category === o.category));
   }
 
-  function ligneObjet(it, cat) {
-    const i = brouillon.items.indexOf(it);
+  function ligneObjet(it, cat, freres) {
+    /* Le rang parmi ce qu'on voit : sans quoi la flèche du haut resterait
+       cliquable sur la première ligne d'un bloc, sans rien faire. */
+    const l = freres || brouillon.items;
+    const i = l.indexOf(it);
     const couts = Object.keys(it.cost).map(rid => {
       const r = brouillon.resources.find(x => x.id === rid);
       return r ? '<span class="ad-cout">' + U.esc(r.name) + " ×" + U.nombre(it.cost[rid]) +
@@ -379,7 +407,7 @@
 
     return '<div class="ad-ligne' + (it.enabled ? "" : " est-eteint") +
       '" data-ligne="' + U.esc(it.id) + '">' +
-      fleches(i, brouillon.items.length) +
+      fleches(i, l.length) +
       '<span class="ad-ico">' + mnIcon(it.icon) + "</span>" +
       '<div class="ad-corps">' +
         "<b>" + U.esc(it.name) + (it.enabled ? "" : " " + U.etiquette("masqué")) + "</b>" +
@@ -973,7 +1001,7 @@
     z.querySelector('[data-a="add"]').addEventListener("click", () => editerCtype(null));
     brancherLignes(z, brouillon.contractTypes || [], {
       edit: t => editerCtype(t), del: t => supprimerCtype(t)
-    });
+    }, dIci(brouillon.contractTypes || []));
   }
 
   function editerCtype(t) {
@@ -1033,6 +1061,9 @@
     }).join("");
   }
 
+  /** Les employés à l'écran : ceux du garage regardé, encore en poste. */
+  const presents = () => dIci(brouillon.users.filter(x => !MNStore.estArchive(x)));
+
   function vueUsers(z) {
     z.innerHTML =
       outils("Qui peut se connecter, et avec quels droits — les flèches réordonnent la liste",
@@ -1040,7 +1071,7 @@
       /* L'administration ne gère que l'équipe en poste : les partis se
          consultent sur la page Équipe, onglet Archives. */
       (function () {
-        const vivants = dIci(brouillon.users.filter(x => !MNStore.estArchive(x)));
+        const vivants = presents();
         const partis = brouillon.users.filter(MNStore.estArchive).length;
         return (vivants.length
           ? '<div class="pile pile--sm">' + vivants.map(ligneUser).join("") + "</div>"
@@ -1072,17 +1103,19 @@
         }
         u.active = !u.active; valider();
       }
-    });
+    }, presents());
   }
 
   function ligneUser(u) {
     const role = brouillon.roles.find(r => r.id === u.roleId) ||
       { name: "Sans rôle", color: "#6a6280", perms: [] };
-    const i = brouillon.users.indexOf(u);
+    /* Le rang parmi ce qu'on voit, pas dans le tableau complet. */
+    const vus = presents();
+    const i = vus.indexOf(u);
 
     return '<div class="ad-ligne' + (u.active ? "" : " est-eteint") +
       '" data-ligne="' + U.esc(u.id) + '">' +
-      fleches(i, brouillon.users.length) +
+      fleches(i, vus.length) +
       '<span class="avatar" style="background:' + U.esc(role.color) + '">' +
         U.esc(U.initiales(u.pseudo)) + "</span>" +
       '<div class="ad-corps">' +
@@ -1268,10 +1301,10 @@
     z.innerHTML =
       outils("Les droits sont portés par le rôle, pas par la personne",
         U.bouton("Nouveau rôle", { variante: "principal", icone: "plus", action: "add" })) +
-      '<div class="pile pile--sm">' + dIci(brouillon.roles).map((r, i) => {
+      '<div class="pile pile--sm">' + dIci(brouillon.roles).map((r, i, vus) => {
         const n = brouillon.users.filter(u => u.roleId === r.id).length;
         return '<div class="ad-ligne" data-ligne="' + U.esc(r.id) + '">' +
-          fleches(i, brouillon.roles.length) +
+          fleches(i, vus.length) +
           '<span class="ad-ico" style="border:1px solid ' + U.esc(r.color) +
             ';color:' + U.esc(r.color) + '">' + mnIcon(r.icon) + "</span>" +
           '<div class="ad-corps">' +
@@ -1291,7 +1324,8 @@
       id => brouillon.roles.filter(x => MNStore.estDeAtelier(x, id)).length);
 
     z.querySelector('[data-a="add"]').addEventListener("click", () => editerRole(null));
-    brancherLignes(z, brouillon.roles, { edit: r => editerRole(r), del: r => supprimerRole(r) });
+    brancherLignes(z, brouillon.roles,
+      { edit: r => editerRole(r), del: r => supprimerRole(r) }, dIci(brouillon.roles));
   }
 
   function editerRole(r) {

@@ -1532,7 +1532,7 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--pink); outline-o
 
 .emgrille {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(370px, 1fr));
   gap: 10px;
 }
 
@@ -1661,3 +1661,19 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--pink); outline-o
 }
 .respast b { font-size: 13.5px; font-variant-numeric: tabular-nums; }
 .respast i { font-style: normal; font-size: 13px; color: var(--muted); }
+
+/* La vignette d'une émote : on reconnaît un geste plus vite qu'on ne retient
+   « /e mechanic2 ». Carrée et bornée — les images de la bibliothèque ont
+   toutes des proportions différentes. */
+.emote__img {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none;
+  width: 40px; height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--sunk);
+  overflow: hidden;
+}
+.emote__img svg { width: 20px; height: 20px; color: var(--dim); }
+.emote__img img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
+.emote__img .mn-emoji { font-size: 22px; line-height: 1; }

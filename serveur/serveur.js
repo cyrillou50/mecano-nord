@@ -676,6 +676,9 @@ const LISTES = {
         commande: cmd && cmd[0] !== "/" ? "/" + cmd : cmd,
         categorie: texte(e.categorie, 40).trim(),
         note: texte(e.note, 200),
+        /* Référence d'image : un chemin, une adresse, « srv:nom » ou un
+           emoji. Le site sait quoi en faire, le serveur n'a qu'à la garder. */
+        image: texte(e.image, 300),
         ateliers: ateliersDe(e.ateliers)
       };
     }

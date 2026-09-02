@@ -947,6 +947,9 @@ window.MNStore = (function () {
         /* Texte libre : « Mécanique », « Accueil »… Vide = « Sans catégorie ». */
         categorie: String(e.categorie || e.cat || "").trim().slice(0, 40),
         note: String(e.note || "").slice(0, 200),
+        /* Une image vaut mieux qu'un nom : on reconnaît un geste, on ne
+           retient pas « /e mechanic2 ». Vide = pas de vignette. */
+        image: String(e.image || "").slice(0, 300),
         ateliers: normAteliers(e.ateliers, TOUS_ATELIERS)
       };
     }).filter(e => e.nom || e.commande);

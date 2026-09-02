@@ -12,6 +12,7 @@
 
   const U = V2UI;
   const $ = s => document.querySelector(s);
+  const mnIcon = window.mnIcon;
   const L = MNListes.emotes;
 
   const SANS_CAT = "Sans catégorie";
@@ -166,6 +167,7 @@
 
   function ligne(e) {
     return '<div class="emote">' +
+      (e.image ? '<span class="emote__img">' + mnIcon(e.image) + "</span>" : "") +
       '<div class="emote__txt"><b>' + U.esc(e.nom) + "</b>" +
         (e.note ? "<i>" + U.esc(e.note) + "</i>" : "") + "</div>" +
       (e.commande
@@ -267,7 +269,7 @@
     const neuf = !e;
     const cats = catsConnues();
 
-    U.modale({
+    const m = U.modale({
       titre: neuf ? "Nouvelle émote" : "Modifier l'émote",
       corps: '<div class="pile">' +
         U.champ({ id: "e-nom", label: "Nom", max: 60, repere: "Réparer le moteur",
@@ -282,6 +284,16 @@
         U.champ({ id: "e-note", label: "Note", max: 200,
                   repere: "Quand l'utiliser, ce qu'elle montre…",
                   valeur: e ? e.note : "" }) +
+        '<div class="champ"><span class="champ__label">Image</span>' +
+          '<div class="rang">' +
+            '<span class="ad-ico" id="e-img-prev">' +
+              mnIcon((e && e.image) || "etoile") + "</span>" +
+            '<input class="saisie" id="e-img" maxlength="300" style="flex:1" value="' +
+              U.esc(e ? e.image : "") + '" placeholder="../assets/img/souder.png">' +
+            U.bouton("Choisir", { taille: "sm", action: "img-pick" }) +
+          "</div>" +
+          '<p class="champ__aide">Facultatif. Une capture du geste se reconnaît ' +
+            "plus vite qu'une commande.</p></div>" +
         champAteliers("e-at", e ? MNStore.ateliersDe(e) : [ici()]) +
       "</div>",
       actions: [
@@ -303,6 +315,7 @@
               commande: cmd,
               categorie: corps.querySelector("#e-cat").value.trim(),
               note: corps.querySelector("#e-note").value.trim(),
+              image: corps.querySelector("#e-img").value.trim(),
               ateliers: ats
             };
 
@@ -316,6 +329,22 @@
           }
         }
       ]
+    });
+
+    /* Aperçu vivant, et la bibliothèque partagée pour ne pas retaper un
+       chemin. 320 px : la vignette fait 40 px de côté, le reste ne servirait
+       qu'à alourdir le stockage. */
+    const apercu = m.corps.querySelector("#e-img-prev");
+    const champImg = m.corps.querySelector("#e-img");
+    const rafraichir = () => {
+      apercu.innerHTML = mnIcon(champImg.value.trim() || "etoile");
+    };
+    champImg.addEventListener("input", rafraichir);
+    m.corps.querySelector('[data-a="img-pick"]').addEventListener("click", () => {
+      MNImagier.choisir(champImg.value.trim(), ref => {
+        champImg.value = ref;
+        rafraichir();
+      }, { max: 320 });
     });
   }
 

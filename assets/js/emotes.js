@@ -19,6 +19,7 @@
 
   const $ = s => document.querySelector(s);
   const svg = MNUI.svg, esc = MNUI.esc;
+  const mnIcon = window.mnIcon;
   const L = MNListes.emotes;
 
   const SANS_CAT = "Sans catégorie";
@@ -194,6 +195,7 @@
 
   function ligne(e) {
     return '<div class="emote">' +
+      (e.image ? '<span class="emote__img">' + mnIcon(e.image) + "</span>" : "") +
       '<div class="emote__txt"><b>' + esc(e.nom) + "</b>" +
         (e.note ? "<i>" + esc(e.note) + "</i>" : "") + "</div>" +
       (e.commande
@@ -298,8 +300,38 @@
         '<div class="field"><label class="label" for="e-note">Note</label>' +
           '<input class="input" id="e-note" maxlength="200" placeholder="Quand l\'utiliser, ce qu\'elle montre…" value="' +
             esc(e ? e.note : "") + '"></div>' +
+
+        '<div class="field"><label class="label">Image</label>' +
+          '<div class="iconpick">' +
+            '<div class="iconpick__preview" id="e-img-prev">' +
+              mnIcon((e && e.image) || "star") + "</div>" +
+            '<div style="flex:1;display:flex;flex-direction:column;gap:8px">' +
+              '<input class="input mono" id="e-img" maxlength="300" value="' +
+                esc(e ? e.image : "") + '" placeholder="assets/img/souder.png">' +
+              '<button class="btn btn--ghost btn--sm" id="e-img-pick" type="button">' +
+                "Choisir dans la bibliothèque</button>" +
+            "</div></div>" +
+          '<p class="hint">Facultatif. Une capture du geste se reconnaît plus vite ' +
+            "qu'une commande.</p></div>" +
+
         champAteliers("e-at", e ? MNStore.ateliersDe(e) : [ici()]) +
       "</div>";
+
+    /* Aperçu vivant, et la bibliothèque partagée pour ne pas retaper un
+       chemin. 320 px : la vignette fait 40 px de côté, le reste ne servirait
+       qu'à alourdir le stockage. */
+    const apercu = body.querySelector("#e-img-prev");
+    const champImg = body.querySelector("#e-img");
+    const rafraichir = () => {
+      apercu.innerHTML = mnIcon(champImg.value.trim() || "star");
+    };
+    champImg.addEventListener("input", rafraichir);
+    body.querySelector("#e-img-pick").addEventListener("click", () => {
+      MNImagier.choisir(champImg.value.trim(), ref => {
+        champImg.value = ref;
+        rafraichir();
+      }, { max: 320 });
+    });
 
     MNUI.modal({
       title: neuf ? "Nouvelle émote" : "Modifier l'émote",
@@ -323,6 +355,7 @@
               commande: cmd,
               categorie: body.querySelector("#e-cat").value.trim(),
               note: body.querySelector("#e-note").value.trim(),
+              image: body.querySelector("#e-img").value.trim(),
               ateliers: ats
             };
 

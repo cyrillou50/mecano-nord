@@ -285,11 +285,11 @@
 
             return bloc("catblock", "h3", "section-title", "cat:" + p.id, p.name, total,
               (directs.length
-                ? '<div class="rows">' + directs.map(it => itemRow(it, p)).join("") + "</div>"
+                ? '<div class="rows">' + directs.map(it => itemRow(it, p, directs)).join("") + "</div>"
                 : "") +
               sous.map(x =>
                 bloc("subblock", "h4", "section-subtitle", "sub:" + x.s.id, x.s.name, x.items.length,
-                  '<div class="rows">' + x.items.map(it => itemRow(it, x.s)).join("") + "</div>")
+                  '<div class="rows">' + x.items.map(it => itemRow(it, x.s, x.items)).join("") + "</div>")
               ).join(""));
           }).join("")
         : '<div class="empty">' + svg("box") + "<b>Aucun objet</b><p>Clique sur « Nouvel objet » pour commencer.</p></div>");
@@ -337,14 +337,22 @@
         if (a === "edit") return editItem(it);
         if (a === "dup") return duplicateItem(it);
         if (a === "del") return deleteItem(it);
-        if (a === "up" || a === "down") return moveInArray(draft.items, id, a === "up" ? -1 : 1);
+        if (a === "up" || a === "down") {
+          /* Les objets s'affichent groupés par catégorie : la voisine à
+             l'écran est la suivante du même bloc, pas du tableau. */
+          return moveInArray(draft.items, id, a === "up" ? -1 : 1,
+                             list.filter(x => x.category === it.category));
+        }
         if (a === "toggle") { it.enabled = !it.enabled; commit(); }
       }));
     });
   }
 
-  function itemRow(it, cat) {
-    const idx = draft.items.indexOf(it);
+  function itemRow(it, cat, freres) {
+    /* Le rang parmi ce qu'on voit : sans quoi la flèche du haut resterait
+       cliquable sur la première ligne d'un bloc, sans rien faire. */
+    const l = freres || draft.items;
+    const idx = l.indexOf(it);
     const chips = Object.keys(it.cost).map(rid => {
       const r = MNStore.resourceById(rid) || draft.resources.find(x => x.id === rid);
       return r ? "<em>" + esc(r.name) + " ×" + num(it.cost[rid]) + "</em>" : "";
@@ -353,7 +361,7 @@
     return '<div class="trow' + (it.enabled ? "" : " is-off") + '" data-row="' + esc(it.id) + '">' +
       '<div class="ord">' +
         '<button data-a="up"' + (idx === 0 ? " disabled" : "") + ' aria-label="Monter">' + svg("chevUp") + "</button>" +
-        '<button data-a="down"' + (idx === draft.items.length - 1 ? " disabled" : "") + ' aria-label="Descendre">' + svg("chevDown") + "</button>" +
+        '<button data-a="down"' + (idx === l.length - 1 ? " disabled" : "") + ' aria-label="Descendre">' + svg("chevDown") + "</button>" +
       "</div>" +
       '<div class="trow__ico">' + mnIcon(it.icon) + "</div>" +
       '<div class="trow__main">' +
@@ -395,11 +403,30 @@
     return /^[0-9a-f]{6}$/i.test(s) ? "#" + s.toLowerCase() : "";
   }
 
-  function moveInArray(arr, id, dir) {
+  /**
+   * Déplace une entrée d'un cran en la faisant passer par-dessus sa voisine
+   * VISIBLE, et non par-dessus la suivante du tableau.
+   *
+   * On échange les deux places au lieu de retirer puis réinsérer : les deux
+   * lignes ne sont pas forcément côte à côte dans le tableau, et tout ce qui
+   * les sépare doit rester où c'est.
+   *
+   * @param {Array} arr   la liste complète, celle qu'on enregistre
+   * @param {Array} vues  les entrées affichées, dans l'ordre de l'écran
+   * @param {string} id
+   * @param {number} dir  -1 pour monter, +1 pour descendre
+   */
+  function moveInArray(arr, id, dir, vues) {
+    const l = vues || arr;
+    const v = l.findIndex(x => x.id === id);
+    const cible = v === -1 ? null : l[v + dir];
+    if (!cible) return;
+
     const i = arr.findIndex(x => x.id === id);
-    const j = i + dir;
-    if (i < 0 || j < 0 || j >= arr.length) return;
-    arr.splice(j, 0, arr.splice(i, 1)[0]);
+    const j = arr.findIndex(x => x.id === cible.id);
+    if (i < 0 || j < 0) return;
+
+    const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
     commit();
   }
 
@@ -1320,7 +1347,8 @@
       (draft.contractTypes || []).filter(x => MNStore.estDeAtelier(x, id)).length);
 
     $("#add").addEventListener("click", () => editCtype(null));
-    bindRows(host, draft.contractTypes, { edit: t => editCtype(t), del: t => deleteCtype(t) });
+    bindRows(host, draft.contractTypes,
+      { edit: t => editCtype(t), del: t => deleteCtype(t) }, types);
   }
 
   function editCtype(t) {
@@ -1420,7 +1448,11 @@
   }
 
   /** Écouteurs communs des lignes (monter / descendre / modifier / supprimer). */
-  function bindRows(host, arr, handlers) {
+  /**
+   * @param {Array} [vues] les entrées affichées, quand la liste est filtrée.
+   *        Sans elle, on suppose que tout le tableau est à l'écran.
+   */
+  function bindRows(host, arr, handlers, vues) {
     host.querySelectorAll("[data-row]").forEach(row => {
       const id = row.dataset.row;
       row.querySelectorAll("[data-a]").forEach(b => b.addEventListener("click", () => {
@@ -1430,7 +1462,9 @@
         /* Un gestionnaire explicite prime : les catégories ont leur propre
            façon de se déplacer, par niveau. */
         if (handlers[a]) return handlers[a](obj);
-        if (a === "up" || a === "down") return moveInArray(arr, id, a === "up" ? -1 : 1);
+        if (a === "up" || a === "down") {
+          return moveInArray(arr, id, a === "up" ? -1 : 1, vues);
+        }
       }));
     });
   }
@@ -1438,6 +1472,9 @@
   /* =========================================================================
      EMPLOYÉS
      ========================================================================= */
+
+  /** Les employés à l'écran : ceux du garage regardé, encore en poste. */
+  const presents = () => dIci(draft.users).filter(x => !MNStore.estArchive(x));
 
   function paneUsers(host) {
     const me = MNAuth.session();
@@ -1451,7 +1488,7 @@
       (function () {
         /* L'admin ne gère que l'équipe en poste : les partis se consultent
            sur la page Équipe, onglet Archives. */
-        const vivants = dIci(draft.users).filter(x => !MNStore.estArchive(x));
+        const vivants = presents();
         const partis = dIci(draft.users).length - vivants.length;
         return (vivants.length
           ? '<div class="rows">' + vivants.map(u => userRow(u, me)).join("") + "</div>"
@@ -1479,7 +1516,7 @@
         if (me.uid === u.id) return MNUI.toast("Tu ne peux pas désactiver ton propre compte", "err");
         u.active = !u.active; commit();
       }
-    });
+    }, presents());
   }
 
   function userRow(u, me) {
@@ -1495,7 +1532,7 @@
             }).join(""))
       : '<span class="permtag permtag--none">aucun droit</span>';
 
-    const idx = draft.users.indexOf(u);
+    const idx = presents().indexOf(u);
 
     return '<div class="trow' + (u.active ? "" : " is-off") + '" data-row="' + esc(u.id) + '">' +
       '<div class="ord">' +
@@ -1975,8 +2012,7 @@
         '<span class="spacer"></span>' +
         '<button class="btn btn--primary" id="add">' + svg("plus") + "<span>Nouveau rôle</span></button>" +
       "</div>" +
-      '<div class="rows">' + dIci(draft.roles).map(r => {
-        const i = draft.roles.indexOf(r);
+      '<div class="rows">' + dIci(draft.roles).map((r, i) => {
         const n = draft.users.filter(u =>
           MNStore.roleIdDe(u, ouSuisJe()) === r.id &&
           MNStore.estDeAtelier(u, ouSuisJe())).length;
@@ -2012,7 +2048,8 @@
       id => draft.roles.filter(x => MNStore.estDeAtelier(x, id)).length);
 
     $("#add").addEventListener("click", () => editRole(null));
-    bindRows(host, draft.roles, { edit: r => editRole(r), del: r => deleteRole(r) });
+    bindRows(host, draft.roles,
+      { edit: r => editRole(r), del: r => deleteRole(r) }, dIci(draft.roles));
   }
 
   function editRole(r) {
