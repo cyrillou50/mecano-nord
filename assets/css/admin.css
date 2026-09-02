@@ -1686,14 +1686,21 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--pink); outline-o
 .plan__cadre { overflow-x: auto; padding-bottom: 4px; }
 
 .plan {
+  /* Le plancher d'une colonne d'heure, pas sa largeur : au-delà, elles
+     s'étirent. Sans quoi la grille laissait un vide à droite du panneau. */
   --col: 30px;
-  min-width: max-content;
+  --lab: 116px;   /* la colonne des noms */
+  --tot: 56px;    /* celle des totaux */
+  /* En dessous de cette largeur la grille ne se lit plus : le cadre défile
+     plutôt que d'écraser les colonnes. */
+  min-width: calc(var(--lab) + var(--h) * var(--col) + var(--tot));
   font-variant-numeric: tabular-nums;
 }
 
 .plan__l {
   display: grid;
-  grid-template-columns: 116px repeat(var(--h), var(--col)) 56px;
+  grid-template-columns:
+    var(--lab) repeat(var(--h), minmax(var(--col), 1fr)) var(--tot);
   align-items: stretch;
   width: 100%;
   padding: 0; margin: 0;
