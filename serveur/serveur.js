@@ -692,11 +692,26 @@ const LISTES = {
       if (!id || !nom) return null;
       const rb = ["aucun", "du", "fait"].indexOf(x.remboursement) !== -1
         ? x.remboursement : "aucun";
-      const levee = x.levee && typeof x.levee === "object" ? {
-        at: dateIso(x.levee.at) || new Date().toISOString(),
-        by: texte(x.levee.by, 60),
-        note: texte(x.levee.note, 300)
-      } : null;
+      /* Une levée par garage. L'ancienne forme — une seule pour toute
+         l'entrée — vaut pour tous les garages où celle-ci s'applique. */
+      const ats = ateliersDe(x.ateliers);
+      const uneLevee = l => ({
+        at: dateIso(l.at) || new Date().toISOString(),
+        by: texte(l.by, 60),
+        note: texte(l.note, 300)
+      });
+      const levee = {};
+      if (x.levee && typeof x.levee === "object") {
+        if (x.levee.at || x.levee.by || x.levee.note) {
+          ats.forEach(id => { levee[id] = uneLevee(x.levee); });
+        } else {
+          ATELIERS_CONNUS.forEach(id => {
+            if (x.levee[id] && typeof x.levee[id] === "object") {
+              levee[id] = uneLevee(x.levee[id]);
+            }
+          });
+        }
+      }
       /* Ce qu'on doit rendre se compte en ressources, pas en dollars :
          l'atelier facture en Ferraille et en Plastique. Le serveur ne connaît
          pas la liste des ressources et n'a pas à la connaître — il vérifie la
@@ -715,7 +730,7 @@ const LISTES = {
         raison: texte(x.raison, 600),
         remboursement: rb,
         ressources,
-        ateliers: ateliersDe(x.ateliers),
+        ateliers: ats,
         at: dateIso(x.at) || new Date().toISOString(),
         by: texte(x.by, 60),
         levee

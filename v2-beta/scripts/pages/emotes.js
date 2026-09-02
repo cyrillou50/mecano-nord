@@ -185,6 +185,30 @@
 
   const trouver = id => brut().find(e => e.id === id) || null;
 
+  /**
+   * Retire une émote d'ici. Elle vaut peut-être aussi dans l'autre garage : dans ce
+   * cas on ne l'efface pas, on lui retire ce garage-ci. Supprimer pour de
+   * bon ne se fait que là où elle n'existe plus qu'ici.
+   * @returns {{op:object, liste:Array, partagee:boolean}}
+   */
+  function retirer(e) {
+    const ats = MNStore.ateliersDe(e);
+    const reste = ats.filter(a => a !== ici());
+
+    if (!reste.length) {
+      return { op: { op: "remove", id: e.id },
+               liste: brut().filter(y => y.id !== e.id),
+               partagee: false };
+    }
+
+    const entree = Object.assign({}, e, { ateliers: reste });
+    const liste = MNStore.clone(brut());
+    const i = liste.findIndex(y => y.id === e.id);
+    if (i !== -1) liste[i] = entree;
+    return { op: { op: "set", entree }, liste, partagee: true };
+  }
+
+
   /* ---- Le garage où vaut une entrée ------------------------------------------
      Des cases, une par garage. Une émote peut valoir des deux côtés. */
 
@@ -297,13 +321,19 @@
 
   async function supprimer(e) {
     if (!e) return;
+    const r = retirer(e);
     const ok = await U.confirmer({
       titre: "Supprimer l'émote",
-      message: "« " + e.nom + " » sera retirée de la liste.",
-      confirmer: "Supprimer", danger: true
+      message: r.partagee
+        ? "« " + e.nom + " » ne sera plus proposée au " + MNStore.nomAtelier(ici()) +
+          ". Elle reste en place dans l'autre garage."
+        : "« " + e.nom + " » sera retirée de la liste.",
+      confirmer: r.partagee ? "Retirer d'ici" : "Supprimer", danger: true
     });
     if (!ok) return;
-    ecrire({ op: "remove", id: e.id }, brut().filter(x => x.id !== e.id), "Émote supprimée");
+    ecrire(r.op, r.liste, r.partagee
+      ? "Retirée du " + MNStore.nomAtelier(ici())
+      : "Émote supprimée");
   }
 
   /* ---- Import en masse --------------------------------------------------------

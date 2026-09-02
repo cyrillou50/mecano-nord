@@ -43,8 +43,11 @@
 
   /** Celles du garage où l'on travaille. */
   const toutes = () => brut().filter(x => MNStore.estDeAtelier(x, ici()));
-  const actives = () => toutes().filter(x => !x.levee);
-  const levees = () => toutes().filter(x => x.levee);
+  /** La levée vaut par garage : le Nord peut refuser qui le Sud a repris. */
+  const leveeIci = x => MNStore.leveeIci(x, ici());
+
+  const actives = () => toutes().filter(x => !leveeIci(x));
+  const levees = () => toutes().filter(x => leveeIci(x));
 
   function filtrer(l) {
     const q = filtre.trim().toLowerCase();
@@ -144,7 +147,7 @@
 
   function carte(x) {
     const r = MNStore.remboursementDe(x.remboursement);
-    const lev = !!x.levee;
+    const lev = leveeIci(x);
 
     return U.carte({
       classe: "blentree" + (lev ? " blentree--levee" : ""),
@@ -168,8 +171,8 @@
         '<p class="champ__aide">Inscrit ' + U.ilYA(x.at) +
           (x.by ? " par " + U.esc(x.by) : "") + "." +
           (lev
-            ? " Levée " + U.ilYA(x.levee.at) + (x.levee.by ? " par " + U.esc(x.levee.by) : "") +
-              (x.levee.note ? " — " + U.esc(x.levee.note) : "") + "."
+            ? " Levée " + U.ilYA(lev.at) + (lev.by ? " par " + U.esc(lev.by) : "") +
+              (lev.note ? " — " + U.esc(lev.note) : "") + "."
             : "") + "</p>" +
         (peutGerer
           ? '<div class="rang" style="margin-top:var(--e-3)">' +
@@ -204,6 +207,41 @@
   }
 
   const trouver = id => brut().find(x => x.id === id) || null;
+
+  /**
+   * Retire une inscription d'ici. Elle vaut peut-être aussi dans l'autre
+   * garage : dans ce cas on ne l'efface pas, on lui retire ce garage-ci.
+   * Supprimer pour de bon ne se fait que là où elle n'existe plus qu'ici.
+   * @returns {{op:object, liste:Array, partagee:boolean}}
+   */
+  function retirer(x) {
+    const ats = MNStore.ateliersDe(x);
+    const reste = ats.filter(a => a !== ici());
+
+    if (!reste.length) {
+      return { op: { op: "remove", id: x.id },
+               liste: brut().filter(y => y.id !== x.id),
+               partagee: false };
+    }
+
+    /* La levée d'ici part avec le garage : la garder n'aurait plus de sens. */
+    const levee = Object.assign({}, x.levee);
+    delete levee[ici()];
+
+    const entree = Object.assign({}, x, { ateliers: reste, levee });
+    const liste = MNStore.clone(brut());
+    const i = liste.findIndex(y => y.id === x.id);
+    if (i !== -1) liste[i] = entree;
+    return { op: { op: "set", entree }, liste, partagee: true };
+  }
+
+  /** Écrit la levée du garage où l'on est, sans toucher à celle de l'autre. */
+  function poserLevee(x, valeur) {
+    const levee = Object.assign({}, x.levee);
+    if (valeur) levee[ici()] = valeur; else delete levee[ici()];
+    return Object.assign({}, x, { levee });
+  }
+
 
   /* ---- Le garage où vaut une inscription -------------------------------------
      Des cases, une par garage. Un client peut être refusé des deux côtés. */
@@ -300,7 +338,7 @@
               nom, raison, remboursement: rb, ressources, ateliers: ats,
               at: x ? x.at : new Date().toISOString(),
               by: x ? x.by : moi.pseudo,
-              levee: x ? x.levee : null
+              levee: x ? x.levee : {}
             });
 
             fermer();
@@ -385,9 +423,8 @@
           onClick: (fermer, corps) => {
             const note = corps.querySelector("#b-note").value.trim();
             fermer();
-            poser(Object.assign({}, x, {
-              levee: { at: new Date().toISOString(), by: moi.pseudo, note }
-            }), "Inscription levée");
+            poser(poserLevee(x, { at: new Date().toISOString(), by: moi.pseudo, note }),
+                  "Levée au " + MNStore.nomAtelier(ici()));
           }
         }
       ]
@@ -402,9 +439,7 @@
       confirmer: "Réinscrire"
     });
     if (!ok) return;
-    poser(Object.assign({}, x, {
-      levee: null, at: new Date().toISOString(), by: moi.pseudo
-    }), "Réinscrit");
+    poser(poserLevee(x, null), "Réinscrit au " + MNStore.nomAtelier(ici()));
   }
 
   async function rembourse(x) {
@@ -423,13 +458,19 @@
 
   async function supprimer(x) {
     if (!x) return;
+    const r = retirer(x);
     const ok = await U.confirmer({
-      titre: "Supprimer définitivement",
-      message: "L'inscription de « " + x.nom + " » disparaîtra, trace comprise. " +
-        "Pour la sortir de la liste en gardant l'historique, utilise plutôt « Lever ».",
-      confirmer: "Supprimer", danger: true
+      titre: r.partagee ? "Retirer de ce garage" : "Supprimer définitivement",
+      message: r.partagee
+        ? "L'inscription de « " + x.nom + " » quittera le " +
+          MNStore.nomAtelier(ici()) + ". Elle reste en place dans l'autre garage."
+        : "L'inscription de « " + x.nom + " » disparaîtra, trace comprise. " +
+          "Pour la sortir de la liste en gardant l'historique, utilise plutôt « Lever ».",
+      confirmer: r.partagee ? "Retirer d'ici" : "Supprimer", danger: true
     });
     if (!ok) return;
-    ecrire({ op: "remove", id: x.id }, brut().filter(y => y.id !== x.id), "Inscription supprimée");
+    ecrire(r.op, r.liste, r.partagee
+      ? "Retirée du " + MNStore.nomAtelier(ici())
+      : "Inscription supprimée");
   }
 })();

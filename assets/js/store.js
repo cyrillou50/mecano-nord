@@ -373,6 +373,20 @@ window.MNStore = (function () {
     REMBOURSEMENTS.find(r => r.id === id) || REMBOURSEMENTS[0];
 
   /**
+   * La levée d'une inscription dans le garage demandé, ou null.
+   * Tolère la forme d'avant — une levée unique, sans garage — parce que les
+   * entrées venues du serveur ne repassent pas par normalize() : un serveur
+   * pas encore à jour la renvoie telle quelle, et la prendre pour une table
+   * par garage ferait réapparaître des inscriptions qu'on avait levées.
+   */
+  function leveeIci(x, ou) {
+    const l = x && x.levee;
+    if (!l || typeof l !== "object") return null;
+    if (l.at || l.by || l.note) return l;                 // forme d'avant
+    return l[TOUS_ATELIERS.indexOf(ou) !== -1 ? ou : _atelier] || null;
+  }
+
+  /**
    * Additionne des paniers de ressources.
    * @param {Array<Object>} paniers  des { idRessource: quantité }
    * @returns {Object} la somme, ressource par ressource
@@ -971,11 +985,26 @@ window.MNStore = (function () {
         ateliers: normAteliers(x.ateliers, TOUS_ATELIERS),
         at: x.at || new Date().toISOString(),
         by: String(x.by || "").slice(0, 60),
-        levee: x.levee && typeof x.levee === "object"
-          ? { at: x.levee.at || new Date().toISOString(),
-              by: String(x.levee.by || "").slice(0, 60),
-              note: String(x.levee.note || "").slice(0, 300) }
-          : null
+        /* Une levée par garage : le Nord peut continuer de refuser quelqu'un
+           que le Sud a laissé revenir. L'ancienne forme — une seule levée
+           pour toute l'entrée — vaut pour tous ses garages. */
+        levee: (function (v, ats) {
+          const une = l => ({
+            at: l.at || new Date().toISOString(),
+            by: String(l.by || "").slice(0, 60),
+            note: String(l.note || "").slice(0, 300)
+          });
+          if (!v || typeof v !== "object") return {};
+          const o = {};
+          if (v.at || v.by || v.note) {
+            ats.forEach(id => { o[id] = une(v); });      // forme d'avant
+            return o;
+          }
+          TOUS_ATELIERS.forEach(id => {
+            if (v[id] && typeof v[id] === "object") o[id] = une(v[id]);
+          });
+          return o;
+        })(x.levee, normAteliers(x.ateliers, TOUS_ATELIERS))
       };
     }).filter(x => x.nom)
       .sort((a, b) => new Date(b.at) - new Date(a.at))
@@ -1327,7 +1356,7 @@ window.MNStore = (function () {
     setAtelier, atelier, roleIdDe, estMasqueIci, estMasquePartout, minimumDe, livretDe,
     memeNom, soucisHomonyme,
     MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,
-    REMBOURSEMENTS, remboursementDe, sommeRessources, ressourcesEnClair,
+    REMBOURSEMENTS, remboursementDe, leveeIci, sommeRessources, ressourcesEnClair,
     usersActifs, usersArchives,
     GRAVITES, graviteDe, normAvertissement, avertActif, avertBilan,
     addAvertissement, leverAvertissement, retirerAvertissement,
