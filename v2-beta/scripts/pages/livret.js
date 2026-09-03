@@ -138,21 +138,10 @@
     const livret = MNStore.livretDe(MNAuth.atelier()).trim();
     const peutEcrire = V2Shell.peut("admin", "items");
 
+    /* La question d'abord : un apprenti arrive avec une question, pas avec
+       l'envie de lire trois écrans. Le livret est juste dessous pour qui veut
+       le parcourir. */
     hote.innerHTML =
-      U.carte({
-        titre: "Le livret",
-        actions: peutEcrire
-          ? '<a class="btn btn--fantome btn--sm" href="admin.html">' +
-            U.icone("crayon") + "<span>Le modifier</span></a>"
-          : "",
-        corps: livret
-          ? '<div class="livret">' + enParagraphes(livret) + "</div>"
-          : '<p class="champ__aide">Le livret n\'a pas encore été écrit. ' +
-            (peutEcrire
-              ? "Tu peux t'en charger dans l'administration, onglet « Livret »."
-              : "Un responsable doit s'en charger.") + "</p>"
-      }) +
-      '<div style="margin-top:var(--e-4)">' +
       U.carte({
         titre: "Une question ?",
         actions: '<span id="a-etat"></span>',
@@ -166,6 +155,20 @@
           '<p class="champ__aide" id="a-aide">L\'assistant relit le livret et les ' +
             "données du site pour te répondre. Il ne connaît que ça : s'il ne sait " +
             "pas, il te dira d'aller voir un responsable.</p>"
+      }) +
+      '<div style="margin-top:var(--e-4)">' +
+      U.carte({
+        titre: "Le livret",
+        actions: peutEcrire
+          ? '<a class="btn btn--fantome btn--sm" href="admin.html">' +
+            U.icone("crayon") + "<span>Le modifier</span></a>"
+          : "",
+        corps: livret
+          ? '<div class="livret">' + enParagraphes(livret) + "</div>"
+          : '<p class="champ__aide">Le livret n\'a pas encore été écrit. ' +
+            (peutEcrire
+              ? "Tu peux t'en charger dans l'administration, onglet « Livret »."
+              : "Un responsable doit s'en charger.") + "</p>"
       }) + "</div>";
 
     peindreFil();

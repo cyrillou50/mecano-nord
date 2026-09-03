@@ -156,7 +156,26 @@
       '<h1 class="page-title">Livret</h1>' +
       '<p class="page-sub">Ce qu\'il faut savoir en arrivant à l\'atelier</p>' +
 
+      /* La question d'abord : un apprenti arrive avec une question, pas avec
+         l'envie de lire trois écrans. Le livret est juste dessous pour qui
+         veut le parcourir. */
       '<div class="panel" style="margin-bottom:18px">' +
+        '<div class="panel__head"><h2>Une question ?</h2>' +
+        '<span class="spacer"></span><span id="a-etat"></span></div>' +
+        '<div class="panel__body">' +
+          '<div id="a-fil" class="fil"></div>' +
+          '<div class="row" style="margin-top:12px">' +
+            '<input class="input" id="a-q" maxlength="600" ' +
+              'placeholder="Ex. Combien coûte une vidange ?" autocomplete="off">' +
+            '<button class="btn btn--primary" id="a-go">' + svg("check") +
+              "<span>Demander</span></button>" +
+          "</div>" +
+          '<p class="hint" id="a-aide">L\'assistant relit le livret et les données ' +
+            "du site pour te répondre. Il ne connaît que ça : s'il ne sait pas, " +
+            "il te dira d'aller voir un responsable.</p>" +
+        "</div></div>" +
+
+      '<div class="panel">' +
         '<div class="panel__head"><h2>Le livret</h2>' +
           '<span class="spacer"></span>' +
           (peutEcrire
@@ -171,21 +190,6 @@
               (peutEcrire
                 ? "Tu peux t'en charger dans l'administration, onglet « Livret »."
                 : "Un responsable doit s'en charger.") + "</p>") +
-        "</div></div>" +
-
-      '<div class="panel"><div class="panel__head"><h2>Une question ?</h2>' +
-        '<span class="spacer"></span><span id="a-etat"></span></div>' +
-        '<div class="panel__body">' +
-          '<div id="a-fil" class="fil"></div>' +
-          '<div class="row" style="margin-top:12px">' +
-            '<input class="input" id="a-q" maxlength="600" ' +
-              'placeholder="Ex. Combien coûte une vidange ?" autocomplete="off">' +
-            '<button class="btn btn--primary" id="a-go">' + svg("check") +
-              "<span>Demander</span></button>" +
-          "</div>" +
-          '<p class="hint" id="a-aide">L\'assistant relit le livret et les données ' +
-            "du site pour te répondre. Il ne connaît que ça : s'il ne sait pas, " +
-            "il te dira d'aller voir un responsable.</p>" +
         "</div></div>";
 
     peindreFil();
