@@ -120,13 +120,24 @@ window.MNWebhook = (function () {
     const brand = MNStore.brand();
     const avatar = absUrl(c.avatar || brand.logo);
 
+    /* Les deux garages partagent le salon : sans leur nom sur le message, on
+       ne sait pas lequel parle. Il tient dans l'expéditeur et dans le pied —
+       l'un se lit en survolant la liste, l'autre en lisant le message. */
+    const ou = MNStore.atelier();
+    const garage = MNStore.nomAtelier(ou);
+    /* Un nom d'expéditeur réglé à la main reste : on lui accole le garage
+       plutôt que de l'écraser, sinon le réglage n'aurait plus d'effet. */
+    const expediteur = c.name
+      ? String(c.name) + " · " + MNStore.courtAtelier(ou)
+      : garage;
+
     const body = {
-      username: String(c.name || brand.name).slice(0, 80),
+      username: expediteur.slice(0, 80),
       embeds: [Object.assign({
         color: COLORS.bt,
         timestamp: new Date().toISOString(),
         footer: Object.assign(
-          { text: brand.name + " · " + brand.tagline },
+          { text: garage + " · " + brand.tagline },
           avatar ? { icon_url: avatar } : {}
         )
       }, embed)]

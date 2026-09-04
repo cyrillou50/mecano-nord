@@ -361,6 +361,11 @@
     /* Exempté : aucun minimum ne lui est demandé, il n'y a donc pas de reste
        à faire à afficher. */
     if (MNDuty.sansMinimum(moi.uid)) return U.esc("aucun minimum hebdomadaire attendu");
+    /* Une première semaine n'est pas une semaine entière : on ne réclame pas
+       à quelqu'un les jours d'avant son arrivée. */
+    if (MNDuty.premiereSemaine(moi.uid)) {
+      return U.esc("arrivé cette semaine — aucun minimum attendu");
+    }
     /* Un congé posé n'est pas un manquement : on ne réclame pas des heures à
        quelqu'un qui avait prévu de ne pas être là, et le récapitulatif du
        dimanche ne le signalera pas non plus. */

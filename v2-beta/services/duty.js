@@ -777,6 +777,24 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
     }
   }
 
+  /**
+   * Vient-il d'entrer dans l'atelier ? Quelqu'un embauché le jeudi n'a pas eu
+   * la semaine pour faire ses heures : la lui compter entière reviendrait à
+   * lui reprocher les jours d'avant son arrivée.
+   *
+   * On compare des jours et non des horodatages : `hiredAt` est une date
+   * d'embauche, pas une heure, et le lundi de la semaine en est une aussi.
+   */
+  function premiereSemaine(uid) {
+    try {
+      const u = (MNStore.catalog().users || []).find(x => x.id === uid);
+      if (!u || !u.hiredAt) return false;
+      return u.hiredAt >= jourLocal(new Date(weekStart()));
+    } catch (_) {
+      return false;
+    }
+  }
+
   /** Secondes cumulées par employé sur les N derniers jours. */
   function totals(days) {
     const since = Date.now() - (days || 7) * 86400000;
@@ -823,7 +841,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
     clockIn, clockOut, forceOut, forceIn, clearLog, removeLog, editLog,
     conges, congesOf, congeOf, congeById, enConge, chevauche,
     setConge, clearConge, jourLocal, nbJours,
-    logOf, secondsFor, weekStart, sansMinimum,
+    logOf, secondsFor, weekStart, sansMinimum, premiereSemaine,
     totals, dur, sinceDur, secBetween, minutesBetween
   };
 })();

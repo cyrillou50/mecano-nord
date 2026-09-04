@@ -2202,7 +2202,13 @@ async function effectifRecap(quel) {
   return (cat.users || [])
     .filter(u => u && u.id && u.active !== false && !u.depart &&
       !exempte(u) && !masqueIci(u) && dIci(u))
-    .map(u => ({ id: String(u.id), pseudo: String(u.pseudo || "?") }));
+    .map(u => ({
+      id: String(u.id),
+      pseudo: String(u.pseudo || "?"),
+      /* La date d'entrée, pour ne rien reprocher à qui vient d'arriver. */
+      hiredAt: /^\d{4}-\d{2}-\d{2}$/.test(u.hiredAt) ? u.hiredAt
+        : (typeof u.createdAt === "string" ? u.createdAt.slice(0, 10) : "")
+    }));
 }
 
 /**
@@ -2267,7 +2273,10 @@ function sousLeSeuil(par, roster, board, depuis, quel, seuilH) {
     .map(u => ({
       id: u.id,
       pseudo: (par[u.id] && par[u.id].pseudo) || u.pseudo,
-      seconds: par[u.id] ? par[u.id].seconds : 0
+      seconds: par[u.id] ? par[u.id].seconds : 0,
+      /* Arrivé pendant la semaine comptée : il n'a pas eu la semaine pour
+         faire ses heures, on ne les lui réclame donc pas. */
+      arrive: !!(u.hiredAt && u.hiredAt >= jDebut && u.hiredAt <= jFin)
     }))
     .filter(g => g.seconds < seuil)
     .map(g => Object.assign(g, { conges: congesSemaine(board, g.id, jDebut, jFin, quel) }))
@@ -2279,12 +2288,15 @@ function sousLeSeuil(par, roster, board, depuis, quel, seuilH) {
        que de laisser croire que tous les autres ont fait leur temps. */
     complet: !!roster,
     attendus: (roster || Object.keys(par)).length,
-    gens: sous.filter(g => !g.conges),
-    conges: sous.filter(g => g.conges)
+    /* L'arrivée passe avant les congés : quelqu'un qui entre le jeudi et pose
+       le vendredi n'a pas à figurer deux fois. */
+    gens: sous.filter(g => !g.arrive && !g.conges),
+    conges: sous.filter(g => !g.arrive && g.conges),
+    nouveaux: sous.filter(g => g.arrive)
   };
 }
 
-function embedRecap(r, debut, fin) {
+function embedRecap(r, debut, fin, nom) {
   const jour = d => new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
   const s = r.sous;
   const fields = [];
@@ -2307,6 +2319,18 @@ function embedRecap(r, debut, fin) {
       value: s.gens.slice(0, 25)
         .map(g => "• **" + g.pseudo + "** — " +
           (g.seconds ? dureeCourte(g.seconds) : "aucun service"))
+        .join("\n").slice(0, 1024)
+    });
+  }
+
+  /* Ceux qui viennent d'arriver. Comme les congés : nommés, mais pas
+     reprochés — leur première semaine n'en est pas une entière. */
+  if (s && s.nouveaux && s.nouveaux.length) {
+    fields.push({
+      name: "Arrivés cette semaine",
+      value: s.nouveaux.slice(0, 25)
+        .map(g => "• **" + g.pseudo + "** — " +
+          (g.seconds ? dureeCourte(g.seconds) + " pour un début" : "pas encore pointé"))
         .join("\n").slice(0, 1024)
     });
   }
@@ -2341,12 +2365,17 @@ function embedRecap(r, debut, fin) {
       : "Personne n'a pointé cette semaine.") + bilan,
     color: 0xffa92e,
     fields,
-    /* Sans catalogue ici, ceux qui n'ont jamais pointé restent invisibles :
+    /* Le pied nomme toujours le garage : deux récapitulatifs se suivent dans
+       le même salon, et rien d'autre ne les distingue une fois défilés.
+       Sans catalogue ici, ceux qui n'ont jamais pointé restent invisibles :
        mieux vaut l'écrire que laisser lire une liste incomplète. */
-    footer: s && (s.gens.length || s.conges.length) && !s.complet
-      ? { text: "Seules les personnes ayant pointé sont connues du serveur — " +
-                "publie le catalogue pour voir aussi celles restées à zéro." }
-      : undefined
+    footer: {
+      text: (nom || "Mécano Nord") +
+        (s && (s.gens.length || s.conges.length) && !s.complet
+          ? " · seules les personnes ayant pointé sont connues du serveur — " +
+            "publie le catalogue pour voir aussi celles restées à zéro."
+          : "")
+    }
   };
 }
 
@@ -2424,8 +2453,11 @@ async function envoyerRecap(marquer) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        /* Le garage se lit dans le nom de l'expéditeur, pas seulement dans le
+           texte : deux messages d'affilée, on ne lit que l'en-tête. */
+        username: nom.slice(0, 80),
         content: "**Récapitulatif de la semaine — " + nom + "**",
-        embeds: [embedRecap(a.recap, p.debut, p.fin)],
+        embeds: [embedRecap(a.recap, p.debut, p.fin, nom)],
         allowed_mentions: { parse: [] }
       })
     }).catch(e => ({ ok: false, status: 0, _e: e.message }));
