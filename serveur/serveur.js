@@ -1916,7 +1916,7 @@ async function ecrireCatalogue(cat) {
 
 const GEMINI_CLE = process.env.GEMINI_CLE || process.env.GEMINI_KEY || "";
 const GEMINI_MODELE = process.env.GEMINI_MODELE || "";
-const MAX_CONTEXTE = 24000;
+const MAX_CONTEXTE = 120000;
 /* L adresse de l API. Reglable pour pouvoir la remplacer par un serveur
    local pendant les essais : sans ca, verifier le comportement en cas de
    surcharge demanderait d attendre que Google le soit vraiment. */

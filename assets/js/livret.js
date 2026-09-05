@@ -15,6 +15,16 @@
   const $ = s => document.querySelector(s);
   const svg = MNUI.svg, esc = MNUI.esc;
 
+  /* Ce qu'on accepte d'envoyer d'un coup. Le livret, lui, n'a plus de longueur
+     maximale : c'est un texte que l'équipe écrit, pas un champ de formulaire.
+     La requête en garde une quand même — sans quoi un livret devenu énorme
+     partirait en entier à chaque question posée. Le serveur applique le même
+     chiffre et coupe aussi de son côté. */
+  const MAX_CONTEXTE = 120000;
+  const COUPE = "\n\n[Le livret est plus long que ce qui tient ici : il est " +
+    "coupé à cet endroit. Si la réponse dépend de la suite, dis-le plutôt que " +
+    "de l'inventer.]";
+
   let me = null;
   let assistantDispo = null;   // null = pas encore su
   let occupe = false;
@@ -138,12 +148,18 @@
       l.push("TYPES DE CONTRAT : " + types.map(t => t.name).join(", "));
     }
 
+    /* Le livret vient en dernier : c'est donc lui qu'une coupe par la fin
+       atteindrait, et lui seul. On lui laisse toute la place qui reste, et
+       s'il ne tient toujours pas, on le dit dans le texte — un assistant qui
+       n'a lu que la moitié du livret ne doit pas répondre comme s'il l'avait
+       lu en entier. */
+    const tete = l.join("\n") + "\n\nLIVRET DE L'ATELIER :\n";
     const livret = MNStore.livretDe(MNAuth.atelier()).trim();
-    l.push("");
-    l.push("LIVRET DE L'ATELIER :");
-    l.push(livret || "(aucun livret n'a encore été écrit)");
+    if (!livret) return tete + "(aucun livret n'a encore été écrit)";
 
-    return l.join("\n").slice(0, 24000);
+    const place = MAX_CONTEXTE - tete.length;
+    if (livret.length <= place) return tete + livret;
+    return tete + livret.slice(0, Math.max(0, place - COUPE.length)) + COUPE;
   }
 
   /* ---- Rendu ------------------------------------------------------------------ */

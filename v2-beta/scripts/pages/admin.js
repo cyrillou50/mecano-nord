@@ -166,6 +166,12 @@
      personne n'a envie de remplir un formulaire pour expliquer un métier, et
      l'assistant s'en accommode très bien. */
 
+  /** « 12 480 caractères » — sans plafond à annoncer, on dit juste la taille. */
+  function tailleTexte(t) {
+    const n = t.length;
+    return n.toLocaleString("fr-FR") + (n > 1 ? " caractères" : " caractère");
+  }
+
   function vueLivret(z) {
     const ou = ouSuisJe();
     const t = (brouillon.settings.livret && brouillon.settings.livret[ou]) || "";
@@ -180,10 +186,10 @@
           "une ligne qui commence par un tiret fait une puce.</p>" +
         '<p class="champ__aide">Chaque garage a le sien : celui-ci ne se lit ' +
           "qu'au " + MNStore.nomAtelier(ou) + ".</p>" +
-        '<textarea class="saisie" id="l-txt" rows="20" maxlength="20000" ' +
+        '<textarea class="saisie" id="l-txt" rows="20" ' +
           'style="width:100%;margin-top:var(--e-3)">' + U.esc(t) + "</textarea>" +
         '<div class="rang" style="justify-content:space-between;margin-top:var(--e-3)">' +
-          '<span class="champ__aide" id="l-n">' + t.length + " / 20000</span>" +
+          '<span class="champ__aide" id="l-n">' + tailleTexte(t) + "</span>" +
           U.bouton("Enregistrer le livret",
             { variante: "principal", icone: "check", action: "lsave" }) +
         "</div>"
@@ -196,12 +202,12 @@
 
     const zone = z.querySelector("#l-txt");
     zone.addEventListener("input", () => {
-      z.querySelector("#l-n").textContent = zone.value.length + " / 20000";
+      z.querySelector("#l-n").textContent = tailleTexte(zone.value);
     });
     z.querySelector('[data-a="lsave"]').addEventListener("click", () => {
       /* On n'écrit que le garage regardé : l'autre garde le sien. */
       brouillon.settings.livret = Object.assign({}, brouillon.settings.livret,
-        { [ou]: zone.value.slice(0, 20000) });
+        { [ou]: zone.value });
       valider();
       U.toast("Livret du " + MNStore.nomAtelier(ou) + " enregistré" +
         (MNGitHub.autoActif() ? "" : " — pense à publier"), "ok");

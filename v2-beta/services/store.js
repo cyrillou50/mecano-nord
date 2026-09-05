@@ -589,9 +589,12 @@ window.MNStore = (function () {
          plutôt que de choisir à qui l'enlever. */
       livret: (function (v) {
         const o = {};
-        const ancien = typeof v === "string" ? v.slice(0, 20000) : "";
+        /* Aucune longueur maximale : un livret complet vaut mieux qu'un
+           livret arrêté au milieu d'une phrase. Le catalogue passe par une
+           route qui accepte plusieurs mégaoctets — la place ne manque pas. */
+        const ancien = typeof v === "string" ? v : "";
         TOUS_ATELIERS.forEach(id => {
-          o[id] = String((v && typeof v === "object" ? v[id] : "") || ancien).slice(0, 20000);
+          o[id] = String((v && typeof v === "object" ? v[id] : "") || ancien);
         });
         return o;
       })(s.livret),

@@ -2237,6 +2237,12 @@
      personne n'a envie de remplir un formulaire pour expliquer un métier, et
      l'assistant s'en accommode très bien. */
 
+  /** « 12 480 caractères » — sans plafond à annoncer, on dit juste la taille. */
+  function tailleTexte(t) {
+    const n = t.length;
+    return n.toLocaleString("fr-FR") + (n > 1 ? " caractères" : " caractère");
+  }
+
   function paneLivret(host) {
     const ou = ouSuisJe();
     const t = (draft.settings.livret && draft.settings.livret[ou]) || "";
@@ -2256,11 +2262,11 @@
             "Chaque garage a le sien : celui-ci ne se lit qu'au " +
             esc(MNStore.nomAtelier(ou)) + ".</p>" +
           '<div class="field"><textarea class="textarea" id="l-txt" rows="22" ' +
-            'maxlength="20000" placeholder="Ex.\n\nBienvenue à l\'atelier.\n\n' +
+            'placeholder="Ex.\n\nBienvenue à l\'atelier.\n\n' +
             "- On pointe en arrivant, on dépointe en partant.\n" +
             '- Un devis par client, jamais deux.">' + esc(t) + "</textarea></div>" +
           '<div class="row" style="justify-content:space-between;align-items:center">' +
-            '<span class="hint" id="l-n">' + t.length + " / 20000</span>" +
+            '<span class="hint" id="l-n">' + tailleTexte(t) + "</span>" +
             '<button class="btn btn--primary" id="l-save">' + svg("save") +
               "<span>Enregistrer le livret</span></button>" +
           "</div>" +
@@ -2273,12 +2279,12 @@
 
     const zone = $("#l-txt");
     zone.addEventListener("input", () => {
-      $("#l-n").textContent = zone.value.length + " / 20000";
+      $("#l-n").textContent = tailleTexte(zone.value);
     });
     $("#l-save").addEventListener("click", () => {
       /* On n'écrit que le garage regardé : l'autre garde le sien. */
       draft.settings.livret = Object.assign({}, draft.settings.livret,
-        { [ou]: zone.value.slice(0, 20000) });
+        { [ou]: zone.value });
       commit();
       MNUI.toast("Livret du " + MNStore.nomAtelier(ou) + " enregistré" +
         (MNGitHub.autoActif() ? "" : " — pense à publier"), "ok");
