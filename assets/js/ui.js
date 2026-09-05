@@ -256,12 +256,149 @@ window.MNUI = (function () {
 
   /* ---- Barre du haut -------------------------------------------------------- */
 
+  /* ---- Navigation ------------------------------------------------------------
+     Une seule table pour la barre du haut. `perm` : une des permissions
+     listées, ou rien pour une page ouverte à tous. Un groupe dont plus rien
+     n'est visible disparaît entièrement — inutile d'ouvrir un menu vide.
+
+     La V2 tient la même table dans `v2-beta/config/site.js` : les deux
+     versions décrivent le même atelier, elles doivent le ranger pareil. */
+
+  const NAV = [
+    {
+      groupe: "Atelier",
+      entrees: [
+        { id: "fact", nom: "Facturation", href: "index.html" },
+        /* L'historique n'est pas une page : c'est une fenêtre sur la
+           facturation. Ailleurs, on y va par l'ancre — la page l'ouvre en
+           arrivant. */
+        { id: "historique", nom: "Historique", href: "index.html#historique",
+          fenetre: true }
+      ]
+    },
+    {
+      groupe: "Dossiers",
+      entrees: [
+        { id: "contrats", nom: "Contrats", href: "contrats.html",
+          perm: ["contracts_view", "contracts", "contracts_delete"] },
+        /* La blacklist se lit au comptoir, par celui qui reçoit le client.
+           La réserver aux responsables reviendrait à ne pas l'avoir. */
+        { id: "blacklist", nom: "Blacklist", href: "blacklist.html" },
+        /* Le livret s'adresse d'abord à ceux qui arrivent : ouvert à tous. */
+        { id: "livret", nom: "Livret", href: "livret.html" }
+      ]
+    },
+    {
+      groupe: "Employés",
+      entrees: [
+        { id: "equipe", nom: "Équipe", href: "equipe.html",
+          perm: ["staff", "promote", "users"] },
+        { id: "service", nom: "Service", href: "service.html",
+          perm: ["duty", "duty_view"] },
+        /* Le calendrier est ouvert : savoir ce qui est prévu n'est pas une
+           faveur. */
+        { id: "calendrier", nom: "Calendrier", href: "calendrier.html" }
+      ]
+    },
+    {
+      groupe: "Outils",
+      entrees: [
+        /* Les véhicules sont un catalogue de consultation, les émotes un
+           mémo : ouverts tous les deux. */
+        { id: "vehicules", nom: "Véhicules", href: "vehicules.html" },
+        { id: "emotes", nom: "Émotes", href: "emotes.html" }
+      ]
+    },
+    {
+      groupe: "Admin",
+      entrees: [
+        { id: "admin", nom: "Admin", href: "admin.html",
+          perm: ["items", "users", "publish", "theme", "contracts", "admin"] }
+      ]
+    }
+  ];
+
+  /** Les groupes débarrassés de ce que la session ne voit pas. */
+  const navVisible = () => NAV
+    .map(g => ({ groupe: g.groupe, entrees: g.entrees.filter(e =>
+      !e.perm || MNAuth.canAny.apply(null, e.perm)) }))
+    .filter(g => g.entrees.length);
+
+  /**
+   * Les menus de la barre du haut.
+   * @param {string} active identifiant de la page ouverte
+   */
+  function navHtml(active) {
+    return navVisible().map((g, i) => {
+      const ici = g.entrees.some(e => e.id === active);
+      return '<div class="navgrp" data-grp="' + i + '">' +
+        '<button type="button" class="navgrp__b' + (ici ? " is-active" : "") +
+          '" aria-haspopup="true" aria-expanded="false">' +
+          "<span>" + esc(g.groupe) + "</span>" + svg("chevDown") +
+        "</button>" +
+        '<div class="navmenu" hidden>' +
+          g.entrees.map(e =>
+            /* Sur la facturation, l'historique s'ouvre sur place : recharger
+               la page pour une fenêtre serait absurde. */
+            (e.fenetre && active === "fact"
+              ? '<button type="button" class="navmenu__i" id="nav-history">'
+              : '<a class="navmenu__i' + (e.id === active ? " is-on" : "") +
+                '" href="' + esc(e.href) + '"' +
+                (e.id === active ? ' aria-current="page"' : "") + ">") +
+            esc(e.nom) +
+            (e.fenetre && active === "fact" ? "</button>" : "</a>")).join("") +
+        "</div>" +
+      "</div>";
+    }).join("");
+  }
+
+  let _navBranche = false;
+
+  /** Ouvre, ferme, et referme quand on clique ailleurs ou qu'on appuie sur Échap. */
+  function brancherNav(el) {
+    const groupes = [...el.querySelectorAll(".navgrp")];
+    const fermer = sauf => groupes.forEach(g => {
+      if (g === sauf) return;
+      g.querySelector(".navmenu").hidden = true;
+      g.querySelector(".navgrp__b").setAttribute("aria-expanded", "false");
+    });
+
+    groupes.forEach(g => {
+      const b = g.querySelector(".navgrp__b");
+      const m = g.querySelector(".navmenu");
+      b.addEventListener("click", ev => {
+        ev.stopPropagation();
+        const ouvrir = m.hidden;
+        fermer(g);
+        m.hidden = !ouvrir;
+        b.setAttribute("aria-expanded", ouvrir ? "true" : "false");
+      });
+      /* Un clic dans le menu mène ailleurs : le laisser ouvert derrière une
+         fenêtre modale ne servirait à rien. */
+      m.addEventListener("click", () => setTimeout(() => fermer(null), 0));
+    });
+
+    /* Sur le document, une fois pour toutes : la barre peut se redessiner, et
+       on n'empile pas un écouteur de plus à chaque fois. On relit les groupes
+       au moment du clic plutôt que de retenir ceux d'alors. */
+    if (!_navBranche) {
+      _navBranche = true;
+      const toutFermer = () => document.querySelectorAll(".navgrp").forEach(g => {
+        g.querySelector(".navmenu").hidden = true;
+        g.querySelector(".navgrp__b").setAttribute("aria-expanded", "false");
+      });
+      document.addEventListener("click", toutFermer);
+      document.addEventListener("keydown", e => {
+        if (e.key === "Escape") toutFermer();
+      });
+    }
+  }
+
   function mountTopbar(active) {
     const el = document.getElementById("topbar");
     if (!el) return;
     const b = MNStore.brand();
     const s = MNAuth.session();
-    const canAdmin = MNAuth.canAny("items", "users", "publish", "theme", "contracts", "admin");
     const mark = brandMark();
 
     /* L'enseigne dit où l'on se trouve : avec deux garages, « Mécano Nord »
@@ -273,39 +410,7 @@ window.MNUI = (function () {
         '<span class="brand__mark' + (mark.custom ? " brand__mark--custom" : "") + '">' + mark.html + "</span>" +
         '<span class="brand__txt"><b>' + esc(ici) + "</b><i>" + esc(b.tagline) + "</i></span>" +
       "</a>" +
-      '<nav class="topnav">' +
-        '<a class="navlink' + (active === "fact" ? " is-active" : "") + '" href="index.html">Facturation</a>' +
-        (active === "fact" ? '<button class="navlink" id="nav-history">Historique</button>' : "") +
-        /* Le calendrier est ouvert : savoir ce qui est prévu n'est pas une faveur. */
-        '<a class="navlink' + (active === "calendrier" ? " is-active" : "") +
-          '" href="calendrier.html">Calendrier</a>' +
-        /* Les contrats demandent au minimum le droit de les lire. */
-        (MNAuth.canAny("contracts_view", "contracts", "contracts_delete")
-          ? '<a class="navlink' + (active === "contrats" ? " is-active" : "") +
-            '" href="contrats.html">Contrats</a>'
-          : "") +
-        (MNAuth.canAny("duty", "duty_view")
-          ? '<a class="navlink' + (active === "service" ? " is-active" : "") + '" href="service.html">Service</a>'
-          : "") +
-        (MNAuth.canAny("staff", "promote", "users")
-          ? '<a class="navlink' + (active === "equipe" ? " is-active" : "") + '" href="equipe.html">Équipe</a>'
-          : "") +
-        /* Les véhicules sont un catalogue de consultation : ouvert à tous. */
-        '<a class="navlink' + (active === "vehicules" ? " is-active" : "") +
-          '" href="vehicules.html">Véhicules</a>' +
-        /* Les émotes du serveur de jeu : un mémo, ouvert à tous. */
-        '<a class="navlink' + (active === "emotes" ? " is-active" : "") +
-          '" href="emotes.html">Émotes</a>' +
-        /* La blacklist se lit au comptoir, par celui qui reçoit le client.
-           La réserver aux responsables reviendrait à ne pas l'avoir. */
-        '<a class="navlink' + (active === "blacklist" ? " is-active" : "") +
-          '" href="blacklist.html">Blacklist</a>' +
-        /* Le livret s'adresse d'abord à ceux qui arrivent : il est ouvert à
-           tout le monde, sans permission à demander. */
-        '<a class="navlink' + (active === "livret" ? " is-active" : "") +
-          '" href="livret.html">Livret</a>' +
-        (canAdmin ? '<a class="navlink' + (active === "admin" ? " is-active" : "") + '" href="admin.html">Admin</a>' : "") +
-      "</nav>" +
+      '<nav class="topnav">' + navHtml(active) + "</nav>" +
       '<div class="topbar__spacer"></div>' +
       /* Un dossier qui pèse reste sous les yeux, même une fois la fenêtre
          d'arrivée refermée. Le jeton rouvre le détail : la page Équipe est
@@ -353,6 +458,8 @@ window.MNUI = (function () {
             "</button>" +
           "</div>"
         : "");
+
+    brancherNav(el);
 
     const av = document.getElementById("btn-av");
     if (av) av.addEventListener("click", () => montrerAvertissements(mesAvertissements(), false));

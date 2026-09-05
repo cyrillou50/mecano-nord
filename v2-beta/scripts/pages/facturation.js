@@ -413,6 +413,14 @@
     if (b) historique();
   });
 
+  /* Arrivé depuis le menu d'une autre page. On efface l'ancre aussitôt :
+     sinon un rafraîchissement rouvrirait la fenêtre sans qu'on l'ait
+     demandé, et le bouton « précédent » deviendrait imprévisible. */
+  if (location.hash === "#historique") {
+    history.replaceState(null, "", location.pathname + location.search);
+    setTimeout(historique, 0);
+  }
+
   function historique() {
     const l = MNStore.getBTs();
     const m = U.modale({

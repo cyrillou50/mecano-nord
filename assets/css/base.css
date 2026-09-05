@@ -231,11 +231,10 @@ ul { margin: 0; padding: 0; list-style: none; }
   display: flex; gap: 4px;
   margin-left: 10px;
   flex: 0 1 auto; min-width: 0;
-  overflow-x: auto;
-  /* La barre de défilement traverserait les liens sur 34 px de haut. */
-  scrollbar-width: none;
+  /* Surtout pas d'`overflow` ici : les menus s'ouvrent en dehors de la barre
+     et seraient rognés. Cinq intitulés tiennent — c'est justement pourquoi ils
+     ont remplacé onze liens à plat. */
 }
-.topnav::-webkit-scrollbar { display: none; }
 
 .navlink {
   flex: none; white-space: nowrap;
@@ -249,6 +248,57 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 .navlink:hover { color: var(--txt); background: rgba(255, 255, 255, .05); text-decoration: none; }
 .navlink.is-active { color: var(--pink-soft); background: var(--pink-ink); }
+
+/* ---- Menus de la barre du haut -------------------------------------------
+   Onze liens à plat débordaient de la barre, et rien ne disait ce qui allait
+   avec quoi. Cinq intitulés, cinq menus. */
+
+.navgrp { position: relative; flex: none; }
+
+.navgrp__b {
+  display: flex; align-items: center; gap: 5px;
+  padding: 8px 10px;
+  border: 0; background: none; cursor: pointer;
+  border-radius: var(--r-sm);
+  font-family: var(--font-display);
+  font-size: 13.5px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: color .15s, background .15s;
+}
+.navgrp__b svg { width: 14px; height: 14px; opacity: .7; }
+.navgrp__b:hover { color: var(--txt); background: rgba(255, 255, 255, .05); }
+/* Le groupe où l'on se trouve, pour ne pas avoir à ouvrir les cinq. */
+.navgrp__b.is-active { color: var(--pink-soft); background: var(--pink-ink); }
+.navgrp__b[aria-expanded="true"] { color: var(--txt); background: rgba(255, 255, 255, .07); }
+
+.navmenu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
+  min-width: 190px;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .45);
+}
+
+.navmenu__i {
+  display: block; width: 100%;
+  padding: 8px 10px;
+  border: 0; background: none; cursor: pointer;
+  border-radius: var(--r-sm);
+  font: inherit; font-size: 14px; font-weight: 600;
+  text-align: left;
+  color: var(--txt);
+  white-space: nowrap;
+}
+.navmenu__i:hover { background: rgba(255, 255, 255, .06); text-decoration: none; }
+.navmenu__i.is-on { color: var(--pink-soft); background: var(--pink-ink); }
+
+/* Le dernier menu déborderait à droite de la fenêtre : il s'ouvre à gauche. */
+.navgrp:last-child .navmenu { left: auto; right: 0; }
 
 .topbar__spacer { flex: 1; }
 

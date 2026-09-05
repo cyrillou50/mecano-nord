@@ -665,6 +665,14 @@
   function bindHistory() {
     const b = document.getElementById("nav-history");
     if (b) b.addEventListener("click", openHistory);
+
+    /* Arrivé depuis le menu d'une autre page. On efface l'ancre aussitôt :
+       sinon un rafraîchissement rouvrirait la fenêtre sans qu'on l'ait
+       demandé, et le bouton « précédent » deviendrait imprévisible. */
+    if (location.hash === "#historique") {
+      history.replaceState(null, "", location.pathname + location.search);
+      openHistory();
+    }
   }
 
   function openHistory() {

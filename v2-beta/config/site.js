@@ -41,44 +41,51 @@ V2.NAV = [
   {
     groupe: "Atelier",
     entrees: [
+      /* La page d'accueil de la V2. Elle n'existe pas en V1, où le logo mène
+         directement à la facturation. */
       { id: "dashboard", nom: "Tableau de bord", href: "index.html", icone: "grille" },
       { id: "facturation", nom: "Facturation", href: "facturation.html", icone: "recu",
         perm: ["bt"] },
+      /* L'historique n'est pas une page : c'est une fenêtre sur la
+         facturation. Depuis ailleurs on y va par l'ancre, et la page
+         l'ouvre en arrivant. */
+      { id: "historique", nom: "Historique", href: "facturation.html#historique",
+        icone: "horloge", perm: ["bt"] }
+    ]
+  },
+  {
+    groupe: "Dossiers",
+    entrees: [
       { id: "contrats", nom: "Contrats", href: "contrats.html", icone: "contrat",
         perm: ["contracts_view", "contracts", "contracts_delete"] },
-      { id: "calendrier", nom: "Calendrier", href: "calendrier.html", icone: "calendrier" },
+      /* La blacklist se lit par celui qui reçoit le client. La réserver aux
+         responsables reviendrait à ne pas l'avoir. */
+      { id: "blacklist", nom: "Blacklist", href: "blacklist.html", icone: "alerte" },
       /* Le livret s'adresse d'abord à ceux qui arrivent : ouvert à tous,
          sans permission à demander. */
       { id: "livret", nom: "Livret", href: "livret.html", icone: "contrat" }
     ]
   },
   {
-    groupe: "Équipe",
+    groupe: "Employés",
     entrees: [
+      { id: "equipe", nom: "Équipe", href: "equipe.html", icone: "equipe",
+        perm: ["staff", "promote", "users"] },
       { id: "service", nom: "Service", href: "service.html", icone: "horloge",
         perm: ["duty", "duty_view", "duty_manage"] },
-      { id: "equipe", nom: "Fiches", href: "equipe.html", icone: "equipe",
-        perm: ["staff", "promote", "users"] }
+      { id: "calendrier", nom: "Calendrier", href: "calendrier.html", icone: "calendrier" }
     ]
   },
   {
-    groupe: "Parc",
+    groupe: "Outils",
     entrees: [
-      { id: "vehicules", nom: "Véhicules", href: "vehicules.html", icone: "vehicule" }
-    ]
-  },
-  {
-    groupe: "Comptoir",
-    entrees: [
+      { id: "vehicules", nom: "Véhicules", href: "vehicules.html", icone: "vehicule" },
       /* Les émotes du serveur de jeu : un mémo, ouvert à tous. */
-      { id: "emotes", nom: "Émotes", href: "emotes.html", icone: "etoile" },
-      /* La blacklist se lit par celui qui reçoit le client. La réserver aux
-         responsables reviendrait à ne pas l'avoir. */
-      { id: "blacklist", nom: "Blacklist", href: "blacklist.html", icone: "alerte" }
+      { id: "emotes", nom: "Émotes", href: "emotes.html", icone: "etoile" }
     ]
   },
   {
-    groupe: "Réglages",
+    groupe: "Admin",
     entrees: [
       { id: "admin", nom: "Administration", href: "admin.html", icone: "reglages",
         perm: ["items", "users", "publish", "theme", "contracts", "admin"] }
