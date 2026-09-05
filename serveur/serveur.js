@@ -72,14 +72,49 @@ const FICHIER_CAT = path.join(DOSSIER, "catalogue.json");
 const ORIGINES = String(process.env.ORIGINE || "*")
   .split(",").map(s => s.trim()).filter(Boolean);
 
-const WEBHOOKS = {
-  bt: process.env.WEBHOOK_BT || "",
-  duty: process.env.WEBHOOK_DUTY || "",
+/* Les salons Discord, garage par garage.
+
+   Le Nord garde les variables historiques, telles quelles : un serveur déjà
+   en place n'a rien à changer. Le Sud a les siennes, suffixées « _SUD » — et
+   tant qu'elles ne sont pas posées, il parle dans les salons du Nord, comme
+   il l'a toujours fait. On sépare donc le jour où les webhooks du Sud sont
+   créés, sans coupure entre-temps et sans toucher au site. */
+const env = n => String(process.env[n] || "").trim();
+
+const NORD = {
+  bt: env("WEBHOOK_BT"),
+  duty: env("WEBHOOK_DUTY"),
   /* Sans salon dédié, les congés rejoignent celui des prises de service. */
-  conges: process.env.WEBHOOK_CONGES || process.env.WEBHOOK_DUTY || "",
+  conges: env("WEBHOOK_CONGES") || env("WEBHOOK_DUTY"),
   /* Les avertissements n'ont pas de repli : sans salon à eux, rien n'est
      envoyé. Une sanction n'a rien à faire dans un salon de service. */
-  avertissements: process.env.WEBHOOK_AVERTISSEMENTS || ""
+  avertissements: env("WEBHOOK_AVERTISSEMENTS")
+};
+
+const SUD = {
+  bt: env("WEBHOOK_BT_SUD") || NORD.bt,
+  duty: env("WEBHOOK_DUTY_SUD") || NORD.duty,
+  /* Même repli qu'au Nord, mais d'abord chez soi : donner un salon de service
+     au Sud sans lui donner de salon de congés doit envoyer ses congés dans
+     SON salon de service, pas dans celui du Nord. */
+  conges: env("WEBHOOK_CONGES_SUD") || env("WEBHOOK_DUTY_SUD") || NORD.conges,
+  avertissements: env("WEBHOOK_AVERTISSEMENTS_SUD") || NORD.avertissements
+};
+
+const WEBHOOKS = { nord: NORD, sud: SUD };
+
+/** Les salons du garage demandé. Garage inconnu ou tu : ceux du Nord. */
+function salons(ou) {
+  return WEBHOOKS[String(ou || "").toLowerCase()] || NORD;
+}
+
+/** Un salon de ce type existe-t-il quelque part ? */
+const salonQuelquePart = kind => !!(NORD[kind] || SUD[kind]);
+
+/* Les mêmes mots que dans le README et sur le site : « WEBHOOK_BT » ne dit
+   rien à qui lit un journal de démarrage. */
+const NOMS_SALONS = {
+  bt: "devis", duty: "service", conges: "congés", avertissements: "avertissements"
 };
 
 const MAX_CORPS = 512 * 1024;      // 512 ko suffisent largement
@@ -1221,7 +1256,7 @@ const serveur = http.createServer(async (req, res) => {
         const etat = await lireRecap();
         return repondre(res, 200, {
           ok: true, actif: RECAP_ACTIF, jour: RECAP_JOUR, heure: RECAP_HEURE,
-          salonConfigure: !!WEBHOOKS.duty, dejaEnvoyee: etat.derniere === p.semaine,
+          salonConfigure: salonQuelquePart("duty"), dejaEnvoyee: etat.derniere === p.semaine,
           semaine: p.semaine, debut: p.debut, fin: p.fin, miniDefaut: RECAP_MINI,
           ateliers: p.ateliers
         }, req);
@@ -1577,7 +1612,10 @@ const serveur = http.createServer(async (req, res) => {
       }
       if (type !== "webhook") return repondre(res, 400, { error: "Type inconnu : " + type }, req);
 
-      const cible = WEBHOOKS[corps.kind];
+      /* Le garage vient du message : c'est lui qui décide du salon. Un site
+         plus ancien n'en envoie pas — il parlait alors d'un seul garage, et
+         c'était le Nord. */
+      const cible = salons(corps.atelier)[corps.kind];
       if (!cible) return repondre(res, 400, { error: "Webhook non configuré : " + corps.kind }, req);
 
       const m = corps.message || {};
@@ -2433,14 +2471,16 @@ async function nomAtelier(quel) {
  *   sinon un test du vendredi ferait sauter l'envoi du dimanche.
  */
 async function envoyerRecap(marquer) {
-  const cible = WEBHOOKS.duty;
-  if (!cible) return { ok: false, error: "Aucun webhook de service configuré" };
+  if (!salonQuelquePart("duty")) {
+    return { ok: false, error: "Aucun webhook de service configuré" };
+  }
 
   const p = await prepareRecap();
 
-  /* Un message par garage, dans le même salon : le réglage des webhooks ne
-     change pas. On saute celui qui n'a ni employé attendu ni service — un
-     atelier qui n'existe pas encore n'a pas à parler toutes les semaines. */
+  /* Un message par garage, chacun dans le salon qui est le sien — le même
+     pour les deux tant que le Sud n'a pas ses propres webhooks. On saute
+     celui qui n'a ni employé attendu ni service : un atelier qui n'existe pas
+     encore n'a pas à parler toutes les semaines. */
   const aDire = p.ateliers.filter(a =>
     a.recap.lignes.length || (a.recap.sous && a.recap.sous.attendus));
 
@@ -2449,6 +2489,14 @@ async function envoyerRecap(marquer) {
   let personnes = 0;
   for (const a of aDire) {
     const nom = await nomAtelier(a.atelier);
+    /* Pas de salon pour ce garage : on passe, plutôt que de faire échouer
+       l'envoi entier et de priver l'autre de son récapitulatif. */
+    const cible = salons(a.atelier).duty;
+    if (!cible) {
+      console.error(new Date().toISOString(),
+        "récapitulatif : aucun salon de service pour", a.atelier);
+      continue;
+    }
     const r = await fetch(cible, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2478,7 +2526,7 @@ async function envoyerRecap(marquer) {
    dort, une machine dont l'horloge saute ou un changement d'heure ne doivent
    pas faire manquer la semaine. Le repère sur disque empêche le doublon. */
 async function verifierRecap() {
-  if (!RECAP_ACTIF || !WEBHOOKS.duty) return;
+  if (!RECAP_ACTIF || !salonQuelquePart("duty")) return;
   const maintenant = new Date();
   if (maintenant.getDay() !== RECAP_JOUR || maintenant.getHours() < RECAP_HEURE) return;
 
@@ -2500,6 +2548,13 @@ serveur.listen(PORT, HOTE, () => {
   console.log("  écoute    : " + HOTE + ":" + PORT);
   console.log("  données   : " + FICHIER);
   console.log("  origines  : " + ORIGINES.join(", "));
-  console.log("  webhooks  : " +
-    (WEBHOOKS.bt ? "devis ✓" : "devis ✗") + "  " + (WEBHOOKS.duty ? "service ✓" : "service ✗"));
+  /* Deux lignes plutôt qu'une : c'est en lisant celle du Sud qu'on voit s'il
+     a bien ses propres salons ou s'il parle encore dans ceux du Nord. */
+  const etatSalons = w => ["bt", "duty", "conges", "avertissements"]
+    .map(k => NOMS_SALONS[k] + (w[k] ? " ✓" : " ✗"))
+    .join("  ");
+  console.log("  Nord      : " + etatSalons(NORD));
+  console.log("  Sud       : " + etatSalons(SUD) +
+    (SUD.bt === NORD.bt && SUD.duty === NORD.duty && SUD.conges === NORD.conges
+      ? "  (les salons du Nord)" : ""));
 });

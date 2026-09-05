@@ -107,6 +107,9 @@ Environment=WEBHOOK_BT=https://discord.com/api/webhooks/…
 Environment=WEBHOOK_DUTY=https://discord.com/api/webhooks/…
 Environment=WEBHOOK_CONGES=https://discord.com/api/webhooks/…
 Environment=WEBHOOK_AVERTISSEMENTS=https://discord.com/api/webhooks/…
+Environment=WEBHOOK_BT_SUD=https://discord.com/api/webhooks/…
+Environment=WEBHOOK_DUTY_SUD=https://discord.com/api/webhooks/…
+Environment=WEBHOOK_CONGES_SUD=https://discord.com/api/webhooks/…
 Environment=GEMINI_CLE=…
 Environment=GH_TOKEN=github_pat_…
 Environment=GH_OWNER=cyrillou50
@@ -138,6 +141,34 @@ Le format de la clé n'a pas d'importance — Google en délivre plusieurs (`AIz
 sans salon à eux, les avertissements ne partent nulle part. C'est voulu — une
 sanction n'a rien à faire dans le salon où toute l'équipe lit les prises de
 service. Donne-lui un salon réservé aux responsables, ou laisse vide.
+
+### Un salon par garage
+
+Les variables ci-dessus sont celles du **Mécano Nord**. Le **Mécano Sud** a les
+siennes, mêmes noms suivis de `_SUD` :
+
+| Ce qui part | Nord | Sud |
+|---|---|---|
+| Devis terminés | `WEBHOOK_BT` | `WEBHOOK_BT_SUD` |
+| Prises et fins de service | `WEBHOOK_DUTY` | `WEBHOOK_DUTY_SUD` |
+| Congés posés ou annulés | `WEBHOOK_CONGES` | `WEBHOOK_CONGES_SUD` |
+| Avertissements | `WEBHOOK_AVERTISSEMENTS` | `WEBHOOK_AVERTISSEMENTS_SUD` |
+
+Celles du Sud sont **toutes facultatives** : sans elles, le Sud parle dans les
+salons du Nord — exactement ce qui se passait avant qu'on les sépare. On peut
+donc n'en poser qu'une et séparer un seul type de message.
+
+Le récapitulatif du dimanche suit la même règle : un message par garage, chacun
+dans son salon de service.
+
+Le garage voyage avec le message, il n'y a donc rien à régler sur le site. Les
+adresses de l'onglet **Discord** de l'administration ne servent que sans relais
+— et dans ce cas, les deux garages les partagent : c'est le prix de les garder
+hors du dépôt.
+
+Au démarrage, le serveur écrit ce qu'il a pour chaque garage : c'est en lisant
+la ligne « Sud » qu'on voit s'il a bien ses propres salons ou s'il parle encore
+dans ceux du Nord.
 
 `Ctrl+O`, `Entrée`, `Ctrl+X` pour enregistrer. Puis :
 
@@ -564,7 +595,8 @@ passé par chacun pendant la semaine. C'est lui qui s'en charge et pas le
 site : personne ne garantit qu'un navigateur sera ouvert au bon moment.
 
 Il n'y a rien à installer — pas de `cron`, pas de dépendance. Il suffit que
-`WEBHOOK_DUTY` soit renseigné.
+`WEBHOOK_DUTY` soit renseigné (ou `WEBHOOK_DUTY_SUD`, pour un serveur qui
+n'aurait que le Sud).
 
 | Variable | Défaut | Rôle |
 |---|---|---|

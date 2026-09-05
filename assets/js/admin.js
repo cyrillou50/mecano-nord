@@ -2534,7 +2534,13 @@
         '<div class="panel__body editor">' +
           (relayOn
             ? '<p class="hint">Un relais est configuré : les adresses ci-dessus ne sont plus utilisées, ' +
-              "c'est lui qui connaît les vraies. Elles ne sont donc plus dans le dépôt.</p>"
+              "c'est lui qui connaît les vraies. Elles ne sont donc plus dans le dépôt.</p>" +
+              '<p class="hint">Chaque garage y a ses propres salons : ' +
+              "<code>WEBHOOK_BT</code>, <code>WEBHOOK_DUTY</code> et " +
+              "<code>WEBHOOK_CONGES</code> pour le " + esc(MNStore.nomAtelier("nord")) +
+              ", les mêmes suivis de <code>_SUD</code> pour le " +
+              esc(MNStore.nomAtelier("sud")) + ". Tant que celles du Sud ne sont pas " +
+              "renseignées, ses messages partent dans les salons du Nord.</p>"
             : '<p class="hint">Sans relais, les adresses restent dans le fichier de données. Elles y sont ' +
               "<b>brouillées</b> — on ne les trouve pas en cherchant « discord.com » — mais c'est un " +
               "ralentisseur, pas une protection : le site doit pouvoir les lire, donc quelqu'un de " +

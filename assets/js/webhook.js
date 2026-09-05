@@ -154,7 +154,10 @@ window.MNWebhook = (function () {
        façon qu'elle ne soit pas dans le dépôt. Sans relais, envoi direct. */
     const relay = relayUrl();
     const target = relay || unpack(stored);
-    const payload = relay ? { type: "webhook", kind, message: body } : body;
+    /* Le garage voyage avec le message : c'est lui qui décide du salon, et le
+       relais est le seul endroit où les deux adresses existent. Un relais plus
+       ancien ignore simplement le champ et garde son salon unique. */
+    const payload = relay ? { type: "webhook", kind, atelier: ou, message: body } : body;
 
     try {
       const r = await fetch(target, {
@@ -176,9 +179,13 @@ window.MNWebhook = (function () {
            d'échouer, on réessaie dans le salon de repli. */
         if (REPLI[kind]) return send(REPLI[kind], embed);
         /* Plus de repli : c'est que le relais n'a pas l'adresse. On le dit
-           franchement, avec le nom exact de la variable à renseigner. */
+           franchement, avec le nom exact de la variable à renseigner — celle
+           du garage d'où part le message, pas une autre. */
+        const variable = "WEBHOOK_" + kind.toUpperCase() +
+          (ou === "nord" ? "" : "_" + ou.toUpperCase());
         return { ok: false, error: "Ton relais n'a pas d'adresse pour « " + kind +
-          " ». Ajoute WEBHOOK_" + kind.toUpperCase() + " dans son service, puis redémarre-le." };
+          " » au " + garage + ". Ajoute " + variable +
+          " dans son service, puis redémarre-le." };
       }
 
       if (r.status === 401 || r.status === 404) {
