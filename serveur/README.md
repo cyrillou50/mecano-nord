@@ -107,9 +107,11 @@ Environment=WEBHOOK_BT=https://discord.com/api/webhooks/…
 Environment=WEBHOOK_DUTY=https://discord.com/api/webhooks/…
 Environment=WEBHOOK_CONGES=https://discord.com/api/webhooks/…
 Environment=WEBHOOK_AVERTISSEMENTS=https://discord.com/api/webhooks/…
+Environment=WEBHOOK_RECAP=https://discord.com/api/webhooks/…
 Environment=WEBHOOK_BT_SUD=https://discord.com/api/webhooks/…
 Environment=WEBHOOK_DUTY_SUD=https://discord.com/api/webhooks/…
 Environment=WEBHOOK_CONGES_SUD=https://discord.com/api/webhooks/…
+Environment=WEBHOOK_RECAP_SUD=https://discord.com/api/webhooks/…
 Environment=GEMINI_CLE=…
 Environment=GH_TOKEN=github_pat_…
 Environment=GH_OWNER=cyrillou50
@@ -150,6 +152,7 @@ siennes, mêmes noms suivis de `_SUD` :
 | Ce qui part | Nord | Sud |
 |---|---|---|
 | Devis terminés | `WEBHOOK_BT` | `WEBHOOK_BT_SUD` |
+| Bilan de la semaine | `WEBHOOK_RECAP` | `WEBHOOK_RECAP_SUD` |
 | Prises et fins de service | `WEBHOOK_DUTY` | `WEBHOOK_DUTY_SUD` |
 | Congés posés ou annulés | `WEBHOOK_CONGES` | `WEBHOOK_CONGES_SUD` |
 | Avertissements | `WEBHOOK_AVERTISSEMENTS` | `WEBHOOK_AVERTISSEMENTS_SUD` |
@@ -158,8 +161,9 @@ Celles du Sud sont **toutes facultatives** : sans elles, le Sud parle dans les
 salons du Nord — exactement ce qui se passait avant qu'on les sépare. On peut
 donc n'en poser qu'une et séparer un seul type de message.
 
-Le récapitulatif du dimanche suit la même règle : un message par garage, chacun
-dans son salon de service.
+Le bilan de la semaine a son propre salon, `WEBHOOK_RECAP` : c'est une lecture,
+pas un flux, et on ne la cherche pas au milieu des « Paul a pris son service ».
+Sans lui, il rejoint le salon des services comme avant.
 
 Le garage voyage avec le message, il n'y a donc rien à régler sur le site. Les
 adresses de l'onglet **Discord** de l'administration ne servent que sans relais
@@ -590,24 +594,38 @@ souci d'origine.
 
 ## Récapitulatif hebdomadaire des services
 
-Chaque dimanche soir, le serveur poste dans le salon des services le temps
-passé par chacun pendant la semaine. C'est lui qui s'en charge et pas le
-site : personne ne garantit qu'un navigateur sera ouvert au bon moment.
+**Lundi à 00 h**, une fois le dimanche fini, le serveur poste le temps passé
+par chacun pendant la semaine qui vient de s'achever. C'est lui qui s'en charge
+et pas le site : personne ne garantit qu'un navigateur sera ouvert au bon
+moment.
+
+Le message parle donc toujours d'une **semaine complète**. C'est ce qui change
+par rapport à un envoi le dimanche à 20 h : la soirée du dimanche tombait dans
+le vide, comptée nulle part.
 
 Il n'y a rien à installer — pas de `cron`, pas de dépendance. Il suffit que
-`WEBHOOK_DUTY` soit renseigné (ou `WEBHOOK_DUTY_SUD`, pour un serveur qui
-n'aurait que le Sud).
+`WEBHOOK_RECAP` soit renseigné (à défaut `WEBHOOK_DUTY`, ou leurs versions
+`_SUD`).
 
 | Variable | Défaut | Rôle |
 |---|---|---|
 | `RECAP` | `on` | `off` pour ne rien envoyer |
-| `RECAP_JOUR` | `0` | jour de l'envoi — 0 = dimanche, 6 = samedi |
-| `RECAP_HEURE` | `20` | heure locale de l'envoi |
+| `RECAP_JOUR` | `1` | jour de l'envoi — 0 = dimanche, 1 = lundi, 6 = samedi |
+| `RECAP_HEURE` | `0` | heure locale de l'envoi |
 | `RECAP_MINI` | `4` | heures attendues — **repli seulement**, voir ci-dessous |
 | `TZ` | heure système | fuseau, par exemple `Europe/Paris` |
 
 **Mets `TZ`** dans le service : sans lui, beaucoup de VPS sont en UTC et le
 message partirait deux heures trop tôt l'été.
+
+Le message résume la semaine qui s'achève au moment réglé. Ramené au dimanche
+20 h, il repart donc sur la semaine en cours, comme avant — le réglage seul
+suffit à retrouver l'ancien comportement.
+
+Le minuteur ne se réveille pas à la seconde près, et un VPS peut être éteint à
+minuit : le serveur rattrape de lui-même tant que la semaine close n'a pas été
+racontée. Un serveur tout juste installé, lui, note la semaine sans l'envoyer —
+il n'a pas vu passer celle d'avant.
 
 ### Un message par garage
 
@@ -661,13 +679,16 @@ La semaine déjà envoyée est retenue dans `donnees/recap.json`. Sans ce
 repère, un serveur redémarré trois fois dans la soirée enverrait trois fois
 le même message.
 
-### Le tester sans attendre dimanche
+### Le tester sans attendre lundi
 
 ```bash
-# Ce que le message dira, sans rien envoyer
+# Où en est la semaine EN COURS, sans rien envoyer.
+# « semaineEnvoi » dit de quelle semaine le prochain message parlera.
 curl -s https://ton-serveur/recap | jq
 
-# L'envoyer tout de suite — un essai, la semaine reste due
+# L'envoyer tout de suite — un essai, la semaine reste due.
+# Il porte sur la dernière semaine complète, pas sur celle en cours :
+# c'est exactement ce que lundi enverra.
 curl -s -X POST https://ton-serveur/recap
 
 # L'envoyer et considérer la semaine comme faite

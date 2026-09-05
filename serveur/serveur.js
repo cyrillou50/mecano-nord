@@ -88,7 +88,11 @@ const NORD = {
   conges: env("WEBHOOK_CONGES") || env("WEBHOOK_DUTY"),
   /* Les avertissements n'ont pas de repli : sans salon à eux, rien n'est
      envoyé. Une sanction n'a rien à faire dans un salon de service. */
-  avertissements: env("WEBHOOK_AVERTISSEMENTS")
+  avertissements: env("WEBHOOK_AVERTISSEMENTS"),
+  /* Le bilan du dimanche est d'une autre nature que « Paul a pris son
+     service » : c'est une lecture, pas un flux. Sans salon à lui il rejoint
+     celui des services, comme il l'a toujours fait. */
+  recap: env("WEBHOOK_RECAP") || env("WEBHOOK_DUTY")
 };
 
 const SUD = {
@@ -98,7 +102,10 @@ const SUD = {
      au Sud sans lui donner de salon de congés doit envoyer ses congés dans
      SON salon de service, pas dans celui du Nord. */
   conges: env("WEBHOOK_CONGES_SUD") || env("WEBHOOK_DUTY_SUD") || NORD.conges,
-  avertissements: env("WEBHOOK_AVERTISSEMENTS_SUD") || NORD.avertissements
+  avertissements: env("WEBHOOK_AVERTISSEMENTS_SUD") || NORD.avertissements,
+  /* Même repli chez soi d'abord : le Sud qui a un salon de service mais pas
+     de salon de bilan poste son bilan dans SON salon de service. */
+  recap: env("WEBHOOK_RECAP_SUD") || env("WEBHOOK_DUTY_SUD") || NORD.recap
 };
 
 const WEBHOOKS = { nord: NORD, sud: SUD };
@@ -114,7 +121,8 @@ const salonQuelquePart = kind => !!(NORD[kind] || SUD[kind]);
 /* Les mêmes mots que dans le README et sur le site : « WEBHOOK_BT » ne dit
    rien à qui lit un journal de démarrage. */
 const NOMS_SALONS = {
-  bt: "devis", duty: "service", conges: "congés", avertissements: "avertissements"
+  bt: "devis", duty: "service", conges: "congés",
+  avertissements: "avertissements", recap: "bilan"
 };
 
 const MAX_CORPS = 512 * 1024;      // 512 ko suffisent largement
@@ -1256,8 +1264,14 @@ const serveur = http.createServer(async (req, res) => {
         const etat = await lireRecap();
         return repondre(res, 200, {
           ok: true, actif: RECAP_ACTIF, jour: RECAP_JOUR, heure: RECAP_HEURE,
-          salonConfigure: salonQuelquePart("duty"), dejaEnvoyee: etat.derniere === p.semaine,
-          semaine: p.semaine, debut: p.debut, fin: p.fin, miniDefaut: RECAP_MINI,
+          salonConfigure: salonQuelquePart("recap"),
+          /* Deux semaines à ne pas confondre : celle que cet aperçu montre —
+             la semaine en cours, pour voir où en est l'équipe — et celle dont
+             le prochain message parlera, qui est la dernière close. */
+          semaine: p.semaine, debut: p.debut, fin: p.fin,
+          semaineEnvoi: cleSemaine(semaineClose(new Date())),
+          dejaEnvoyee: etat.derniere === cleSemaine(semaineClose(new Date())),
+          miniDefaut: RECAP_MINI,
           ateliers: p.ateliers
         }, req);
       }
@@ -2137,17 +2151,49 @@ async function demanderGemini(question, contexte) {
 
    Réglages (variables d'environnement) :
      RECAP=off          n'envoie rien
-     RECAP_JOUR=0       jour de l'envoi, 0 = dimanche … 6 = samedi
-     RECAP_HEURE=20     heure locale de l'envoi
+     RECAP_JOUR=1       jour de l'envoi, 0 = dimanche … 6 = samedi
+     RECAP_HEURE=0      heure locale de l'envoi
      RECAP_MINI=4       heures attendues dans la semaine, 0 pour ne rien signaler
    L'heure est celle de la machine : mets TZ=Europe/Paris dans le service. */
 
 const FICHIER_RECAP = path.join(DOSSIER, "recap.json");
 const RECAP_ACTIF = String(process.env.RECAP || "on").toLowerCase() !== "off";
-const RECAP_JOUR = nombre(process.env.RECAP_JOUR === undefined ? 0 : process.env.RECAP_JOUR, 0, 6);
-const RECAP_HEURE = nombre(process.env.RECAP_HEURE === undefined ? 20 : process.env.RECAP_HEURE, 0, 23);
+/* Lundi 00 h : le dimanche est fini, la semaine est complète. Réglé au
+   dimanche 20 h comme avant, le message partait avant la fin de la journée et
+   ne comptait pas la soirée du dimanche — elle tombait dans le vide. */
+const RECAP_JOUR = nombre(process.env.RECAP_JOUR === undefined ? 1 : process.env.RECAP_JOUR, 0, 6);
+const RECAP_HEURE = nombre(process.env.RECAP_HEURE === undefined ? 0 : process.env.RECAP_HEURE, 0, 23);
 /* Le minimum attendu sur la semaine. En dessous, la personne est signalée. */
 const RECAP_MINI = nombre(process.env.RECAP_MINI === undefined ? 4 : process.env.RECAP_MINI, 0, 168);
+
+/**
+ * La dernière occurrence du moment réglé, à cet instant ou avant.
+ *
+ * Le minuteur ne se réveille pas à la seconde près, et un serveur éteint à
+ * l'heure dite doit pouvoir rattraper : on raisonne donc sur le moment prévu,
+ * pas sur celui du réveil. Lundi 00 h 07, le moment d'envoi reste lundi 00 h.
+ */
+function momentEnvoi(maintenant) {
+  const d = new Date(maintenant);
+  d.setHours(RECAP_HEURE, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() - RECAP_JOUR + 7) % 7));
+  /* Le jour est le bon mais l'heure n'est pas encore venue : c'est celui de
+     la semaine d'avant qu'on vient de dépasser. */
+  if (d > maintenant) d.setDate(d.getDate() - 7);
+  return d;
+}
+
+/**
+ * Un instant dans la semaine que le message résume.
+ *
+ * On raconte une semaine finie. À lundi 00 h la semaine en cours vient de
+ * naître et n'a rien à dire : celle dont on parle est celle qui s'achève une
+ * seconde plus tôt. Réglé au dimanche 20 h, ce recul d'une seconde ne change
+ * pas de semaine — le comportement d'avant est conservé tel quel.
+ */
+function semaineClose(maintenant) {
+  return new Date(momentEnvoi(maintenant).getTime() - 1000);
+}
 
 /** Lundi 00:00 de la semaine où tombe `d`. */
 function debutSemaine(d) {
@@ -2314,8 +2360,15 @@ function sousLeSeuil(par, roster, board, depuis, quel, seuilH) {
       seconds: par[u.id] ? par[u.id].seconds : 0,
       /* Arrivé pendant la semaine comptée : il n'a pas eu la semaine pour
          faire ses heures, on ne les lui réclame donc pas. */
-      arrive: !!(u.hiredAt && u.hiredAt >= jDebut && u.hiredAt <= jFin)
+      arrive: !!(u.hiredAt && u.hiredAt >= jDebut && u.hiredAt <= jFin),
+      /* Arrivé après : il n'était tout simplement pas là. Le bilan part une
+         fois la semaine finie, l'effectif est celui d'aujourd'hui — sans
+         cette ligne, un embauché du lundi serait signalé pour la semaine
+         d'avant, et même nommé parmi les arrivés d'une semaine qu'il n'a pas
+         vue. */
+      apres: !!(u.hiredAt && u.hiredAt > jFin)
     }))
+    .filter(g => !g.apres)
     .filter(g => g.seconds < seuil)
     .map(g => Object.assign(g, { conges: congesSemaine(board, g.id, jDebut, jFin, quel) }))
     .sort((a, b) => a.seconds - b.seconds);
@@ -2471,11 +2524,14 @@ async function nomAtelier(quel) {
  *   sinon un test du vendredi ferait sauter l'envoi du dimanche.
  */
 async function envoyerRecap(marquer) {
-  if (!salonQuelquePart("duty")) {
-    return { ok: false, error: "Aucun webhook de service configuré" };
+  if (!salonQuelquePart("recap")) {
+    return { ok: false, error: "Aucun webhook de bilan configuré" };
   }
 
-  const p = await prepareRecap();
+  /* Toujours la dernière semaine complète, y compris pour un envoi à la main :
+     un bilan de demi-semaine ne veut rien dire, et l'essai doit montrer
+     exactement ce que le dimanche enverra. */
+  const p = await prepareRecap(semaineClose(new Date()));
 
   /* Un message par garage, chacun dans le salon qui est le sien — le même
      pour les deux tant que le Sud n'a pas ses propres webhooks. On saute
@@ -2491,10 +2547,10 @@ async function envoyerRecap(marquer) {
     const nom = await nomAtelier(a.atelier);
     /* Pas de salon pour ce garage : on passe, plutôt que de faire échouer
        l'envoi entier et de priver l'autre de son récapitulatif. */
-    const cible = salons(a.atelier).duty;
+    const cible = salons(a.atelier).recap;
     if (!cible) {
       console.error(new Date().toISOString(),
-        "récapitulatif : aucun salon de service pour", a.atelier);
+        "récapitulatif : aucun salon de bilan pour", a.atelier);
       continue;
     }
     const r = await fetch(cible, {
@@ -2526,13 +2582,21 @@ async function envoyerRecap(marquer) {
    dort, une machine dont l'horloge saute ou un changement d'heure ne doivent
    pas faire manquer la semaine. Le repère sur disque empêche le doublon. */
 async function verifierRecap() {
-  if (!RECAP_ACTIF || !salonQuelquePart("duty")) return;
-  const maintenant = new Date();
-  if (maintenant.getDay() !== RECAP_JOUR || maintenant.getHours() < RECAP_HEURE) return;
+  if (!RECAP_ACTIF || !salonQuelquePart("recap")) return;
 
+  const semaine = cleSemaine(semaineClose(new Date()));
   const etat = await lireRecap();
-  if (etat.derniere === cleSemaine(maintenant)) return;   // déjà fait
+  if (etat.derniere === semaine) return;                  // déjà fait
 
+  /* Premier démarrage : on note la semaine sans l'envoyer. Sinon un serveur
+     tout juste installé un mercredi cracherait aussitôt le bilan de la
+     semaine d'avant, qu'il n'a pas vue passer. */
+  if (!etat.derniere) return ecrireRecap({ derniere: semaine, envoyeLe: null });
+
+  /* Plus de garde sur le jour ni l'heure : `semaineClose` ne change de
+     semaine qu'une fois le moment réglé passé. Ce qui suit rattrape donc de
+     lui-même un serveur éteint à l'heure dite — lundi 00 h est un moment où
+     personne ne surveille. */
   const r = await envoyerRecap(true);
   if (!r.ok) console.error(new Date().toISOString(), "récapitulatif :", r.error);
 }
@@ -2550,11 +2614,11 @@ serveur.listen(PORT, HOTE, () => {
   console.log("  origines  : " + ORIGINES.join(", "));
   /* Deux lignes plutôt qu'une : c'est en lisant celle du Sud qu'on voit s'il
      a bien ses propres salons ou s'il parle encore dans ceux du Nord. */
-  const etatSalons = w => ["bt", "duty", "conges", "avertissements"]
+  const etatSalons = w => ["bt", "duty", "conges", "avertissements", "recap"]
     .map(k => NOMS_SALONS[k] + (w[k] ? " ✓" : " ✗"))
     .join("  ");
   console.log("  Nord      : " + etatSalons(NORD));
   console.log("  Sud       : " + etatSalons(SUD) +
-    (SUD.bt === NORD.bt && SUD.duty === NORD.duty && SUD.conges === NORD.conges
+    (["bt", "duty", "conges", "recap"].every(k => SUD[k] === NORD[k])
       ? "  (les salons du Nord)" : ""));
 });
