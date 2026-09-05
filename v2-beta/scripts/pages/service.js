@@ -337,7 +337,7 @@
   /* Heures attendues sur la semaine, réglées dans l'administration, garage par
      garage. Elles viennent du catalogue déjà chargé : rien à demander au
      serveur, et la jauge s'affiche du premier coup. */
-  const objectifIci = () => MNStore.minimumDe(MNAuth.atelier());
+  const objectifIci = () => MNStore.minimumPour(moi && moi.uid, MNAuth.atelier());
 
   const hhmm = d => new Date(d).toLocaleTimeString("fr-FR",
     { hour: "2-digit", minute: "2-digit" });

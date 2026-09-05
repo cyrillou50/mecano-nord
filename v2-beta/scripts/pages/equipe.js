@@ -554,6 +554,9 @@
             /* Se voir sans ouvrir l'éditeur : sinon on cherche pourquoi
                quelqu'un manque au récapitulatif du dimanche. */
             (u.sansMinimum && !MNStore.estMasqueIci(u) ? U.etiquette("sans minimum") : "") +
+            (!u.sansMinimum && u.minimum !== null && u.minimum !== undefined &&
+             u.minimum !== MNStore.minimumDe(ici())
+              ? U.etiquette(u.minimum + " h/sem.") : "") +
             /* Utile surtout pour ceux des deux garages : on doit voir d'un
                coup d'œil qu'on les retrouvera aussi de l'autre côté. */
             (MNStore.ateliersDe(u).length > 1 ? U.etiquette("Nord + Sud", "info") : "") +
@@ -1442,6 +1445,14 @@
         "normalement. Le bouton en bas de la liste le réaffiche.</p>" +
       U.champ({ id: "f-hors", type: "bascule", label: "Exempter du minimum hebdomadaire",
                 valeur: u.sansMinimum }) +
+              U.champ({ id: "f-mini", label: "Heures minimum par semaine",
+                type: "number", min: 0, plafond: 168, pas: 1,
+                repere: MNStore.minimumDe(ici()) + " (celles du garage)",
+                aide: "Laisse vide pour suivre le garage — " +
+                  MNStore.nomAtelier(ici()) + " en demande " + MNStore.minimumDe(ici()) +
+                  " h. Un chiffre ici ne vaut que pour cette personne.",
+                valeur: u.minimum === null || u.minimum === undefined
+                  ? "" : String(u.minimum) }) +
       '<p class="champ__aide">Ses heures restent comptées et affichées comme celles de ' +
         "tout le monde, dans le récapitulatif du dimanche comme ailleurs. Il n'est " +
         "simplement jamais signalé pour un minimum non atteint." +
@@ -1502,6 +1513,14 @@
               active: u.id === moi.uid ? true : k.querySelector("#f-actif").checked,
               masques: lireMasques(k, "f-masq"),
               sansMinimum: k.querySelector("#f-hors").checked,
+              /* Vide = celles du garage. `null` et non 0 : zéro heure est un
+                 réglage à part entière, « rien de particulier » en est un autre. */
+              minimum: (function (v) {
+                const s = String(v == null ? "" : v).trim();
+                if (!s) return null;
+                const n = Math.round(Number(s));
+                return isNaN(n) ? null : Math.max(0, Math.min(168, n));
+              })(k.querySelector("#f-mini").value),
               ateliers: lireAteliers(k, "f-at")
             };
 

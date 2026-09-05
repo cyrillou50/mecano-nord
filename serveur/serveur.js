@@ -1864,6 +1864,16 @@ function appliquerEquipe(cat, op) {
         u.masques = ATELIERS_CONNUS.filter(x => m.indexOf(x) !== -1);
       }
       if (op.sansMinimum !== undefined) u.sansMinimum = op.sansMinimum === true;
+      /* Heures attendues pour cette personne. Vide (null) = celles du garage :
+         c'est le cas ordinaire, et il faut pouvoir y revenir. */
+      if (op.minimum !== undefined) {
+        if (op.minimum === null || op.minimum === "") u.minimum = null;
+        else {
+          const n = Math.round(Number(op.minimum));
+          if (isNaN(n)) return { erreur: "minimum hebdomadaire invalide" };
+          u.minimum = Math.max(0, Math.min(168, n));
+        }
+      }
       /* Les ateliers ou la personne travaille. Au moins un : une fiche sans
          atelier n existerait plus nulle part. */
       if (Array.isArray(op.ateliers)) {
@@ -2291,7 +2301,14 @@ async function effectifRecap(quel) {
       pseudo: String(u.pseudo || "?"),
       /* La date d'entrée, pour ne rien reprocher à qui vient d'arriver. */
       hiredAt: /^\d{4}-\d{2}-\d{2}$/.test(u.hiredAt) ? u.hiredAt
-        : (typeof u.createdAt === "string" ? u.createdAt.slice(0, 10) : "")
+        : (typeof u.createdAt === "string" ? u.createdAt.slice(0, 10) : ""),
+      /* Son minimum à elle, quand sa fiche en porte un. `null` = celui du
+         garage — c'est le cas de presque tout le monde. */
+      minimum: (function (v) {
+        if (v === null || v === undefined || v === "") return null;
+        const n = Math.round(Number(v));
+        return isNaN(n) ? null : Math.max(0, Math.min(168, n));
+      })(u.minimum)
     }));
 }
 
@@ -2344,8 +2361,15 @@ function congesSemaine(board, uid, jDebut, jFin, quel) {
  */
 function sousLeSeuil(par, roster, board, depuis, quel, seuilH) {
   const mini = seuilH === undefined ? RECAP_MINI : seuilH;
-  if (!mini) return null;
-  const seuil = mini * 3600;
+
+  /* Le seuil de chacun : le sien s'il en a un, celui du garage sinon. On ne
+     peut donc plus s'arrêter tôt quand le garage est à zéro — quelqu'un peut
+     très bien avoir un minimum là où le garage n'en demande aucun. */
+  const seuilDe = u => {
+    const v = u && u.minimum !== null && u.minimum !== undefined ? u.minimum : mini;
+    return Number(v) || 0;
+  };
+  if (!mini && !(roster || []).some(u => seuilDe(u))) return null;
 
   /* La semaine entière, pas seulement jusqu'à maintenant : des congés posés
      pour vendredi comptent déjà le lundi, sinon un aperçu en milieu de semaine
@@ -2366,14 +2390,19 @@ function sousLeSeuil(par, roster, board, depuis, quel, seuilH) {
          cette ligne, un embauché du lundi serait signalé pour la semaine
          d'avant, et même nommé parmi les arrivés d'une semaine qu'il n'a pas
          vue. */
-      apres: !!(u.hiredAt && u.hiredAt > jFin)
+      apres: !!(u.hiredAt && u.hiredAt > jFin),
+      /* Ce qu'on attendait de cette personne-là, pour le dire dans le message
+         plutôt que de laisser croire à un seuil commun. */
+      seuil: seuilDe(u)
     }))
     .filter(g => !g.apres)
-    .filter(g => g.seconds < seuil)
+    .filter(g => g.seuil > 0 && g.seconds < g.seuil * 3600)
     .map(g => Object.assign(g, { conges: congesSemaine(board, g.id, jDebut, jFin, quel) }))
     .sort((a, b) => a.seconds - b.seconds);
 
   return {
+    /* Le seuil du garage : celui que le titre du message annonce. Les seuils
+       propres, quand ils diffèrent, se lisent ligne par ligne. */
     seuil: mini,
     /* Faux : on ne voit que ceux qui ont pointé. Le message le dira, plutôt
        que de laisser croire que tous les autres ont fait leur temps. */
@@ -2406,10 +2435,14 @@ function embedRecap(r, debut, fin, nom) {
 
   if (s && s.gens.length) {
     fields.push({
-      name: "⚠️ Moins de " + s.seuil + " h cette semaine",
+      name: s.seuil ? "⚠️ Moins de " + s.seuil + " h cette semaine"
+                    : "⚠️ Sous les heures attendues",
       value: s.gens.slice(0, 25)
         .map(g => "• **" + g.pseudo + "** — " +
-          (g.seconds ? dureeCourte(g.seconds) : "aucun service"))
+          (g.seconds ? dureeCourte(g.seconds) : "aucun service") +
+          /* Un seuil personnel n'est pas celui du titre : sans le dire, la
+             ligne aurait l'air d'une erreur de calcul. */
+          (g.seuil && g.seuil !== s.seuil ? " (attendu : " + g.seuil + " h)" : ""))
         .join("\n").slice(0, 1024)
     });
   }

@@ -498,6 +498,20 @@ window.MNStore = (function () {
     return isNaN(v) ? 0 : v;
   };
 
+  /**
+   * Les heures attendues d'une personne sur la semaine : les siennes si sa
+   * fiche en porte, celles de son garage sinon.
+   *
+   * Un seul endroit pour cette règle : la jauge de la page Service, le
+   * récapitulatif du dimanche et la fiche doivent dire le même chiffre, sans
+   * quoi on lit deux verdicts pour une seule question.
+   */
+  const minimumPour = (uid, ou) => {
+    const u = (_catalog.users || []).find(x => x.id === uid);
+    if (u && u.minimum !== null && u.minimum !== undefined) return u.minimum;
+    return minimumDe(ou);
+  };
+
   /** Les grades proposés dans un atelier. */
   const rolesDeAtelier = ou =>
     (_catalog.roles || []).filter(r => estDeAtelier(r, ou));
@@ -914,6 +928,17 @@ window.MNStore = (function () {
            minimum non atteint. (`horsRecap` : le nom d'avant, quand le réglage
            retirait aussi les heures. Relu pour ne rien perdre.) */
         sansMinimum: u.sansMinimum === true || u.horsRecap === true,
+        /* Heures attendues sur la semaine pour cette personne seule. `null` =
+           celles du garage, et c'est le cas de presque tout le monde : régler
+           le garage doit continuer de tous les changer d'un coup. Un chiffre
+           propre existe parce que les disponibilités ne sont pas les mêmes
+           pour tous, et qu'un seuil unique finit par signaler chaque semaine
+           les mêmes gens sans que cela veuille dire quoi que ce soit. */
+        minimum: (function (v) {
+          if (v === null || v === undefined || v === "") return null;
+          const n = Math.round(Number(v));
+          return isNaN(n) ? null : Math.max(0, Math.min(168, n));
+        })(u.minimum),
         createdAt,
         /* Date d'embauche (AAAA-MM-JJ), séparée de la création du compte. */
         hiredAt: /^\d{4}-\d{2}-\d{2}$/.test(u.hiredAt) ? u.hiredAt : createdAt.slice(0, 10),
@@ -1357,7 +1382,8 @@ window.MNStore = (function () {
     topCategories, subCategories, categoryScope, itemLabel, totals, duree,
     ATELIERS, atelierById, nomAtelier, courtAtelier,
     ateliersDe, estDeAtelier, usersDeAtelier, rolesDeAtelier, normAteliers,
-    setAtelier, atelier, roleIdDe, estMasqueIci, estMasquePartout, minimumDe, livretDe,
+    setAtelier, atelier, roleIdDe, estMasqueIci, estMasquePartout,
+    minimumDe, minimumPour, livretDe,
     memeNom, soucisHomonyme,
     MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,
     REMBOURSEMENTS, remboursementDe, leveeIci, sommeRessources, ressourcesEnClair,

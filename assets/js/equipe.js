@@ -663,6 +663,9 @@
                  quelqu'un manque au récapitulatif du dimanche. */
               (u.sansMinimum && !MNStore.estMasqueIci(u)
                 ? ' <span class="pill pill--dim">sans minimum</span>' : "") +
+              (!u.sansMinimum && u.minimum !== null && u.minimum !== undefined &&
+               u.minimum !== MNStore.minimumDe(ici())
+                ? ' <span class="pill pill--dim">' + esc(u.minimum + " h/sem.") + "</span>" : "") +
               /* Utile surtout pour ceux des deux garages : on doit voir d'un
                  coup d'œil qu'on les retrouvera aussi de l'autre côté. */
               (MNStore.ateliersDe(u).length > 1
@@ -1567,13 +1570,24 @@
         (u.id === me.uid ? " disabled" : "") + '><span class="switch__box"></span><span>Compte actif</span></label>' +
       champMasques("f-masq", u) +
 
+      '<div class="field"><label class="label" for="f-mini">Heures minimum par semaine</label>' +
+        '<input class="input" id="f-mini" type="number" min="0" max="168" step="1" ' +
+          'placeholder="' + MNStore.minimumDe(ici()) + ' (celles du garage)" value="' +
+          (u.minimum === null || u.minimum === undefined ? "" : esc(String(u.minimum))) +
+          '"></div>' +
+      '<p class="hint">Laisse vide pour suivre le garage — ' +
+        esc(MNStore.nomAtelier(ici())) + " en demande " + MNStore.minimumDe(ici()) +
+        " h. Un chiffre ici ne vaut que pour cette personne, dans les deux " +
+        "garages : c'est un rythme, pas un réglage d'atelier.</p>" +
+
       '<label class="switch"><input type="checkbox" id="f-hors"' +
         (u.sansMinimum ? " checked" : "") + ">" +
         '<span class="switch__box"></span>' +
         "<span>Exempter du minimum hebdomadaire</span></label>" +
       '<p class="hint">Ses heures restent comptées et affichées comme celles de ' +
         "tout le monde, dans le récapitulatif du dimanche comme ailleurs. Il n'est " +
-        "simplement jamais signalé pour un minimum non atteint." +
+        "simplement jamais signalé pour un minimum non atteint. L'exemption " +
+        "l'emporte sur le chiffre ci-dessus." +
         (u.hidden
           ? " Ce compte est masqué : il en est déjà exempté de toute façon."
           : "") + "</p>";
@@ -1624,6 +1638,14 @@
               active: u.id === me.uid ? true : body.querySelector("#f-active").checked,
               masques: lireMasques(body, "f-masq"),
               sansMinimum: body.querySelector("#f-hors").checked,
+              /* Vide = celles du garage. `null` et non 0 : zéro heure est un
+                 réglage à part entière, « rien de particulier » en est un autre. */
+              minimum: (function (v) {
+                const s = String(v == null ? "" : v).trim();
+                if (!s) return null;
+                const n = Math.round(Number(s));
+                return isNaN(n) ? null : Math.max(0, Math.min(168, n));
+              })(body.querySelector("#f-mini").value),
               ateliers: lireAteliers(body, "f-at")
             };
 

@@ -641,8 +641,23 @@ pas à parler toutes les semaines.
 héberge ; `RECAP_MINI` n'est plus qu'un repli, utilisé tant que le catalogue ne
 lui a pas été publié.
 
-Sous `RECAP_MINI` heures, la personne est signalée dans un second champ du
-message. Deux points méritent d'être connus.
+**Une personne peut avoir le sien.** Sur sa fiche (Équipe → *Modifier* →
+*Heures minimum par semaine*, champ `minimum`), un chiffre remplace celui du
+garage pour elle seule. Laissé vide, il vaut `null` et la personne suit le
+garage — c'est le cas de presque tout le monde, et régler le garage continue
+donc de les changer tous d'un coup.
+
+Le seuil personnel existe parce que les disponibilités ne sont pas les mêmes
+pour tous : un seuil unique finit par signaler chaque semaine les mêmes gens,
+et le message n'apprend plus rien à personne.
+
+Quand il diffère de celui du garage, la ligne du message le dit —
+`• **Nom** — 3 h (attendu : 20 h)` — sans quoi elle aurait l'air d'une erreur
+de calcul sous un titre qui annonce un autre chiffre. Un garage réglé à 0 ne
+signale plus personne, sauf ceux qui ont un seuil à eux.
+
+Sous ce seuil, la personne est signalée dans un second champ du message. Deux
+points méritent d'être connus.
 
 **Ceux qui n'ont pas pointé du tout.** Zéro heure est le cas le plus grave, et
 c'est le seul qui ne laisse aucune trace dans le journal des services : pour le
@@ -668,7 +683,12 @@ Sont écartés de l'effectif attendu les comptes désactivés et archivés.
 - les **comptes masqués**, techniques ou d'administration plutôt que membres de
   l'atelier ;
 - ceux qu'un responsable a exemptés, avec l'interrupteur **Exempter du minimum
-  hebdomadaire** sur leur fiche (champ `sansMinimum`).
+  hebdomadaire** sur leur fiche (champ `sansMinimum`) — l'exemption l'emporte
+  sur un seuil personnel ;
+- ceux **embauchés après la semaine résumée** : le message part une fois la
+  semaine finie et l'effectif est celui d'aujourd'hui, donc quelqu'un arrivé
+  lundi n'a rien à voir avec la semaine d'avant. Arrivé *pendant* la semaine,
+  il est nommé à part, sans reproche.
 
 Leurs heures restent comptées et affichées comme celles de tout le monde, dans
 « Temps par personne » comme dans le total : ce n'est pas leur temps qu'on
