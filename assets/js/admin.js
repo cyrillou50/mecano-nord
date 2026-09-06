@@ -119,8 +119,8 @@
     const mot = MNGitHub.motAuto();
     const annulable = !etat.envoye && !etat.enCours;
 
-    /* Pas de mot : l'automatique ne peut rien — ni droit de publier, ni
-       serveur, ni jeton. C'est le seul cas où il reste un bouton à cliquer. */
+    /* Pas de mot : l'automatique ne peut rien — pas de serveur pour écrire.
+       C'est le seul cas où il reste un bouton à cliquer. */
     if (!mot) {
       bar.innerHTML =
         '<span class="draftbar__dot"></span>' +
@@ -813,8 +813,9 @@
 
   /**
    * Liste les images de assets/img/.
-   * Avec un jeton GitHub on lit le dépôt (toujours exact) ; sinon on retombe
-   * sur le manifeste assets/img/index.json, tenu à jour à chaque dépôt.
+   * Le dépôt ne se lit pas depuis le site — il faudrait une clé, et le site
+   * n'en a pas. On s'appuie donc sur le manifeste assets/img/index.json,
+   * fichier public tenu à jour à chaque dépôt.
    */
   /**
    * Toutes les images disponibles, celles du serveur d'abord.
@@ -830,13 +831,9 @@
       } catch (_) { /* serveur muet : on se rabat sur le dépôt */ }
     }
 
-    if (MNGitHub.hasToken() && MNGitHub.isConfigured()) {
-      try {
-        const files = await MNGitHub.listDir(IMG_DIR);
-        names = files.filter(f => f.type === "file" && IMG_RE.test(f.name)).map(f => f.name);
-        source = "github";
-      } catch (_) { /* on tentera le manifeste */ }
-    }
+    /* Le dépôt ne se lit plus depuis le site : il faudrait une clé, et le
+       site n'en a pas. Le manifeste `index.json`, lui, est un fichier public
+       comme un autre — il suffit. */
     if (source !== "github") {
       try {
         const r = await fetch(IMG_DIR + "/index.json?v=" + Date.now(), { cache: "no-store" });
@@ -980,9 +977,8 @@
 
       if (!refs.length) {
         imgs.innerHTML = '<p class="hint">Aucune image trouvée. Clique sur <b>Ajouter une image</b>' +
-          (surServeur() ? "." : ", ou dépose tes fichiers dans <code>" + IMG_DIR + "/</code> sur GitHub." +
-            (MNGitHub.hasToken() ? "" : " (Configure le jeton GitHub dans l'onglet « Mise en ligne » " +
-              "pour que la liste se mette à jour toute seule.)")) + "</p>";
+          (surServeur() ? "." : ", ou dépose tes fichiers dans <code>" + IMG_DIR + "/</code> sur " +
+            "GitHub en pensant à mettre <code>index.json</code> à jour.") + "</p>";
         return;
       }
 
@@ -1748,9 +1744,9 @@
 
   async function paneImages(host) {
     const peutAjouter = MNGitHub.canPublish() || surServeur();
-    /* Sur le serveur, tout se fait sans jeton. Dans le dépôt, renommer et
-       supprimer en exigent un. */
-    const ready = MNGitHub.hasToken() && MNGitHub.isConfigured();
+    /* Renommer et supprimer dans le dépôt demandent de le lire d'abord, ce
+       que le site ne sait plus faire sans clé. Sur le serveur, tout marche. */
+    const ready = surServeur();
 
     host.innerHTML =
       '<div class="toolbar">' +
@@ -1768,8 +1764,9 @@
       "</div>" +
       (ready || surServeur() ? "" :
         '<div class="alert alert--warn">' + svg("alert") +
-        "<span>Sans jeton GitHub sur cet appareil, tu peux consulter les images mais pas les " +
-        "renommer ni les supprimer. Configure-le dans l'onglet « Mise en ligne ».</span></div>") +
+        "<span>Ces images vivent dans le dépôt : tu peux les consulter, mais les renommer ou " +
+        "les supprimer demanderait de le lire, ce que le site ne fait pas. Héberge-les sur le " +
+        "serveur de l'atelier et tout redevient possible.</span></div>") +
       '<div id="i-list"><p class="hint">Lecture du dossier…</p></div>';
 
     $("#i-refresh").addEventListener("click", () => { imgCache = null; paneImages(host); });
@@ -1781,7 +1778,7 @@
       e.target.value = "";
       if (!f) return;
       fileToIcon(f, async data => {
-        if (!peutAjouter) return MNUI.toast("Serveur ou jeton GitHub requis pour déposer une image", "err");
+        if (!peutAjouter) return MNUI.toast("Il faut un serveur pour déposer une image", "err");
         try {
           const path = await uploadToRepo(data, f.name);
           if (!path) return;
@@ -1805,8 +1802,8 @@
       '<div class="rows">' + refs.map(x => {
         const uses = usesOf(x.ref);
         const src = x.serveur ? MNStore.imageUrl(x.name) : x.ref;
-        /* Une image du dépôt reste intouchable sans jeton ; celles du serveur
-           ne demandent rien. */
+        /* Une image du dépôt reste intouchable — il faudrait lire le dépôt.
+           Celles du serveur se manipulent normalement. */
         const modifiable = x.serveur || ready;
         return '<div class="trow" data-img="' + esc(x.name) + '" data-srv="' + (x.serveur ? "1" : "") + '">' +
           '<div class="trow__ico"><img src="' + esc(src) + '" alt="" loading="lazy" decoding="async"></div>' +
@@ -2758,8 +2755,8 @@
               s: etat.echec.message }
           : !etat.actif
             ? { cls: "off", ico: "lock", t: "Mise en ligne non configurée",
-                s: "Renseigne l'adresse du serveur dans « Le site » — ou, à défaut, " +
-                   "un jeton GitHub ci-dessous." }
+                s: "Renseigne l'adresse du serveur dans « Le site » : c'est lui qui " +
+                   "met le site à jour, et il est le seul à détenir la clé." }
             : enRoute
               ? { cls: "ok", ico: "refresh", t: "Enregistré — départ imminent",
                   s: etat.immediat
@@ -2773,8 +2770,6 @@
       '<div class="pubstate pubstate--' + state.cls + '">' +
         '<div class="pubstate__ico">' + svg(state.ico) + "</div>" +
         '<div class="pubstate__txt"><b>' + esc(state.t) + "</b><span>" + esc(state.s) + "</span></div>" +
-        '<button class="btn btn--solid" id="p-go"' + (enRoute ? "" : " disabled") + ">" +
-          svg("cloud") + "<span>Publier maintenant</span></button>" +
       "</div>" +
 
       '<div class="panel"><div class="panel__head">' + svg("cloud") + "<h2>Où vivent les données</h2></div>" +
@@ -2796,8 +2791,10 @@
               : "<b>Pas encore ici.</b> Aucun serveur n'est configuré : renseigne son adresse " +
                 "dans l'onglet « Le site ». D'ici là chaque mise en ligne est un commit, alors " +
                 "elles partent groupées, une minute après la dernière modification.") + "</p>" +
-          '<p class="hint">Plus rien à cocher ni à cliquer : le brouillon part tout seul, ' +
-            "depuis n'importe quelle page. « Publier maintenant » ne sert qu'à forcer.</p>" +
+          '<p class="hint">Plus rien à cocher ni à cliquer, et <b>plus de clé à donner ' +
+            "à personne</b> : le jeton GitHub vit dans le service du VPS, jamais ici. " +
+            "Le site poste au serveur, le serveur écrit. Qui a pu changer quelque chose " +
+            "le voit donc en ligne, sans permission supplémentaire et sans rien installer.</p>" +
         "</div></div>" +
 
       '<div class="panel"><div class="panel__head">' + svg("github") + "<h2>Dépôt GitHub</h2></div>" +
@@ -2812,40 +2809,19 @@
             '<div class="field"><label class="label" for="p-path">Fichier de données</label>' +
               '<input class="input" id="p-path" value="' + esc(gh.path) + '"></div>' +
           "</div>" +
-          '<div class="field"><label class="label" for="p-token">Jeton d\'accès GitHub</label>' +
-            '<div class="copyfield">' +
-              '<input class="input" id="p-token" type="password" placeholder="' +
-                (MNGitHub.hasToken() ? "•••••••••• (enregistré sur cet appareil)" : "github_pat_…") + '">' +
-              '<button class="btn btn--ghost" id="p-check">' + svg("check") + "<span>Vérifier</span></button>" +
-            "</div>" +
-            '<p class="hint">Le jeton reste dans TON navigateur, il n\'est jamais écrit dans le dépôt. ' +
-              "Chaque personne qui publie met le sien." +
-              (MNGitHub.hasToken() ? ' <a href="#" id="p-forget">Oublier le jeton de cet appareil</a>' : "") + "</p>" +
-          "</div>" +
-          '<div id="p-result"></div>' +
+          '<p class="hint">Ces quatre champs disent au serveur <b>où</b> écrire. La clé qui lui ' +
+            "permet d'écrire, elle, est dans son service systemd (<code>GH_TOKEN</code>) et " +
+            "nulle part ailleurs — surtout pas ici : le catalogue est public.</p>" +
           '<div><button class="btn btn--ghost btn--sm" id="p-save-repo">' + svg("save") +
             "<span>Enregistrer les infos du dépôt</span></button></div>" +
         "</div></div>" +
 
       pointagePanel() +
 
-      '<div class="panel"><div class="panel__head"><h2>Mise en route (une seule fois)</h2></div>' +
-        '<div class="panel__body"><div class="steps">' +
-          '<div class="step"><p class="step__txt">Va sur <b>github.com</b> → ton avatar → <b>Settings</b> → tout en bas ' +
-            "<b>Developer settings</b> → <b>Personal access tokens</b> → <b>Fine-grained tokens</b> → " +
-            "<b>Generate new token</b>.</p></div>" +
-          '<div class="step"><p class="step__txt">Dans <b>Repository access</b>, choisis <b>Only select repositories</b> ' +
-            "et sélectionne le dépôt de ce site.</p></div>" +
-          '<div class="step"><p class="step__txt">Dans <b>Permissions → Repository permissions</b>, mets ' +
-            "<code>Contents</code> sur <b>Read and write</b>. Rien d'autre n'est nécessaire.</p></div>" +
-          '<div class="step"><p class="step__txt">Copie le jeton généré, colle-le dans le champ ci-dessus, ' +
-            "clique sur <b>Vérifier</b> puis sur <b>Publier maintenant</b>.</p></div>" +
-        "</div></div></div>" +
-
-      '<div class="panel"><div class="panel__head"><h2>Méthode manuelle (sans jeton)</h2></div>' +
+      '<div class="panel"><div class="panel__head"><h2>Copie manuelle</h2></div>' +
         '<div class="panel__body editor">' +
-          '<p class="hint">Si tu préfères ne pas utiliser de jeton : télécharge le fichier et remplace ' +
-            "<code>" + esc(gh.path) + "</code> dans ton dépôt GitHub.</p>" +
+          '<p class="hint">Pour un dépannage, ou pour garder une copie : télécharge le fichier et ' +
+            "remplace <code>" + esc(gh.path) + "</code> dans le dépôt GitHub à la main.</p>" +
           '<div class="row row--wrap">' +
             '<button class="btn btn--ghost" id="p-dl">' + svg("download") + "<span>Télécharger le fichier</span></button>" +
             '<button class="btn btn--ghost" id="p-copy">' + svg("copy") + "<span>Copier le contenu</span></button>" +
@@ -2860,22 +2836,6 @@
 
     bindPointage();
 
-    $("#p-go").addEventListener("click", () => publishNow());
-
-    const share = $("#p-share");
-    if (share) share.addEventListener("click", () => {
-      const url = "https://" + (draft.settings.github.owner || "").toLowerCase() + ".github.io/" +
-        (draft.settings.github.repo || "") + "/service.html";
-      MNUI.copy(
-        "**Pointage du service — à faire une seule fois**\n" +
-        "1. Ouvre " + url + " et connecte-toi\n" +
-        "2. Clique sur « Saisir le jeton »\n" +
-        "3. Colle ceci :\n```\n" + MNGitHub.getToken() + "\n```\n" +
-        "Garde-le pour toi, ne le partage avec personne.",
-        "Message copié — envoie-le en privé, jamais dans un salon public"
-      );
-    });
-
     $("#p-save-repo").addEventListener("click", () => {
       draft.settings.github = {
         owner: $("#p-owner").value.trim(),
@@ -2885,46 +2845,6 @@
       };
       commit();
       MNUI.toast("Infos du dépôt enregistrées", "ok");
-    });
-
-    $("#p-check").addEventListener("click", async () => {
-      const box = $("#p-result");
-      const tok = $("#p-token").value.trim();
-      if (tok) MNGitHub.setToken(tok);
-      if (!MNGitHub.hasToken()) {
-        box.innerHTML = '<div class="alert alert--err">' + svg("alert") + "<span>Colle d'abord un jeton.</span></div>";
-        return;
-      }
-      draft.settings.github = {
-        owner: $("#p-owner").value.trim(),
-        repo: $("#p-repo").value.trim(),
-        branch: $("#p-branch").value.trim() || "main",
-        path: $("#p-path").value.trim() || "data/catalog.json"
-      };
-      MNStore.saveDraft(draft);
-
-      box.innerHTML = '<div class="alert alert--info">' + svg("refresh") + "<span>Vérification…</span></div>";
-      try {
-        const r = await MNGitHub.check();
-        box.innerHTML = '<div class="alert alert--' + (r.canWrite ? "ok" : "warn") + '">' +
-          svg(r.canWrite ? "check" : "alert") +
-          "<span>Connecté à <b>" + esc(r.repo) + "</b>" + (r.login ? " en tant que <b>" + esc(r.login) + "</b>" : "") + ". " +
-          (r.canWrite ? "Écriture autorisée — tu peux publier." :
-            "Mais le jeton n'a pas le droit d'écrire. Repasse par l'étape 3.") +
-          (r.fileExists ? "" : " Le fichier n'existe pas encore, il sera créé à la première publication.") +
-          "</span></div>";
-        $("#p-token").value = "";
-      } catch (e) {
-        box.innerHTML = '<div class="alert alert--err">' + svg("alert") + "<span>" + esc(e.message) + "</span></div>";
-      }
-    });
-
-    const forget = $("#p-forget");
-    if (forget) forget.addEventListener("click", e => {
-      e.preventDefault();
-      MNGitHub.forgetToken();
-      MNUI.toast("Jeton oublié sur cet appareil", "ok");
-      render();
     });
 
     $("#p-dl").addEventListener("click", () => {
@@ -2977,17 +2897,17 @@
       '<div class="panel__body editor">' +
         (serveur
           ? '<div class="alert alert--ok">' + svg("check") +
-            "<span><b>Tout passe par ton serveur.</b> L'équipe pointe son service et les responsables " +
-            "publient depuis le site, <b>sans que personne n'ait de jeton</b>. Les adresses Discord " +
-            "restent chez toi.</span></div>"
+            "<span><b>Tout passe par ton serveur.</b> L'équipe pointe son service et chaque " +
+            "modification part en ligne toute seule, <b>sans que personne n'ait de clé</b>. " +
+            "Les adresses Discord restent chez toi.</span></div>"
           : auto
             ? '<div class="alert alert--ok">' + svg("check") +
               "<span>Le pointage est partagé. Renseigne l'adresse du serveur ci-dessous pour que " +
-              "la <b>publication</b> se passe aussi de jeton.</span></div>"
+              "la <b>mise en ligne</b> s'y ajoute.</span></div>"
             : '<div class="alert alert--warn">' + svg("alert") +
-              "<span><b>Sans serveur, il faut un jeton GitHub par personne</b> — pour publier comme " +
-              "pour apparaître dans le tableau de service. Renseigne ton serveur ci-dessous et tout " +
-              "devient automatique.</span></div>") +
+              "<span><b>Sans serveur, rien ne peut être mis en ligne</b> : c'est lui qui détient " +
+              "la clé GitHub, et le site n'en détient aucune. C'est aussi lui qui partage le " +
+              "tableau de service. Renseigne son adresse ci-dessous.</span></div>") +
 
         '<div class="field"><label class="label" for="w-serveur">Adresse de ton serveur</label>' +
           '<div class="copyfield">' +
@@ -3041,15 +2961,6 @@
         '<div id="w-relay-msg"></div>' +
         '<p class="hint">Code prêt dans <code>relais.js</code>. Ces deux champs ne servent que si ' +
           "tu n'as pas de serveur : l'adresse du serveur ci-dessus les remplace tous les deux.</p>" +
-        "</details>" +
-
-        '<details style="margin-top:6px"><summary class="subtitle" style="cursor:pointer;padding:6px 0">' +
-          "Dépannage : partager mon jeton en attendant</summary>" +
-          '<p class="hint" style="margin:10px 0">À éviter si possible : ce jeton donne le droit ' +
-            "d'écrire sur <b>tout</b> le dépôt. Envoie-le en message privé, jamais dans un salon, et " +
-            "régénère-le dès que l'une des deux options ci-dessus fonctionne.</p>" +
-          '<button class="btn btn--ghost btn--sm" id="p-share"' + (MNGitHub.hasToken() ? "" : " disabled") + ">" +
-            svg("copy") + "<span>Copier le message</span></button>" +
         "</details>" +
 
         '<div class="row" style="justify-content:flex-end;margin-top:4px">' +
@@ -3133,7 +3044,7 @@
         } catch (_) { pub = "inconnu"; }
 
         const pistes = {
-          ok: "<b>La publication passera par lui</b> — plus besoin de jeton.",
+          ok: "<b>La mise en ligne passera par lui</b> — personne n'a de clé à donner.",
           absent: "<b>La publication n'est pas configurée</b> : ajoute <code>GH_TOKEN</code>, " +
             "<code>GH_OWNER</code> et <code>GH_REPO</code> dans le service, puis redémarre-le.",
           vieux: "<b>Version trop ancienne</b> : ce serveur ne connaît pas encore la publication. " +
@@ -3250,13 +3161,11 @@
   async function publishNow() {
     if (MNGitHub.etatAuto().enCours) return;
 
-    if (!MNAuth.can("publish")) return MNUI.toast("Tu n'as pas la permission de publier", "err");
-
+    /* Plus de permission à vérifier : la mise en ligne suit l'écriture. Reste
+       la seule vraie condition — un serveur pour écrire. */
     if (!MNGitHub.canPublish()) {
       tab = "publish"; render();
-      MNUI.toast(MNGitHub.hasToken()
-        ? "Renseigne le propriétaire et le nom du dépôt"
-        : "Renseigne l'adresse de ton serveur, ou un jeton GitHub", "err");
+      MNUI.toast("Renseigne l'adresse de ton serveur dans « Le site »", "err");
       return;
     }
 
@@ -3277,8 +3186,8 @@
     } else {
       const echec = MNGitHub.etatAuto().echec;
       if (echec) {
-        /* Le conseil dépend de ce qui a échoué : inutile d'envoyer quelqu'un
-           vérifier son jeton quand c'est le serveur qui est en cause. */
+        /* Le conseil dépend de ce qui a échoué : « le serveur ne répond pas »
+           et « le serveur n'a pas les accès GitHub » ne se règlent pas pareil. */
         const m = String(echec.message || "");
         let piste;
         if (/Chemin inconnu/i.test(m)) {
@@ -3295,8 +3204,8 @@
           piste = "Le serveur refuse d'écrire ce fichier. C'est volontaire : il n'autorise que " +
             "le catalogue et les images.";
         } else {
-          piste = "Vérifie le jeton et les infos du dépôt dans l'onglet " +
-            "« Mise en ligne », puis réessaie.";
+          piste = "Vérifie les infos du dépôt dans l'onglet « Mise en ligne », " +
+            "puis réessaie.";
         }
 
         MNUI.modal({

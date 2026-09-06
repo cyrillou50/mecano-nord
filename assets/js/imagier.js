@@ -348,7 +348,7 @@ window.MNImagier = (function () {
       bouton.innerHTML = MNUI.svg("refresh") + "<span>Envoi…</span>";
       try {
         const data = await depuisFichier(file, max);
-        /* Sans serveur ni jeton, on garde l'image dans les données plutôt que
+        /* Sans serveur, on garde l'image dans les données plutôt que
            d'échouer : elle marche tout de suite, au prix d'un fichier plus
            lourd. */
         if (!surServeur() && !MNGitHub.canPublish()) {

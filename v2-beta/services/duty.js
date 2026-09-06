@@ -3,9 +3,9 @@
 
    Le tableau des présents vit dans data/duty.json, à côté du catalogue.
    • Pointer envoie un message Discord (immédiat, marche pour tout le monde).
-   • Si la personne a un jeton GitHub, le tableau partagé est aussi mis à jour
+   • Si le serveur de l'atelier est configuré, le tableau partagé est aussi mis à jour
      pour que les gérants le voient sur le site.
-   Sans jeton, le pointage reste visible sur Discord et en local seulement —
+   Sans serveur, le pointage reste visible sur Discord et en local seulement —
    le site le signale clairement.
    ========================================================================== */
 
@@ -270,17 +270,16 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
 
   /**
    * Le pointage peut-il rejoindre le tableau commun ?
-   * Avec un relais, c'est automatique pour tout le monde : personne n'a
-   * de jeton à installer. Sinon, il faut un jeton sur cet appareil.
+   *
+   * Le serveur, et rien d'autre. On demandait autrefois à chacun d'installer
+   * un jeton sur son appareil : c'était distribuer une clé d'écriture sur le
+   * dépôt à des gens qui voulaient juste pointer.
    */
-  const canShare = () => {
-    if (baseUrl() || relayUrl()) return true;
-    try { return MNGitHub.hasToken() && MNGitHub.isConfigured(); }
-    catch (_) { return false; }
-  };
+  const canShare = () => !!(baseUrl() || relayUrl());
 
-  /** Le partage se fait-il sans que l'employé n'ait rien à installer ? */
-  const isAuto = () => !!(baseUrl() || relayUrl());
+  /** Le partage se fait-il sans que l'employé n'ait rien à installer ?
+      Oui, toujours — il n'y a plus rien à installer. */
+  const isAuto = canShare;
 
   /* ---- Opérations côté serveur ------------------------------------------------
      Si le serveur sait appliquer les opérations lui-même, on lui envoie
@@ -377,13 +376,10 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
       }
     }
 
-    if (!canShare()) return { ok: false, skipped: true };
-    try {
-      await MNGitHub.putText(FILE, JSON.stringify(b, null, 2) + "\n", message);
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, error: e.message };
-    }
+    /* Ni base ni relais : personne pour écrire le tableau commun. Le pointage
+       reste local et part sur Discord — la page l'a déjà annoncé, canShare()
+       étant faux. */
+    return { ok: false, skipped: true };
   }
 
   const minutesBetween = (a, b) => Math.round(secBetween(a, b) / 60);

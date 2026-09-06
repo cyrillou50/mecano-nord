@@ -1533,9 +1533,9 @@
 
   async function vueImages(z) {
     const peutDeposer = MNGitHub.canPublish() || surServeur();
-    /* Sur le serveur, tout se fait sans jeton. Dans le dépôt, renommer et
-       supprimer en exigent un. */
-    const jeton = MNGitHub.hasToken() && MNGitHub.isConfigured();
+    /* Renommer et supprimer dans le dépôt demandent de le lire d'abord, ce
+       que le site ne sait plus faire sans clé. Sur le serveur, tout marche. */
+    const peutRetoucher = surServeur();
 
     z.innerHTML =
       outils(surServeur()
@@ -1549,10 +1549,11 @@
           : "") +
         U.bouton("Ajouter une image", { variante: "principal", icone: "plus", action: "add" }) +
         '<input type="file" id="i-fichier" accept="image/*" hidden>') +
-      (jeton || surServeur() ? "" : U.alerte({
+      (peutRetoucher ? "" : U.alerte({
         ton: "alerte",
-        texte: "Sans jeton GitHub sur cet appareil, tu peux consulter les images mais " +
-               "pas les renommer ni les supprimer. Configure-le dans l'onglet « Mise en ligne »."
+        texte: "Ces images vivent dans le dépôt : tu peux les consulter, mais les renommer " +
+               "ou les supprimer demanderait de le lire, ce que le site ne fait pas. " +
+               "Héberge-les sur le serveur de l'atelier et tout redevient possible."
       })) +
       '<div id="i-liste" style="margin-top:var(--e-3)">' +
         '<p class="champ__aide">Lecture du dossier…</p></div>';
@@ -1571,7 +1572,7 @@
       if (!f) return;
       fichierVersIcone(f, async data => {
         if (!peutDeposer) {
-          return U.toast("Serveur ou jeton GitHub requis pour déposer une image", "err");
+          return U.toast("Il faut un serveur pour déposer une image", "err");
         }
         try {
           const chemin = await deposer(data, f.name);
@@ -1598,9 +1599,9 @@
       '<div class="pile pile--sm">' + refs.map(x => {
         const usages = usagesDe(x.ref);
         const src = x.serveur ? MNStore.imageUrl(x.nom) : x.ref;
-        /* Une image du dépôt reste intouchable sans jeton ; celles du
+        /* Une image du dépôt reste intouchable — il faudrait le lire ; celles du
            serveur ne demandent rien. */
-        const modifiable = x.serveur || jeton;
+        const modifiable = x.serveur || peutRetoucher;
         return '<div class="ad-ligne" data-img="' + U.esc(x.nom) + '" data-srv="' +
           (x.serveur ? "1" : "") + '">' +
           '<span class="ad-ico"><img src="' + U.esc(src) +
@@ -2319,45 +2320,20 @@
             U.champ({ id: "p-branche", label: "Branche", valeur: gh.branch, repere: "main" }) +
             U.champ({ id: "p-chemin", label: "Fichier de données", valeur: gh.path }) +
           "</div>" +
-          '<div class="champ" style="margin-top:var(--e-4)">' +
-            '<label class="champ__label" for="p-jeton">Jeton d\'accès GitHub</label>' +
-            '<div class="ad-copie">' +
-              '<input class="saisie" id="p-jeton" type="password" placeholder="' +
-                (MNGitHub.hasToken() ? "•••••••••• (enregistré sur cet appareil)"
-                                     : "github_pat_…") + '">' +
-              U.bouton("Vérifier", { variante: "fantome", icone: "check", action: "check" }) +
-            "</div>" +
-            '<p class="champ__aide">Le jeton reste dans <b>ton</b> navigateur, il n\'est jamais ' +
-              "écrit dans le dépôt. Chaque personne qui publie met le sien." + "</p>" +
-            (MNGitHub.hasToken()
-              ? '<div>' + U.bouton("Oublier le jeton de cet appareil",
-                  { variante: "fantome", taille: "sm", icone: "croix", action: "oublier" }) +
-                "</div>"
-              : "") +
-          "</div>" +
-          '<div id="p-resultat" style="margin-top:var(--e-3)"></div>' +
+          '<p class="champ__aide" style="margin-top:var(--e-4)">Ces quatre champs disent au ' +
+            "serveur <b>où</b> écrire. La clé qui lui permet d'écrire, elle, est dans son " +
+            "service systemd (<code>GH_TOKEN</code>) et nulle part ailleurs — surtout pas " +
+            "ici : le catalogue est public.</p>" +
           '<div style="margin-top:var(--e-3)">' +
             U.bouton("Enregistrer les infos du dépôt", { variante: "fantome", taille: "sm",
                                                          icone: "check", action: "save-depot" }) +
           "</div>"
         }) +
 
-        U.carte({ titre: "Mise en route (une seule fois)", corps: etapes([
-          "Va sur <b>github.com</b> → ton avatar → <b>Settings</b> → tout en bas " +
-            "<b>Developer settings</b> → <b>Personal access tokens</b> → " +
-            "<b>Fine-grained tokens</b> → <b>Generate new token</b>.",
-          "Dans <b>Repository access</b>, choisis <b>Only select repositories</b> et " +
-            "sélectionne le dépôt de ce site.",
-          "Dans <b>Permissions → Repository permissions</b>, mets <code>Contents</code> sur " +
-            "<b>Read and write</b>. Rien d'autre n'est nécessaire.",
-          "Copie le jeton généré, colle-le dans le champ ci-dessus, clique sur " +
-            "<b>Vérifier</b> puis sur <b>Publier maintenant</b>."
-        ]) }) +
-
-        U.carte({ titre: "Méthode manuelle (sans jeton)", corps:
-          '<p class="champ__aide" style="margin-bottom:var(--e-3)">Si tu préfères ne pas ' +
-            "utiliser de jeton : télécharge le fichier et remplace <code>" + U.esc(gh.path) +
-            "</code> dans ton dépôt GitHub.</p>" +
+        U.carte({ titre: "Copie manuelle", corps:
+          '<p class="champ__aide" style="margin-bottom:var(--e-3)">Pour un dépannage, ou pour ' +
+            "garder une copie : télécharge le fichier et remplace <code>" + U.esc(gh.path) +
+            "</code> dans le dépôt GitHub à la main.</p>" +
           '<div class="rang">' +
             U.bouton("Télécharger le fichier", { variante: "fantome", action: "dl" }) +
             U.bouton("Copier le contenu", { variante: "fantome", action: "copier" }) +
@@ -2385,42 +2361,6 @@
       brouillon.settings.github = lireDepot();
       valider();
       U.toast("Infos du dépôt enregistrées", "ok");
-    });
-
-    z.querySelector('[data-a="check"]').addEventListener("click", async () => {
-      const boite = z.querySelector("#p-resultat");
-      const jeton = z.querySelector("#p-jeton").value.trim();
-      if (jeton) MNGitHub.setToken(jeton);
-      if (!MNGitHub.hasToken()) {
-        boite.innerHTML = U.alerte({ ton: "erreur", texte: "Colle d'abord un jeton." });
-        return;
-      }
-      brouillon.settings.github = lireDepot();
-      MNStore.saveDraft(brouillon);
-
-      boite.innerHTML = U.alerte({ ton: "info", texte: "Vérification…" });
-      try {
-        const r = await MNGitHub.check();
-        boite.innerHTML = U.alerte({
-          ton: r.canWrite ? "succes" : "alerte",
-          titre: "Connecté à " + r.repo + (r.login ? " en tant que " + r.login : ""),
-          texte: (r.canWrite
-            ? "Écriture autorisée — tu peux publier."
-            : "Mais le jeton n'a pas le droit d'écrire. Repasse par l'étape 3.") +
-            (r.fileExists ? ""
-              : " Le fichier n'existe pas encore, il sera créé à la première publication.")
-        });
-        z.querySelector("#p-jeton").value = "";
-      } catch (e) {
-        boite.innerHTML = U.alerte({ ton: "erreur", texte: e.message });
-      }
-    });
-
-    const oub = z.querySelector('[data-a="oublier"]');
-    if (oub) oub.addEventListener("click", () => {
-      MNGitHub.forgetToken();
-      U.toast("Jeton oublié sur cet appareil", "ok");
-      dessiner();
     });
 
     z.querySelector('[data-a="dl"]').addEventListener("click", () => {
@@ -2473,16 +2413,17 @@
       corps:
         (serveur
           ? U.alerte({ ton: "succes", titre: "Tout passe par ton serveur",
-              texte: "L'équipe pointe son service et les responsables publient depuis le " +
-                     "site, sans que personne n'ait de jeton. Les adresses Discord restent " +
+              texte: "L'équipe pointe son service et les modifications partent en ligne " +
+                     "seules, sans que personne n'ait de clé. Les adresses Discord restent " +
                      "chez toi." })
           : auto
             ? U.alerte({ ton: "succes",
                 texte: "Le pointage est partagé. Renseigne l'adresse du serveur ci-dessous " +
-                       "pour que la publication se passe aussi de jeton." })
-            : U.alerte({ ton: "alerte", titre: "Sans serveur, il faut un jeton par personne",
-                texte: "Pour publier comme pour apparaître dans le tableau de service. " +
-                       "Renseigne ton serveur ci-dessous et tout devient automatique." })) +
+                       "pour que la mise en ligne s'y ajoute." })
+            : U.alerte({ ton: "alerte", titre: "Sans serveur, rien ne peut être mis en ligne",
+                texte: "C'est lui qui détient la clé GitHub, et le site n'en détient aucune. " +
+                       "C'est aussi lui qui partage le tableau de service. Renseigne son " +
+                       "adresse ci-dessous." })) +
 
         '<div class="champ" style="margin-top:var(--e-4)">' +
           '<label class="champ__label" for="v-serveur">Adresse de ton serveur</label>' +
@@ -2600,7 +2541,7 @@
         } catch (_) { pub = "inconnu"; }
 
         const pistes = {
-          ok: "La publication passera par lui — plus besoin de jeton.",
+          ok: "La mise en ligne passera par lui — personne n'a de clé à donner.",
           absent: "La publication n'est pas configurée : ajoute GH_TOKEN, GH_OWNER et " +
                   "GH_REPO dans le service, puis redémarre-le.",
           vieux: "Version trop ancienne : ce serveur ne connaît pas encore la publication. " +
@@ -2715,13 +2656,11 @@
   async function publier() {
     if (MNGitHub.etatAuto().enCours) return;
 
-    if (!MNAuth.can("publish")) return U.toast("Tu n'as pas la permission de publier", "err");
-
+    /* Plus de permission à vérifier : la mise en ligne suit l'écriture. Reste
+       la seule vraie condition — un serveur pour écrire. */
     if (!MNGitHub.canPublish()) {
       onglet = "publier"; dessiner();
-      return U.toast(MNGitHub.hasToken()
-        ? "Renseigne le propriétaire et le nom du dépôt"
-        : "Renseigne l'adresse de ton serveur, ou un jeton GitHub", "err");
+      return U.toast("Renseigne l'adresse de ton serveur dans « Le site »", "err");
     }
 
     /* L'envoi porte le brouillon du magasin ; celui de cette page est le même
@@ -2740,8 +2679,8 @@
     } else {
       const echec = MNGitHub.etatAuto().echec;
       if (echec) {
-        /* Le conseil dépend de ce qui a échoué : inutile d'envoyer quelqu'un
-           vérifier son jeton quand c'est le serveur qui est en cause. */
+        /* Le conseil dépend de ce qui a échoué : « le serveur ne répond pas »
+           et « le serveur n'a pas les accès GitHub » ne se règlent pas pareil. */
         const m = String(echec.message || "");
         let piste;
         if (/Chemin inconnu/i.test(m)) {
@@ -2758,7 +2697,7 @@
           piste = "Le serveur refuse d'écrire ce fichier. C'est volontaire : il n'autorise " +
             "que le catalogue et les images.";
         } else {
-          piste = "Vérifie le jeton et les infos du dépôt ci-dessous, puis réessaie.";
+          piste = "Vérifie les infos du dépôt ci-dessous, puis réessaie.";
         }
 
         U.modale({
@@ -2950,8 +2889,8 @@
 
   /**
    * Toutes les images disponibles, celles du serveur d'abord.
-   * Avec un jeton GitHub on lit le dépôt (toujours exact) ; sinon on retombe
-   * sur le manifeste, tenu à jour à chaque dépôt.
+   * Le dépôt ne se lit pas depuis le site — il faudrait une clé, et le site
+   * n'en a pas. On s'appuie sur le manifeste, tenu à jour à chaque dépôt.
    */
   async function listerImages(force) {
     if (cacheImages && !force) return cacheImages;
@@ -2962,13 +2901,9 @@
       catch (_) { /* serveur muet : on se rabat sur le dépôt */ }
     }
 
-    if (MNGitHub.hasToken() && MNGitHub.isConfigured()) {
-      try {
-        const fichiers = await MNGitHub.listDir(IMG_DIR);
-        noms = fichiers.filter(f => f.type === "file" && IMG_RE.test(f.name)).map(f => f.name);
-        source = "github";
-      } catch (_) { /* on tentera le manifeste */ }
-    }
+    /* Le dépôt ne se lit plus depuis le site : il faudrait une clé, et le
+       site n'en a pas. Le manifeste `index.json` est un fichier public comme
+       un autre — il suffit. */
     if (source !== "github") {
       try {
         const r = await fetch(IMG_DIR + "/index.json?v=" + Date.now(), { cache: "no-store" });

@@ -60,7 +60,7 @@ window.MN_PERMS = [
   { key: "emotes",    name: "Gérer les émotes",    desc: "Ajouter, corriger et supprimer les émotes du serveur de jeu. Tout le monde peut les consulter." },
   { key: "blacklist", name: "Gérer la blacklist",  desc: "Inscrire un client, dire pourquoi, suivre le remboursement et lever une inscription. Tout le monde peut la lire — c'est au comptoir qu'elle sert." },
   { key: "users",     name: "Gérer l'équipe",      desc: "Ajouter des employés, créer des rôles et régler leurs droits." },
-  { key: "publish",   name: "Publier en ligne",    desc: "Envoyer les modifications sur le site public." },
+  { key: "publish",   name: "Réglages de mise en ligne", desc: "Voir l'onglet « Mise en ligne » : dépôt, adresse du serveur, copie manuelle. Mettre le site à jour, en revanche, est automatique pour tout le monde." },
   { key: "theme",     name: "Gérer l'apparence",   desc: "Choisir le thème et les couleurs de tout le site, et décider si chacun peut se faire les siennes." },
   { key: "admin",     name: "Patron (tout)",       desc: "Accès complet : implique toutes les permissions." }
 ];

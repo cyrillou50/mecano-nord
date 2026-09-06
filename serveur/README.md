@@ -6,8 +6,8 @@ moteur, pour que tout se fasse depuis le site.
 Une fois en place :
 
 - tes employés **pointent leur service** sans rien installer,
-- les responsables **publient** depuis le panneau admin **sans jeton GitHub** :
-  c'est le serveur qui détient le jeton et écrit sur le dépôt,
+- les modifications partent **en ligne toutes seules**, sans que personne
+  n'ait de jeton GitHub : c'est le serveur qui le détient et qui écrit,
 - les adresses de webhook Discord ne sont plus dans le dépôt public,
 - les données de pointage sont chez toi, avec sauvegardes automatiques.
 
@@ -313,7 +313,7 @@ Caddy obtient le certificat tout seul, en quelques secondes.
 
 ### B4. Brancher le site
 
-Ton site reste sur GitHub Pages. Dans **Admin → Publier → Serveur de
+Ton site reste sur GitHub Pages. Dans **Admin → Mise en ligne → Serveur de
 l'atelier**, un seul champ à remplir :
 
 | Champ | Valeur |
@@ -326,8 +326,9 @@ publication y est configurée. Puis **Enregistrer** et **Publier**.
 Ensuite, dans **Admin → Discord**, vide les deux champs d'adresse de webhook —
 c'est le serveur qui les connaît — et publie à nouveau.
 
-À partir de là, **plus personne n'a besoin de jeton** : les responsables
-publient depuis le site, l'équipe pointe, tout passe par ton serveur.
+À partir de là, **plus personne n'a besoin de jeton** — le site ne sait même
+plus en utiliser un. Les modifications partent en ligne toutes seules, l'équipe
+pointe, tout passe par ton serveur.
 
 ---
 
@@ -428,7 +429,7 @@ https://api.tondomaine.fr/sante
 ```
 
 Doit afficher `{"ok":true,...}`. Colle ensuite `https://api.tondomaine.fr`
-dans **Admin → Publier → Serveur de l'atelier**, clique **Tester**, puis
+dans **Admin → Mise en ligne → Serveur de l'atelier**, clique **Tester**, puis
 enregistre et publie.
 
 Tes autres sites ne sont pas touchés : tu as simplement ajouté un vhost.
@@ -523,7 +524,7 @@ tourner avec l'ancienne version, et les nouveautés ne répondent pas.
 mais qu'il est trop vieux pour connaître la publication. La mise à jour
 ci-dessus le corrige.
 
-Pour savoir où tu en es, va dans **Admin → Publier → Serveur de l'atelier**
+Pour savoir où tu en es, va dans **Admin → Mise en ligne → Serveur de l'atelier**
 et clique **Tester** : il te dit s'il est à jour, si les accès GitHub manquent,
 ou s'il ne répond pas.
 

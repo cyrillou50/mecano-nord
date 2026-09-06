@@ -291,9 +291,6 @@
     document.querySelectorAll("[data-out]").forEach(b =>
       b.addEventListener("click", () => kick(b.dataset.out, b.dataset.pseudo)));
 
-    const tk = $("#d-token");
-    if (tk) tk.addEventListener("click", askToken);
-
     const pin = $("#d-punch");
     if (pin) pin.addEventListener("click", punchSomeone);
 
@@ -621,61 +618,10 @@
       "<span><b>Les pointages ne sont pas encore partagés.</b> Ils partent sur Discord, mais " +
       "n'apparaissent pas dans le tableau commun. " +
       (chef
-        ? "Mets en place le <b>relais</b> (panneau admin → Discord) : une fois fait, tout le monde " +
-          "pointe sans rien avoir à installer."
-        : "Préviens un responsable : il doit mettre en place le relais du site.") + "</span>" +
-      (chef
-        ? '<button class="btn btn--ghost btn--sm" id="d-token" style="flex:none" ' +
-          'title="Solution de dépannage : utiliser un jeton sur cet appareil">' + svg("key") +
-          "<span>Jeton</span></button>"
-        : "") +
+        ? "Renseigne l'adresse du <b>serveur de l'atelier</b> (Administration → Le site) : " +
+          "une fois fait, tout le monde pointe sans rien avoir à installer."
+        : "Préviens un responsable : il doit renseigner l'adresse du serveur.") + "</span>" +
       "</div>";
-  }
-
-  /** Enregistre le jeton d'équipe sur cet appareil. */
-  function askToken() {
-    const body = document.createElement("div");
-    body.innerHTML =
-      '<div class="field"><label class="label" for="tk">Jeton d\'équipe</label>' +
-        '<input class="input mono" id="tk" type="password" placeholder="github_pat_…" autocomplete="off"></div>' +
-      '<div id="tk-msg" style="margin-top:12px"></div>' +
-      '<p class="hint" style="margin-top:12px">Colle ici le jeton que ton responsable t\'a envoyé. ' +
-        "Il reste sur <b>cet appareil</b> et sert uniquement à inscrire tes prises de service dans le " +
-        "tableau commun. Tu n'auras plus à le refaire.</p>";
-
-    MNUI.modal({
-      title: "Jeton d'équipe", body,
-      actions: [
-        { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
-        {
-          label: "Enregistrer", variant: "btn--primary", icon: "save",
-          onClick: async (close, b, btn) => {
-            const v = body.querySelector("#tk").value.trim();
-            const msg = body.querySelector("#tk-msg");
-            if (!v) return MNUI.toast("Colle d'abord le jeton", "err");
-
-            btn.disabled = true;
-            btn.innerHTML = svg("refresh") + "<span>Vérification…</span>";
-            const avant = MNGitHub.getToken();
-            MNGitHub.setToken(v);
-            try {
-              const r = await MNGitHub.check();
-              if (!r.canWrite) throw new Error("Ce jeton n'a pas le droit d'écrire sur le dépôt.");
-              close();
-              MNUI.toast("Jeton enregistré — tes pointages sont maintenant partagés", "ok");
-              await MNDuty.load(true);
-              render();
-            } catch (e) {
-              if (avant) MNGitHub.setToken(avant); else MNGitHub.forgetToken();
-              btn.disabled = false;
-              btn.innerHTML = svg("save") + "<span>Enregistrer</span>";
-              msg.innerHTML = '<div class="alert alert--err">' + svg("alert") +
-                "<span>" + esc(e.message) + "</span></div>";
-            }
-          }
-        }
-      ]
-    });
   }
 
   function teamCount(onDuty) {

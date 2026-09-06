@@ -92,9 +92,8 @@ ayant `duty_view` voient le tableau des présents, le temps cumulé sur 7 jours
 et les derniers pointages, et peuvent clôturer le service de quelqu'un qui a
 oublié.
 
-Le tableau partagé vit dans `data/duty.json`. Il n'est mis à jour pour toute
-l'équipe que par les personnes ayant un **jeton GitHub** sur leur appareil ;
-pour les autres, le pointage part sur Discord et le site le signale.
+Le tableau partagé vit sur le serveur de l'atelier. Sans serveur configuré, le
+pointage part sur Discord et reste local — le site le signale.
 
 ### Webhooks Discord
 
@@ -118,10 +117,9 @@ construction.
 
 ### Pointage automatique pour toute l'équipe
 
-Par défaut, seuls les employés ayant un jeton GitHub apparaissent dans le
-tableau de service. Pour que ce soit automatique **sans que personne
-n'installe quoi que ce soit**, deux options, à régler dans
-**Admin → Publier → Pointage de l'équipe** :
+Sans serveur, personne n'apparaît dans le tableau de service. Pour que ce soit
+automatique **sans que personne n'installe quoi que ce soit**, trois options, à
+régler dans **Admin → Mise en ligne → Pointage de l'équipe** :
 
 **Option 1 — Base partagée (le plus simple, ~5 min, aucun code à déployer)**
 
@@ -154,8 +152,9 @@ le HTTPS, réglages du site). Compte 20 minutes.
 
 **Option 3 — Relais Cloudflare**, si tu n'as ni VPS ni envie de Firebase.
 
-⚠️ Ne partage jamais un jeton GitHub « d'équipe » pour contourner ça : il
-donne le droit d'écrire sur **tout** le dépôt.
+⚠️ Ne distribue jamais de jeton GitHub « d'équipe » pour contourner ça : il
+donne le droit d'écrire sur **tout** le dépôt. Le site ne sait d'ailleurs plus
+en utiliser un — c'est voulu.
 
 ---
 
@@ -168,13 +167,13 @@ fichier. Une fois en place, tu colles son adresse dans **Admin → Discord** :
 
 1. **Les webhooks Discord** ne sont plus dans le dépôt : c'est le relais qui
    les connaît.
-2. **Le pointage devient automatique pour toute l'équipe.** Sans relais, seuls
-   les employés ayant un jeton GitHub apparaissent dans le tableau de service.
-   Avec lui, c'est le relais qui écrit, et **personne n'a rien à installer**.
+2. **Le pointage devient automatique pour toute l'équipe.** Sans relais ni
+   serveur, personne n'apparaît dans le tableau de service. Avec, c'est lui
+   qui écrit, et **personne n'a rien à installer**.
 
-⚠️ Ne partage jamais un jeton GitHub « d'équipe » pour contourner ça : il donne
-le droit d'écrire sur **tout** le dépôt. Le relais, lui, ne peut toucher qu'au
-fichier de pointage.
+⚠️ Ne distribue jamais de jeton GitHub « d'équipe » pour contourner ça : il
+donne le droit d'écrire sur **tout** le dépôt. Le relais, lui, ne peut toucher
+qu'au fichier de pointage.
 
 En attendant, utilise un salon dédié sans enjeu, et régénère le webhook depuis
 Discord au moindre doute.
@@ -198,13 +197,13 @@ le bouton **Choisir une icône** propose quatre possibilités :
 
 1. **Bibliothèque intégrée** — une trentaine d'icônes vectorielles qui prennent
    la couleur du thème.
-2. **Tes images** — le sélecteur liste **automatiquement** le contenu de
-   `assets/img/` (lu dans le dépôt si ton jeton GitHub est configuré, sinon
-   d'après `assets/img/index.json`). Un clic sur une vignette suffit.
+2. **Tes images** — le sélecteur liste **automatiquement** celles du serveur,
+   plus le contenu de `assets/img/` d'après `assets/img/index.json`. Un clic
+   sur une vignette suffit.
 3. **Ajouter une image** — le fichier est recadré (marges transparentes
-   supprimées), centré dans un carré de 128 px, puis **déposé dans
-   `assets/img/` du dépôt** et référencé par son chemin. Sans jeton, il est
-   intégré au fichier de données à la place.
+   supprimées), centré dans un carré de 128 px, puis **déposé sur le serveur**
+   et référencé par son nom. Sans serveur, il est intégré au fichier de
+   données à la place.
 4. **Un emoji** ou une **adresse externe** (`https://…`).
 
 Toutes les images sont donc au même gabarit quelle que soit leur taille
@@ -216,45 +215,42 @@ de connexion et dans l'onglet du navigateur.
 
 ---
 
-## 5. Publier les modifications en un clic
+## 5. La mise en ligne : rien à faire
 
-Par défaut tes modifications restent dans **ton** navigateur. Pour que toute
-l'équipe les voie, il faut les publier. Configuration à faire **une seule fois** :
+**Il n'y a pas de bouton « Publier », et personne n'a de clé à donner.**
 
-1. Sur github.com : ton avatar → **Settings** → tout en bas
-   **Developer settings** → **Personal access tokens** →
-   **Fine-grained tokens** → **Generate new token**
-2. *Repository access* : **Only select repositories** → choisis le dépôt du site
-3. *Permissions → Repository permissions* : **Contents** = **Read and write**
-   (rien d'autre)
-4. Copie le jeton, colle-le dans **Admin → Publier**, clique **Vérifier**
+Tu modifies quelque chose, c'est enregistré, et c'est en ligne quelques
+secondes plus tard. Depuis n'importe quelle page, pour n'importe qui : si tu as
+eu le droit de le changer, tu as le droit de le voir en ligne. Il n'y a pas de
+permission « publier » à accorder en plus — elle ne servait qu'à décider qui
+détenait la clé, et il n'y a plus de clé à détenir côté site.
 
-Ensuite, un clic sur **Publier** suffit : le site public est à jour environ
-une minute plus tard.
+### Comment ça marche
 
-### Publication automatique
+Le **serveur de l'atelier** garde les données et le jeton GitHub. Le site lui
+poste les modifications ; il écrit. Le jeton vit dans son service systemd
+(`GH_TOKEN`), jamais dans le navigateur de qui que ce soit et jamais dans le
+dépôt — le catalogue est public, l'y mettre reviendrait à le publier.
 
-Dans **Admin → Publier**, active **« Envoyer sur GitHub à chaque modification »** :
-tu n'as plus rien à cliquer. Quelques secondes après ta dernière modification,
-le catalogue part tout seul. Les changements rapprochés sont regroupés en un
-seul envoi pour ne pas créer un commit par clic.
+C'est aussi ce qui évite les commits inutiles : le catalogue est **hébergé par
+le serveur**, où l'écriture est immédiate. Le dépôt ne reçoit plus qu'une copie
+d'amorçage, réécrite le jour où l'adresse du serveur change. Un commit ferait
+reconstruire le site entier pour un numéro de téléphone corrigé.
 
-Le réglage est propre à chaque navigateur, et **Publier maintenant** force
-toujours un envoi immédiat.
+L'installation du serveur est décrite dans **`serveur/README.md`** (Node,
+systemd, Caddy pour le HTTPS). Compte 20 minutes, une fois pour toutes.
+
+### Sans serveur
+
+Rien ne part, et le site le dit clairement plutôt que de réclamer un jeton.
+L'onglet **Mise en ligne** propose alors « Télécharger le fichier » : tu
+remplaces `data/catalog.json` à la main sur GitHub.
 
 ### Les images aussi
 
 Quand tu importes une image depuis le sélecteur d'icônes, elle est **déposée
-directement dans `assets/img/` du dépôt** (et référencée par son chemin, pas
-recopiée dans les données). Sans jeton configuré, elle est simplement intégrée
-au fichier de données.
-
-Le jeton reste **dans ton navigateur uniquement**, il n'est jamais écrit dans
-le dépôt. Chaque personne qui publie met le sien.
-
-> Tu ne veux pas de jeton ? L'onglet **Publier** propose aussi
-> « Télécharger le fichier » : tu remplaces `data/catalog.json` à la main
-> sur GitHub.
+sur le serveur** et référencée par son nom, pas recopiée dans les données.
+Sans serveur, elle est simplement intégrée au fichier de données.
 
 ---
 
