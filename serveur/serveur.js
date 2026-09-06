@@ -771,6 +771,9 @@ const LISTES = {
 
       return {
         id, nom,
+        /* Le groupe du client, quand il en a un : écrit pareil que sur les
+           fiches, c'est lui qui permet de les rapprocher. */
+        groupe: texte(x.groupe, 60).trim(),
         raison: texte(x.raison, 600),
         remboursement: rb,
         ressources,
@@ -1855,6 +1858,10 @@ function appliquerEquipe(cat, op) {
         u.trainings = op.trainings.map(t => texte(t, 40)).filter(Boolean).slice(0, 30);
       }
       if (op.note !== undefined) u.note = texte(op.note, 400);
+      /* Le groupe auquel la personne appartient — un gang, une organisation.
+         Du texte libre : ces groupes vont et viennent. C'est ce nom qui, sur
+         la blacklist, dit qui en fait partie. */
+      if (op.groupe !== undefined) u.groupe = texte(op.groupe, 60).trim();
       if (op.active !== undefined) u.active = op.active === true;
       if (op.hidden !== undefined) u.hidden = op.hidden === true;
       /* Le masquage se regle garage par garage : une liste, pas un booleen. */

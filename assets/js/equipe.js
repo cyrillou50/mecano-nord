@@ -666,6 +666,14 @@
               (!u.sansMinimum && u.minimum !== null && u.minimum !== undefined &&
                u.minimum !== MNStore.minimumDe(ici())
                 ? ' <span class="pill pill--dim">' + esc(u.minimum + " h/sem.") + "</span>" : "") +
+              /* Le groupe, et en rouge s'il est sur la blacklist : c'est
+                 exactement ce qu'on veut voir sans ouvrir chaque fiche. */
+              (u.groupe
+                ? ' <span class="pill pill--' +
+                  (MNStore.blacklistDuGroupe(u.groupe, ici())
+                    .some(x => !MNStore.leveeIci(x, ici())) ? "danger" : "outline") +
+                  '">' + esc(u.groupe) + "</span>"
+                : "") +
               /* Utile surtout pour ceux des deux garages : on doit voir d'un
                  coup d'œil qu'on les retrouvera aussi de l'autre côté. */
               (MNStore.ateliersDe(u).length > 1
@@ -762,6 +770,8 @@
 
           serviceSection(u, on) +
 
+          groupeSection(u) +
+
           (u.note && canSeeNotes
             ? '<h3 class="section-title" style="margin-top:24px">Note interne</h3>' +
               '<p class="hint" style="white-space:pre-wrap">' + esc(u.note) + "</p>"
@@ -826,6 +836,37 @@
     const jours = l.reduce((n, c) => n + MNDuty.nbJours(c.from, c.to), 0);
     return stat(parti ? "Congés — total" : "Congés — " + an, jours + " j", false, null,
       l.length ? l.length + " période" + (l.length > 1 ? "s" : "") : "aucun");
+  }
+
+  /**
+   * Le groupe de la personne, et ce que la blacklist en dit.
+   *
+   * C'est le point du rapprochement : une inscription vise un groupe, la
+   * fiche dit lequel, et on n'a plus à se souvenir de qui traîne avec qui.
+   * Une inscription levée est nommée aussi, mais sans alarme — elle a existé.
+   */
+  function groupeSection(u) {
+    if (!u.groupe) return "";
+    const inscrits = MNStore.blacklistDuGroupe(u.groupe, ici());
+    const actives = inscrits.filter(x => !MNStore.leveeIci(x, ici()));
+    const autres = MNStore.membresDuGroupe(u.groupe, ici()).filter(x => x.id !== u.id);
+
+    return '<h3 class="section-title" style="margin-top:24px">Groupe</h3>' +
+      '<p><b>' + esc(u.groupe) + "</b>" +
+      (autres.length
+        ? ' <span class="hint">— aussi ' + autres.map(x => esc(x.pseudo)).join(", ") +
+          "</span>"
+        : "") + "</p>" +
+      (actives.length
+        ? '<div class="alert alert--err" style="margin-top:10px">' + svg("alert") +
+          "<span><b>Ce groupe est sur la blacklist.</b> " +
+          actives.map(x => esc(x.raison || "sans raison écrite")).join(" — ") +
+          "</span></div>"
+        : inscrits.length
+          ? '<div class="alert alert--warn" style="margin-top:10px">' + svg("alert") +
+            "<span>Ce groupe a été sur la blacklist, l'inscription est levée.</span></div>"
+          : "") +
+      '<p class="hint"><a href="blacklist.html">Voir la blacklist</a></p>';
   }
 
   function congesSection(u) {
@@ -1562,6 +1603,15 @@
           '<input class="input" id="f-new" placeholder="Ex. Remorquage" maxlength="40">' +
           '<button class="btn btn--ghost btn--sm" id="f-add" type="button">' + svg("plus") + "<span>Ajouter</span></button>" +
         "</div></div>" +
+      '<div class="field"><label class="label" for="f-groupe">Groupe</label>' +
+        '<input class="input" id="f-groupe" maxlength="60" list="f-groupes" ' +
+          'placeholder="Aucun — laisse vide" value="' + esc(u.groupe || "") + '">' +
+        '<datalist id="f-groupes">' +
+          MNStore.groupesConnus().map(g =>
+            '<option value="' + esc(g) + '">').join("") + "</datalist>" +
+        '<p class="hint">Le gang ou l\'organisation dont la personne fait partie, ' +
+          "s'il y en a un. Écris-le pareil que sur la blacklist : c'est ce nom " +
+          "qui permet de voir, quand un groupe y est inscrit, qui en est.</p></div>" +
       '<div class="field"><label class="label" for="f-note">Note interne</label>' +
         '<textarea class="textarea" id="f-note" maxlength="400" placeholder="Remarques, disponibilités…">' +
           esc(u.note || "") + "</textarea></div>" +
@@ -1634,6 +1684,7 @@
               pseudo,
               hiredAt: body.querySelector("#f-hired").value || u.hiredAt,
               trainings,
+              groupe: body.querySelector("#f-groupe").value.trim(),
               note: body.querySelector("#f-note").value.trim(),
               active: u.id === me.uid ? true : body.querySelector("#f-active").checked,
               masques: lireMasques(body, "f-masq"),

@@ -52,7 +52,8 @@
   function filtrer(l) {
     const q = filtre.trim().toLowerCase();
     if (!q) return l;
-    return l.filter(x => (x.nom + " " + x.raison).toLowerCase().indexOf(q) !== -1);
+    return l.filter(x =>
+      (x.nom + " " + x.groupe + " " + x.raison).toLowerCase().indexOf(q) !== -1);
   }
 
   /** Ce qui reste à rendre, tous clients confondus, ressource par ressource. */
@@ -99,7 +100,7 @@
                 MNStore.ressourcesEnClair(du) + "." })) +
 
         (toutes().length
-          ? U.champ({ id: "bl-q", repere: "Rechercher un nom, une raison…", valeur: filtre }) +
+          ? U.champ({ id: "bl-q", repere: "Rechercher un nom, un groupe, une raison…", valeur: filtre }) +
             corps(l, lev)
           : U.vide({
               icone: "check",
@@ -145,6 +146,25 @@
     "</div>";
   }
 
+  /**
+   * Les employés de l'atelier qui appartiennent au groupe inscrit.
+   *
+   * C'est tout l'intérêt de noter un groupe : quand il arrive au comptoir, on
+   * veut savoir en un coup d'œil si quelqu'un de la maison en est — et le
+   * savoir avant, pas après.
+   */
+  function membres(x) {
+    if (!x.groupe) return "";
+    const l = MNStore.membresDuGroupe(x.groupe, ici());
+    if (!l.length) return "";
+    return U.alerte({
+      ton: "alerte",
+      titre: (l.length > 1 ? "Des employés font" : "Un employé fait") +
+        " partie de « " + x.groupe + " »",
+      texte: l.map(u => U.esc(u.pseudo)).join(", ")
+    });
+  }
+
   function carte(x) {
     const r = MNStore.remboursementDe(x.remboursement);
     const lev = leveeIci(x);
@@ -155,6 +175,7 @@
         '<div class="rang blentree__tete">' +
           '<span class="blpoint" aria-hidden="true"></span>' +
           "<b>" + U.esc(x.nom) + "</b>" +
+          (x.groupe ? U.etiquette(x.groupe, "info") : "") +
           '<span class="pousse"></span>' +
           (x.remboursement !== "aucun"
             ? U.etiquette(r.nom, x.remboursement === "du" ? "alerte" : "succes")
@@ -168,6 +189,7 @@
               pastilles(x.ressources) +
             "</div>"
           : "") +
+        membres(x) +
         '<p class="champ__aide">Inscrit ' + U.ilYA(x.at) +
           (x.by ? " par " + U.esc(x.by) : "") + "." +
           (lev
@@ -292,6 +314,16 @@
       corps: '<div class="pile">' +
         U.champ({ id: "b-nom", label: "Nom du client", max: 60, repere: "Prénom Nom",
                   valeur: x ? x.nom : "" }) +
+        '<div class="champ"><label class="champ__label" for="b-groupe">Groupe</label>' +
+          '<input class="saisie" id="b-groupe" maxlength="60" list="b-groupes" ' +
+            'placeholder="Aucun — laisse vide" value="' +
+            U.esc(x ? x.groupe || "" : "") + '">' +
+          '<datalist id="b-groupes">' +
+            MNStore.groupesConnus().map(g =>
+              '<option value="' + U.esc(g) + '">').join("") + "</datalist>" +
+          '<p class="champ__aide">Le gang ou l\'organisation, s\'il y en a une. ' +
+            "Écris-le pareil que sur les fiches employés : c'est ce nom qui dira " +
+            "si quelqu'un de la maison en fait partie.</p></div>" +
         U.champ({ id: "b-raison", type: "zone", label: "Raison", lignes: 4, max: 600,
                   valeur: x ? x.raison : "",
                   repere: "Ce qui s'est passé, en clair. C'est ce que lira celui qui le verra arriver." }) +
@@ -315,6 +347,7 @@
           label: neuf ? "Inscrire" : "Enregistrer", variante: "principal",
           onClick: (fermer, corps) => {
             const nom = corps.querySelector("#b-nom").value.trim();
+            const groupe = corps.querySelector("#b-groupe").value.trim();
             if (!nom) return U.toast("Il faut un nom", "erreur");
             const raison = corps.querySelector("#b-raison").value.trim();
             if (!raison) return U.toast("Dis pourquoi : sans raison, l'inscription ne sert à personne", "erreur");
@@ -335,7 +368,7 @@
 
             const entree = Object.assign({}, x || {}, {
               id: x ? x.id : MNStore.uniqueId(nom, brut().map(y => y.id)),
-              nom, raison, remboursement: rb, ressources, ateliers: ats,
+              nom, groupe, raison, remboursement: rb, ressources, ateliers: ats,
               at: x ? x.at : new Date().toISOString(),
               by: x ? x.by : moi.pseudo,
               levee: x ? x.levee : {}

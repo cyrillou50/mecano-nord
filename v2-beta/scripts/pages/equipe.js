@@ -557,6 +557,12 @@
             (!u.sansMinimum && u.minimum !== null && u.minimum !== undefined &&
              u.minimum !== MNStore.minimumDe(ici())
               ? U.etiquette(u.minimum + " h/sem.") : "") +
+            /* Le groupe, en rouge s'il est sur la blacklist : c'est ce qu'on
+               veut voir sans ouvrir chaque fiche. */
+            (u.groupe
+              ? U.etiquette(u.groupe, MNStore.blacklistDuGroupe(u.groupe, ici())
+                  .some(x => !MNStore.leveeIci(x, ici())) ? "erreur" : "info")
+              : "") +
             /* Utile surtout pour ceux des deux garages : on doit voir d'un
                coup d'œil qu'on les retrouvera aussi de l'autre côté. */
             (MNStore.ateliersDe(u).length > 1 ? U.etiquette("Nord + Sud", "info") : "") +
@@ -635,6 +641,8 @@
         (voitAvert(u) ? blocAvert(u) : "") +
 
         historique(u, on) +
+
+        blocGroupe(u) +
 
         (u.note && voitNotes
           ? section("Note interne", 0,
@@ -762,6 +770,35 @@
       '<p class="champ__aide" style="margin-top:var(--e-2)">' + tous.length + " période" +
         (tous.length > 1 ? "s" : "") + " · <b>" + jours + " jour" + (jours > 1 ? "s" : "") +
         "</b> au total.</p>");
+  }
+
+  /**
+   * Le groupe de la personne, et ce que la blacklist en dit.
+   *
+   * C'est le point du rapprochement : une inscription vise un groupe, la
+   * fiche dit lequel, et on n'a plus à se souvenir de qui traîne avec qui.
+   * Une inscription levée est nommée aussi, mais sans alarme — elle a existé.
+   */
+  function blocGroupe(u) {
+    if (!u.groupe) return "";
+    const inscrits = MNStore.blacklistDuGroupe(u.groupe, ici());
+    const actives = inscrits.filter(x => !MNStore.leveeIci(x, ici()));
+    const autres = MNStore.membresDuGroupe(u.groupe, ici()).filter(x => x.id !== u.id);
+
+    return section("Groupe", 0,
+      "<p><b>" + U.esc(u.groupe) + "</b>" +
+        (autres.length
+          ? ' <span class="champ__aide">— aussi ' +
+            autres.map(x => U.esc(x.pseudo)).join(", ") + "</span>"
+          : "") + "</p>" +
+      (actives.length
+        ? U.alerte({ ton: "erreur", titre: "Ce groupe est sur la blacklist",
+            texte: actives.map(x => U.esc(x.raison || "sans raison écrite")).join(" — ") })
+        : inscrits.length
+          ? U.alerte({ ton: "alerte",
+              texte: "Ce groupe a été sur la blacklist, l'inscription est levée." })
+          : "") +
+      '<p class="champ__aide"><a href="blacklist.html">Voir la blacklist</a></p>');
   }
 
   const section = (titre, n, corps) =>
@@ -1435,6 +1472,17 @@
           U.bouton("Ajouter", { variante: "fantome", taille: "sm", icone: "plus",
                                 action: "addtag", type: "button" }) +
         "</div></div>" +
+      /* Une liste des groupes déjà écrits plutôt qu'une saisie libre : le
+         rapprochement se fait sur le nom, deux orthographes le cassent. */
+      '<div class="champ"><label class="champ__label" for="f-groupe">Groupe</label>' +
+        '<input class="saisie" id="f-groupe" maxlength="60" list="f-groupes" ' +
+          'placeholder="Aucun — laisse vide" value="' + U.esc(u.groupe || "") + '">' +
+        '<datalist id="f-groupes">' +
+          MNStore.groupesConnus().map(g =>
+            '<option value="' + U.esc(g) + '">').join("") + "</datalist>" +
+        '<p class="champ__aide">Le gang ou l\'organisation dont la personne fait ' +
+          "partie, s'il y en a un. Écris-le pareil que sur la blacklist : c'est ce " +
+          "nom qui permet de voir, quand un groupe y est inscrit, qui en est.</p></div>" +
       U.champ({ id: "f-note", label: "Note interne", type: "zone", valeur: u.note || "",
                 max: 400, repere: "Remarques, disponibilités…" }) +
       champAteliers("f-at", MNStore.ateliersDe(u)) +
@@ -1509,6 +1557,7 @@
               pseudo,
               hiredAt: k.querySelector("#f-emb").value || u.hiredAt,
               trainings: formations,
+              groupe: k.querySelector("#f-groupe").value.trim(),
               note: k.querySelector("#f-note").value.trim(),
               active: u.id === moi.uid ? true : k.querySelector("#f-actif").checked,
               masques: lireMasques(k, "f-masq"),

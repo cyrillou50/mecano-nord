@@ -485,6 +485,56 @@ window.MNStore = (function () {
     (_catalog.users || []).filter(u => estDeAtelier(u, atelier));
 
   /** Les heures attendues sur la semaine dans un atelier. 0 = aucun minimum. */
+  /* ---- Groupes ------------------------------------------------------------
+     Le même groupe s'écrit « Los Santos Cartel », « los santos cartel » ou
+     avec un espace en trop selon qui l'a tapé. On compare donc à la casse et
+     aux espaces près, sinon le rapprochement ne se ferait qu'une fois sur
+     deux et on ne s'en apercevrait pas. */
+
+  const cleGroupe = g => String(g || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+  /** Deux noms de groupe désignent-ils le même ? (vide = non) */
+  const memeGroupe = (a, b) => {
+    const x = cleGroupe(a);
+    return !!x && x === cleGroupe(b);
+  };
+
+  /**
+   * Les employés d'un groupe donné. Sert dans les deux sens : sur la
+   * blacklist pour savoir qui en fait partie, sur une fiche pour savoir si le
+   * groupe de la personne est inscrit.
+   * @param {string} g   le nom du groupe
+   * @param {string} [ou] limiter à un garage
+   */
+  function membresDuGroupe(g, ou) {
+    if (!cleGroupe(g)) return [];
+    return (_catalog.users || []).filter(u =>
+      u.active !== false && memeGroupe(u.groupe, g) &&
+      (!ou || estDeAtelier(u, ou)));
+  }
+
+  /**
+   * Les inscriptions en blacklist qui visent ce groupe, celles qui sont
+   * encore actives d'abord — une levée range l'entrée, elle ne l'efface pas.
+   */
+  function blacklistDuGroupe(g, ou) {
+    if (!cleGroupe(g)) return [];
+    return (_catalog.blacklist || []).filter(x =>
+      memeGroupe(x.groupe, g) && (!ou || estDeAtelier(x, ou)));
+  }
+
+  /** Tous les groupes déjà écrits quelque part, pour proposer plutôt que faire saisir. */
+  function groupesConnus() {
+    const vus = new Map();
+    const ajoute = g => {
+      const k = cleGroupe(g);
+      if (k && !vus.has(k)) vus.set(k, String(g).trim());
+    };
+    (_catalog.users || []).forEach(u => ajoute(u.groupe));
+    (_catalog.blacklist || []).forEach(x => ajoute(x.groupe));
+    return [...vus.values()].sort((a, b) => a.localeCompare(b, "fr"));
+  }
+
   /** Le livret du garage demandé, ou de celui où l'on travaille. */
   const livretDe = ou => {
     const l = settings().livret;
@@ -944,6 +994,12 @@ window.MNStore = (function () {
         hiredAt: /^\d{4}-\d{2}-\d{2}$/.test(u.hiredAt) ? u.hiredAt : createdAt.slice(0, 10),
         trainings: (Array.isArray(u.trainings) ? u.trainings : [])
           .map(t => String(t).trim()).filter(Boolean).slice(0, 30),
+        /* Le groupe auquel la personne appartient, s'il y en a un — un gang,
+           une organisation. Du texte libre : ces groupes vont et viennent, en
+           tenir une liste fermée demanderait de la maintenir pour rien.
+           C'est ce nom qui permet de voir, quand un groupe est blacklisté,
+           qui en fait partie. */
+        groupe: String(u.groupe || "").trim().slice(0, 60),
         note: u.note ? String(u.note).slice(0, 400) : "",
         depart: normDepart(u.depart),
         history: history.slice(-40),
@@ -995,6 +1051,9 @@ window.MNStore = (function () {
       return {
         id,
         nom: String(x.nom || "").slice(0, 60),
+        /* Le groupe du client, quand il en a un. Écrit pareil que sur les
+           fiches, c'est lui qui dit « attention, untel en fait partie ». */
+        groupe: String(x.groupe || "").trim().slice(0, 60),
         raison: String(x.raison || "").slice(0, 600),
         /* « aucun » quand il n'y a rien à rendre, « du » tant que ce n'est pas
            fait, « fait » une fois rendu. Les ressources restent renseignées
@@ -1384,6 +1443,7 @@ window.MNStore = (function () {
     ateliersDe, estDeAtelier, usersDeAtelier, rolesDeAtelier, normAteliers,
     setAtelier, atelier, roleIdDe, estMasqueIci, estMasquePartout,
     minimumDe, minimumPour, livretDe,
+    memeGroupe, membresDuGroupe, blacklistDuGroupe, groupesConnus,
     memeNom, soucisHomonyme,
     MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,
     REMBOURSEMENTS, remboursementDe, leveeIci, sommeRessources, ressourcesEnClair,
