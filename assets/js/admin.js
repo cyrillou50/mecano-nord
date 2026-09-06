@@ -125,14 +125,9 @@
       bar.innerHTML =
         '<span class="draftbar__dot"></span>' +
         '<div class="draftbar__txt"><b>Modifications enregistrées ici seulement.</b> ' +
-          "<span>" + (MNAuth.can("publish")
-            ? "Renseigne l'adresse du serveur dans « Mise en ligne » pour qu'elles partent seules."
-            : "Un responsable les mettra en ligne.") + "</span></div>" +
-        btAnnuler() +
-        (MNAuth.can("publish")
-          ? '<button class="btn btn--solid btn--sm" id="db-publish">' + svg("cloud") +
-            "<span>Publier</span></button>"
-          : "");
+          '<span>Renseigne l\'adresse du serveur dans « Mise en ligne » : ' +
+          "c'est lui qui met le site à jour.</span></div>" +
+        btAnnuler();
       brancherDraftbar();
       return;
     }
@@ -1020,7 +1015,7 @@
       if (!f) return;
 
       fileToIcon(f, async data => {
-        const canUpload = MNGitHub.canPublish() && MNAuth.can("publish");
+        const canUpload = MNGitHub.canPublish();
         if (!canUpload) {
           setSel(data, true);
           MNUI.toast("Image mise au gabarit et intégrée aux données (" + weight(data) + " ko)", "ok");

@@ -295,21 +295,18 @@ window.V2Shell = (function () {
     if (!z) return;
     if (!MNStore.hasDraft()) { z.innerHTML = ""; return; }
 
-    const peut = MNAuth.can("publish") && MNGitHub.canPublish();
     const mot = MNGitHub.motAuto();
 
+    /* Pas de mot : l'envoi automatique ne peut rien faire — il n'y a pas de
+       serveur pour écrire. La permission « publier » n'entre plus en jeu :
+       la mise en ligne suit l'écriture, pour tout le monde. */
     if (!mot) {
       z.innerHTML =
         '<div class="brouillon" role="status">' +
           '<span class="brouillon__point"></span>' +
           '<div class="brouillon__txt"><b>Modifications enregistrées ici seulement.</b> ' +
-            "<span>" + (peut
-              ? "Publie-les pour que l'équipe les voie."
-              : "Un responsable les mettra en ligne.") + "</span></div>" +
-          (peut
-            ? U().bouton("Publier", { variante: "principal", taille: "sm",
-                                      icone: "nuage", action: "pub" })
-            : "") +
+            "<span>Aucun serveur n'est configuré : c'est lui qui met le site " +
+            "à jour.</span></div>" +
         "</div>";
     } else {
       const c = TONS_ENVOI[mot.ton] || TONS_ENVOI.ok;

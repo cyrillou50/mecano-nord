@@ -2423,7 +2423,7 @@ function sousLeSeuil(par, roster, board, depuis, quel, seuilH) {
   };
 }
 
-function embedRecap(r, debut, fin, nom) {
+function embedRecap(r, debut, fin, nom, avecTrace) {
   const jour = d => new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
   const s = r.sous;
   const fields = [];
@@ -2444,7 +2444,10 @@ function embedRecap(r, debut, fin, nom) {
     fields.push({
       name: s.seuil ? "⚠️ Moins de " + s.seuil + " h cette semaine"
                     : "⚠️ Sous les heures attendues",
-      value: s.gens.slice(0, 25)
+      value: (avecTrace
+        ? "*Un rappel à l'ordre a été posé sur leur fiche, sur le site.*\n"
+        : "") +
+        s.gens.slice(0, 25)
         .map(g => "• **" + g.pseudo + "** — " +
           (g.seconds ? dureeCourte(g.seconds) : "aucun service") +
           /* Un seuil personnel n'est pas celui du titre : sans le dire, la
@@ -2558,6 +2561,79 @@ async function nomAtelier(quel) {
   return quel === "sud" ? "Mécano Sud" : "Mécano Nord";
 }
 
+/* ---- L'avertissement du bilan --------------------------------------------------
+   Le message du lundi nommait ceux qui n'avaient pas fait leurs heures, et
+   c'était tout : quelques heures plus tard il était enfoui dans le salon, et
+   plus personne ne s'en souvenait. Le même constat se pose maintenant sur la
+   fiche de la personne, où il reste lisible et où il s'additionne — trois
+   semaines de suite, ça finit par se voir.
+
+   Un « rappel à l'ordre », la gravité la plus légère : une semaine creuse
+   n'est pas une faute, c'est un fait qu'on note. Il cesse de compter au bout
+   de deux mois, comme n'importe quel avertissement à échéance — un manquement
+   d'il y a six mois n'a pas à peser encore.
+
+   Pour ne signaler personne, il n'y a rien de plus à régler : le minimum à 0
+   (par garage ou sur une fiche) vide déjà la liste, et donc celle-ci. */
+
+const AVERT_JOURS = 56;
+
+/** L'avertissement que le bilan pose sur une fiche. */
+function avertDuBilan(g, atelier, semaine, nom) {
+  const fin = new Date();
+  fin.setDate(fin.getDate() + AVERT_JOURS);
+  return {
+    /* La semaine et le garage dans l'identifiant : renvoyer le bilan deux
+       fois n'écrit rien de plus, « avert-add » refusant un doublon. */
+    id: "recap-" + semaine + "-" + atelier,
+    at: new Date().toISOString(),
+    by: texte(nom || "Bilan hebdomadaire", 60),
+    gravite: "rappel",
+    motif: "Heures de la semaine non atteintes",
+    note: (g.seconds ? dureeCourte(g.seconds) : "aucun service") +
+      " sur " + g.seuil + " h attendues — semaine " + semaine + ".",
+    expire: jourDe(fin),
+    leve: false, levePar: "", leveLe: null
+  };
+}
+
+/**
+ * Pose l'avertissement du bilan sur chaque fiche signalée.
+ *
+ * Une seule écriture du catalogue pour tout le monde : c'est un geste unique,
+ * pas dix. Sans catalogue ici, on ne peut rien poser — le serveur ne connaît
+ * alors que ceux qui ont pointé, et le message le dit déjà.
+ *
+ * @returns {Promise<number>} combien d'avertissements ont été posés
+ */
+async function poserAvertsBilan(p, aDire) {
+  const dus = [];
+  for (const a of aDire) {
+    const s = a.recap && a.recap.sous;
+    if (!s || !s.gens || !s.gens.length) continue;
+    const nom = await nomAtelier(a.atelier);
+    s.gens.forEach(g => dus.push({
+      uid: g.id, avert: avertDuBilan(g, a.atelier, p.semaine, nom)
+    }));
+  }
+  if (!dus.length) return 0;
+
+  return enFile(async () => {
+    const cat = await lireCatalogue();
+    if (!cat) return 0;
+    let n = 0;
+    dus.forEach(d => {
+      const r = appliquerEquipe(cat, { op: "avert-add", uid: d.uid, avert: d.avert });
+      if (r && r.ok) n++;
+    });
+    if (n) {
+      cat.updatedAt = new Date().toISOString();
+      await ecrireCatalogue(cat);
+    }
+    return n;
+  });
+}
+
 /**
  * Envoie le récapitulatif sur Discord.
  * @param {boolean} marquer faux pour un essai : on n'écrit pas la semaine,
@@ -2582,6 +2658,11 @@ async function envoyerRecap(marquer) {
 
   if (!aDire.length) return { ok: true, semaine: p.semaine, envoyes: 0, personnes: 0 };
 
+  /* La trace sur les fiches part avant le message : elle vaut d'être posée
+     même si Discord est injoignable. Seulement pour un vrai envoi — un essai
+     du vendredi ne doit sanctionner personne. */
+  const avertis = marquer ? await poserAvertsBilan(p, aDire) : 0;
+
   let personnes = 0;
   for (const a of aDire) {
     const nom = await nomAtelier(a.atelier);
@@ -2601,7 +2682,7 @@ async function envoyerRecap(marquer) {
            texte : deux messages d'affilée, on ne lit que l'en-tête. */
         username: nom.slice(0, 80),
         content: "**Récapitulatif de la semaine — " + nom + "**",
-        embeds: [embedRecap(a.recap, p.debut, p.fin, nom)],
+        embeds: [embedRecap(a.recap, p.debut, p.fin, nom, !!marquer)],
         allowed_mentions: { parse: [] }
       })
     }).catch(e => ({ ok: false, status: 0, _e: e.message }));
@@ -2614,8 +2695,9 @@ async function envoyerRecap(marquer) {
 
   if (marquer) await ecrireRecap({ derniere: p.semaine, envoyeLe: new Date().toISOString() });
   console.log(new Date().toISOString(), "récapitulatif envoyé :", p.semaine,
-    "—", aDire.length, "atelier(s),", personnes, "personnes");
-  return { ok: true, semaine: p.semaine, envoyes: aDire.length, personnes };
+    "—", aDire.length, "atelier(s),", personnes, "personnes,",
+    avertis, "avertissement(s)");
+  return { ok: true, semaine: p.semaine, envoyes: aDire.length, personnes, avertis };
 }
 
 /* L'heure est vérifiée souvent plutôt que calculée une fois : un serveur qui

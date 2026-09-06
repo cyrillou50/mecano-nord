@@ -158,7 +158,7 @@
         "<b>Les contrats ne sont enregistrés que sur cet appareil.</b> " +
         "<span>Sans serveur configuré, ils vivent dans le catalogue, " +
         "et il faut le mettre en ligne pour que l'équipe les voie.</span></span>" +
-      (MNAuth.can("publish")
+      (MNAuth.canAny("items", "users", "publish", "theme", "contracts", "admin")
         ? '<a class="btn btn--primary btn--sm" href="admin.html">' + svg("cloud") + "<span>Publier</span></a>"
         : "");
   }

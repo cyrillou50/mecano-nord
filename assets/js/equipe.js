@@ -132,18 +132,14 @@
     bar.hidden = false;
 
     const mot = MNGitHub.motAuto();
-    const canPub = MNAuth.can("publish") && MNGitHub.canPublish();
-
-    /* Pas de mot : l'envoi automatique ne peut rien faire d'ici. */
+    /* Pas de mot : l'envoi automatique ne peut rien faire d'ici — il n'y a
+       pas de serveur pour écrire. */
     if (!mot) {
       bar.innerHTML =
         '<span class="draftbar__dot"></span>' +
         '<div class="draftbar__txt"><b>Modifications enregistrées ici seulement.</b> ' +
-          "<span>" + (canPub
-            ? "Clique sur Publier pour que l'équipe les voie."
-            : "Un responsable devra les mettre en ligne.") + "</span></div>" +
-        (canPub ? '<button class="btn btn--solid btn--sm" id="sb-pub">' + svg("cloud") +
-          "<span>Publier</span></button>" : "");
+          "<span>Aucun serveur n'est configuré : c'est lui qui met le site " +
+          "à jour.</span></div>";
       brancher();
       return;
     }

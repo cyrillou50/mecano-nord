@@ -657,8 +657,25 @@ Quand il diffère de celui du garage, la ligne du message le dit —
 de calcul sous un titre qui annonce un autre chiffre. Un garage réglé à 0 ne
 signale plus personne, sauf ceux qui ont un seuil à eux.
 
-Sous ce seuil, la personne est signalée dans un second champ du message. Deux
-points méritent d'être connus.
+Sous ce seuil, la personne est signalée dans un second champ du message —
+**et un rappel à l'ordre est posé sur sa fiche**, sur le site. Le message du
+lundi est enfoui dans le salon quelques heures plus tard ; la fiche, elle,
+garde la trace, et les rappels s'y additionnent — trois semaines de suite, ça
+finit par se voir.
+
+C'est la gravité la plus légère du site : une semaine creuse est un fait qu'on
+note, pas une faute. Le rappel cesse de compter au bout de deux mois, mais
+reste lisible. Un responsable peut le lever ou le retirer comme n'importe quel
+avertissement (Équipe → la fiche → Avertissements).
+
+Seul l'envoi réel en pose : un essai (`POST /recap` sans `marquer`) ne
+sanctionne personne, et le message le dit. Renvoyer deux fois le même bilan
+n'écrit rien de plus — l'identifiant du rappel porte la semaine et le garage.
+
+Pour n'en poser aucun, il n'y a rien de plus à régler : mettre le minimum à 0,
+par garage ou sur une fiche, vide déjà la liste des signalés.
+
+Deux points méritent d'être connus.
 
 **Ceux qui n'ont pas pointé du tout.** Zéro heure est le cas le plus grave, et
 c'est le seul qui ne laisse aucune trace dans le journal des services : pour le

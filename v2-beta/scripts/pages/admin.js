@@ -3095,7 +3095,7 @@
       fichierVersIcone(f, async data => {
         /* Sans droit de publication, l'image ne peut aller nulle part : on
            l'intègre aux données plutôt que d'échouer. */
-        if (!(MNGitHub.canPublish() && MNAuth.can("publish"))) {
+        if (!MNGitHub.canPublish()) {
           poser(data, true);
           return U.toast("Image mise au gabarit et intégrée aux données (" +
             poids(data) + " ko)", "ok");

@@ -221,7 +221,7 @@
         "<b>Le parc n'est enregistré que sur cet appareil.</b> " +
         "<span>Sans serveur configuré, il vit dans le catalogue, " +
         "et il faut le mettre en ligne pour que l'équipe le voie.</span></span>" +
-      (MNAuth.can("publish")
+      (MNAuth.canAny("items", "users", "publish", "theme", "contracts", "admin")
         ? '<a class="btn btn--primary btn--sm" href="admin.html">' + svg("cloud") + "<span>Publier</span></a>"
         : "");
   }
