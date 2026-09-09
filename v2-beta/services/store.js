@@ -86,17 +86,22 @@ window.MNStore = (function () {
      le pas tombe à 1 : la tranche est alors la valeur elle-même, et
      « 4 places » veut dire quatre places. */
 
-  const PAS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
-  const MAX_TRANCHES = 8;
+  const PAS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2500, 5000];
+
+  /* Ce qu'on accepte de mettre dans un menu de filtre. Vingt lignes se
+     parcourent d'un coup d'œil, et plus il y en a, plus le tri est fin : au
+     dessous on propose les valeurs telles quelles, au-dessus on regroupe avec
+     le pas le plus fin qui tienne dans ce compte. */
+  const MAX_CHOIX = 20;
 
   /**
    * Découpe une série de nombres en choix bornés des deux côtés.
    *
    * Deux cas, parce que deux échelles. Peu de valeurs différentes — le
-   * nombre de places, presque toujours — et on propose ces valeurs telles
-   * quelles : « 4 places » veut dire quatre places, on ne peut pas faire plus
-   * clair. Beaucoup de valeurs — les coffres d'un vrai parc — et on regroupe
-   * en tranches, sinon la liste devient un mur de chiffres.
+   * nombre de places, presque toujours, et bien des parcs pour les coffres —
+   * et on propose ces valeurs telles quelles : « 45 kg » veut dire quarante
+   * cinq kilos, on ne peut pas trier plus fin. Au-delà de ce qu'un menu peut
+   * porter, on regroupe en tranches.
    *
    * Le pas des tranches n'est pas fixé d'avance : un parc de scooters n'a pas
    * les ordres de grandeur d'un parc de camions. On prend le plus petit pas
@@ -115,7 +120,7 @@ window.MNStore = (function () {
     if (!l.length) return [];
 
     const seules = [...new Set(l)].sort((a, b) => a - b);
-    if (seules.length <= MAX_TRANCHES) {
+    if (seules.length <= MAX_CHOIX) {
       return seules.map(n => ({ min: n, max: n, nom: String(n) }));
     }
 
@@ -127,7 +132,7 @@ window.MNStore = (function () {
        le neuvieme decile comme repere, et les tranches du haut couvrent
        l'exception sans commander l'echelle. */
     const repere = seules[Math.max(0, Math.ceil(seules.length * 0.9) - 1)];
-    const pas = PAS.find(p => Math.ceil(repere / p) <= MAX_TRANCHES) ||
+    const pas = PAS.find(p => Math.ceil(repere / p) <= MAX_CHOIX) ||
       PAS[PAS.length - 1];
 
     const out = [];
