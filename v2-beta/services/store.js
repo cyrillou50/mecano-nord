@@ -1100,6 +1100,15 @@ window.MNStore = (function () {
            C'est ce nom qui permet de voir, quand un groupe est blacklisté,
            qui en fait partie. */
         groupe: String(u.groupe || "").trim().slice(0, 60),
+        /* La photo de la personne : une référence d'image, comme partout
+           ailleurs sur le site — « srv:nom » ou un fichier du dossier. Elle
+           s'affiche à la place des initiales, dans le même carré : une fiche
+           n'a pas à s'allonger parce qu'on a mis une photo. */
+        photo: (function (v) {
+          const s = String(v || "").trim();
+          return /^(srv:[\w.-]{1,120}|(\.\.\/)?assets\/img\/[\w.-]{1,120})$/.test(s)
+            ? s : "";
+        })(u.photo),
         note: u.note ? String(u.note).slice(0, 400) : "",
         depart: normDepart(u.depart),
         history: history.slice(-40),
@@ -1423,6 +1432,18 @@ window.MNStore = (function () {
     return base ? base + "/" + encodeURIComponent(nom) : "";
   }
 
+  /**
+   * L'adresse d'une photo de fiche, ou "" si la personne n'en a pas.
+   * Même règle que les icônes : on garde la référence, jamais l'adresse — le
+   * jour où le serveur déménage, les fiches suivent.
+   */
+  function photoUrl(u) {
+    const ref = String((u && u.photo) || "").trim();
+    if (!ref) return "";
+    const nom = imageName(ref);
+    return nom ? imageUrl(nom) : ref;
+  }
+
   /** Le serveur peut-il héberger les images ? */
   const imagesHebergees = () => !!api("images");
 
@@ -1559,7 +1580,7 @@ window.MNStore = (function () {
     contractTypes: () => (_catalog.contractTypes || []).filter(t => estDeAtelier(t, _atelier)),
     contractTypeById: id => (_catalog.contractTypes || []).find(t => t.id === id) || null,
     vehicleById, vehicleCatById,
-    IMG_TAG, imageName, imageUrl, imagesHebergees,
+    IMG_TAG, imageName, imageUrl, imagesHebergees, photoUrl,
     NA, CARBURANTS, statsVehicule,
     estNA: v => String(v || "").trim().toUpperCase() === NA,
     getCart, setCart, getBTs, addBT, removeBT, clearBTs

@@ -392,7 +392,7 @@
           "</span>"
         : "") +
       '<span class="avatar" style="background:' + U.esc(r.color) + '">' +
-        U.esc(U.initiales(u.pseudo)) + "</span>" +
+        vignette(u) + "</span>" +
       '<span class="duo__txt"><b class="tronque">' + U.esc(u.pseudo) + "</b>" +
         /* En archives, le grade importe moins que la raison du départ :
            c'est ce qu'on vient vérifier. */
@@ -540,7 +540,7 @@
     z.innerHTML =
       '<div class="eq-tete" style="--grade:' + U.esc(r.color) + '">' +
         '<div class="eq-tete__av" style="background:' + U.esc(r.color) + '">' +
-          U.esc(U.initiales(u.pseudo)) + "</div>" +
+          vignette(u) + "</div>" +
         '<div class="eq-tete__id">' +
           "<h2>" + U.esc(u.pseudo) + "</h2>" +
           '<div class="rang">' +
@@ -636,13 +636,13 @@
                 U.etiquette(t)).join("") + "</div>"
             : '<p class="champ__aide">Aucune formation enregistrée.</p>') +
 
+        blocGroupe(u) +
+
         blocConges(u) +
 
         (voitAvert(u) ? blocAvert(u) : "") +
 
         historique(u, on) +
-
-        blocGroupe(u) +
 
         (u.note && voitNotes
           ? section("Note interne", 0,
@@ -799,6 +799,18 @@
               texte: "Ce groupe a été sur la blacklist, l'inscription est levée." })
           : "") +
       '<p class="champ__aide"><a href="blacklist.html">Voir la blacklist</a></p>');
+  }
+
+  /**
+   * Ce qu'on met dans le carré d'une fiche : la photo si elle existe, les
+   * initiales sinon. Le carré ne change pas de taille — une photo ne doit pas
+   * faire enfler la fiche, elle remplit la place déjà prévue.
+   */
+  function vignette(u) {
+    const src = MNStore.photoUrl(u);
+    return src
+      ? '<img class="av-photo" src="' + U.esc(src) + '" alt="" loading="lazy" decoding="async">'
+      : U.esc(U.initiales(u.pseudo));
   }
 
   const section = (titre, n, corps) =>
@@ -1474,6 +1486,16 @@
         "</div></div>" +
       /* Une liste des groupes déjà écrits plutôt qu'une saisie libre : le
          rapprochement se fait sur le nom, deux orthographes le cassent. */
+      '<div class="champ"><span class="champ__label">Photo</span>' +
+        '<div class="rang" style="align-items:center;gap:var(--e-3)">' +
+          '<span class="avatar av-apercu" id="f-photo-v">' + vignette(u) + "</span>" +
+          U.bouton("Choisir", { variante: "fantome", taille: "sm", action: "photo" }) +
+          (u.photo
+            ? U.bouton("Retirer", { variante: "fantome", taille: "sm", action: "photox" })
+            : "") +
+        "</div>" +
+        '<p class="champ__aide">Elle remplace les initiales, dans le même carré : ' +
+          "une fiche ne s'allonge pas parce qu'on a mis une photo.</p></div>" +
       '<div class="champ"><label class="champ__label" for="f-groupe">Groupe</label>' +
         '<input class="saisie" id="f-groupe" maxlength="60" list="f-groupes" ' +
           'placeholder="Aucun — laisse vide" value="' + U.esc(u.groupe || "") + '">' +
@@ -1535,6 +1557,27 @@
       }
       formations.push(v); n.value = ""; peindre(); n.focus();
     };
+    /* La photo se choisit avec la bibliothèque d'images du site. */
+    let photo = u.photo || "";
+    const majPhoto = () => {
+      const v = corps.querySelector("#f-photo-v");
+      if (v) v.innerHTML = vignette(Object.assign({}, u, { photo }));
+    };
+    const bp = corps.querySelector('[data-a="photo"]');
+    if (bp) bp.addEventListener("click", () => {
+      MNImagier.choisir(photo, ref => {
+        const v = String(ref || "");
+        /* « Aucune » rend une chaîne vide : c'est un choix, pas une erreur. */
+        if (v && !/^srv:|^assets\/img\//.test(v)) {
+          return U.toast("Choisis une image : une icône du site ne fait pas une photo", "err");
+        }
+        photo = v;
+        majPhoto();
+      });
+    });
+    const xp = corps.querySelector('[data-a="photox"]');
+    if (xp) xp.addEventListener("click", () => { photo = ""; majPhoto(); });
+
     corps.querySelector('[data-a="addtag"]').addEventListener("click", ajouter);
     corps.querySelector("#f-new").addEventListener("keydown", e => {
       if (e.key === "Enter") { e.preventDefault(); ajouter(); }
@@ -1558,6 +1601,7 @@
               hiredAt: k.querySelector("#f-emb").value || u.hiredAt,
               trainings: formations,
               groupe: k.querySelector("#f-groupe").value.trim(),
+              photo,
               note: k.querySelector("#f-note").value.trim(),
               active: u.id === moi.uid ? true : k.querySelector("#f-actif").checked,
               masques: lireMasques(k, "f-masq"),

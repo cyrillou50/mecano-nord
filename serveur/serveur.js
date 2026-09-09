@@ -1961,6 +1961,14 @@ function appliquerEquipe(cat, op) {
          Du texte libre : ces groupes vont et viennent. C'est ce nom qui, sur
          la blacklist, dit qui en fait partie. */
       if (op.groupe !== undefined) u.groupe = texte(op.groupe, 60).trim();
+      /* La photo : une référence d'image du site, pas une adresse quelconque.
+         Le site vérifie déjà la forme ; on la revoit ici, une opération
+         pouvant arriver d'ailleurs. */
+      if (op.photo !== undefined) {
+        const p = texte(op.photo, 200).trim();
+        u.photo = /^(srv:[\w.-]{1,120}|(\.\.\/)?assets\/img\/[\w.-]{1,120})$/.test(p)
+          ? p : "";
+      }
       if (op.active !== undefined) u.active = op.active === true;
       if (op.hidden !== undefined) u.hidden = op.hidden === true;
       /* Le masquage se regle garage par garage : une liste, pas un booleen. */

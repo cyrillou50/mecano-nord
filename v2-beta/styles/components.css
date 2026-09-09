@@ -2278,54 +2278,90 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
 
 .edi { border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
 
+/* La barre se replie par groupes entiers : `flex: none` partout, sinon les
+   boutons rétrécissent les uns après les autres jusqu'à devenir illisibles. */
 .edi__barre {
-  display: flex; flex-wrap: wrap; gap: 4px;
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 5px 4px;
   padding: 7px 8px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--line);
   position: sticky; top: 0; z-index: 5;
 }
 .edi__grp {
+  flex: none;
   display: flex; align-items: center; gap: 2px;
-  padding-right: 6px; margin-right: 2px;
+  padding-right: 7px;
   border-right: 1px solid var(--line);
 }
-.edi__grp:last-child { border-right: 0; }
+.edi__grp:last-child { border-right: 0; padding-right: 0; }
 
 .edi__b {
-  min-width: 30px; height: 30px;
-  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-  padding: 0 7px;
+  flex: none;
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0;
   border: 1px solid transparent; border-radius: var(--r-sm);
   background: none; color: var(--txt);
-  font: inherit; font-size: 14px; line-height: 1;
+  font-family: var(--font-body); font-size: 14px; line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
 }
-.edi__b:hover { background: rgba(255, 255, 255, .07); }
-.edi__b.is-on { background: var(--pink-ink); color: var(--pink-soft); border-color: rgba(255, 43, 209, .35); }
-.edi__b svg { width: 15px; height: 15px; }
+.edi__b--large { width: auto; padding: 0 10px; font-size: 12.5px; }
+.edi__b:hover { background: rgba(255, 255, 255, .08); }
+.edi__b.is-on { background: var(--pink-ink); color: var(--pink-soft); border-color: rgb(var(--accent-rgb) / .35); }
+
 .edi__b--gras { font-weight: 800; }
 .edi__b--ital { font-style: italic; font-family: Georgia, serif; }
 .edi__b--soul { text-decoration: underline; }
 .edi__b--barre { text-decoration: line-through; }
+/* Les trois alignements sont dessinés plutôt qu'écrits : trois traits, celui
+   du milieu plus court et calé à gauche, au centre ou à droite. Un glyphe
+   décalé de deux pixels dans une case de trente ne se distingue pas. */
+.edi__b--g, .edi__b--c, .edi__b--d { font-size: 0; }
+.edi__b--g::before, .edi__b--c::before, .edi__b--d::before {
+  content: "";
+  width: 15px; height: 11px;
+  background:
+    linear-gradient(currentColor, currentColor) 0 0 / 100% 2px no-repeat,
+    linear-gradient(currentColor, currentColor) var(--x, 0) 4.5px / 62% 2px no-repeat,
+    linear-gradient(currentColor, currentColor) 0 9px / 100% 2px no-repeat;
+}
+.edi__b--c::before { --x: 50%; }
+.edi__b--d::before { --x: 100%; }
 
 .edi__sel {
-  height: 30px; max-width: 132px;
+  flex: none;
+  height: 30px; width: 104px;
   padding: 0 6px;
   border: 1px solid var(--line); border-radius: var(--r-sm);
   background: var(--surface); color: var(--txt);
-  font: inherit; font-size: 13px;
+  font-family: var(--font-body); font-size: 12.5px;
   cursor: pointer;
 }
 
-.edi__pal { display: inline-flex; align-items: center; gap: 3px; }
-.edi__pal__t { font-size: 12px; color: var(--muted); margin-right: 1px; }
+/* ---- Les couleurs, derrière un bouton ---- */
+
+.edi__coul { position: relative; flex: none; display: inline-flex; }
+.edi__b--coul { flex-direction: column; gap: 1px; font-size: 12px; }
+.edi__jauge {
+  display: block; width: 15px; height: 3px; border-radius: 2px;
+  background: var(--pink-soft);
+}
+.edi__pan {
+  position: absolute; top: calc(100% + 5px); left: 0; z-index: 30;
+  display: grid; grid-template-columns: repeat(4, 20px); gap: 5px;
+  padding: 7px;
+  background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .55);
+}
 .edi__pastille {
-  width: 15px; height: 15px; padding: 0;
-  border: 1px solid rgba(255, 255, 255, .25); border-radius: 3px;
+  width: 20px; height: 20px; padding: 0; flex: none;
+  border: 1px solid rgba(255, 255, 255, .25); border-radius: 4px;
   cursor: pointer;
 }
-.edi__pastille:hover { transform: scale(1.18); }
+.edi__pastille:hover { transform: scale(1.12); }
 
 .edi__zone {
   position: relative;
@@ -2335,19 +2371,15 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
   background: var(--surface);
   outline: 0;
 }
-.edi__zone:focus { box-shadow: inset 0 0 0 2px rgba(255, 43, 209, .25); }
+.edi__zone:focus { box-shadow: inset 0 0 0 2px rgb(var(--accent-rgb) / .25); }
 
 /* Dans l'éditeur, une image montre qu'on peut la prendre. */
 .edi__zone .liv-img { cursor: move; }
 .edi__zone .liv-img--libre { box-shadow: 0 2px 14px rgba(0, 0, 0, .45); }
+/* Le coin qui redimensionne n'apparaît que sur l'image choisie : sinon le
+   livret se couvre de poignées. */
 .edi__zone .liv-img.is-choisie {
-  outline: 2px solid var(--pink-soft);
-  outline-offset: 2px;
-}
-/* Le coin qui redimensionne : visible seulement sur l'image choisie, pour ne
-   pas couvrir le livret de poignées. */
-.edi__zone .liv-img.is-choisie {
-  cursor: move;
+  outline: 2px solid var(--pink-soft); outline-offset: 2px;
   background-image: linear-gradient(135deg, transparent 62%, var(--pink-soft) 62%);
   background-position: bottom right; background-size: 18px 18px;
   background-repeat: no-repeat;
@@ -2362,9 +2394,28 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
   box-shadow: 0 6px 18px rgba(0, 0, 0, .5);
 }
 .edi__img button {
-  height: 24px; padding: 0 8px;
+  height: 24px; padding: 0 8px; flex: none;
   border: 0; border-radius: 4px;
   background: none; color: var(--txt);
-  font: inherit; font-size: 12px; cursor: pointer;
+  font-family: var(--font-body); font-size: 12px; cursor: pointer;
 }
 .edi__img button:hover { background: rgba(255, 255, 255, .09); }
+
+/* ---- La photo d'un employé ------------------------------------------------
+   Elle remplit le carré des initiales, ni plus ni moins : une fiche ne doit
+   pas s'allonger parce qu'on a mis une photo. */
+.av-photo {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+}
+.av-apercu {
+  width: 54px; height: 54px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 14px;
+  background: var(--surface-2);
+  font-family: var(--font-display); font-weight: 800; font-size: 19px;
+  color: var(--txt);
+  overflow: hidden;
+}

@@ -2262,8 +2262,7 @@
           '<p class="hint">' +
             "Chaque garage a le sien : celui-ci ne se lit qu'au " +
             esc(MNStore.nomAtelier(ou)) + ".</p>" +
-          '<div class="field" id="l-edi"></div>' +
-          '<div class="row row--wrap" style="margin-top:10px;align-items:center">' +
+          '<div class="row row--wrap" style="margin-bottom:12px;align-items:center">' +
             '<span class="label" style="margin:0">Polices</span>' +
             '<span id="l-pol" class="row row--wrap" style="gap:6px"></span>' +
             '<span class="spacer"></span>' +
@@ -2271,11 +2270,11 @@
               "<span>Ajouter une police</span></button>" +
             '<input type="file" id="l-pol-f" accept=".woff2,.woff,.ttf,.otf" hidden>' +
           "</div>" +
-          '<p class="hint">Un fichier <code>.woff2</code>, <code>.woff</code>, ' +
-            "<code>.ttf</code> ou <code>.otf</code>. Il est déposé sur le serveur de " +
-            "l'atelier, jamais dans le dépôt : une police pèse lourd et n'a rien à " +
-            "faire dans l'historique du site. N'y mets que des polices que tu as le " +
-            "droit d'utiliser.</p>" +
+          '<div class="field" id="l-edi"></div>' +
+          '<p class="hint">Les polices déposées sont proposées dans la barre ' +
+            "ci-dessus. Elles vivent sur le serveur de l'atelier, jamais dans le " +
+            "dépôt : une police pèse lourd et n'a rien à faire dans l'historique du " +
+            "site. N'y mets que des polices que tu as le droit d'utiliser.</p>" +
           '<div class="row" style="justify-content:space-between;align-items:center">' +
             '<span class="hint" id="l-n">' + tailleTexte(MNTexte.enTexte(t)) + "</span>" +
             '<button class="btn btn--primary" id="l-save">' + svg("save") +

@@ -384,7 +384,7 @@
                 "</span>"
               : "") +
             '<span class="userchip__av" style="width:34px;height:34px;flex:none;background:' +
-              esc(r.color) + '">' + esc(MNUI.initials(u.pseudo)) + "</span>" +
+              esc(r.color) + '">' + vignette(u) + "</span>" +
             '<span class="staffrow__txt"><b>' + esc(u.pseudo) + "</b>" +
               /* En archives, le grade importe moins que la raison du départ :
                  c'est ce qu'on vient vérifier. */
@@ -648,7 +648,7 @@
       '<div class="panel">' +
         '<div class="staffhead" style="--role:' + esc(r.color) + '">' +
           '<div class="staffhead__av" style="background:' + esc(r.color) + '">' +
-            esc(MNUI.initials(u.pseudo)) + "</div>" +
+            vignette(u) + "</div>" +
           '<div class="staffhead__id">' +
             "<h2>" + esc(u.pseudo) +
               (MNStore.estArchive(u) ? " <span class=\"pill pill--danger\">archivé</span>" : "") +
@@ -760,13 +760,13 @@
                 '<span class="permtag">' + esc(t) + "</span>").join("") + "</div>"
             : '<p class="hint">Aucune formation enregistrée.</p>') +
 
+          groupeSection(u) +
+
           congesSection(u) +
 
           (voitAvert(u) ? sectionAvert(u) : "") +
 
           serviceSection(u, on) +
-
-          groupeSection(u) +
 
           (u.note && canSeeNotes
             ? '<h3 class="section-title" style="margin-top:24px">Note interne</h3>' +
@@ -863,6 +863,18 @@
             "<span>Ce groupe a été sur la blacklist, l'inscription est levée.</span></div>"
           : "") +
       '<p class="hint"><a href="blacklist.html">Voir la blacklist</a></p>';
+  }
+
+  /**
+   * Ce qu'on met dans le carré d'une fiche : la photo si elle existe, les
+   * initiales sinon. Le carré ne change pas de taille — une photo ne doit pas
+   * faire enfler la fiche, elle doit remplir la place déjà prévue.
+   */
+  function vignette(u) {
+    const src = MNStore.photoUrl(u);
+    return src
+      ? '<img class="av-photo" src="' + esc(src) + '" alt="" loading="lazy" decoding="async">'
+      : esc(MNUI.initials(u.pseudo));
   }
 
   function congesSection(u) {
@@ -1599,6 +1611,18 @@
           '<input class="input" id="f-new" placeholder="Ex. Remorquage" maxlength="40">' +
           '<button class="btn btn--ghost btn--sm" id="f-add" type="button">' + svg("plus") + "<span>Ajouter</span></button>" +
         "</div></div>" +
+      '<div class="field"><span class="label">Photo</span>' +
+        '<div class="row" style="align-items:center;gap:12px">' +
+          '<span class="av-apercu" id="f-photo-v">' + vignette(u) + "</span>" +
+          '<button class="btn btn--ghost btn--sm" type="button" id="f-photo-b">' +
+            svg("edit") + "<span>Choisir</span></button>" +
+          (u.photo
+            ? '<button class="btn btn--ghost btn--sm" type="button" id="f-photo-x">' +
+              svg("trash") + "<span>Retirer</span></button>"
+            : "") +
+        "</div>" +
+        '<p class="hint">Elle remplace les initiales, dans le même carré : ' +
+          "une fiche ne s'allonge pas parce qu'on a mis une photo.</p></div>" +
       '<div class="field"><label class="label" for="f-groupe">Groupe</label>' +
         '<input class="input" id="f-groupe" maxlength="60" list="f-groupes" ' +
           'placeholder="Aucun — laisse vide" value="' + esc(u.groupe || "") + '">' +
@@ -1637,6 +1661,28 @@
         (u.hidden
           ? " Ce compte est masqué : il en est déjà exempté de toute façon."
           : "") + "</p>";
+
+    /* La photo se choisit avec le sélecteur d'images du site : le même que
+       pour les icônes, qui sait déjà déposer et lister. */
+    let photo = u.photo || "";
+    const majPhoto = () => {
+      const v = body.querySelector("#f-photo-v");
+      if (v) v.innerHTML = vignette(Object.assign({}, u, { photo }));
+    };
+    const bPhoto = body.querySelector("#f-photo-b");
+    if (bPhoto) bPhoto.addEventListener("click", () => {
+      MNImagier.choisir(photo, ref => {
+        const v = String(ref || "");
+        /* « Aucune » rend une chaîne vide : c'est un choix, pas une erreur. */
+        if (v && !/^srv:|^assets\/img\//.test(v)) {
+          return MNUI.toast("Choisis une image : une icône du site ne fait pas une photo", "err");
+        }
+        photo = v;
+        majPhoto();
+      });
+    });
+    const xPhoto = body.querySelector("#f-photo-x");
+    if (xPhoto) xPhoto.addEventListener("click", () => { photo = ""; majPhoto(); });
 
     const tagsHost = body.querySelector("#f-tags");
     function paintTags() {
@@ -1681,6 +1727,7 @@
               hiredAt: body.querySelector("#f-hired").value || u.hiredAt,
               trainings,
               groupe: body.querySelector("#f-groupe").value.trim(),
+              photo,
               note: body.querySelector("#f-note").value.trim(),
               active: u.id === me.uid ? true : body.querySelector("#f-active").checked,
               masques: lireMasques(body, "f-masq"),

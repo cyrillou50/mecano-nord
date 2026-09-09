@@ -169,6 +169,44 @@
      personne n'a envie de remplir un formulaire pour expliquer un métier, et
      l'assistant s'en accommode très bien. */
 
+  /** Les polices déposées, avec de quoi en retirer une. */
+  function peindrePolices(z) {
+    const hote = z.querySelector("#l-pol");
+    if (!hote) return;
+    const l = MNPolices.liste();
+    if (!l.length) {
+      hote.innerHTML = '<span class="champ__aide">' + (MNPolices.surServeur()
+        ? "aucune pour l'instant"
+        : "aucun serveur : seules les polices du site sont proposées") + "</span>";
+      return;
+    }
+    hote.innerHTML = l.map(f =>
+      '<span class="etiq" style="font-family:' + U.esc(MNPolices.famille(f)) + '">' +
+        U.esc(MNPolices.nomLisible(f)) +
+        ' <button type="button" data-pol="' + U.esc(f) +
+          '" title="Retirer" style="background:none;border:0;color:inherit;cursor:pointer">' +
+          "✕</button></span>").join("");
+
+    hote.querySelectorAll("[data-pol]").forEach(b =>
+      b.addEventListener("click", async () => {
+        const nom = b.dataset.pol;
+        const ok = await U.confirmer({
+          titre: "Retirer cette police",
+          message: "« " + MNPolices.nomLisible(nom) + " » ne sera plus proposée, et " +
+            "les livrets qui l'utilisent retrouveront la police du site.",
+          confirmer: "Retirer", danger: true
+        });
+        if (!ok) return;
+        try {
+          await MNPolices.retirer(nom);
+          U.toast("Police retirée", "ok");
+          vueLivret(z);
+        } catch (e) {
+          U.toast("Retrait impossible : " + e.message, "err");
+        }
+      }));
+  }
+
   /* L'éditeur en cours, s'il y en a un : on le démonte avant d'en poser un
      autre, il écoute la souris du document entier. */
   let editeur = null;
@@ -193,7 +231,20 @@
           "alignement, et des images qu'on pose où l'on veut.</p>" +
         '<p class="champ__aide">Chaque garage a le sien : celui-ci ne se lit ' +
           "qu'au " + MNStore.nomAtelier(ou) + ".</p>" +
+        '<div class="rang" style="margin-top:var(--e-3);align-items:center;flex-wrap:wrap">' +
+          '<span class="champ__label" style="margin:0">Polices</span>' +
+          '<span id="l-pol" class="rang" style="flex-wrap:wrap;gap:6px"></span>' +
+          '<span class="pousse"></span>' +
+          U.bouton("Ajouter une police",
+            { variante: "fantome", taille: "sm", action: "poladd" }) +
+          '<input type="file" id="l-pol-f" accept=".woff2,.woff,.ttf,.otf" hidden>' +
+        "</div>" +
         '<div id="l-edi" style="margin-top:var(--e-3)"></div>' +
+        '<p class="champ__aide" style="margin-top:var(--e-2)">Les polices déposées ' +
+          "sont proposées dans la barre ci-dessus. Elles vivent sur le serveur de " +
+          "l'atelier, jamais dans le dépôt : une police pèse lourd et n'a rien à " +
+          "faire dans l'historique du site. N'y mets que des polices que tu as le " +
+          "droit d'utiliser.</p>" +
         '<div class="rang" style="justify-content:space-between;margin-top:var(--e-3)">' +
           '<span class="champ__aide" id="l-n">' +
             tailleTexte(MNTexte.enTexte(t)) + "</span>" +
@@ -228,6 +279,28 @@
           res(ref);
         });
       })
+    });
+
+    peindrePolices(z);
+
+    const bAdd = z.querySelector('[data-a="poladd"]');
+    if (bAdd) bAdd.addEventListener("click", () => {
+      if (!MNPolices.surServeur()) {
+        return U.toast("Il faut un serveur pour héberger une police", "err");
+      }
+      z.querySelector("#l-pol-f").click();
+    });
+    z.querySelector("#l-pol-f").addEventListener("change", async e => {
+      const f = e.target.files[0];
+      e.target.value = "";
+      if (!f) return;
+      try {
+        const nom = await MNPolices.deposer(f);
+        U.toast("Police « " + MNPolices.nomLisible(nom) + " » ajoutée", "ok");
+        vueLivret(z);              // la barre d'outils doit la proposer
+      } catch (err) {
+        U.toast("Dépôt impossible : " + err.message, "err");
+      }
     });
 
     z.querySelector('[data-a="lsave"]').addEventListener("click", () => {

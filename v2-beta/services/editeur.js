@@ -84,40 +84,42 @@ window.MNEditeur = (function () {
         '<div class="edi__barre" role="toolbar" aria-label="Mise en forme">' +
 
           '<div class="edi__grp">' +
-            bouton("gras", "B", "Gras (Ctrl+B)", "edi__b--gras") +
-            bouton("italique", "I", "Italique (Ctrl+I)", "edi__b--ital") +
-            bouton("souligne", "S", "Souligné (Ctrl+U)", "edi__b--soul") +
+            bouton("gras", "B", "Gras", "edi__b--gras") +
+            bouton("italique", "I", "Italique", "edi__b--ital") +
+            bouton("souligne", "U", "Souligné", "edi__b--soul") +
             bouton("barre", "S", "Barré", "edi__b--barre") +
           "</div>" +
 
           '<div class="edi__grp">' +
-            liste("taille", "Taille", [{ id: "", nom: "Taille" }].concat(TAILLES)) +
+            liste("taille", "Taille du texte",
+              [{ id: "", nom: "Taille" }].concat(TAILLES)) +
             liste("police", "Police", polices) +
           "</div>" +
 
+          /* Les couleurs derrière un bouton : treize pastilles à plat
+             mangeaient toute la barre et se tassaient dès qu'elle rétrécit. */
           '<div class="edi__grp">' +
-            palette("couleur", "Couleur du texte", COULEURS, "A") +
-            palette("surligne", "Surligner", SURLIGNES, "◼") +
+            panneau("couleur", "A", "Couleur du texte", COULEURS) +
+            panneau("surligne", "▮", "Surligner", SURLIGNES) +
           "</div>" +
 
           '<div class="edi__grp">' +
-            bouton("gauche", "◧", "Aligner à gauche") +
-            bouton("centre", "◫", "Centrer") +
-            bouton("droite", "◨", "Aligner à droite") +
+            bouton("gauche", "≡", "Aligner à gauche", "edi__b--g") +
+            bouton("centre", "≡", "Centrer", "edi__b--c") +
+            bouton("droite", "≡", "Aligner à droite", "edi__b--d") +
           "</div>" +
 
           '<div class="edi__grp">' +
-            bouton("puces", "•—", "Liste à puces") +
-            bouton("nombres", "1—", "Liste numérotée") +
-            bouton("titre", "H", "Titre") +
+            bouton("puces", "•", "Liste à puces") +
+            bouton("nombres", "1.", "Liste numérotée") +
+            bouton("titre", "T", "Titre") +
           "</div>" +
 
           '<div class="edi__grp">' +
             (o.choisirImage
-              ? '<button type="button" class="edi__b" data-cmd="image" ' +
-                'title="Insérer une image">' + svg("plus") + "<span>Image</span></button>"
+              ? bouton("image", "Image", "Insérer une image", "edi__b--large")
               : "") +
-            bouton("propre", "✕", "Enlever la mise en forme") +
+            bouton("propre", "Effacer", "Enlever la mise en forme", "edi__b--large") +
           "</div>" +
         "</div>" +
 
@@ -193,12 +195,44 @@ window.MNEditeur = (function () {
       const b = e.target.closest("[data-cmd]");
       if (b) { e.preventDefault(); const f = ACTIONS[b.dataset.cmd]; if (f) f(); return; }
 
+      const p = e.target.closest("[data-pan]");
+      if (p) {
+        e.preventDefault();
+        ouvrirPanneau(p.dataset.pan);
+        return;
+      }
+
       const c = e.target.closest("[data-couleur]");
       if (c) {
         e.preventDefault();
         const quoi = c.dataset.pour === "surligne" ? "hiliteColor" : "foreColor";
         cmd(quoi, c.dataset.couleur);
+        /* La couleur choisie reste sous le bouton : on voit ce qu'on a pris
+           sans rouvrir le panneau. */
+        const j = hote.querySelector('[data-jauge="' + c.dataset.pour + '"]');
+        if (j) j.style.background = c.dataset.couleur;
+        fermerPanneaux();
       }
+    }
+
+    /** Ouvre un panneau de couleurs, ferme l'autre. */
+    function ouvrirPanneau(quel) {
+      let ouvert = false;
+      hote.querySelectorAll("[data-panneau]").forEach(p => {
+        const moi = p.dataset.panneau === quel;
+        const montrer = moi && p.hidden;
+        p.hidden = !montrer;
+        if (montrer) ouvert = true;
+      });
+      hote.querySelectorAll("[data-pan]").forEach(b =>
+        b.setAttribute("aria-expanded",
+          b.dataset.pan === quel && ouvert ? "true" : "false"));
+    }
+
+    function fermerPanneaux() {
+      hote.querySelectorAll("[data-panneau]").forEach(p => { p.hidden = true; });
+      hote.querySelectorAll("[data-pan]").forEach(b =>
+        b.setAttribute("aria-expanded", "false"));
     }
     hote.querySelector(".edi__barre").addEventListener("mousedown", surBarre);
 
@@ -348,6 +382,13 @@ window.MNEditeur = (function () {
     document.addEventListener("mousemove", bouger);
     document.addEventListener("mouseup", lacher);
 
+    /* Un panneau de couleurs oublié ouvert couvre le texte qu'on écrit. */
+    function ailleurs(e) {
+      if (!hote.contains(e.target)) fermerPanneaux();
+      else if (!e.target.closest(".edi__coul")) fermerPanneaux();
+    }
+    document.addEventListener("mousedown", ailleurs);
+
     /* ---- Changements ---- */
 
     let minuterie = null;
@@ -395,6 +436,7 @@ window.MNEditeur = (function () {
       clearTimeout(minuterie);
       document.removeEventListener("mousemove", bouger);
       document.removeEventListener("mouseup", lacher);
+      document.removeEventListener("mousedown", ailleurs);
     }
 
     majBarre();
@@ -415,13 +457,25 @@ window.MNEditeur = (function () {
         esc(x.nom) + "</option>").join("") + "</select>";
   }
 
-  function palette(pour, titre, couleurs, marque) {
-    return '<span class="edi__pal" title="' + esc(titre) + '">' +
-      '<span class="edi__pal__t">' + esc(marque) + "</span>" +
-      couleurs.map(c =>
-        '<button type="button" class="edi__pastille" data-pour="' + pour +
-          '" data-couleur="' + esc(c) + '" style="background:' + esc(c) +
-          '" title="' + esc(titre) + '"></button>').join("") +
+  /**
+   * Un bouton de couleur et son panneau.
+   *
+   * Les pastilles étaient posées à plat dans la barre : treize éléments qui
+   * se tassaient dès que la colonne rétrécissait, jusqu'à ne plus faire qu'un
+   * trait. Elles vivent maintenant derrière un bouton, et la barre garde sa
+   * forme quelle que soit la largeur.
+   */
+  function panneau(pour, marque, titre, couleurs) {
+    return '<span class="edi__coul">' +
+      '<button type="button" class="edi__b edi__b--coul" data-pan="' + pour +
+        '" title="' + esc(titre) + '" aria-haspopup="true" aria-expanded="false">' +
+        esc(marque) + '<i class="edi__jauge" data-jauge="' + pour + '"></i></button>' +
+      '<div class="edi__pan" data-panneau="' + pour + '" hidden>' +
+        couleurs.map(c =>
+          '<button type="button" class="edi__pastille" data-pour="' + pour +
+            '" data-couleur="' + esc(c) + '" style="background:' + esc(c) +
+            '" title="' + esc(c) + '"></button>').join("") +
+      "</div>" +
     "</span>";
   }
 
