@@ -1974,7 +1974,7 @@ button.plan__l:hover .plan__c--jour { color: var(--pink-soft); }
 
 .edi__zone {
   position: relative;
-  min-height: 340px; max-height: 62vh;
+  min-height: min(560px, 52vh); max-height: 74vh;
   overflow: auto;
   padding: 16px 18px;
   background: var(--surface);

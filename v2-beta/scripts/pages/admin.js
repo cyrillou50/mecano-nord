@@ -144,6 +144,10 @@
   function dessiner() {
     V2Shell.brouillon(dessiner);
 
+    /* Seul le livret s'écrit en pleine fenêtre : les autres onglets ont des
+       tableaux dessinés pour la colonne de lecture. */
+    hote.classList.toggle("contenu--plein", onglet === "livret");
+
     hote.innerHTML =
       '<div class="onglets onglets--fin" id="a-onglets">' + permis().map(o =>
         '<button class="onglet' + (o.id === onglet ? " is-actif" : "") +

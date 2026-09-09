@@ -150,6 +150,10 @@
   width: 100%;
 }
 
+/* Le livret prend toute la fenêtre : c'est un document, pas une colonne de
+   lecture, et la largeur doit être la même à l'écriture et à la lecture. */
+.contenu--plein { max-width: none; }
+
 /* ---- Tablette : barre latérale réduite aux icônes ------------------------- */
 
 @media (max-width: 1180px) and (min-width: 1025px) {

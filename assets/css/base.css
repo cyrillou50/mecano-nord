@@ -614,6 +614,11 @@ ul { margin: 0; padding: 0; list-style: none; }
 
 .wrap { width: min(1180px, 100%); margin: 0 auto; padding: 0 clamp(14px, 3vw, 28px); }
 
+/* Une page qui prend toute la fenêtre plutôt que la colonne de lecture. Les
+   marges restent : le texte ne doit pas toucher le bord, et elles font la
+   même largeur que celles de la barre du haut. */
+.wrap--plein { width: 100%; }
+
 .empty {
   padding: 46px 20px;
   text-align: center;

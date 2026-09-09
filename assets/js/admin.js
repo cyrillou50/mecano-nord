@@ -80,7 +80,9 @@
   function render() {
     renderDraftbar();
     $("#admin-root").innerHTML =
-      '<div class="wrap admin">' +
+      /* Le livret s'écrit en pleine fenêtre — c'est un document, pas une
+         fiche. Les autres onglets gardent la colonne. */
+      '<div class="wrap admin' + (tab === "livret" ? " wrap--plein" : "") + '">' +
         '<nav class="tabs" id="tabs"></nav>' +
         '<div class="pane" id="pane"></div>' +
       "</div>";
