@@ -2455,6 +2455,22 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
   border-radius: inherit;
   display: block;
 }
+/* Une photo qu'on peut ouvrir en grand le dit : le curseur change, et un
+   liseré apparaît au survol. */
+.is-grandissable { cursor: zoom-in; }
+.is-grandissable:hover { outline: 2px solid var(--pink-soft); outline-offset: 2px; }
+.is-grandissable:focus-visible { outline: 2px solid var(--pink-soft); outline-offset: 2px; }
+
+/* La photo en grand : elle tient dans la fenêtre sans la déborder, et garde
+   ses proportions — un portrait etire ne ressemble a personne. */
+.av-grand { display: flex; justify-content: center; }
+.av-grand img {
+  max-width: 100%; max-height: 66vh;
+  width: auto; height: auto;
+  border-radius: var(--r-md);
+  display: block;
+}
+
 /* Les ronds et carrés qui peuvent porter une photo la coupent à leur forme. */
 .userchip__av, .avatar, .staffhead__av, .eq-tete__av { overflow: hidden; }
 .av-apercu {

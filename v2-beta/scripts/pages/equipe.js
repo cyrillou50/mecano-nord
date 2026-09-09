@@ -539,8 +539,11 @@
 
     z.innerHTML =
       '<div class="eq-tete" style="--grade:' + U.esc(r.color) + '">' +
-        '<div class="eq-tete__av" style="background:' + U.esc(r.color) + '">' +
-          vignette(u) + "</div>" +
+        '<div class="eq-tete__av' + (u.photo ? " is-grandissable" : "") +
+          '" style="background:' + U.esc(r.color) + '"' +
+          (u.photo
+            ? ' id="c-photo" role="button" tabindex="0" title="Voir la photo en grand"'
+            : "") + ">" + vignette(u) + "</div>" +
         '<div class="eq-tete__id">' +
           "<h2>" + U.esc(u.pseudo) + "</h2>" +
           '<div class="rang">' +
@@ -649,6 +652,20 @@
               '<p class="champ__aide" style="white-space:pre-wrap">' + U.esc(u.note) + "</p>")
           : "") +
       "</div>";
+
+    const ph = z.querySelector("#c-photo");
+    if (ph) {
+      const ouvrir = () => U.modale({
+        titre: u.pseudo,
+        corps: '<div class="av-grand"><img src="' + U.esc(MNStore.photoUrl(u)) +
+          '" alt="' + U.esc(u.pseudo) + '"></div>'
+      });
+      ph.addEventListener("click", ouvrir);
+      /* Au clavier aussi : c'est un bouton, il doit se comporter comme tel. */
+      ph.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvrir(); }
+      });
+    }
 
     const g = z.querySelector('[data-a="grade"]');
     if (g) g.addEventListener("click", () => promouvoir(u));

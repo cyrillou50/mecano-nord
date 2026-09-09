@@ -647,8 +647,11 @@
     pane.innerHTML =
       '<div class="panel">' +
         '<div class="staffhead" style="--role:' + esc(r.color) + '">' +
-          '<div class="staffhead__av" style="background:' + esc(r.color) + '">' +
-            vignette(u) + "</div>" +
+          '<div class="staffhead__av' + (u.photo ? " is-grandissable" : "") +
+            '" style="background:' + esc(r.color) + '"' +
+            (u.photo
+              ? ' id="c-photo" role="button" tabindex="0" title="Voir la photo en grand"'
+              : "") + ">" + vignette(u) + "</div>" +
           '<div class="staffhead__id">' +
             "<h2>" + esc(u.pseudo) +
               (MNStore.estArchive(u) ? " <span class=\"pill pill--danger\">archivé</span>" : "") +
@@ -774,6 +777,20 @@
             : "") +
         "</div>" +
       "</div>";
+
+    const ph = $("#c-photo");
+    if (ph) {
+      const ouvrir = () => MNUI.modal({
+        title: u.pseudo,
+        body: '<div class="av-grand"><img src="' + esc(MNStore.photoUrl(u)) +
+          '" alt="' + esc(u.pseudo) + '"></div>'
+      });
+      ph.addEventListener("click", ouvrir);
+      /* Au clavier aussi : c'est un bouton, il doit se comporter comme tel. */
+      ph.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvrir(); }
+      });
+    }
 
     const cd = $("#c-code"); if (cd) cd.addEventListener("click", () => reglerCode(u));
     const p = $("#c-promote"); if (p) p.addEventListener("click", () => promote(u));

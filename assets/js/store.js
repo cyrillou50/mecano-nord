@@ -1441,7 +1441,16 @@ window.MNStore = (function () {
     const ref = String((u && u.photo) || "").trim();
     if (!ref) return "";
     const nom = imageName(ref);
-    return nom ? imageUrl(nom) : ref;
+    if (nom) return imageUrl(nom);
+    /* Un fichier du dépôt : le chemin est relatif à la page, et la V2 vit un
+       cran plus bas. On le refait depuis le dossier que la version déclare,
+       plutôt que de laisser une image cassée d'un côté sur deux. */
+    const m = ref.match(/(?:^|\/)assets\/img\/([\w.-]+)$/);
+    if (m) {
+      const dossier = (window.MN_CONFIG && MN_CONFIG.imgDir) || "assets/img";
+      return dossier + "/" + m[1];
+    }
+    return ref;
   }
 
   /**
