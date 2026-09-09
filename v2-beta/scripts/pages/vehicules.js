@@ -16,9 +16,8 @@
   let hote = null, moi = null;
   let sel = null;
   let q = "", fCarb = "", fCat = "", fEtoile = "";
-  /* « Il me faut de quoi charger 400 kg » et « il me faut 6 places » : on
-     cherche un véhicule qui en fait au moins autant, pas exactement autant.
-     Un 6 places convient à qui en demande 5. D'où « et + » partout. */
+  /* Une tranche, pas un minimum : « 400 kg et + » finissait par tout garder.
+     La valeur retenue s'écrit « min-max », bornes comprises. */
   let fPlaces = "", fCoffre = "";
   let peutEcrire = false, peutValider = false;
 
@@ -69,17 +68,23 @@
   const coffreDe = v => MNStore.coffreKg(v.coffre);
 
   /**
-   * Les paliers proposés par un filtre : ceux qu'on trouve vraiment dans le
-   * parc, et rien d'autre. Proposer « 8 places » quand aucun véhicule n'en a
-   * huit donnerait une liste vide, et laisserait croire à un parc incomplet.
+   * Les tranches proposées par un filtre, découpées sur ce qu'on trouve
+   * vraiment dans le parc — voir MNStore.tranchesDe.
    */
-  function paliers(lire) {
-    const vus = new Set();
+  function tranches(lire) {
+    const vus = [];
     P().vehicles.forEach(v => {
       const n = lire(v);
-      if (n !== null) vus.add(n);
+      if (n !== null) vus.push(n);
     });
-    return [...vus].sort((a, b) => a - b);
+    return MNStore.tranchesDe(vus);
+  }
+
+  /** « 26-50 » → le véhicule tombe-t-il dedans ? */
+  function dansTranche(choix, n) {
+    if (n === null) return false;
+    const b = String(choix).split("-");
+    return n >= Number(b[0]) && n <= Number(b[1]);
   }
 
   function liste() {
@@ -88,17 +93,11 @@
       if (fCarb && v.carburant !== fCarb) return false;
       if (fCat && v.category !== fCat) return false;
       if (fEtoile && (manques(v).length > 0) !== (fEtoile === "oui")) return false;
-      /* Un coffre non renseigné, ou « N/A », n'atteint aucun minimum : on ne
-         peut pas promettre qu'il chargera 400 kg. Il sort donc du résultat,
-         mais reste trouvable en retirant le filtre. */
-      if (fPlaces) {
-        const n = placesDe(v);
-        if (n === null || n < Number(fPlaces)) return false;
-      }
-      if (fCoffre) {
-        const n = coffreDe(v);
-        if (n === null || n < Number(fCoffre)) return false;
-      }
+      /* Un coffre non renseigné, ou « N/A », n'est dans aucune tranche : on
+         ne sait pas ce qu'il charge. Il sort donc du résultat, mais reste
+         trouvable en retirant le filtre. */
+      if (fPlaces && !dansTranche(fPlaces, placesDe(v))) return false;
+      if (fCoffre && !dansTranche(fCoffre, coffreDe(v))) return false;
       if (!f) return true;
       return v.name.toLowerCase().indexOf(f) !== -1 ||
         catDe(v).name.toLowerCase().indexOf(f) !== -1;
@@ -128,11 +127,11 @@
                  "n'enregistre rien tant que le serveur n'a pas répondu." }) + "</div>");
   }
 
-  /** Un menu de seuils, vide s'il n'y a rien à proposer. */
-  function menuPalier(id, valeur, valeurs, tous, libelle) {
-    if (!valeurs.length) return "";
+  /** Un menu de tranches, vide s'il n'y a rien à proposer. */
+  function menuTranche(id, valeur, liste, tous, unite) {
+    if (!liste.length) return "";
     return select(id, valeur, [{ valeur: "", nom: tous }]
-      .concat(valeurs.map(n => ({ valeur: String(n), nom: libelle(n) }))));
+      .concat(liste.map(t => ({ valeur: t.min + "-" + t.max, nom: t.nom + unite }))));
   }
 
   function dessinerListe() {
@@ -153,10 +152,10 @@
           /* Ces deux-là n'apparaissent que si le parc a de quoi les remplir :
              un filtre sur le coffre n'a rien à proposer tant que personne ne
              l'a renseigné. */
-          menuPalier("v-places", fPlaces, paliers(placesDe),
-            "Toutes places", n => n + " places et +") +
-          menuPalier("v-coffre", fCoffre, paliers(coffreDe),
-            "Tout coffre", n => n + " kg et +") +
+          menuTranche("v-places", fPlaces, tranches(placesDe),
+            "Toutes places", " places") +
+          menuTranche("v-coffre", fCoffre, tranches(coffreDe),
+            "Tout coffre", " kg") +
         "</div>" +
       "</div>" +
 

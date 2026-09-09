@@ -27,11 +27,10 @@
   let fCarb = "";           // "", "Essence" ou "Diesel"
   let fCat = "";            // "" = toutes
   let fEtoile = "";         // "" = toutes, "oui" = incomplètes, "non" = complètes
-  /* « Il me faut de quoi charger 400 kg » et « il me faut 6 places » : on
-     cherche un véhicule qui en fait au moins autant, pas exactement autant.
-     Un 6 places convient à qui en demande 5. D'où « et + » partout. */
-  let fPlaces = "";         // "" = toutes, sinon un minimum
-  let fCoffre = "";         // "" = tous, sinon un minimum en kilos
+  /* Une tranche, pas un minimum : « 400 kg et + » finissait par tout garder.
+     La valeur retenue s'écrit « min-max », bornes comprises. */
+  let fPlaces = "";         // "" = toutes, sinon « min-max »
+  let fCoffre = "";         // "" = tous, sinon « min-max » en kilos
 
   MNUI.start({ page: "vehicules", title: "Véhicules", onReady: init });
 
@@ -116,22 +115,28 @@
   }
 
   /**
-   * Les paliers proposés par un filtre : ceux qu'on trouve vraiment dans le
-   * parc, et rien d'autre. Proposer « 8 places » quand aucun véhicule n'en a
-   * huit donnerait une liste vide, et laisserait croire à un parc incomplet.
+   * Les tranches proposées par un filtre, découpées sur ce qu'on trouve
+   * vraiment dans le parc — voir MNStore.tranchesDe.
    * @param {(v:object) => number|null} lire  ce qu'on lit sur un véhicule
    */
-  function paliers(lire) {
-    const vus = new Set();
+  function tranches(lire) {
+    const vus = [];
     P().vehicles.forEach(v => {
       const n = lire(v);
-      if (n !== null) vus.add(n);
+      if (n !== null) vus.push(n);
     });
-    return [...vus].sort((a, b) => a - b);
+    return MNStore.tranchesDe(vus);
   }
 
   const placesDe = v => MNStore.placesDe(v.places);
   const coffreDe = v => MNStore.coffreKg(v.coffre);
+
+  /** « 26-50 » → le véhicule tombe-t-il dedans ? */
+  function dansTranche(choix, n) {
+    if (n === null) return false;
+    const b = String(choix).split("-");
+    return n >= Number(b[0]) && n <= Number(b[1]);
+  }
 
   /** Un filtre est-il en cours ? Sert à tout déplier et à proposer un retour. */
   const filtre = () =>
@@ -144,17 +149,11 @@
       if (fCarb && v.carburant !== fCarb) return false;
       if (fCat && v.category !== fCat) return false;
       if (fEtoile && (manques(v).length > 0) !== (fEtoile === "oui")) return false;
-      /* Un coffre non renseigné, ou « N/A », n'atteint aucun minimum : on ne
-         peut pas promettre qu'il chargera 400 kg. Il sort donc du résultat,
-         mais reste trouvable en retirant le filtre. */
-      if (fPlaces) {
-        const n = placesDe(v);
-        if (n === null || n < Number(fPlaces)) return false;
-      }
-      if (fCoffre) {
-        const n = coffreDe(v);
-        if (n === null || n < Number(fCoffre)) return false;
-      }
+      /* Un coffre non renseigné, ou « N/A », n'est dans aucune tranche : on
+         ne sait pas ce qu'il charge. Il sort donc du résultat, mais reste
+         trouvable en retirant le filtre. */
+      if (fPlaces && !dansTranche(fPlaces, placesDe(v))) return false;
+      if (fCoffre && !dansTranche(fCoffre, coffreDe(v))) return false;
       if (!f) return true;
       return v.name.toLowerCase().indexOf(f) !== -1 ||
         catOf(v).name.toLowerCase().indexOf(f) !== -1;
@@ -211,16 +210,18 @@
    * une proposition resterait sinon invisible pour tout le monde.
    */
   /**
-   * Un menu de seuils. Vide s'il n'y a rien à proposer : un parc où personne
-   * n'a rempli le coffre n'a pas besoin d'un filtre sur le coffre.
+   * Un menu de tranches. Vide s'il n'y a rien à proposer : un parc où
+   * personne n'a rempli le coffre n'a pas besoin d'un filtre sur le coffre.
    */
-  function menuPalier(id, valeur, valeurs, tous, libelle, titre) {
-    if (!valeurs.length) return "";
+  function menuTranche(id, valeur, liste, tous, unite, titre) {
+    if (!liste.length) return "";
     return '<select class="select" id="' + id + '" title="' + esc(titre) + '">' +
       '<option value="">' + esc(tous) + "</option>" +
-      valeurs.map(n =>
-        '<option value="' + n + '"' + (valeur === String(n) ? " selected" : "") + ">" +
-        esc(libelle(n)) + "</option>").join("") +
+      liste.map(t => {
+        const v = t.min + "-" + t.max;
+        return '<option value="' + esc(v) + '"' + (valeur === v ? " selected" : "") + ">" +
+          esc(t.nom + unite) + "</option>";
+      }).join("") +
     "</select>";
   }
 
@@ -356,10 +357,10 @@
               '<option value="' + esc(c.id) + '"' + (fCat === c.id ? " selected" : "") + ">" +
               esc(c.name) + "</option>").join("") +
           "</select>" +
-          menuPalier("v-places", fPlaces, paliers(placesDe),
-            "Toutes places", n => n + " places et +", "Places minimum") +
-          menuPalier("v-coffre", fCoffre, paliers(coffreDe),
-            "Tout coffre", n => n + " kg et +", "Coffre minimum") +
+          menuTranche("v-places", fPlaces, tranches(placesDe),
+            "Toutes places", " places", "Nombre de places") +
+          menuTranche("v-coffre", fCoffre, tranches(coffreDe),
+            "Tout coffre", " kg", "Charge du coffre") +
         "</div>" +
         (filtre()
           ? '<button class="btn btn--ghost btn--sm" id="v-clear" style="width:100%;margin-top:6px">' +

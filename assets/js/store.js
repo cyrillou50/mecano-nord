@@ -74,6 +74,74 @@ window.MNStore = (function () {
     return isFinite(n) && n > 0 ? n : null;
   }
 
+  /* ---- Tranches -----------------------------------------------------------
+     Un filtre « 400 kg et + » finit par tout garder : dès qu'on descend le
+     seuil, presque tout le parc correspond, et on n'a rien trié. Une tranche
+     borne des deux côtés — « 26 à 50 kg » ne renvoie que ces coffres-là.
+
+     Le pas n'est pas choisi à l'avance : un parc de scooters n'a pas les
+     mêmes ordres de grandeur qu'un parc de camions. On prend le plus petit
+     pas d'une échelle ronde qui tienne en huit tranches — 25 kg si les
+     coffres montent à 200, 250 kg s'ils montent à 2 tonnes. Sur des places,
+     le pas tombe à 1 : la tranche est alors la valeur elle-même, et
+     « 4 places » veut dire quatre places. */
+
+  const PAS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
+  const MAX_TRANCHES = 8;
+
+  /**
+   * Découpe une série de nombres en choix bornés des deux côtés.
+   *
+   * Deux cas, parce que deux échelles. Peu de valeurs différentes — le
+   * nombre de places, presque toujours — et on propose ces valeurs telles
+   * quelles : « 4 places » veut dire quatre places, on ne peut pas faire plus
+   * clair. Beaucoup de valeurs — les coffres d'un vrai parc — et on regroupe
+   * en tranches, sinon la liste devient un mur de chiffres.
+   *
+   * Le pas des tranches n'est pas fixé d'avance : un parc de scooters n'a pas
+   * les ordres de grandeur d'un parc de camions. On prend le plus petit pas
+   * d'une échelle ronde qui tienne en huit tranches.
+   *
+   * Les bornes sont inclusives des deux côtés — « 0 à 25 », puis « 26 à 50 » —
+   * pour qu'on n'ait jamais à se demander de quel côté tombe un 25. Les
+   * tranches vides sont retirées : en proposer une qui ne renvoie rien
+   * ferait croire à un parc incomplet.
+   *
+   * @param {number[]} valeurs  ce qu'on trouve vraiment
+   * @returns {{min:number, max:number, nom:string}[]}
+   */
+  function tranchesDe(valeurs) {
+    const l = (valeurs || []).filter(n => typeof n === "number" && isFinite(n));
+    if (!l.length) return [];
+
+    const seules = [...new Set(l)].sort((a, b) => a - b);
+    if (seules.length <= MAX_TRANCHES) {
+      return seules.map(n => ({ min: n, max: n, nom: String(n) }));
+    }
+
+    const haut = seules[seules.length - 1];
+
+    /* Le pas se cale sur le gros du parc, pas sur son exception : un seul
+       camion de 1,2 t imposerait des tranches de 250 kg, et les vingt
+       voitures en dessous tomberaient toutes dans la premiere. On prend donc
+       le neuvieme decile comme repere, et les tranches du haut couvrent
+       l'exception sans commander l'echelle. */
+    const repere = seules[Math.max(0, Math.ceil(seules.length * 0.9) - 1)];
+    const pas = PAS.find(p => Math.ceil(repere / p) <= MAX_TRANCHES) ||
+      PAS[PAS.length - 1];
+
+    const out = [];
+    for (let k = 0; k * pas <= haut; k++) {
+      /* La première part de 0, les suivantes reprennent au chiffre d'après :
+         deux tranches ne se chevauchent jamais. */
+      const min = k === 0 ? 0 : k * pas + 1;
+      const max = (k + 1) * pas;
+      if (!seules.some(n => n >= min && n <= max)) continue;   // tranche vide
+      out.push({ min, max, nom: min + " à " + max });
+    }
+    return out;
+  }
+
   /* Liste fermée : on saisit au clic, mais une valeur peut arriver d'ailleurs
      — d'un ancien enregistrement, d'un import — alors on la rapproche. Une
      seule table, d'où sortent aussi bien le menu déroulant que le filtre :
@@ -1477,7 +1545,7 @@ window.MNStore = (function () {
     memeNom, soucisHomonyme,
     MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,
     REMBOURSEMENTS, remboursementDe, leveeIci, sommeRessources, ressourcesEnClair,
-    coffreKg, placesDe,
+    coffreKg, placesDe, tranchesDe,
     usersActifs, usersArchives,
     GRAVITES, graviteDe, normAvertissement, avertActif, avertBilan,
     addAvertissement, leverAvertissement, retirerAvertissement,
