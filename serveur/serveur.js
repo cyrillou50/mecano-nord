@@ -48,6 +48,9 @@ const FICHIER = path.join(DOSSIER, "duty.json");
 /* Les images vivent ici plutôt que dans le dépôt : les y déposer coûtait un
    commit et une reconstruction complète du site pour un fichier de 30 ko. */
 const DOSSIER_IMG = path.join(DOSSIER, "images");
+/* Les polices téléversées pour le livret. Même principe que les images : des
+   fichiers, chez toi, servis par le serveur — pas dans le dépôt public. */
+const DOSSIER_POL = path.join(DOSSIER, "polices");
 /* Le parc automobile vit ici, pas dans le dépôt : chacun peut proposer un
    véhicule sans avoir le droit de publier, et le catalogue GitHub reste
    réservé à ce qui touche au site lui-même. */
@@ -913,6 +916,61 @@ function nomImage(v) {
   return IMG_TYPES[path.extname(s).toLowerCase()] ? s : null;
 }
 
+/* Les formats qu'un navigateur sait lire. On s'arrête là : accepter n'importe
+   quel fichier reviendrait à héberger n'importe quoi sous couvert de police. */
+const POLICE_TYPES = {
+  ".woff2": "font/woff2", ".woff": "font/woff",
+  ".ttf": "font/ttf", ".otf": "font/otf"
+};
+
+/* Une police est un gros fichier, mais pas une vidéo : au-delà, c'est qu'on
+   se trompe de fichier. */
+const MAX_POLICE = 4 * 1024 * 1024;
+
+/** Nom de fichier sûr pour une police, ou null. */
+function nomPolice(v) {
+  const s = texte(v, 120).trim();
+  if (!/^[\w.-]+$/.test(s) || s.indexOf("..") !== -1) return null;
+  return POLICE_TYPES[path.extname(s).toLowerCase()] ? s : null;
+}
+
+async function listerPolices() {
+  try {
+    const noms = await fsp.readdir(DOSSIER_POL);
+    return noms.filter(n => nomPolice(n)).sort((a, b) => a.localeCompare(b, "fr"));
+  } catch (_) {
+    return [];                    // dossier pas encore créé : simplement vide
+  }
+}
+
+/**
+ * Sert une police. Le cache est long — un an — parce qu'un fichier de police
+ * ne change jamais sous le même nom : on en dépose une autre, on ne modifie
+ * pas celle-ci.
+ */
+async function servirPolice(res, nom, req) {
+  const f = path.join(DOSSIER_POL, nom);
+  let st;
+  try { st = await fsp.stat(f); } catch (_) { return false; }
+  if (!st.isFile()) return false;
+
+  const h = Object.assign(entetes(req), {
+    "Content-Type": POLICE_TYPES[path.extname(nom).toLowerCase()],
+    "Cache-Control": "public, max-age=31536000, immutable",
+    "Content-Length": st.size
+  });
+  res.writeHead(200, h);
+  fs.createReadStream(f).pipe(res);
+  return true;
+}
+
+async function ecrirePolice(nom, base64) {
+  await fsp.mkdir(DOSSIER_POL, { recursive: true });
+  const tmp = path.join(DOSSIER_POL, "." + nom + ".tmp");
+  await fsp.writeFile(tmp, Buffer.from(String(base64 || ""), "base64"));
+  await fsp.rename(tmp, path.join(DOSSIER_POL, nom));
+}
+
 async function listerImages() {
   try {
     const noms = await fsp.readdir(DOSSIER_IMG);
@@ -1212,7 +1270,11 @@ const serveur = http.createServer(async (req, res) => {
 
   /* Une page affiche des dizaines d'images : les compter épuiserait le quota
      en un chargement. Ce sont des lectures de fichiers, sans effet de bord. */
-  const lectureImage = req.method === "GET" && /^\/images\/./.test(chemin);
+  /* Charger une page peut demander plusieurs fichiers d un coup : les
+     compter dans la limite de debit ferait rater des images ou des polices
+     a qui ouvre simplement le livret. */
+  const lectureImage = req.method === "GET" &&
+    (/^\/images\/./.test(chemin) || /^\/polices\/./.test(chemin));
   if (!lectureImage && tropDeRequetes(ip)) {
     return repondre(res, 429, { error: "Trop de requêtes" }, req);
   }
@@ -1248,7 +1310,8 @@ const serveur = http.createServer(async (req, res) => {
          « images: true » qu'il peut héberger les images ici, « relais »
          qu'il sait aller chercher une image sur un autre domaine. */
       return repondre(res, 200, {
-        ok: true, ops: true, images: true, vehicules: true, relais: true, contrats: true,
+        ok: true, ops: true, images: true, polices: true,
+        vehicules: true, relais: true, contrats: true,
         calendrier: true, catalogue: true, equipe: true, emotes: true, blacklist: true,
         recap: RECAP_ACTIF, recapMini: RECAP_MINI, assistant: !!GEMINI_CLE,
         assistantModele: _modele || GEMINI_MODELE || "(choisi au premier usage)",
@@ -1471,6 +1534,42 @@ const serveur = http.createServer(async (req, res) => {
         return repondre(res, 200, { ok: true, liste: r.liste, deja: !!r.deja }, req);
       }
       return repondre(res, 405, { error: "Méthode non autorisée" }, req);
+    }
+
+    /* --- polices --- */
+    if (chemin === "/polices" && req.method === "GET") {
+      return repondre(res, 200, { ok: true, polices: await listerPolices() }, req);
+    }
+
+    if (req.method === "GET" && /^\/polices\/./.test(chemin)) {
+      const nom = nomPolice(decodeURIComponent(chemin.slice("/polices/".length)));
+      if (!nom) return repondre(res, 400, { error: "Nom de police invalide" }, req);
+      if (await servirPolice(res, nom, req)) return;
+      return repondre(res, 404, { error: "Police introuvable : " + nom }, req);
+    }
+
+    if (chemin === "/polices" && req.method === "POST") {
+      const c = await corpsJson(req, MAX_POLICE);
+
+      if (c.op === "delete") {
+        const nom = nomPolice(c.name);
+        if (!nom) return repondre(res, 400, { error: "Nom de police invalide" }, req);
+        try { await fsp.unlink(path.join(DOSSIER_POL, nom)); }
+        catch (_) { return repondre(res, 200, { ok: true, deja: true }, req); }
+        console.log(new Date().toISOString(), "police supprimée :", nom);
+        return repondre(res, 200, { ok: true }, req);
+      }
+
+      const nom = nomPolice(c.name);
+      if (!nom) {
+        return repondre(res, 400, {
+          error: "Nom de police invalide — attendu .woff2, .woff, .ttf ou .otf"
+        }, req);
+      }
+      if (!c.base64) return repondre(res, 400, { error: "Fichier manquant" }, req);
+      await ecrirePolice(nom, c.base64);
+      console.log(new Date().toISOString(), "police déposée :", nom);
+      return repondre(res, 200, { ok: true, polices: await listerPolices() }, req);
     }
 
     /* --- images --- */

@@ -2241,3 +2241,130 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
   color: var(--c-faible); font-size: 13.5px;
   border: 1px dashed var(--c-bord-net); border-radius: var(--r-2);
 }
+
+/* ---- Livret enrichi ------------------------------------------------------
+   Le livret n'est plus un bloc de texte : il porte des titres, des couleurs,
+   et des images qu'on pose où l'on veut. Celles-là sont en position absolue,
+   d'où le repère `position:relative` sur la zone — sans lui, elles se
+   caleraient sur la fenêtre et suivraient le défilement. */
+
+.livret { position: relative; }
+.livret h2 { font-size: 1.35em; margin: 22px 0 10px; }
+.livret h2:first-child { margin-top: 0; }
+.livret h3 { font-size: 1.15em; margin: 18px 0 8px; }
+.livret ol { margin: 0 0 14px; padding-left: 22px; list-style: decimal; }
+.livret blockquote {
+  margin: 0 0 14px; padding: 8px 0 8px 14px;
+  border-left: 3px solid var(--line);
+  color: var(--muted);
+}
+.livret mark { background: #ffe066; color: #1a1520; padding: 0 3px; border-radius: 3px; }
+.livret a { text-decoration: underline; }
+.livret hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
+
+/* Une image du livret. `--libre` la sort du fil : le texte coule dessous
+   sans bouger d'un pixel, ce qui est tout l'intérêt. */
+.livret .liv-img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  vertical-align: middle;
+}
+.livret .liv-img--libre { position: absolute; z-index: 2; }
+.livret .liv-img--gauche { float: left; margin: 0 14px 10px 0; }
+.livret .liv-img--droite { float: right; margin: 0 0 10px 14px; }
+
+/* ---- L'éditeur ----------------------------------------------------------- */
+
+.edi { border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+
+.edi__barre {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  padding: 7px 8px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 5;
+}
+.edi__grp {
+  display: flex; align-items: center; gap: 2px;
+  padding-right: 6px; margin-right: 2px;
+  border-right: 1px solid var(--line);
+}
+.edi__grp:last-child { border-right: 0; }
+
+.edi__b {
+  min-width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 0 7px;
+  border: 1px solid transparent; border-radius: var(--r-sm);
+  background: none; color: var(--txt);
+  font: inherit; font-size: 14px; line-height: 1;
+  cursor: pointer;
+}
+.edi__b:hover { background: rgba(255, 255, 255, .07); }
+.edi__b.is-on { background: var(--pink-ink); color: var(--pink-soft); border-color: rgba(255, 43, 209, .35); }
+.edi__b svg { width: 15px; height: 15px; }
+.edi__b--gras { font-weight: 800; }
+.edi__b--ital { font-style: italic; font-family: Georgia, serif; }
+.edi__b--soul { text-decoration: underline; }
+.edi__b--barre { text-decoration: line-through; }
+
+.edi__sel {
+  height: 30px; max-width: 132px;
+  padding: 0 6px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--txt);
+  font: inherit; font-size: 13px;
+  cursor: pointer;
+}
+
+.edi__pal { display: inline-flex; align-items: center; gap: 3px; }
+.edi__pal__t { font-size: 12px; color: var(--muted); margin-right: 1px; }
+.edi__pastille {
+  width: 15px; height: 15px; padding: 0;
+  border: 1px solid rgba(255, 255, 255, .25); border-radius: 3px;
+  cursor: pointer;
+}
+.edi__pastille:hover { transform: scale(1.18); }
+
+.edi__zone {
+  position: relative;
+  min-height: 340px; max-height: 62vh;
+  overflow: auto;
+  padding: 16px 18px;
+  background: var(--surface);
+  outline: 0;
+}
+.edi__zone:focus { box-shadow: inset 0 0 0 2px rgba(255, 43, 209, .25); }
+
+/* Dans l'éditeur, une image montre qu'on peut la prendre. */
+.edi__zone .liv-img { cursor: move; }
+.edi__zone .liv-img--libre { box-shadow: 0 2px 14px rgba(0, 0, 0, .45); }
+.edi__zone .liv-img.is-choisie {
+  outline: 2px solid var(--pink-soft);
+  outline-offset: 2px;
+}
+/* Le coin qui redimensionne : visible seulement sur l'image choisie, pour ne
+   pas couvrir le livret de poignées. */
+.edi__zone .liv-img.is-choisie {
+  cursor: move;
+  background-image: linear-gradient(135deg, transparent 62%, var(--pink-soft) 62%);
+  background-position: bottom right; background-size: 18px 18px;
+  background-repeat: no-repeat;
+}
+
+.edi__img {
+  position: absolute; z-index: 20;
+  display: flex; gap: 2px;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .5);
+}
+.edi__img button {
+  height: 24px; padding: 0 8px;
+  border: 0; border-radius: 4px;
+  background: none; color: var(--txt);
+  font: inherit; font-size: 12px; cursor: pointer;
+}
+.edi__img button:hover { background: rgba(255, 255, 255, .09); }

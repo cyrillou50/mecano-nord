@@ -53,6 +53,9 @@
       }
       brouillon = MNStore.clone(MNStore.catalog());
       onglet = (permis()[0] || { id: "objets" }).id;
+      MNPolices.charger()
+        .then(() => { if (onglet === "livret") dessiner(); })
+        .catch(() => { /* sans serveur, les polices du site suffisent */ });
       /* L'onglet « Mise en ligne » montre l'état de l'envoi : il doit suivre. */
       MNGitHub.onAuto(() => { if (onglet === "publier") dessiner(); });
       dessiner();
@@ -166,6 +169,10 @@
      personne n'a envie de remplir un formulaire pour expliquer un métier, et
      l'assistant s'en accommode très bien. */
 
+  /* L'éditeur en cours, s'il y en a un : on le démonte avant d'en poser un
+     autre, il écoute la souris du document entier. */
+  let editeur = null;
+
   /** « 12 480 caractères » — sans plafond à annoncer, on dit juste la taille. */
   function tailleTexte(t) {
     const n = t.length;
@@ -182,14 +189,14 @@
       corps:
         '<p class="champ__aide">Il se lit sur la page « Livret », et c\'est lui ' +
           "que l'assistant relit pour répondre aux questions des apprentis. " +
-          "Écris-le comme tu le dirais : une ligne vide sépare deux paragraphes, " +
-          "une ligne qui commence par un tiret fait une puce.</p>" +
+          "Mets-le en forme comme tu veux : gras, tailles, couleurs, " +
+          "alignement, et des images qu'on pose où l'on veut.</p>" +
         '<p class="champ__aide">Chaque garage a le sien : celui-ci ne se lit ' +
           "qu'au " + MNStore.nomAtelier(ou) + ".</p>" +
-        '<textarea class="saisie" id="l-txt" rows="20" ' +
-          'style="width:100%;margin-top:var(--e-3)">' + U.esc(t) + "</textarea>" +
+        '<div id="l-edi" style="margin-top:var(--e-3)"></div>' +
         '<div class="rang" style="justify-content:space-between;margin-top:var(--e-3)">' +
-          '<span class="champ__aide" id="l-n">' + tailleTexte(t) + "</span>" +
+          '<span class="champ__aide" id="l-n">' +
+            tailleTexte(MNTexte.enTexte(t)) + "</span>" +
           U.bouton("Enregistrer le livret",
             { variante: "principal", icone: "check", action: "lsave" }) +
         "</div>"
@@ -200,14 +207,33 @@
     barreAteliers(z, vueLivret,
       id => ((brouillon.settings.livret && brouillon.settings.livret[id]) || "").trim() ? 1 : 0);
 
-    const zone = z.querySelector("#l-txt");
-    zone.addEventListener("input", () => {
-      z.querySelector("#l-n").textContent = tailleTexte(zone.value);
+    /* L'éditeur remplace la zone de texte. Il rend du HTML déjà passé au
+       tamis — voir texte.js, qui est la barrière, pas ce fichier. */
+    if (editeur) { editeur.detruire(); editeur = null; }
+    editeur = MNEditeur.monter(z.querySelector("#l-edi"), {
+      valeur: t,
+      polices: window.MNPolices ? MNPolices.pourEditeur() : [],
+      onChange: h => {
+        const n = z.querySelector("#l-n");
+        if (n) n.textContent = tailleTexte(MNTexte.enTexte(h));
+      },
+      /* Le sélecteur d'icônes sait déjà déposer et lister les images. On
+         refuse seulement ce qui n'est pas une image. */
+      choisirImage: () => new Promise(res => {
+        choisirIcone("", ref => {
+          if (!/^srv:|^assets\/img\//.test(String(ref || ""))) {
+            U.toast("Choisis une image : les icônes du site ne s'insèrent pas ici", "err");
+            return res("");
+          }
+          res(ref);
+        });
+      })
     });
+
     z.querySelector('[data-a="lsave"]').addEventListener("click", () => {
       /* On n'écrit que le garage regardé : l'autre garde le sien. */
       brouillon.settings.livret = Object.assign({}, brouillon.settings.livret,
-        { [ou]: zone.value });
+        { [ou]: editeur.html() });
       valider();
       U.toast("Livret du " + MNStore.nomAtelier(ou) + " enregistré" +
         (MNGitHub.autoActif() ? "" : " — pense à publier"), "ok");

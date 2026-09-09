@@ -26,6 +26,9 @@
     if (!MNAuth.canAny("items", "users", "publish", "theme", "admin")) return denied();
     draft = MNStore.clone(MNStore.catalog());
     tab = firstAllowedTab();
+    MNPolices.charger()
+      .then(() => { if (tab === "livret" && $("#pane")) paneLivret($("#pane")); })
+      .catch(() => { /* sans serveur, les polices du site suffisent */ });
     MNGitHub.onAuto(() => {
       if (!$("#draftbar")) return;          // page pas encore dessinée
       renderDraftbar();
@@ -2229,6 +2232,11 @@
      personne n'a envie de remplir un formulaire pour expliquer un métier, et
      l'assistant s'en accommode très bien. */
 
+  /* L'éditeur en cours, s'il y en a un. On le démonte avant d'en poser un
+     autre : il écoute la souris du document entier pour déplacer les images,
+     et deux éditeurs vivants se disputeraient le même geste. */
+  let editeur = null;
+
   /** « 12 480 caractères » — sans plafond à annoncer, on dit juste la taille. */
   function tailleTexte(t) {
     const n = t.length;
@@ -2247,18 +2255,29 @@
       "</div>" +
         '<div class="panel__body editor">' +
           '<p class="hint">Il se lit sur la page « Livret », et c\'est lui que ' +
-            "l'assistant relit pour répondre aux questions des apprentis. Écris-le " +
-            "comme tu le dirais : une ligne vide sépare deux paragraphes, une ligne " +
-            "qui commence par un tiret fait une puce.</p>" +
+            "l'assistant relit pour répondre aux questions des apprentis. " +
+            "Mets-le en forme comme tu veux : gras, tailles, couleurs, alignement, " +
+            "et des images qu'on pose où l'on veut — elles ne poussent pas le " +
+            "texte.</p>" +
           '<p class="hint">' +
             "Chaque garage a le sien : celui-ci ne se lit qu'au " +
             esc(MNStore.nomAtelier(ou)) + ".</p>" +
-          '<div class="field"><textarea class="textarea" id="l-txt" rows="22" ' +
-            'placeholder="Ex.\n\nBienvenue à l\'atelier.\n\n' +
-            "- On pointe en arrivant, on dépointe en partant.\n" +
-            '- Un devis par client, jamais deux.">' + esc(t) + "</textarea></div>" +
+          '<div class="field" id="l-edi"></div>' +
+          '<div class="row row--wrap" style="margin-top:10px;align-items:center">' +
+            '<span class="label" style="margin:0">Polices</span>' +
+            '<span id="l-pol" class="row row--wrap" style="gap:6px"></span>' +
+            '<span class="spacer"></span>' +
+            '<button class="btn btn--ghost btn--sm" id="l-pol-add">' + svg("upload") +
+              "<span>Ajouter une police</span></button>" +
+            '<input type="file" id="l-pol-f" accept=".woff2,.woff,.ttf,.otf" hidden>' +
+          "</div>" +
+          '<p class="hint">Un fichier <code>.woff2</code>, <code>.woff</code>, ' +
+            "<code>.ttf</code> ou <code>.otf</code>. Il est déposé sur le serveur de " +
+            "l'atelier, jamais dans le dépôt : une police pèse lourd et n'a rien à " +
+            "faire dans l'historique du site. N'y mets que des polices que tu as le " +
+            "droit d'utiliser.</p>" +
           '<div class="row" style="justify-content:space-between;align-items:center">' +
-            '<span class="hint" id="l-n">' + tailleTexte(t) + "</span>" +
+            '<span class="hint" id="l-n">' + tailleTexte(MNTexte.enTexte(t)) + "</span>" +
             '<button class="btn btn--primary" id="l-save">' + svg("save") +
               "<span>Enregistrer le livret</span></button>" +
           "</div>" +
@@ -2269,18 +2288,94 @@
     barreAteliers(host, paneLivret,
       id => ((draft.settings.livret && draft.settings.livret[id]) || "").trim() ? 1 : 0);
 
-    const zone = $("#l-txt");
-    zone.addEventListener("input", () => {
-      $("#l-n").textContent = tailleTexte(zone.value);
+    /* L'éditeur remplace la zone de texte : gras, tailles, couleurs,
+       alignement, et des images qu'on pose où l'on veut. Il rend du HTML déjà
+       passé au tamis — voir texte.js, qui est la barrière, pas ce fichier. */
+    if (editeur) { editeur.detruire(); editeur = null; }
+    editeur = MNEditeur.monter($("#l-edi"), {
+      valeur: t,
+      polices: window.MNPolices ? MNPolices.pourEditeur() : [],
+      onChange: h => { $("#l-n").textContent = tailleTexte(MNTexte.enTexte(h)); },
+      /* Le sélecteur d'icônes sait déjà déposer et lister les images : inutile
+         d'en écrire un second. On refuse seulement ce qui n'est pas une image
+         — une icône du site n'a rien à faire posée dans un livret. */
+      choisirImage: () => new Promise(res => {
+        pickIcon("", ref => {
+          if (!/^srv:|^assets\/img\//.test(String(ref || ""))) {
+            MNUI.toast("Choisis une image : les icônes du site ne s'insèrent pas ici", "err");
+            return res("");
+          }
+          res(ref);
+        });
+      })
     });
+
+    peindrePolices();
+
+    $("#l-pol-add").addEventListener("click", () => {
+      if (!MNPolices.surServeur()) {
+        return MNUI.toast("Il faut un serveur pour héberger une police", "err");
+      }
+      $("#l-pol-f").click();
+    });
+    $("#l-pol-f").addEventListener("change", async e => {
+      const f = e.target.files[0];
+      e.target.value = "";
+      if (!f) return;
+      try {
+        const nom = await MNPolices.deposer(f);
+        MNUI.toast("Police « " + MNPolices.nomLisible(nom) + " » ajoutée", "ok");
+        paneLivret(host);            // la barre d'outils doit la proposer
+      } catch (err) {
+        MNUI.toast("Dépôt impossible : " + err.message, "err");
+      }
+    });
+
     $("#l-save").addEventListener("click", () => {
       /* On n'écrit que le garage regardé : l'autre garde le sien. */
       draft.settings.livret = Object.assign({}, draft.settings.livret,
-        { [ou]: zone.value });
+        { [ou]: editeur.html() });
       commit();
       MNUI.toast("Livret du " + MNStore.nomAtelier(ou) + " enregistré" +
         (MNGitHub.autoActif() ? "" : " — pense à publier"), "ok");
     });
+  }
+
+  /** Les polices déposées, avec de quoi en retirer une. */
+  function peindrePolices() {
+    const hote = $("#l-pol");
+    if (!hote) return;
+    const l = MNPolices.liste();
+    if (!l.length) {
+      hote.innerHTML = '<span class="hint">' + (MNPolices.surServeur()
+        ? "aucune pour l'instant"
+        : "aucun serveur : seules les polices du site sont proposées") + "</span>";
+      return;
+    }
+    hote.innerHTML = l.map(f =>
+      '<span class="permtag" style="font-family:' + esc(MNPolices.famille(f)) + '">' +
+        esc(MNPolices.nomLisible(f)) +
+        '<button type="button" data-pol="' + esc(f) + '" title="Retirer">✕</button>' +
+      "</span>").join("");
+
+    hote.querySelectorAll("[data-pol]").forEach(b =>
+      b.addEventListener("click", async () => {
+        const nom = b.dataset.pol;
+        const ok = await MNUI.confirm({
+          title: "Retirer cette police",
+          message: "« " + MNPolices.nomLisible(nom) + " » ne sera plus proposée, et " +
+            "les livrets qui l'utilisent retrouveront la police du site.",
+          confirmLabel: "Retirer", danger: true
+        });
+        if (!ok) return;
+        try {
+          await MNPolices.retirer(nom);
+          MNUI.toast("Police retirée", "ok");
+          paneLivret(host);
+        } catch (e) {
+          MNUI.toast("Retrait impossible : " + e.message, "err");
+        }
+      }));
   }
 
   function paneTheme(host) {

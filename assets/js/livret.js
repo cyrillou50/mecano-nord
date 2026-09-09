@@ -38,6 +38,9 @@
 
   async function init(session) {
     me = session;
+    /* Les polices déposées, s'il y en a : sans elles, un livret écrit avec
+       l'une d'elles s'afficherait dans celle du site sans qu'on comprenne. */
+    MNPolices.charger().catch(() => { /* le livret se lit quand même */ });
     render();
     sonder();
   }
@@ -154,7 +157,9 @@
        n'a lu que la moitié du livret ne doit pas répondre comme s'il l'avait
        lu en entier. */
     const tete = l.join("\n") + "\n\nLIVRET DE L'ATELIER :\n";
-    const livret = MNStore.livretDe(MNAuth.atelier()).trim();
+    /* Le livret est enrichi : on n'envoie pas les balises à l'assistant, il
+       les recopierait dans ses réponses. */
+    const livret = MNTexte.enTexte(MNStore.livretDe(MNAuth.atelier())).trim();
     if (!livret) return tete + "(aucun livret n'a encore été écrit)";
 
     const place = MAX_CONTEXTE - tete.length;
@@ -201,7 +206,7 @@
         "</div>" +
         '<div class="panel__body">' +
           (livret
-            ? '<div class="livret">' + enParagraphes(livret) + "</div>"
+            ? '<div class="livret">' + MNTexte.pourAffichage(livret) + "</div>"
             : '<p class="hint">Le livret n\'a pas encore été écrit. ' +
               (peutEcrire
                 ? "Tu peux t'en charger dans l'administration, onglet « Livret »."

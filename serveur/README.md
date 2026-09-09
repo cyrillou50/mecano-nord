@@ -593,6 +593,25 @@ souci d'origine.
 
 ---
 
+## Les polices du livret
+
+Le livret se met en forme (gras, tailles, couleurs, alignement, images) et on
+peut y utiliser des polices déposées. Elles vivent **chez toi**, dans
+`donnees/polices/`, servies par ce serveur — jamais dans le dépôt : un fichier
+de police pèse lourd et n'a rien à faire dans l'historique du site.
+
+Ça se fait depuis Administration → Livret → **Ajouter une police**. Formats
+acceptés : `.woff2`, `.woff`, `.ttf`, `.otf`, jusqu'à 4 Mo.
+
+> N'y mets que des polices que tu as le droit d'utiliser : une police est une
+> œuvre, et beaucoup de celles qu'on trouve en ligne ne sont pas libres.
+
+Rien à configurer : la route existe dès que ce serveur tourne. Sans serveur, le
+livret garde les sept polices que tout navigateur connaît, et se met en forme
+normalement pour le reste.
+
+---
+
 ## Récapitulatif hebdomadaire des services
 
 **Lundi à 00 h**, une fois le dimanche fini, le serveur poste le temps passé
