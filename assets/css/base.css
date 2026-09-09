@@ -614,10 +614,11 @@ ul { margin: 0; padding: 0; list-style: none; }
 
 .wrap { width: min(1180px, 100%); margin: 0 auto; padding: 0 clamp(14px, 3vw, 28px); }
 
-/* Une page qui prend toute la fenêtre plutôt que la colonne de lecture. Les
-   marges restent : le texte ne doit pas toucher le bord, et elles font la
-   même largeur que celles de la barre du haut. */
-.wrap--plein { width: 100%; }
+/* Une page large — le livret — plutôt que la colonne de lecture. Une part de
+   la fenêtre et non la fenêtre entière : il faut une marge de chaque côté,
+   sinon le texte est collé au bord. Et un plafond, parce qu'au-delà on
+   n'ajoute plus que de la longueur de ligne, qui se lit mal. */
+.wrap--plein { width: min(1600px, 92%); }
 
 .empty {
   padding: 46px 20px;
