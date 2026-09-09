@@ -97,15 +97,16 @@ window.MNStore = (function () {
   /**
    * Découpe une série de nombres en choix bornés des deux côtés.
    *
-   * Deux cas, parce que deux échelles. Peu de valeurs différentes — le
-   * nombre de places, presque toujours, et bien des parcs pour les coffres —
-   * et on propose ces valeurs telles quelles : « 45 kg » veut dire quarante
-   * cinq kilos, on ne peut pas trier plus fin. Au-delà de ce qu'un menu peut
-   * porter, on regroupe en tranches.
+   * Toujours des tranches — « 0 à 25 », puis « 26 à 50 » — parce qu'un menu
+   * doit se lire pareil d'un parc à l'autre.
    *
-   * Le pas des tranches n'est pas fixé d'avance : un parc de scooters n'a pas
-   * les ordres de grandeur d'un parc de camions. On prend le plus petit pas
-   * d'une échelle ronde qui tienne en huit tranches.
+   * Le pas n'est pas fixé d'avance : un parc de scooters n'a pas les ordres
+   * de grandeur d'un parc de camions. On prend le plus petit pas d'une
+   * échelle ronde qui tienne dans le compte de lignes voulu — donc le
+   * découpage le plus fin que le menu puisse porter.
+   *
+   * Quand le pas tombe à 1, la tranche est la valeur elle-même et se nomme
+   * comme telle : « 4 places » plutôt que « 4 à 4 ».
    *
    * Les bornes sont inclusives des deux côtés — « 0 à 25 », puis « 26 à 50 » —
    * pour qu'on n'ait jamais à se demander de quel côté tombe un 25. Les
@@ -120,10 +121,6 @@ window.MNStore = (function () {
     if (!l.length) return [];
 
     const seules = [...new Set(l)].sort((a, b) => a - b);
-    if (seules.length <= MAX_CHOIX) {
-      return seules.map(n => ({ min: n, max: n, nom: String(n) }));
-    }
-
     const haut = seules[seules.length - 1];
 
     /* Le pas se cale sur le gros du parc, pas sur son exception : un seul
@@ -142,7 +139,7 @@ window.MNStore = (function () {
       const min = k === 0 ? 0 : k * pas + 1;
       const max = (k + 1) * pas;
       if (!seules.some(n => n >= min && n <= max)) continue;   // tranche vide
-      out.push({ min, max, nom: min + " à " + max });
+      out.push({ min, max, nom: min === max ? String(max) : min + " à " + max });
     }
     return out;
   }
