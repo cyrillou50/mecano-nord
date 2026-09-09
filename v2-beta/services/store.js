@@ -1444,6 +1444,20 @@ window.MNStore = (function () {
     return nom ? imageUrl(nom) : ref;
   }
 
+  /**
+   * L'adresse de la photo de quelqu'un, à partir de son identifiant.
+   *
+   * Les lignes de la page Service viennent du tableau de pointage, pas du
+   * catalogue : elles ne portent qu'un identifiant et un pseudo. C'est donc
+   * ici qu'on va rechercher la fiche — nulle part ailleurs, pour que la règle
+   * reste la même partout.
+   */
+  function photoDeId(uid) {
+    if (!uid) return "";
+    const u = (_catalog.users || []).find(x => x.id === uid);
+    return u ? photoUrl(u) : "";
+  }
+
   /** Le serveur peut-il héberger les images ? */
   const imagesHebergees = () => !!api("images");
 
@@ -1580,7 +1594,7 @@ window.MNStore = (function () {
     contractTypes: () => (_catalog.contractTypes || []).filter(t => estDeAtelier(t, _atelier)),
     contractTypeById: id => (_catalog.contractTypes || []).find(t => t.id === id) || null,
     vehicleById, vehicleCatById,
-    IMG_TAG, imageName, imageUrl, imagesHebergees, photoUrl,
+    IMG_TAG, imageName, imageUrl, imagesHebergees, photoUrl, photoDeId,
     NA, CARBURANTS, statsVehicule,
     estNA: v => String(v || "").trim().toUpperCase() === NA,
     getCart, setCart, getBTs, addBT, removeBT, clearBTs

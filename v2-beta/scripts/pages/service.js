@@ -307,7 +307,7 @@
               '<span class="s-point"></span>' +
               '<span class="avatar avatar--sm"' +
                 (role ? ' style="background:' + U.esc(role.color) + '"' : "") + ">" +
-                U.esc(U.initiales(e.pseudo)) + "</span>" +
+                vignette(e) + "</span>" +
               "<b>" + U.esc(e.pseudo) + "</b>" +
               (role ? U.etiquette(role.name) : "") +
               '<span class="pousse nombre muet" data-depuis="' + U.esc(e.since) + '">' +
@@ -338,6 +338,18 @@
      garage. Elles viennent du catalogue déjà chargé : rien à demander au
      serveur, et la jauge s'affiche du premier coup. */
   const objectifIci = () => MNStore.minimumPour(moi && moi.uid, MNAuth.atelier());
+
+  /**
+   * Le rond d'une personne dans une liste : sa photo si elle en a une, ses
+   * initiales sinon. Le rond ne change pas de taille — une photo ne doit pas
+   * faire enfler la ligne.
+   */
+  function vignette(x) {
+    const src = MNStore.photoDeId(x && x.id);
+    return src
+      ? '<img class="av-photo" src="' + U.esc(src) + '" alt="" loading="lazy" decoding="async">'
+      : U.esc(U.initiales(x && x.pseudo));
+  }
 
   const hhmm = d => new Date(d).toLocaleTimeString("fr-FR",
     { hour: "2-digit", minute: "2-digit" });
@@ -561,7 +573,7 @@
       corps: l.length
         ? U.tableau(
             [{ nom: "Employé", rendu: c => '<span class="rang">' +
-                '<span class="avatar avatar--sm">' + U.esc(U.initiales(c.pseudo)) + "</span>" +
+                '<span class="avatar avatar--sm">' + vignette(c) + "</span>" +
                 U.esc(c.pseudo) + "</span>" },
              { nom: "Période", rendu: c => U.esc(periode(c)) },
              { nom: "État", rendu: c => PUCE[etatConge(c)]() },
@@ -789,7 +801,7 @@
         corps: t.length
           ? U.tableau(
               [{ nom: "Employé", rendu: u => '<span class="rang">' +
-                  '<span class="avatar avatar--sm">' + U.esc(U.initiales(u.pseudo)) + "</span>" +
+                  '<span class="avatar avatar--sm">' + vignette(u) + "</span>" +
                   U.esc(u.pseudo) + "</span>" },
                { nom: "Services", num: true, cle: "sessions" },
                { nom: "Total", num: true, rendu: u => "<b>" + U.esc(MNDuty.dur(u.seconds, true)) + "</b>" }],

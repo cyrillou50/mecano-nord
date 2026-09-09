@@ -2367,6 +2367,47 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
 }
 .edi__pastille:hover { transform: scale(1.12); }
 
+/* ---- Le panneau du lien ----
+   Il s'ouvre sous la barre, comme celui des couleurs. Le groupe qui le porte
+   doit donc etre un repere de position. */
+.edi__grp--lien { position: relative; }
+.edi__lien {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+  width: 300px; max-width: 84vw;
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .55);
+  text-align: left;
+}
+.edi__lien label {
+  display: flex; flex-direction: column; gap: 3px;
+  font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted);
+}
+.edi__lien input {
+  height: 30px; padding: 0 8px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--txt);
+  font-family: var(--font-body); font-size: 13px;
+  text-transform: none; letter-spacing: 0;
+}
+.edi__lien input:focus { outline: 0; border-color: rgb(var(--accent-rgb) / .5); }
+.edi__lien__b { display: flex; gap: 6px; }
+.edi__lien__b button {
+  flex: 1; height: 28px;
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: none; color: var(--txt);
+  font-family: var(--font-body); font-size: 12.5px; cursor: pointer;
+}
+.edi__lien__b button:first-child {
+  background: var(--pink-ink); color: var(--pink-soft);
+  border-color: rgb(var(--accent-rgb) / .35);
+}
+.edi__lien__b button:hover { background: rgba(255, 255, 255, .08); }
+.edi__lien p { margin: 0; font-size: 11.5px; color: var(--muted); }
+
 .edi__zone {
   position: relative;
   min-height: 340px; max-height: 62vh;
@@ -2414,6 +2455,8 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
   border-radius: inherit;
   display: block;
 }
+/* Les ronds et carrés qui peuvent porter une photo la coupent à leur forme. */
+.userchip__av, .avatar, .staffhead__av, .eq-tete__av { overflow: hidden; }
 .av-apercu {
   width: 54px; height: 54px; flex: none;
   display: grid; place-items: center;

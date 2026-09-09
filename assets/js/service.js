@@ -585,11 +585,23 @@
       "</div></div>";
   }
 
+  /**
+   * Le rond d'une personne dans une liste : sa photo si elle en a une, ses
+   * initiales sinon. Le rond ne change pas de taille — une photo ne doit pas
+   * faire enfler la ligne.
+   */
+  function vignette(x) {
+    const src = MNStore.photoDeId(x && x.id);
+    return src
+      ? '<img class="av-photo" src="' + esc(src) + '" alt="" loading="lazy" decoding="async">'
+      : esc(MNUI.initials(x && x.pseudo));
+  }
+
   function leaveRow(c, canManage) {
     const role = MNStore.roleById(c.roleId);
     return '<div class="trow' + (etatConge(c) === "passe" ? " is-off" : "") + '">' +
       '<div class="userchip__av" style="width:38px;height:38px;flex:none' +
-        (role ? ";background:" + esc(role.color) : "") + '">' + esc(MNUI.initials(c.pseudo)) + "</div>" +
+        (role ? ";background:" + esc(role.color) : "") + '">' + vignette(c) + "</div>" +
       '<div class="trow__main"><b>' + esc(c.pseudo) + "</b>" +
         '<div class="trow__meta">' +
           puceEtat(c) +
@@ -661,7 +673,7 @@
     return '<div class="trow">' +
       '<span class="dutydot"></span>' +
       '<div class="userchip__av" style="width:38px;height:38px;flex:none' +
-        (role ? ";background:" + esc(role.color) : "") + '">' + esc(MNUI.initials(e.pseudo)) + "</div>" +
+        (role ? ";background:" + esc(role.color) : "") + '">' + vignette(e) + "</div>" +
       '<div class="trow__main"><b>' + esc(e.pseudo) + "</b>" +
         '<div class="trow__meta">' +
           (role ? '<span class="permtag" style="border-color:' + esc(role.color) +
@@ -686,7 +698,7 @@
               const role = MNStore.roleById(u.roleId);
               return '<div class="trow">' +
                 '<div class="userchip__av" style="width:34px;height:34px;flex:none">' +
-                  esc(MNUI.initials(u.pseudo)) + "</div>" +
+                  vignette(u) + "</div>" +
                 '<div class="trow__main"><b>' + esc(u.pseudo) + "</b>" +
                   '<div class="trow__meta">' +
                     (role ? "<i>" + esc(role.name) + "</i>" : "") +

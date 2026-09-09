@@ -59,6 +59,20 @@ window.MNEditeur = (function () {
 
   const svg = n => { try { return MNUI.svg(n); } catch (_) { return ""; } };
 
+  /* Les pages du site : on les propose, personne n'a à retenir des noms de
+     fichiers. Une adresse extérieure reste possible, c'est le même champ. */
+  const PAGES = [
+    { nom: "Facturation", href: "index.html" },
+    { nom: "Contrats", href: "contrats.html" },
+    { nom: "Blacklist", href: "blacklist.html" },
+    { nom: "Livret", href: "livret.html" },
+    { nom: "Équipe", href: "equipe.html" },
+    { nom: "Service", href: "service.html" },
+    { nom: "Calendrier", href: "calendrier.html" },
+    { nom: "Véhicules", href: "vehicules.html" },
+    { nom: "Émotes", href: "emotes.html" }
+  ];
+
   /* ---- Montage ------------------------------------------------------------------ */
 
   /**
@@ -115,11 +129,35 @@ window.MNEditeur = (function () {
             bouton("titre", "T", "Titre") +
           "</div>" +
 
-          '<div class="edi__grp">' +
+          '<div class="edi__grp edi__grp--lien">' +
+            bouton("lien", "Lien", "Mettre un lien sur du texte", "edi__b--large") +
             (o.choisirImage
               ? bouton("image", "Image", "Insérer une image", "edi__b--large")
               : "") +
             bouton("propre", "Effacer", "Enlever la mise en forme", "edi__b--large") +
+
+            /* Le panneau du lien : deux champs et un bouton, posés sous la
+               barre plutôt que dans une fenêtre — l'éditeur ne connaît pas la
+               boîte de dialogue de la version qui l'accueille. */
+            '<div class="edi__lien" hidden>' +
+              '<label>Nom affiché' +
+                '<input type="text" data-lien="nom" maxlength="120" placeholder="Ex. Service">' +
+              "</label>" +
+              "<label>Adresse" +
+                '<input type="text" data-lien="url" maxlength="500" list="edi-pages" ' +
+                  'placeholder="service.html ou https://…">' +
+              "</label>" +
+              '<datalist id="edi-pages">' +
+                PAGES.map(p => '<option value="' + esc(p.href) + '">' +
+                  esc(p.nom) + "</option>").join("") +
+              "</datalist>" +
+              '<div class="edi__lien__b">' +
+                '<button type="button" data-lien="ok">Poser le lien</button>' +
+                '<button type="button" data-lien="non">Annuler</button>' +
+              "</div>" +
+              '<p>Une page du site, ou une adresse en <b>https://</b>. ' +
+                "C'est le nom qui s'affiche, pas l'adresse.</p>" +
+            "</div>" +
           "</div>" +
         "</div>" +
 
@@ -188,10 +226,15 @@ window.MNEditeur = (function () {
       nombres: () => cmd("insertOrderedList"),
       titre: () => cmd("formatBlock", "H2"),
       propre: () => { cmd("removeFormat"); cmd("formatBlock", "P"); },
-      image: () => insererImage()
+      image: () => insererImage(),
+      lien: () => ouvrirLien()
     };
 
     function surBarre(e) {
+      /* Le clic sur la barre va faire perdre le focus de la zone : on note ce
+         qui était sélectionné avant, c'est là-dessus qu'on posera le lien. */
+      retenirSelection();
+
       const b = e.target.closest("[data-cmd]");
       if (b) { e.preventDefault(); const f = ACTIONS[b.dataset.cmd]; if (f) f(); return; }
 
@@ -230,6 +273,7 @@ window.MNEditeur = (function () {
     }
 
     function fermerPanneaux() {
+      if (panLien) panLien.hidden = true;
       hote.querySelectorAll("[data-panneau]").forEach(p => { p.hidden = true; });
       hote.querySelectorAll("[data-pan]").forEach(b =>
         b.setAttribute("aria-expanded", "false"));
@@ -269,6 +313,105 @@ window.MNEditeur = (function () {
       /* Le navigateur a pu poser directement un span : on corrige la valeur. */
       zone.querySelectorAll('span[style*="font-family: x"], span[style*="font-family:x"]')
         .forEach(e => { e.style.fontFamily = valeur; });
+    }
+
+    /* ---- Liens ----------------------------------------------------------
+       Un nom et une adresse, plutôt qu'une adresse collée en clair : « Voir
+       la page Service » se lit, « https://…/service.html » non. */
+
+    const panLien = hote.querySelector(".edi__lien");
+
+    /* Ce qui est sélectionné au moment du clic. Le champ du panneau prend le
+       focus, et avec lui la sélection disparaît : on la garde de côté. */
+    let selection = null;
+
+    function retenirSelection() {
+      try {
+        const s = window.getSelection();
+        if (s && s.rangeCount && zone.contains(s.anchorNode)) {
+          selection = s.getRangeAt(0).cloneRange();
+          return;
+        }
+      } catch (_) { /* pas de sélection utilisable */ }
+      selection = null;
+    }
+
+    function ouvrirLien() {
+      const nom = panLien.querySelector('[data-lien="nom"]');
+      const url = panLien.querySelector('[data-lien="url"]');
+      /* Le texte sélectionné devient le nom proposé : c'est presque toujours
+         celui qu'on veut, et on remplacera ce texte-là. */
+      nom.value = selection ? String(selection).trim().slice(0, 120) : "";
+      url.value = "";
+      panLien.hidden = false;
+      (nom.value ? url : nom).focus();
+    }
+
+    const fermerLien = () => { panLien.hidden = true; };
+
+    /* Taper un nom de page remplit l'adresse : « Service » suffit. */
+    panLien.querySelector('[data-lien="nom"]').addEventListener("input", e => {
+      const url = panLien.querySelector('[data-lien="url"]');
+      const p = PAGES.find(x => x.nom.toLowerCase() === e.target.value.trim().toLowerCase());
+      if (p && !url.value) url.value = p.href;
+    });
+
+    panLien.addEventListener("click", e => {
+      const b = e.target.closest("[data-lien]");
+      if (!b || b.tagName !== "BUTTON") return;
+      if (b.dataset.lien === "non") return fermerLien();
+      if (b.dataset.lien === "ok") poserLien();
+    });
+    panLien.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); poserLien(); }
+      if (e.key === "Escape") { e.preventDefault(); fermerLien(); }
+    });
+
+    function poserLien() {
+      const nom = panLien.querySelector('[data-lien="nom"]').value.trim();
+      const url = panLien.querySelector('[data-lien="url"]').value.trim();
+      const dire = m => {
+        try { MNUI.toast(m, "err"); } catch (_) { /* pas de MNUI ici */ }
+        try { V2UI.toast(m, "err"); } catch (_) { /* ni de V2UI */ }
+      };
+      if (!nom) return dire("Donne un nom : c'est lui qu'on lira");
+      if (!url) return dire("Donne une adresse");
+
+      /* Le tamis dira le dernier mot ; autant le dire tout de suite plutôt
+         que de laisser poser un lien qui disparaîtra à l'enregistrement. */
+      const essai = MNTexte.nettoyer(
+        '<a href="' + url.replace(/"/g, "&quot;") + '">x</a>');
+      if (essai.indexOf("<a ") === -1) {
+        return dire("Adresse refusée — une page du site, ou une adresse en https://");
+      }
+
+      fermerLien();
+      zone.focus();
+
+      const a = document.createElement("a");
+      a.setAttribute("href", url);
+      a.textContent = nom;
+      try {
+        const s = window.getSelection();
+        if (selection) { s.removeAllRanges(); s.addRange(selection); }
+        if (s && s.rangeCount) {
+          const r = s.getRangeAt(0);
+          r.deleteContents();
+          r.insertNode(a);
+          /* Le curseur se remet après le lien : sans ça, ce qu'on tape
+             ensuite continuerait à l'intérieur. */
+          r.setStartAfter(a);
+          r.collapse(true);
+          s.removeAllRanges();
+          s.addRange(r);
+        } else {
+          zone.appendChild(a);
+        }
+      } catch (_) {
+        zone.appendChild(a);
+      }
+      selection = null;
+      changed();
     }
 
     /* ---- Images ---- */
@@ -396,7 +539,9 @@ window.MNEditeur = (function () {
     /* Un panneau de couleurs oublié ouvert couvre le texte qu'on écrit. */
     function ailleurs(e) {
       if (!hote.contains(e.target)) fermerPanneaux();
-      else if (!e.target.closest(".edi__coul")) fermerPanneaux();
+      else if (!e.target.closest(".edi__coul, .edi__lien, [data-cmd=\"lien\"]")) {
+        fermerPanneaux();
+      }
     }
     document.addEventListener("mousedown", ailleurs);
 
