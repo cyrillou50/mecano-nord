@@ -16,6 +16,10 @@
   let hote = null, moi = null;
   let sel = null;
   let q = "", fCarb = "", fCat = "", fEtoile = "";
+  /* « Il me faut de quoi charger 400 kg » et « il me faut 6 places » : on
+     cherche un véhicule qui en fait au moins autant, pas exactement autant.
+     Un 6 places convient à qui en demande 5. D'où « et + » partout. */
+  let fPlaces = "", fCoffre = "";
   let peutEcrire = false, peutValider = false;
 
   const P = () => MNParc.parc();
@@ -61,12 +65,40 @@
   const enumerer = l => l.length < 2 ? (l[0] || "")
     : l.slice(0, -1).join(", ") + " et " + l[l.length - 1];
 
+  const placesDe = v => MNStore.placesDe(v.places);
+  const coffreDe = v => MNStore.coffreKg(v.coffre);
+
+  /**
+   * Les paliers proposés par un filtre : ceux qu'on trouve vraiment dans le
+   * parc, et rien d'autre. Proposer « 8 places » quand aucun véhicule n'en a
+   * huit donnerait une liste vide, et laisserait croire à un parc incomplet.
+   */
+  function paliers(lire) {
+    const vus = new Set();
+    P().vehicles.forEach(v => {
+      const n = lire(v);
+      if (n !== null) vus.add(n);
+    });
+    return [...vus].sort((a, b) => a - b);
+  }
+
   function liste() {
     const f = q.trim().toLowerCase();
     return P().vehicles.filter(v => {
       if (fCarb && v.carburant !== fCarb) return false;
       if (fCat && v.category !== fCat) return false;
       if (fEtoile && (manques(v).length > 0) !== (fEtoile === "oui")) return false;
+      /* Un coffre non renseigné, ou « N/A », n'atteint aucun minimum : on ne
+         peut pas promettre qu'il chargera 400 kg. Il sort donc du résultat,
+         mais reste trouvable en retirant le filtre. */
+      if (fPlaces) {
+        const n = placesDe(v);
+        if (n === null || n < Number(fPlaces)) return false;
+      }
+      if (fCoffre) {
+        const n = coffreDe(v);
+        if (n === null || n < Number(fCoffre)) return false;
+      }
       if (!f) return true;
       return v.name.toLowerCase().indexOf(f) !== -1 ||
         catDe(v).name.toLowerCase().indexOf(f) !== -1;
@@ -96,6 +128,13 @@
                  "n'enregistre rien tant que le serveur n'a pas répondu." }) + "</div>");
   }
 
+  /** Un menu de seuils, vide s'il n'y a rien à proposer. */
+  function menuPalier(id, valeur, valeurs, tous, libelle) {
+    if (!valeurs.length) return "";
+    return select(id, valeur, [{ valeur: "", nom: tous }]
+      .concat(valeurs.map(n => ({ valeur: String(n), nom: libelle(n) }))));
+  }
+
   function dessinerListe() {
     const l = liste();
     const cats = P().cats;
@@ -111,6 +150,13 @@
             .concat(cats.map(c => ({ valeur: c.id, nom: c.name })))) +
           select("v-et", fEtoile, [{ valeur: "", nom: "Toutes fiches" },
             { valeur: "oui", nom: "À compléter" }, { valeur: "non", nom: "Complètes" }]) +
+          /* Ces deux-là n'apparaissent que si le parc a de quoi les remplir :
+             un filtre sur le coffre n'a rien à proposer tant que personne ne
+             l'a renseigné. */
+          menuPalier("v-places", fPlaces, paliers(placesDe),
+            "Toutes places", n => n + " places et +") +
+          menuPalier("v-coffre", fCoffre, paliers(coffreDe),
+            "Tout coffre", n => n + " kg et +") +
         "</div>" +
       "</div>" +
 
@@ -161,7 +207,8 @@
       const n = $("#v-q"); n.focus(); n.setSelectionRange(pos, pos);
     });
     [["#v-carb", v => { fCarb = v; }], ["#v-cat", v => { fCat = v; }],
-     ["#v-et", v => { fEtoile = v; }]].forEach(p => {
+     ["#v-et", v => { fEtoile = v; }], ["#v-places", v => { fPlaces = v; }],
+     ["#v-coffre", v => { fCoffre = v; }]].forEach(p => {
       const n = $(p[0]);
       if (n) n.addEventListener("change", e => { p[1](e.target.value); dessinerListe(); });
     });

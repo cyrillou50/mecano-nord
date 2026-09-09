@@ -44,6 +44,36 @@ window.MNStore = (function () {
     return SANS_OBJET.test(s) ? NA : s;
   };
 
+  /**
+   * Le coffre en kilos, quand on peut le lire. `null` sinon — non renseigné,
+   * sans objet, ou écrit d'une façon qu'on ne devine pas.
+   *
+   * Le champ est du texte libre, et c'est voulu : on y écrit « 250 »,
+   * « 250 kg », « 1,2 t ». Pour filtrer il faut bien en tirer un nombre, mais
+   * sans rien réécrire — la fiche garde ce que la personne a tapé.
+   *
+   * Les tonnes deviennent des kilos : sans ça un « 1,2 t » passerait pour le
+   * plus petit coffre du parc, ce qui est exactement l'inverse.
+   */
+  function coffreKg(val) {
+    const s = String(val == null ? "" : val).trim();
+    if (!s || SANS_OBJET.test(s)) return null;
+    const m = s.replace(",", ".").match(/^\s*([0-9]+(?:\.[0-9]+)?)\s*(kgs?|t|tonnes?)?\s*$/i);
+    if (!m) return null;
+    const n = Number(m[1]);
+    if (!isFinite(n) || n <= 0) return null;
+    const tonnes = /^t/i.test(m[2] || "");
+    return Math.round(tonnes ? n * 1000 : n);
+  }
+
+  /** Le nombre de places, quand il y en a un. `null` sinon. */
+  function placesDe(val) {
+    const s = String(val == null ? "" : val).trim();
+    if (!s || SANS_OBJET.test(s)) return null;
+    const n = Math.round(Number(s.replace(",", ".")));
+    return isFinite(n) && n > 0 ? n : null;
+  }
+
   /* Liste fermée : on saisit au clic, mais une valeur peut arriver d'ailleurs
      — d'un ancien enregistrement, d'un import — alors on la rapproche. Une
      seule table, d'où sortent aussi bien le menu déroulant que le filtre :
@@ -1447,6 +1477,7 @@ window.MNStore = (function () {
     memeNom, soucisHomonyme,
     MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,
     REMBOURSEMENTS, remboursementDe, leveeIci, sommeRessources, ressourcesEnClair,
+    coffreKg, placesDe,
     usersActifs, usersArchives,
     GRAVITES, graviteDe, normAvertissement, avertActif, avertBilan,
     addAvertissement, leverAvertissement, retirerAvertissement,

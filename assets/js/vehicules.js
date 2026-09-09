@@ -27,6 +27,11 @@
   let fCarb = "";           // "", "Essence" ou "Diesel"
   let fCat = "";            // "" = toutes
   let fEtoile = "";         // "" = toutes, "oui" = incomplètes, "non" = complètes
+  /* « Il me faut de quoi charger 400 kg » et « il me faut 6 places » : on
+     cherche un véhicule qui en fait au moins autant, pas exactement autant.
+     Un 6 places convient à qui en demande 5. D'où « et + » partout. */
+  let fPlaces = "";         // "" = toutes, sinon un minimum
+  let fCoffre = "";         // "" = tous, sinon un minimum en kilos
 
   MNUI.start({ page: "vehicules", title: "Véhicules", onReady: init });
 
@@ -110,8 +115,27 @@
       }));
   }
 
+  /**
+   * Les paliers proposés par un filtre : ceux qu'on trouve vraiment dans le
+   * parc, et rien d'autre. Proposer « 8 places » quand aucun véhicule n'en a
+   * huit donnerait une liste vide, et laisserait croire à un parc incomplet.
+   * @param {(v:object) => number|null} lire  ce qu'on lit sur un véhicule
+   */
+  function paliers(lire) {
+    const vus = new Set();
+    P().vehicles.forEach(v => {
+      const n = lire(v);
+      if (n !== null) vus.add(n);
+    });
+    return [...vus].sort((a, b) => a - b);
+  }
+
+  const placesDe = v => MNStore.placesDe(v.places);
+  const coffreDe = v => MNStore.coffreKg(v.coffre);
+
   /** Un filtre est-il en cours ? Sert à tout déplier et à proposer un retour. */
-  const filtre = () => !!(filter.trim() || fCarb || fCat || fEtoile);
+  const filtre = () =>
+    !!(filter.trim() || fCarb || fCat || fEtoile || fPlaces || fCoffre);
 
   /** Les véhicules retenus par la recherche et les filtres, triés. */
   function liste() {
@@ -120,6 +144,17 @@
       if (fCarb && v.carburant !== fCarb) return false;
       if (fCat && v.category !== fCat) return false;
       if (fEtoile && (manques(v).length > 0) !== (fEtoile === "oui")) return false;
+      /* Un coffre non renseigné, ou « N/A », n'atteint aucun minimum : on ne
+         peut pas promettre qu'il chargera 400 kg. Il sort donc du résultat,
+         mais reste trouvable en retirant le filtre. */
+      if (fPlaces) {
+        const n = placesDe(v);
+        if (n === null || n < Number(fPlaces)) return false;
+      }
+      if (fCoffre) {
+        const n = coffreDe(v);
+        if (n === null || n < Number(fCoffre)) return false;
+      }
       if (!f) return true;
       return v.name.toLowerCase().indexOf(f) !== -1 ||
         catOf(v).name.toLowerCase().indexOf(f) !== -1;
@@ -175,6 +210,20 @@
    * publier. Sans serveur, il retombe dans le catalogue et il faut le dire —
    * une proposition resterait sinon invisible pour tout le monde.
    */
+  /**
+   * Un menu de seuils. Vide s'il n'y a rien à proposer : un parc où personne
+   * n'a rempli le coffre n'a pas besoin d'un filtre sur le coffre.
+   */
+  function menuPalier(id, valeur, valeurs, tous, libelle, titre) {
+    if (!valeurs.length) return "";
+    return '<select class="select" id="' + id + '" title="' + esc(titre) + '">' +
+      '<option value="">' + esc(tous) + "</option>" +
+      valeurs.map(n =>
+        '<option value="' + n + '"' + (valeur === String(n) ? " selected" : "") + ">" +
+        esc(libelle(n)) + "</option>").join("") +
+    "</select>";
+  }
+
   function renderDraftbar() {
     const bar = $("#draftbar");
     if (!bar) return;
@@ -307,6 +356,10 @@
               '<option value="' + esc(c.id) + '"' + (fCat === c.id ? " selected" : "") + ">" +
               esc(c.name) + "</option>").join("") +
           "</select>" +
+          menuPalier("v-places", fPlaces, paliers(placesDe),
+            "Toutes places", n => n + " places et +", "Places minimum") +
+          menuPalier("v-coffre", fCoffre, paliers(coffreDe),
+            "Tout coffre", n => n + " kg et +", "Coffre minimum") +
         "</div>" +
         (filtre()
           ? '<button class="btn btn--ghost btn--sm" id="v-clear" style="width:100%;margin-top:6px">' +
@@ -367,10 +420,15 @@
     $("#v-carb").addEventListener("change", filtrer(v => { fCarb = v; }));
     $("#v-etoile").addEventListener("change", filtrer(v => { fEtoile = v; }));
     $("#v-cat").addEventListener("change", filtrer(v => { fCat = v; }));
+    /* Ces deux-là n'existent que si le parc a de quoi les remplir. */
+    const pl = $("#v-places");
+    if (pl) pl.addEventListener("change", filtrer(v => { fPlaces = v; }));
+    const co = $("#v-coffre");
+    if (co) co.addEventListener("change", filtrer(v => { fCoffre = v; }));
 
     const clear = $("#v-clear");
     if (clear) clear.addEventListener("click", () => {
-      filter = ""; fCarb = ""; fCat = ""; fEtoile = "";
+      filter = ""; fCarb = ""; fCat = ""; fEtoile = ""; fPlaces = ""; fCoffre = "";
       scrollListe = 0;
       renderList();
     });
