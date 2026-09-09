@@ -159,10 +159,6 @@
     const livret = MNStore.livretDe(MNAuth.atelier()).trim();
     const peutEcrire = V2Shell.peut("admin", "items");
 
-    /* Toute la fenêtre : le livret est un document, et il doit s'afficher à
-       la largeur où il a été écrit. */
-    hote.classList.add("contenu--plein");
-
     /* La question d'abord : un apprenti arrive avec une question, pas avec
        l'envie de lire trois écrans. Le livret est juste dessous pour qui veut
        le parcourir. */

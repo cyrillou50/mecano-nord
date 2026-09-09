@@ -2410,7 +2410,7 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
 
 .edi__zone {
   position: relative;
-  min-height: min(560px, 52vh); max-height: 74vh;
+  min-height: 340px; max-height: 62vh;
   overflow: auto;
   padding: 16px 18px;
   background: var(--surface);

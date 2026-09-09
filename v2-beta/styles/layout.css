@@ -150,11 +150,6 @@
   width: 100%;
 }
 
-/* Le livret est large : c'est un document, pas une colonne de lecture, et sa
-   largeur doit être la même à l'écriture et à la lecture. Large, pas bord à
-   bord — au-delà, on n'ajoute que de la longueur de ligne. */
-.contenu--plein { max-width: min(1600px, 92%); margin-inline: auto; }
-
 /* ---- Tablette : barre latérale réduite aux icônes ------------------------- */
 
 @media (max-width: 1180px) and (min-width: 1025px) {
