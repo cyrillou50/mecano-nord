@@ -2295,14 +2295,14 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
 .edi__grp {
   flex: none;
   display: flex; align-items: center; gap: 2px;
-  padding-right: 7px;
+  padding-right: 5px;
   border-right: 1px solid var(--line);
 }
 .edi__grp:last-child { border-right: 0; padding-right: 0; }
 
 .edi__b {
   flex: none;
-  width: 30px; height: 30px;
+  width: 28px; height: 28px;
   display: inline-flex; align-items: center; justify-content: center;
   padding: 0;
   border: 1px solid transparent; border-radius: var(--r-sm);
@@ -2311,7 +2311,7 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
   white-space: nowrap;
   cursor: pointer;
 }
-.edi__b--large { width: auto; padding: 0 10px; font-size: 12.5px; }
+.edi__b--large { width: auto; padding: 0 9px; font-size: 12.5px; }
 .edi__b:hover { background: rgba(255, 255, 255, .08); }
 .edi__b.is-on { background: var(--pink-ink); color: var(--pink-soft); border-color: rgb(var(--accent-rgb) / .35); }
 
@@ -2336,7 +2336,7 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
 
 .edi__sel {
   flex: none;
-  height: 30px; width: 104px;
+  height: 28px; width: 96px;
   padding: 0 6px;
   border: 1px solid var(--line); border-radius: var(--r-sm);
   background: var(--surface); color: var(--txt);
@@ -2366,6 +2366,21 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
   cursor: pointer;
 }
 .edi__pastille:hover { transform: scale(1.12); }
+
+/* La pastille qui remet la couleur du livret : elle n'a pas de couleur à
+   montrer. Un carré vide se prendrait pour du noir — on met donc un trait en
+   travers, comme partout où « aucune » veut dire quelque chose. */
+.edi__pastille--nul {
+  background:
+    linear-gradient(to top right, transparent 43%, var(--danger) 43%,
+                    var(--danger) 57%, transparent 57%),
+    repeating-linear-gradient(45deg,
+      rgba(255, 255, 255, .09) 0 3px, transparent 3px 6px);
+}
+
+/* Une flèche éteinte se voit : sinon on clique dans le vide sans comprendre. */
+.edi__b[disabled] { opacity: .32; cursor: default; }
+.edi__b[disabled]:hover { background: none; }
 
 /* ---- Le panneau du lien ----
    Il s'ouvre sous la barre, comme celui des couleurs. Le groupe qui le porte

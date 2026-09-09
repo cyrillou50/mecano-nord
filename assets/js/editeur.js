@@ -59,6 +59,16 @@ window.MNEditeur = (function () {
 
   const svg = n => { try { return MNUI.svg(n); } catch (_) { return ""; } };
 
+  /* Deux flèches dessinées ici plutôt que prises au jeu d'icônes : le module
+     est partagé entre les deux versions du site, qui n'ont pas le même jeu.
+     La taille est écrite : un <svg> sans dimension prend 300 px de large. */
+  const FLECHE = (d) =>
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" ' +
+      'stroke="currentColor" stroke-width="1.9" stroke-linecap="round" ' +
+      'stroke-linejoin="round" aria-hidden="true">' + d + "</svg>";
+  const SVG_ANNULER = FLECHE('<path d="M9 14 4 9l5-5"/><path d="M4 9h9a6.5 6.5 0 0 1 0 13h-2"/>');
+  const SVG_REFAIRE = FLECHE('<path d="m15 14 5-5-5-5"/><path d="M20 9h-9a6.5 6.5 0 0 0 0 13h2"/>');
+
   /* Les pages du site : on les propose, personne n'a à retenir des noms de
      fichiers. Une adresse extérieure reste possible, c'est le même champ. */
   const PAGES = [
@@ -96,6 +106,14 @@ window.MNEditeur = (function () {
     hote.innerHTML =
       '<div class="edi">' +
         '<div class="edi__barre" role="toolbar" aria-label="Mise en forme">' +
+
+          /* Le retour arrière en premier, tout à gauche : c'est le bouton
+             qu'on cherche quand on vient de se tromper, et on le cherche
+             toujours au même endroit. */
+          '<div class="edi__grp">' +
+            boutonHtml("annuler", SVG_ANNULER, "Retour arrière (Ctrl+Z)") +
+            boutonHtml("refaire", SVG_REFAIRE, "Retour avant (Ctrl+Maj+Z)") +
+          "</div>" +
 
           '<div class="edi__grp">' +
             bouton("gras", "B", "Gras", "edi__b--gras") +
@@ -227,7 +245,12 @@ window.MNEditeur = (function () {
       titre: () => cmd("formatBlock", "H2"),
       propre: () => { cmd("removeFormat"); cmd("formatBlock", "P"); },
       image: () => insererImage(),
-      lien: () => ouvrirLien()
+      lien: () => ouvrirLien(),
+      /* L'annulation du navigateur, celle de Ctrl+Z : elle connaît la frappe
+         et les commandes, ce qu'aucune pile tenue à la main ne saurait
+         suivre d'aussi près. */
+      annuler: () => cmd("undo"),
+      refaire: () => cmd("redo")
     };
 
     function surBarre(e) {
@@ -248,12 +271,13 @@ window.MNEditeur = (function () {
       const c = e.target.closest("[data-couleur]");
       if (c) {
         e.preventDefault();
-        const quoi = c.dataset.pour === "surligne" ? "hiliteColor" : "foreColor";
-        cmd(quoi, c.dataset.couleur);
+        const val = c.dataset.couleur;
+        cmd(c.dataset.pour === "surligne" ? "hiliteColor" : "foreColor", val);
         /* La couleur choisie reste sous le bouton : on voit ce qu'on a pris
-           sans rouvrir le panneau. */
+           sans rouvrir le panneau. La couleur de base n'en a aucune à
+           montrer — le trait revient comme au départ. */
         const j = hote.querySelector('[data-jauge="' + c.dataset.pour + '"]');
-        if (j) j.style.background = c.dataset.couleur;
+        if (j) j.style.background = (val === "transparent" || val === "inherit") ? "" : val;
         fermerPanneaux();
       }
     }
@@ -285,34 +309,49 @@ window.MNEditeur = (function () {
         const v = e.target.value;
         e.target.selectedIndex = 0;
         if (!v) return;
-        cmd(e.target.dataset.sel === "taille" ? "fontSize" : "fontName", "x");
-        /* execCommand ne sait poser ni une taille en pixels ni une police
-           quelconque : il pose un repère qu'on remplace ensuite. C'est laid,
-           mais c'est le seul chemin qui marche partout. */
-        remplacerRepere(e.target.dataset.sel === "taille" ? "font-size" : "font-family", v);
-        changed();
+        poserStyle(e.target.dataset.sel === "taille" ? "font-size" : "font-family", v);
       }));
 
     /**
-     * `fontSize`/`fontName` produisent `<font size=…>` ou une taille arbitraire
-     * selon le navigateur. On retrouve ce qui vient d'être posé et on y met la
-     * vraie valeur.
+     * Poser une taille ou une police sur ce qui est sélectionné.
+     *
+     * `execCommand` ne sait poser ni des pixels ni une police quelconque : il
+     * n'accepte qu'une taille de 1 à 7 et une police qu'il ira chercher dans
+     * la liste du système. On lui fait donc poser un repère qu'il sait faire
+     * — la taille 7, la police nommée « x » — et on rhabille l'élément qu'il
+     * vient de créer.
+     *
+     * Deux détails valent leur ligne :
+     *
+     * - `styleWithCSS` coupé le temps de la commande. Le navigateur pose
+     *   alors un `<font>`, qui ne ressemble à rien d'autre dans un livret. En
+     *   CSS il poserait un `<span>`, et on ne saurait plus lequel est à nous.
+     *
+     * - on rhabille, on ne remplace pas. L'élément posé par le navigateur est
+     *   celui que son annulation sait défaire ; en glisser un autre à sa
+     *   place laissait une coquille vide au premier retour arrière.
+     *
+     * Le `<font>` ne sort pas d'ici : `html()` le rhabille en `<span>` sur
+     * une copie, au moment d'enregistrer.
      */
-    function remplacerRepere(prop, valeur) {
-      zone.querySelectorAll('font, [style*="font-size"], [style*="font-family"]')
-        .forEach(e => {
-          if (e.tagName === "FONT" || e.getAttribute("face") === "x" ||
-              /(^|;)\s*font-family:\s*x(;|$)/.test(e.getAttribute("style") || "") ||
-              /x/.test(e.getAttribute("face") || "")) {
-            const span = document.createElement("span");
-            span.style[prop === "font-size" ? "fontSize" : "fontFamily"] = valeur;
-            while (e.firstChild) span.appendChild(e.firstChild);
-            e.parentNode.replaceChild(span, e);
-          }
-        });
-      /* Le navigateur a pu poser directement un span : on corrige la valeur. */
-      zone.querySelectorAll('span[style*="font-family: x"], span[style*="font-family:x"]')
-        .forEach(e => { e.style.fontFamily = valeur; });
+    function poserStyle(quoi, valeur) {
+      const taille = quoi === "font-size";
+      zone.focus();
+      try {
+        document.execCommand("styleWithCSS", false, false);
+        document.execCommand(taille ? "fontSize" : "fontName", false, taille ? "7" : "x");
+        document.execCommand("styleWithCSS", false, true);
+      } catch (_) { /* commande inconnue du navigateur : on n'insiste pas */ }
+
+      /* Le repère, quelle que soit la forme sous laquelle il est sorti. */
+      const marques = taille
+        ? 'font[size="7"], [style*="xxx-large"]'
+        : 'font[face="x"], [style*="font-family: x"], [style*="font-family:x"]';
+      zone.querySelectorAll(marques).forEach(e => {
+        e.removeAttribute(taille ? "size" : "face");
+        e.style[taille ? "fontSize" : "fontFamily"] = valeur;
+      });
+      changed();
     }
 
     /* ---- Liens ----------------------------------------------------------
@@ -574,11 +613,37 @@ window.MNEditeur = (function () {
         try { on = document.queryCommandState(c); } catch (_) { /* rien */ }
         b.classList.toggle("is-on", !!on);
       });
+
+      /* Les deux flèches s'éteignent quand il n'y a plus rien à défaire ou à
+         refaire. On ne pose la question que si l'on écrit bien dans la zone :
+         ailleurs, le navigateur répond pour un autre champ, et les deux
+         boutons resteraient éteints sans raison. */
+      if (zone === document.activeElement || zone.contains(document.activeElement)) {
+        [["annuler", "undo"], ["refaire", "redo"]].forEach(([id, c]) => {
+          const b = hote.querySelector('[data-cmd="' + id + '"]');
+          if (!b) return;
+          try { b.disabled = !document.queryCommandEnabled(c); }
+          catch (_) { b.disabled = false; }
+        });
+      }
     }
 
     /** Le livret prêt à enregistrer : nettoyé, sans les marques de l'éditeur. */
     function html() {
       const copie = zone.cloneNode(true);
+
+      /* Les tailles et les polices vivent dans un `<font>` le temps qu'on
+         écrit — c'est l'élément que le navigateur sait défaire au retour
+         arrière. Le livret, lui, n'en veut pas. On le rhabille ici, sur la
+         copie : y toucher dans la vraie zone casserait l'annulation. */
+      copie.querySelectorAll("font").forEach(f => {
+        const span = document.createElement("span");
+        const style = f.getAttribute("style");
+        if (style) span.setAttribute("style", style);
+        while (f.firstChild) span.appendChild(f.firstChild);
+        f.parentNode.replaceChild(span, f);
+      });
+
       copie.querySelectorAll("img").forEach(img => {
         img.classList.remove("is-choisie");
         img.removeAttribute("src");
@@ -602,8 +667,14 @@ window.MNEditeur = (function () {
   /* ---- Petits morceaux de barre ---- */
 
   function bouton(cmd, texte, titre, classe) {
+    return boutonHtml(cmd, esc(texte), titre, classe);
+  }
+
+  /* Le contenu passe tel quel : c'est un dessin écrit ici, jamais quelque
+     chose qui vienne du livret. */
+  function boutonHtml(cmd, dedans, titre, classe) {
     return '<button type="button" class="edi__b ' + (classe || "") +
-      '" data-cmd="' + cmd + '" title="' + esc(titre) + '">' + esc(texte) + "</button>";
+      '" data-cmd="' + cmd + '" title="' + esc(titre) + '">' + dedans + "</button>";
   }
 
   function liste(nom, titre, options) {
@@ -627,6 +698,22 @@ window.MNEditeur = (function () {
         '" title="' + esc(titre) + '" aria-haspopup="true" aria-expanded="false">' +
         esc(marque) + '<i class="edi__jauge" data-jauge="' + pour + '"></i></button>' +
       '<div class="edi__pan" data-panneau="' + pour + '" hidden>' +
+
+        /* Revenir à la couleur du livret. Sans elle, un mot surligné par
+           erreur ne se réparait qu'avec « Effacer », qui emporte aussi son
+           gras et sa taille.
+
+           « transparent » enlève vraiment le surlignage : le navigateur
+           défait la balise plutôt que d'en poser une par-dessus. Pour la
+           couleur du texte, « inherit » reprend celle qui l'entoure — et
+           comme le navigateur coupe la balise d'à côté au lieu de s'y
+           glisser dedans, c'est bien celle du livret qu'on retrouve. */
+        '<button type="button" class="edi__pastille edi__pastille--nul" ' +
+          'data-pour="' + pour + '" data-couleur="' +
+          (pour === "surligne" ? "transparent" : "inherit") + '" title="' +
+          (pour === "surligne" ? "Sans surlignage" : "Couleur de base") +
+          '"></button>' +
+
         couleurs.map(c =>
           '<button type="button" class="edi__pastille" data-pour="' + pour +
             '" data-couleur="' + esc(c) + '" style="background:' + esc(c) +
