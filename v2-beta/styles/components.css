@@ -1900,7 +1900,7 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--c-action); outli
    Du texte suivi, à lire d'une traite : une largeur de lecture confortable et
    des paragraphes aérés valent mieux qu'une pleine page dense. */
 
-.livret { max-width: 68ch; font-size: var(--t-md); line-height: 1.75; }
+.livret { font-size: var(--t-md); line-height: 1.75; }
 .livret p { margin: 0 0 var(--e-3); }
 .livret p:last-child { margin-bottom: 0; }
 .livret ul { margin: 0 0 var(--e-3); padding-left: 20px; list-style: disc; }
@@ -2248,6 +2248,10 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
    d'où le repère `position:relative` sur la zone — sans lui, elles se
    caleraient sur la fenêtre et suivraient le défilement. */
 
+/* Pas de largeur maximale : le panneau qui l'entoure la donne deja, et la
+   zone d'ecriture doit faire exactement la meme largeur que la zone de
+   lecture — une image posee a 600 px du bord doit retomber au meme endroit
+   des deux cotes. */
 .livret { position: relative; }
 .livret h2 { font-size: 1.35em; margin: 22px 0 10px; }
 .livret h2:first-child { margin-top: 0; }

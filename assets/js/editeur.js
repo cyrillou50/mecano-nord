@@ -284,7 +284,7 @@ window.MNEditeur = (function () {
       preparerImage(img);
       /* Posée en haut à gauche de ce qu'on voit : on la déplace ensuite, et
          la chercher au bas d'un long livret serait pénible. */
-      img.style.cssText = "position:absolute;left:24px;top:" +
+      img.style.cssText = "position:absolute;left:3%;top:" +
         Math.max(8, zone.scrollTop + 16) + "px;width:180px";
       zone.appendChild(img);
       selectionner(img);
@@ -318,7 +318,7 @@ window.MNEditeur = (function () {
       if (quoi === "libre") {
         choisie.className = "liv-img liv-img--libre";
         const l = parseFloat(choisie.style.width) || choisie.offsetWidth;
-        choisie.style.cssText = "position:absolute;left:24px;top:" +
+        choisie.style.cssText = "position:absolute;left:3%;top:" +
           Math.max(8, zone.scrollTop + 16) + "px;width:" + l + "px";
       }
       if (quoi === "fil") {
@@ -340,6 +340,16 @@ window.MNEditeur = (function () {
 
     let glisse = null;
 
+    /**
+     * Une position horizontale, retenue en part de la largeur.
+     * Les deux zones — écriture et lecture — n'ont pas la même largeur ; un
+     * pourcentage veut dire la même chose dans les deux, un pixel non.
+     */
+    function enPourcent(px) {
+      const l = zone.clientWidth || 1;
+      return Math.round(Math.max(0, Math.min(100, (px / l) * 100)) * 10) / 10 + "%";
+    }
+
     zone.addEventListener("mousedown", e => {
       const img = e.target.closest("img.liv-img");
       if (!img) { selectionner(null); return; }
@@ -356,8 +366,9 @@ window.MNEditeur = (function () {
       glisse = {
         img, coin,
         x: e.clientX, y: e.clientY,
-        l: parseFloat(img.style.left) || 0,
-        t: parseFloat(img.style.top) || 0,
+        /* `offsetLeft` donne des pixels quelle que soit l'unité écrite. */
+        l: img.offsetLeft,
+        t: img.offsetTop,
         w: parseFloat(img.style.width) || img.offsetWidth
       };
     });
@@ -369,7 +380,7 @@ window.MNEditeur = (function () {
         glisse.img.style.width = Math.max(40, Math.min(1200, glisse.w + dx)) + "px";
         glisse.img.style.height = "";
       } else {
-        glisse.img.style.left = Math.max(0, glisse.l + dx) + "px";
+        glisse.img.style.left = enPourcent(Math.max(0, glisse.l + dx));
         glisse.img.style.top = Math.max(0, glisse.t + dy) + "px";
       }
       placerBarreImage();
