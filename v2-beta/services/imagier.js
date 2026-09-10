@@ -203,6 +203,35 @@ window.MNImagier = (function () {
     return p;
   }
 
+  /**
+   * Rogne les marges transparentes d'une photo déjà affichée.
+   *
+   * Un portrait détouré n'occupe qu'une partie de son image : le reste est
+   * transparent, et c'est le fond du cadre qu'on voit autour du sujet. On
+   * recadre donc sur le motif visible, et la photo remplit enfin son rond.
+   *
+   * On travaille sur l'adresse déjà résolue plutôt que sur la référence : la
+   * V2 vit un cran plus bas dans l'arborescence, et une même référence n'y
+   * désigne pas le même fichier.
+   *
+   * Rien n'est bloqué en attendant : la photo s'affiche telle quelle, et se
+   * resserre quand les pixels ont pu être lus. Si c'est impossible — pas de
+   * serveur, image d'ailleurs sans en-tête CORS — il ne se passe rien, et le
+   * fond neutre de `.av-photo` reste là pour rattraper.
+   */
+  function serrer(url) {
+    if (!url || /^data:/i.test(url)) return;
+    cadrer(url, 320).then(data => {
+      if (!data) return;
+      /* On repose sur toutes celles qui montrent cette photo : la même
+         personne apparaît dans la liste, sur sa fiche et dans Service. */
+      const l = document.querySelectorAll("img.av-photo");
+      for (let i = 0; i < l.length; i++) {
+        if (l[i].getAttribute("src") === url) l[i].src = data;
+      }
+    }).catch(() => { /* illisible : la photo reste telle quelle */ });
+  }
+
   /** Dimensions d'une image en `data:`, pour prévenir quand elle est petite. */
   function taille(dataUri) {
     return new Promise(resolve => {
@@ -389,5 +418,5 @@ window.MNImagier = (function () {
     });
   }
 
-  return { lister, vider, src, taille, cadrer, deposer, depuisFichier, choisir };
+  return { lister, vider, src, taille, cadrer, serrer, deposer, depuisFichier, choisir };
 })();

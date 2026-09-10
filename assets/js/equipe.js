@@ -889,9 +889,12 @@
    */
   function vignette(u) {
     const src = MNStore.photoUrl(u);
-    return src
-      ? '<img class="av-photo" src="' + esc(src) + '" alt="" loading="lazy" decoding="async">'
-      : esc(MNUI.initials(u.pseudo));
+    if (!src) return esc(MNUI.initials(u.pseudo));
+    /* Une photo détourée laisse voir le cadre autour du sujet : on rogne son
+       vide, dès que ses pixels sont lisibles. */
+    MNImagier.serrer(src);
+    return '<img class="av-photo" src="' + esc(src) +
+      '" alt="" loading="lazy" decoding="async">';
   }
 
   function congesSection(u) {

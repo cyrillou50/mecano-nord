@@ -346,9 +346,12 @@
    */
   function vignette(x) {
     const src = MNStore.photoDeId(x && x.id);
-    return src
-      ? '<img class="av-photo" src="' + U.esc(src) + '" alt="" loading="lazy" decoding="async">'
-      : U.esc(U.initiales(x && x.pseudo));
+    if (!src) return U.esc(U.initiales(x && x.pseudo));
+    /* Une photo détourée laisse voir le cadre autour du sujet : on rogne son
+       vide, dès que ses pixels sont lisibles. */
+    MNImagier.serrer(src);
+    return '<img class="av-photo" src="' + U.esc(src) +
+      '" alt="" loading="lazy" decoding="async">';
   }
 
   const hhmm = d => new Date(d).toLocaleTimeString("fr-FR",
