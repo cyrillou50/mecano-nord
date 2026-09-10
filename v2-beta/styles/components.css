@@ -2465,9 +2465,17 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
    Elle remplit le carré des initiales, ni plus ni moins : une fiche ne doit
    pas s'allonger parce qu'on a mis une photo. */
 .av-photo {
+  /* En absolu, et non dans le flux : le cadre centre ses enfants, et un
+     enfant centré garde la taille de son contenu au lieu de remplir. */
+  position: absolute; inset: 0;
   width: 100%; height: 100%;
   object-fit: cover;
+  /* Le visage est en haut d'un portrait, jamais au milieu : un cadrage
+     centré coupe la tête d'une photo en pied. */
+  object-position: 50% 30%;
   border-radius: inherit;
+  /* Une photo détourée laisserait voir la couleur du grade au travers. */
+  background: var(--surface-2);
   display: block;
 }
 /* Une photo qu'on peut ouvrir en grand le dit : le curseur change, et un
@@ -2486,11 +2494,16 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
   display: block;
 }
 
-/* Les ronds et carrés qui peuvent porter une photo la coupent à leur forme. */
-.userchip__av, .avatar, .staffhead__av, .eq-tete__av { overflow: hidden; }
+/* Les ronds et carrés qui peuvent porter une photo la coupent à leur forme,
+   et lui servent de repère : c'est sur eux qu'elle se cale. */
+.userchip__av, .avatar, .staffhead__av, .eq-tete__av {
+  overflow: hidden;
+  position: relative;
+}
 .av-apercu {
   width: 54px; height: 54px; flex: none;
   display: grid; place-items: center;
+  position: relative;
   border-radius: 14px;
   background: var(--surface-2);
   font-family: var(--font-display); font-weight: 800; font-size: 19px;
