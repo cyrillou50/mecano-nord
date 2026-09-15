@@ -170,6 +170,53 @@ const jour = v => {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s)) ? s : null;
 };
 
+/* ---- Qui est sur le site -------------------------------------------------------
+   Le site se signale toutes les quarante-cinq secondes ; passé cent secondes
+   sans nouvelles, on considère que la page est fermée. L'écart entre les deux
+   laisse passer un battement manqué sans faire clignoter la liste.
+
+   Le navigateur annonce qui il est, et rien ne le vérifie : le serveur n'a pas
+   de session, et les codes du site vivent dans le catalogue. C'est le même
+   niveau de confiance que partout ailleurs ici — la liste sert à savoir qui
+   traîne sur le site, pas à prouver une identité. */
+
+const PRESENCE_OUBLI = 100_000;
+const PRESENCE_MAX = 500;        // au-delà, on n'inscrit plus personne
+const presents = new Map();
+
+function noterPresence(p) {
+  const id = texte(p && p.id, 60).trim();
+  if (!id) return;
+  if (!presents.has(id) && presents.size >= PRESENCE_MAX) return;
+  const avant = presents.get(id);
+  presents.set(id, {
+    id,
+    pseudo: texte(p.pseudo, 60).trim(),
+    roleId: texte(p.roleId, 60).trim(),
+    atelier: p.atelier === "sud" ? "sud" : "nord",
+    /* L'arrivée, pas le dernier battement : c'est elle qu'on affiche, et elle
+       ne doit pas se remettre à zéro toutes les minutes. */
+    depuis: (avant && avant.depuis) || Date.now(),
+    vu: Date.now()
+  });
+}
+
+function partirPresence(p) {
+  const id = texte(p && p.id, 60).trim();
+  if (id) presents.delete(id);
+}
+
+function listePresents() {
+  const limite = Date.now() - PRESENCE_OUBLI;
+  for (const [id, p] of presents) if (p.vu < limite) presents.delete(id);
+  return Array.from(presents.values())
+    .sort((a, b) => a.depuis - b.depuis)
+    .map(p => ({
+      id: p.id, pseudo: p.pseudo, roleId: p.roleId, atelier: p.atelier,
+      depuis: new Date(p.depuis).toISOString()
+    }));
+}
+
 /* ---- Ateliers -----------------------------------------------------------------
    Deux garages écrivent dans le même tableau, mais ne s'y voient pas : chaque
    ligne dit d'où elle vient. Une ligne muette est du Nord — c'est l'atelier
@@ -1310,7 +1357,7 @@ const serveur = http.createServer(async (req, res) => {
          « images: true » qu'il peut héberger les images ici, « relais »
          qu'il sait aller chercher une image sur un autre domaine. */
       return repondre(res, 200, {
-        ok: true, ops: true, images: true, polices: true,
+        ok: true, ops: true, images: true, polices: true, presence: true,
         vehicules: true, relais: true, contrats: true,
         calendrier: true, catalogue: true, equipe: true, emotes: true, blacklist: true,
         recap: RECAP_ACTIF, recapMini: RECAP_MINI, assistant: !!GEMINI_CLE,
@@ -1532,6 +1579,22 @@ const serveur = http.createServer(async (req, res) => {
         console.log(new Date().toISOString(), quel + " :", op.op, "—",
           r.liste.entrees.length, "entrées");
         return repondre(res, 200, { ok: true, liste: r.liste, deja: !!r.deja }, req);
+      }
+      return repondre(res, 405, { error: "Méthode non autorisée" }, req);
+    }
+
+    /* --- qui est sur le site ---
+       Le POST sert de battement et de question à la fois : on se signale, et
+       on reçoit la liste en retour. Une requête au lieu de deux. */
+    if (chemin === "/presence") {
+      if (req.method === "GET") {
+        return repondre(res, 200, { ok: true, gens: listePresents() }, req);
+      }
+      if (req.method === "POST") {
+        const p = await corpsJson(req);
+        if (p && p.parti) partirPresence(p);
+        else noterPresence(p);
+        return repondre(res, 200, { ok: true, gens: listePresents() }, req);
       }
       return repondre(res, 405, { error: "Méthode non autorisée" }, req);
     }

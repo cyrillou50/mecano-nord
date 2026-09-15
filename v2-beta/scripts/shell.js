@@ -124,6 +124,7 @@ window.V2Shell = (function () {
           '<h1 class="topbar__titre">' + esc(titre) + "</h1>" +
           '<div class="rang pousse" id="v2-actions"></div>' +
           boutonAtelier() +
+          '<div id="v2-enligne"></div>' +
           '<div id="v2-avert"></div>' +
           (MNTheme.libre()
             ? U().bouton("", { icone: "palette", variante: "fantome", titre: "Apparence",
@@ -236,6 +237,64 @@ window.V2Shell = (function () {
           rafraichirJetonAvert();
         }
       }]
+    });
+  }
+
+  /* ---- Qui est sur le site --------------------------------------------------
+     À ne pas confondre avec le service : on peut lire le livret sans avoir
+     badgé, et badger sans garder la page ouverte.
+
+     Qui a le droit de le voir se décide dans `presence.js`, sur une seule
+     ligne : ouvrir cette liste à tout le monde doit rester une décision, pas
+     un oubli. */
+
+  function rafraichirJetonEnLigne() {
+    const z = document.getElementById("v2-enligne");
+    if (!z) return;
+    if (!window.MNPresence || !MNPresence.peutVoir()) { z.innerHTML = ""; return; }
+    z.innerHTML = '<button class="enchip" title="Qui est sur le site en ce moment">' +
+      '<i class="enchip__pt"></i><span>' + MNPresence.liste().length + "</span></button>";
+    z.querySelector(".enchip").addEventListener("click", montrerEnLigne);
+  }
+
+  function ligneEnLigne(p) {
+    const u = MNStore.usersActifs().find(x => x.id === p.id);
+    const r = u ? MNStore.roleOf(u) : null;
+    const photo = MNStore.photoDeId(p.id);
+    /* Le catalogue d'abord, ce que le navigateur annonce ensuite : c'est lui
+       qui fait foi pour le nom comme pour le grade. */
+    const nom = (u && u.pseudo) || p.pseudo || p.id;
+    return '<div class="enl__l">' +
+      '<span class="enl__av"' + (r ? ' style="background:' + esc(r.color) + '"' : "") + ">" +
+        (photo
+          ? '<img class="av-photo" src="' + esc(photo) + '" alt="" decoding="async">'
+          : esc(U().initiales(nom))) +
+      "</span>" +
+      '<div class="enl__id"><b>' + esc(nom) + "</b>" +
+        (r ? '<span style="color:' + esc(r.color) + '">' + esc(r.name) + "</span>" : "") +
+      "</div>" +
+      '<span class="enl__ou">' + esc(MNStore.courtAtelier(p.atelier)) + "</span>" +
+      '<span class="enl__t">' + esc(U().ilYA(new Date(p.depuis).getTime())) + "</span>" +
+    "</div>";
+  }
+
+  async function montrerEnLigne() {
+    /* La liste du jeton peut dater du dernier battement : on redemande avant
+       d'ouvrir, sinon on montre qui était là il y a trois quarts de minute. */
+    await MNPresence.battre();
+    const gens = MNPresence.liste();
+    U().modale({
+      titre: gens.length > 1 ? gens.length + " personnes en ligne"
+                             : gens.length + " personne en ligne",
+      corps:
+        '<p class="champ__aide" style="margin-bottom:var(--e-3)">Qui a le site ' +
+          "ouvert en ce moment, et depuis quand. Ce n'est pas le service : on " +
+          "peut lire le livret sans avoir badgé, et badger sans garder la page " +
+          "ouverte.</p>" +
+        (gens.length
+          ? '<div class="enl">' + gens.map(ligneEnLigne).join("") + "</div>"
+          : '<p class="champ__aide">Personne — pas même toi, ce qui veut dire ' +
+            "que le serveur de l'atelier ne répond pas.</p>")
     });
   }
 
@@ -540,6 +599,12 @@ window.V2Shell = (function () {
       MNStore.nomAtelier(MNAuth.atelier()) + (V2.VERSION.beta ? " (V2 bêta)" : "");
 
     monter(o.titre || "");
+
+    /* On se signale, et le compte du jeton suit ce que le serveur répond. */
+    if (window.MNPresence) {
+      MNPresence.demarrer();
+      MNPresence.onChange(rafraichirJetonEnLigne);
+    }
 
     /* Un brouillon peut attendre depuis la visite d'hier — un onglet fermé
        trop tôt, une connexion coupée. On ne sait qu'ici qui est là et ce
