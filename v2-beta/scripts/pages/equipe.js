@@ -573,12 +573,20 @@
             (u.pin ? U.etiquette("code d'accès") : "") +
           "</div>" +
         "</div>" +
-        /* Une fiche archivée ne se modifie plus : elle témoigne. La seule
-           action qui reste est de faire revenir la personne. */
+        /* Une fiche archivée garde ce qui s'est passé — carrière, heures,
+           avertissements — mais ce qu'on a écrit dessus reste corrigible : un
+           nom mal orthographié l'est toujours, et un motif de départ choisi
+           trop vite aussi. */
         (MNStore.estArchive(u)
           ? (peutEditer
-              ? '<div class="rang">' + U.bouton("Réintégrer",
-                  { variante: "principal", icone: "rafraichir", action: "retour" }) + "</div>"
+              ? '<div class="rang">' +
+                  U.bouton("Réintégrer",
+                    { variante: "principal", icone: "rafraichir", action: "retour" }) +
+                  U.bouton("Modifier la fiche",
+                    { variante: "fantome", icone: "crayon", action: "edit" }) +
+                  U.bouton("Corriger le départ",
+                    { variante: "fantome", icone: "sortie", action: "majdepart" }) +
+                "</div>"
               : "")
           : (peutEditer || (peutAvertir && u.id !== moi.uid)
             ? '<div class="rang">' +
@@ -673,6 +681,8 @@
     if (e) e.addEventListener("click", () => modifier(u));
     const dep = z.querySelector('[data-a="partir"]');
     if (dep) dep.addEventListener("click", () => archiver(u));
+    const maj = z.querySelector('[data-a="majdepart"]');
+    if (maj) maj.addEventListener("click", () => archiver(u, true));
     const ret = z.querySelector('[data-a="retour"]');
     if (ret) ret.addEventListener("click", () => reintegrer(u));
 
@@ -1012,58 +1022,80 @@
       "</div>" +
       (d.note ? '<p class="depart__note">' + U.esc(d.note) + "</p>" : "") +
       '<p class="champ__aide">Cette fiche est conservée telle quelle : ancienneté, ' +
-        "carrière, formations et avertissements restent lisibles. Elle ne se modifie plus.</p>" +
+        "carrière, formations et avertissements restent lisibles. Ce qui s'est passé " +
+        "ne bouge plus, mais ce qui est écrit dessus se corrige encore.</p>" +
     "</div>";
   }
 
-  /** Faire partir quelqu'un : la fiche passe aux archives, rien n'est perdu. */
-  function archiver(u) {
+  /**
+   * Faire partir quelqu'un, ou corriger un départ déjà écrit.
+   *
+   * La même fenêtre pour les deux : ce sont les mêmes trois renseignements.
+   * En correction, elle part de ce qui est écrit, et celui qui corrige ne se
+   * réattribue pas l'archivage — c'est quelqu'un d'autre qui l'a fait.
+   */
+  function archiver(u, corriger) {
     const auj = MNDuty.jourLocal();
+    const d0 = (corriger && u.depart) || null;
+    const motifDepart = d0 ? d0.motif : MNStore.MOTIFS_DEPART[0].id;
     const corps = document.createElement("div");
     corps.className = "pile";
     corps.innerHTML =
-      '<p class="champ__aide">' + U.esc(u.pseudo) + " quittera l'équipe et ne pourra plus " +
-        "se connecter. <b>Rien n'est supprimé</b> : sa fiche part aux archives avec toute " +
-        "son histoire, et tu pourras la rouvrir ou le réintégrer plus tard.</p>" +
+      '<p class="champ__aide">' + (d0
+        ? "On corrige ce qui est écrit sur ce départ. Le reste de la fiche — " +
+          "carrière, heures, avertissements — ne bouge pas."
+        : U.esc(u.pseudo) + " quittera l'équipe et ne pourra plus " +
+          "se connecter. <b>Rien n'est supprimé</b> : sa fiche part aux archives avec toute " +
+          "son histoire, et tu pourras la rouvrir ou le réintégrer plus tard.") + "</p>" +
       '<div class="champ"><span class="champ__label">Motif</span>' +
-        '<div class="motifs">' + MNStore.MOTIFS_DEPART.map((m, i) =>
-          '<button type="button" class="motif' + (i === 0 ? " est-choisie" : "") +
+        '<div class="motifs">' + MNStore.MOTIFS_DEPART.map(m =>
+          '<button type="button" class="motif' + (m.id === motifDepart ? " est-choisie" : "") +
           '" data-m="' + U.esc(m.id) + '">' + U.esc(m.nom) + "</button>").join("") +
       "</div></div>" +
       '<div style="max-width:220px">' +
-        U.champ({ id: "d-date", label: "Date du départ", type: "date", valeur: auj,
-                  plafond: auj }) +
+        U.champ({ id: "d-date", label: "Date du départ", type: "date",
+                  valeur: (d0 && d0.le) || auj, plafond: auj }) +
       "</div>" +
       U.champ({ id: "d-note", label: "Précisions (facultatif)", type: "zone", max: 600,
+                valeur: (d0 && d0.note) || "",
                 repere: "Ce qu'il faut retenir de ce départ…" });
 
-    let motif = MNStore.MOTIFS_DEPART[0].id;
+    let motif = motifDepart;
     corps.querySelectorAll("[data-m]").forEach(b => b.addEventListener("click", () => {
       motif = b.dataset.m;
       corps.querySelectorAll("[data-m]").forEach(x => x.classList.toggle("est-choisie", x === b));
     }));
 
     U.modale({
-      titre: "Archiver " + u.pseudo, corps,
+      titre: (d0 ? "Corriger le départ de " : "Archiver ") + u.pseudo, corps,
       actions: [
         { label: "Annuler", onClick: f => f() },
-        { label: "Archiver la fiche", variante: "principal", icone: "sortie",
+        { label: d0 ? "Enregistrer" : "Archiver la fiche",
+          variante: "principal", icone: d0 ? "check" : "sortie",
           onClick: async (fermer, k) => {
             const depart = {
               le: k.querySelector("#d-date").value || auj, motif,
-              note: k.querySelector("#d-note").value.trim(), par: moi.pseudo
+              note: k.querySelector("#d-note").value.trim(),
+              /* Qui a archivé reste qui a archivé : corriger une date ne fait
+                 pas de celui qui corrige l'auteur du départ. */
+              par: (d0 && d0.par) || moi.pseudo
             };
 
-            /* On bascule sur les archives : c'est là qu'il se trouve
-               désormais, le laisser sur une liste où il n'est plus serait
-               déroutant. */
-            vueArchives = true; tranche = null; filtre = "";
-            sel = u.id;
+            if (!d0) {
+              /* On bascule sur les archives : c'est là qu'il se trouve
+                 désormais, le laisser sur une liste où il n'est plus serait
+                 déroutant. */
+              vueArchives = true; tranche = null; filtre = "";
+              sel = u.id;
+            }
 
             const r = await appliquer(
               { op: "depart", uid: u.id, depart },
-              () => MNStore.archiverUser(u, depart, moi.pseudo));
-            if (!r.ok) return U.toast("Archivage impossible : " + r.error, "err");
+              () => MNStore.archiverUser(u, depart, depart.par));
+            if (!r.ok) {
+              return U.toast(
+                (d0 ? "Correction impossible : " : "Archivage impossible : ") + r.error, "err");
+            }
 
             fermer();
             U.toast(u.pseudo + " est archivé — sa fiche reste consultable" + suite(r), "ok");

@@ -148,7 +148,9 @@ pointage *et* les webhooks, garde tes données chez toi avec sauvegardes
 automatiques, et ne laisse plus rien de sensible dans le dépôt.
 
 Le guide pas à pas est dans **`serveur/README.md`** (Node, systemd, Caddy pour
-le HTTPS, réglages du site). Compte 20 minutes.
+le HTTPS, réglages du site). Compte 20 minutes. Ce dossier ne fait pas partie
+du dépôt : le serveur tourne sur le VPS, pas sur la page, et il n'a rien à
+faire dans un site statique. Demande-le à qui tient l'atelier.
 
 **Option 3 — Relais Cloudflare**, si tu n'as ni VPS ni envie de Firebase.
 
@@ -237,8 +239,9 @@ le serveur**, où l'écriture est immédiate. Le dépôt ne reçoit plus qu'une 
 d'amorçage, réécrite le jour où l'adresse du serveur change. Un commit ferait
 reconstruire le site entier pour un numéro de téléphone corrigé.
 
-L'installation du serveur est décrite dans **`serveur/README.md`** (Node,
-systemd, Caddy pour le HTTPS). Compte 20 minutes, une fois pour toutes.
+L'installation du serveur est décrite dans **`serveur/README.md`**, gardé hors
+du dépôt avec le serveur lui-même (Node, systemd, Caddy pour le HTTPS).
+Compte 20 minutes, une fois pour toutes.
 
 ### Sans serveur
 

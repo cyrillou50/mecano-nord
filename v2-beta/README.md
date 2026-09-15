@@ -15,7 +15,7 @@ La V2 s'installe donc à côté :
 ```
 mecano-nord/              ← V1, en production, intacte
 ├── index.html …          ← ses pages
-├── assets/ data/ serveur/
+├── assets/ data/
 │
 └── v2-beta/              ← V2, servie sur /mecano-nord/v2-beta/
     ├── *.html            ← une page = un fichier HTML + un script

@@ -1,2 +1,5 @@
 # sauvegardes locales des images, inutiles en ligne
 assets/img/*-original.*
+
+# le serveur tourne sur le VPS, pas ici : on le garde en local, hors du depot
+serveur/
