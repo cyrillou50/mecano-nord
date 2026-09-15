@@ -808,7 +808,10 @@
     pane.querySelectorAll("[data-av]").forEach(b => b.addEventListener("click", () => {
       const [action, id] = b.dataset.av.split("|");
       if (action === "lever") leverAvert(u, id);
-      else retirerAvert(u, id);
+      else if (action === "modifier") {
+        const a = (u.avertissements || []).find(x => x.id === id);
+        if (a) avertir(u, a);
+      } else retirerAvert(u, id);
     }));
   }
 
@@ -1386,6 +1389,8 @@
       "</div>" +
       (peut
         ? '<div class="av__acts">' +
+            '<button class="btn btn--icon" data-av="modifier|' + esc(a.id) +
+              '" title="Corriger cet avertissement">' + svg("edit") + "</button>" +
             (a.leve ? "" : '<button class="btn btn--icon" data-av="lever|' + esc(a.id) +
               '" title="Lever cet avertissement">' + svg("check") + "</button>") +
             '<button class="btn btn--icon" data-av="retirer|' + esc(a.id) +
@@ -1395,41 +1400,55 @@
     "</div>";
   }
 
-  /** Fenêtre de saisie d'un avertissement. */
-  function avertir(u) {
+  /**
+   * Fenêtre de saisie d'un avertissement, et de correction d'un existant.
+   *
+   * Corriger plutôt que retirer et refaire : on garde ainsi la date des
+   * faits, l'auteur, et on ne réannonce pas sur Discord ce qui l'a déjà été.
+   */
+  function avertir(u, dejaLa) {
     const auj = MNDuty.jourLocal();
+    const jourDe = a => String(a && a.at || "").slice(0, 10) || auj;
+    const depart = (dejaLa && dejaLa.gravite) || "simple";
     const body = document.createElement("div");
     body.className = "editor";
     body.innerHTML =
-      '<p class="hint">Il partira sur Discord si un salon lui est réservé, et ' +
-        esc(u.pseudo) + " le verra sur sa propre fiche.</p>" +
+      '<p class="hint">' + (dejaLa
+        ? "La correction ne repart pas sur Discord : l'avertissement a déjà " +
+          "été annoncé. Sa date et son auteur ne changent pas."
+        : "Il partira sur Discord si un salon lui est réservé, et " +
+          esc(u.pseudo) + " le verra sur sa propre fiche.") + "</p>" +
       '<div class="field"><label class="label">Gravité</label>' +
-        '<div class="gravites" id="a-grav">' + MNStore.GRAVITES.map((g, i) =>
-          '<button type="button" class="grav' + (i === 1 ? " is-on" : "") +
+        '<div class="gravites" id="a-grav">' + MNStore.GRAVITES.map(g =>
+          '<button type="button" class="grav' + (g.id === depart ? " is-on" : "") +
           '" data-g="' + esc(g.id) + '" style="--grav:' + esc(g.couleur) + '">' +
           esc(g.nom) + "</button>").join("") + "</div></div>" +
       '<div class="field"><label class="label" for="a-motif">Motif</label>' +
-        '<input class="input" id="a-motif" maxlength="120" ' +
+        '<input class="input" id="a-motif" maxlength="120" value="' +
+          esc((dejaLa && dejaLa.motif) || "") + '" ' +
           'placeholder="Ex. Véhicule rendu sans les freins"></div>' +
       '<div class="field"><label class="label" for="a-note">Précisions (facultatif)</label>' +
         '<textarea class="textarea" id="a-note" maxlength="600" ' +
-          'placeholder="Ce qui s\'est passé, ce qui est attendu ensuite…"></textarea></div>' +
+          'placeholder="Ce qui s\'est passé, ce qui est attendu ensuite…">' +
+          esc((dejaLa && dejaLa.note) || "") + "</textarea></div>" +
       '<div class="field"><label class="label" for="a-date">Date des faits</label>' +
-        '<input class="input" id="a-date" type="date" value="' + auj + '" max="' + auj + '">' +
+        '<input class="input" id="a-date" type="date" value="' + esc(jourDe(dejaLa)) +
+          '" max="' + auj + '">' +
         '<p class="hint">Il compte tant qu\'un responsable ne l\'a pas levé.</p></div>';
 
-    let gravite = "simple";
+    let gravite = depart;
     body.querySelectorAll("[data-g]").forEach(b => b.addEventListener("click", () => {
       gravite = b.dataset.g;
       body.querySelectorAll("[data-g]").forEach(x => x.classList.toggle("is-on", x === b));
     }));
 
     MNUI.modal({
-      title: "Avertir " + u.pseudo, body,
+      title: (dejaLa ? "Corriger l'avertissement de " : "Avertir ") + u.pseudo, body,
       actions: [
         { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
         {
-          label: "Donner l'avertissement", variant: "btn--primary", icon: "alert",
+          label: dejaLa ? "Enregistrer" : "Donner l'avertissement",
+          variant: "btn--primary", icon: dejaLa ? "check" : "alert",
           onClick: async (close, b2, btn) => {
             const motif = body.querySelector("#a-motif").value.trim();
             if (motif.length < 3) return MNUI.toast("Écris un motif — c'est le cœur de l'avertissement", "err");
@@ -1442,6 +1461,24 @@
             if (isNaN(quand) || quand > new Date()) quand = new Date();
 
             btn.disabled = true;
+
+            /* ---- Correction d'un avertissement déjà posé ---- */
+            if (dejaLa) {
+              const maj = {
+                gravite, motif,
+                note: body.querySelector("#a-note").value.trim(),
+                at: quand.toISOString()
+              };
+              const rc = await appliquer(
+                Object.assign({ op: "avert-maj", uid: u.id, id: dejaLa.id }, maj),
+                () => { Object.assign(dejaLa, maj); });
+              if (!rc.ok) {
+                btn.disabled = false;
+                return MNUI.toast("Enregistrement impossible : " + rc.error, "err");
+              }
+              close();
+              return MNUI.toast("Avertissement corrigé" + suite(rc), "ok");
+            }
 
             /* On construit l'avertissement ici : le serveur le range tel
                quel, et à défaut c'est lui qu'on écrit dans le brouillon. */

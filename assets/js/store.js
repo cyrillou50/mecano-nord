@@ -347,13 +347,30 @@ window.MNStore = (function () {
   ];
   const graviteDe = id => GRAVITES.find(g => g.id === id) || GRAVITES[1];
 
+  /**
+   * La gravité d'un avertissement, en reprenant ceux du bilan.
+   *
+   * Le bilan du dimanche posait un « rappel à l'ordre » ; l'atelier a décidé
+   * que ne pas faire ses heures valait un avertissement. Ceux déjà écrits
+   * disent la même chose que les prochains : ils doivent peser pareil, sans
+   * qu'il faille les reprendre un par un.
+   *
+   * Seuls les siens : leur identifiant commence par « recap- ». Un rappel
+   * donné à la main reste un rappel — c'était un choix, pas un réglage.
+   */
+  function graviteReprise(t) {
+    const g = GRAVITES.some(x => x.id === t.gravite) ? t.gravite : "simple";
+    if (g === "rappel" && /^recap-/.test(String(t.id || ""))) return "simple";
+    return g;
+  }
+
   function normAvertissement(a) {
     const t = a && typeof a === "object" ? a : {};
     return {
       id: String(t.id || ""),
       at: t.at || new Date().toISOString(),
       by: String(t.by || "").slice(0, 60),
-      gravite: GRAVITES.some(g => g.id === t.gravite) ? t.gravite : "simple",
+      gravite: graviteReprise(t),
       motif: String(t.motif || "").trim().slice(0, 120),
       note: String(t.note || "").slice(0, 600),
       /* Pas d'échéance : un avertissement compte tant qu'on ne l'a pas levé.

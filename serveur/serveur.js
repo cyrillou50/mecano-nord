@@ -1858,6 +1858,10 @@ async function ecrireAgenda(ag) {
 
 const MAX_AVERT = 60;
 
+/* Les trois gravités d'un avertissement, de la plus légère à la plus lourde.
+   Le site en tient la liste lisible ; ici on borne, c'est tout. */
+const GRAVITES_AVERT = ["rappel", "simple", "grave"];
+
 function appliquerEquipe(cat, op) {
   const uid = texte(op.uid, 60);
   const users = cat.users || [];
@@ -1876,6 +1880,8 @@ function appliquerEquipe(cat, op) {
 
   switch (op.op) {
     case "avert-add": {
+      /* Le serveur ne connaît pas la liste du site, mais il connaît ces
+         trois-là : elles sont écrites dans les fiches depuis toujours. */
       const a = op.avert;
       if (!a || typeof a !== "object" || !texte(a.id, 80) || !texte(a.motif, 200)) {
         return { erreur: "avertissement invalide" };
@@ -1894,6 +1900,31 @@ function appliquerEquipe(cat, op) {
       a.leve = true;
       a.levePar = texte(op.par, 60);
       a.leveLe = new Date().toISOString();
+      return { ok: true };
+    }
+
+    /* Corriger un avertissement plutôt que le retirer et le refaire : on
+       garde ainsi sa date, son auteur, et on ne le réannonce pas. Seuls les
+       champs envoyés bougent ; ce qui dit qui l'a posé ne se réécrit pas. */
+    case "avert-maj": {
+      const a = (u.avertissements || []).find(x => x.id === texte(op.id, 80));
+      if (!a) return { erreur: "avertissement introuvable" };
+
+      if (op.gravite !== undefined) {
+        if (GRAVITES_AVERT.indexOf(op.gravite) === -1) return { erreur: "gravité inconnue" };
+        a.gravite = op.gravite;
+      }
+      if (op.motif !== undefined) {
+        const m = texte(op.motif, 200).trim();
+        if (m.length < 3) return { erreur: "motif trop court" };
+        a.motif = m;
+      }
+      if (op.note !== undefined) a.note = texte(op.note, 600);
+      if (op.at !== undefined) {
+        const d = dateIso(op.at);
+        if (!d) return { erreur: "date invalide" };
+        a.at = d;
+      }
       return { ok: true };
     }
 

@@ -684,11 +684,15 @@
       if (b) b.addEventListener("click", () => avertir(u));
     });
 
-    z.querySelectorAll('[data-a^="lever|"], [data-a^="retirer|"]').forEach(b =>
-      b.addEventListener("click", () => {
+    z.querySelectorAll('[data-a^="lever|"], [data-a^="retirer|"], [data-a^="modifier|"]')
+      .forEach(b => b.addEventListener("click", () => {
         const coupe = b.dataset.a.indexOf("|");
         const action = b.dataset.a.slice(0, coupe), id = b.dataset.a.slice(coupe + 1);
-        if (action === "lever") leverAvert(u, id); else retirerAvert(u, id);
+        if (action === "lever") leverAvert(u, id);
+        else if (action === "modifier") {
+          const a = (u.avertissements || []).find(x => x.id === id);
+          if (a) avertir(u, a);
+        } else retirerAvert(u, id);
       }));
   }
 
@@ -1264,6 +1268,8 @@
       "</div>" +
       (peut
         ? '<div class="av__acts">' +
+            U.bouton("", { icone: "crayon", variante: "fantome", taille: "sm",
+              titre: "Corriger cet avertissement", action: "modifier|" + a.id }) +
             (a.leve ? "" : U.bouton("", { icone: "check", variante: "fantome", taille: "sm",
               titre: "Lever cet avertissement", action: "lever|" + a.id })) +
             U.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
@@ -1273,27 +1279,40 @@
     "</div>";
   }
 
-  function avertir(u) {
+  /**
+   * Fenêtre de saisie d'un avertissement, et de correction d'un existant.
+   *
+   * Corriger plutôt que retirer et refaire : on garde ainsi la date des
+   * faits, l'auteur, et on ne réannonce pas sur Discord ce qui l'a déjà été.
+   */
+  function avertir(u, dejaLa) {
     const auj = MNDuty.jourLocal();
+    const depart = (dejaLa && dejaLa.gravite) || "simple";
     const corps = document.createElement("div");
     corps.className = "pile";
     corps.innerHTML =
-      '<p class="champ__aide">Il partira sur Discord si un salon lui est réservé, et ' +
-        U.esc(u.pseudo) + " le verra sur sa propre fiche.</p>" +
+      '<p class="champ__aide">' + (dejaLa
+        ? "La correction ne repart pas sur Discord : l'avertissement a déjà " +
+          "été annoncé. Sa date et son auteur ne changent pas."
+        : "Il partira sur Discord si un salon lui est réservé, et " +
+          U.esc(u.pseudo) + " le verra sur sa propre fiche.") + "</p>" +
       '<div class="champ"><span class="champ__label">Gravité</span>' +
-        '<div class="gravites">' + MNStore.GRAVITES.map((g, i) =>
-          '<button type="button" class="grav' + (i === 1 ? " est-choisie" : "") +
+        '<div class="gravites">' + MNStore.GRAVITES.map(g =>
+          '<button type="button" class="grav' + (g.id === depart ? " est-choisie" : "") +
           '" data-g="' + U.esc(g.id) + '" style="--grav:' + U.esc(g.couleur) + '">' +
           U.esc(g.nom) + "</button>").join("") + "</div></div>" +
       U.champ({ id: "a-motif", label: "Motif", max: 120,
+                valeur: (dejaLa && dejaLa.motif) || "",
                 repere: "Ex. Véhicule rendu sans les freins" }) +
       U.champ({ id: "a-note", label: "Précisions (facultatif)", type: "zone", max: 600,
+                valeur: (dejaLa && dejaLa.note) || "",
                 repere: "Ce qui s'est passé, ce qui est attendu ensuite…" }) +
-      U.champ({ id: "a-date", label: "Date des faits", type: "date", valeur: auj,
+      U.champ({ id: "a-date", label: "Date des faits", type: "date",
+                valeur: String(dejaLa && dejaLa.at || "").slice(0, 10) || auj,
                 plafond: auj,
                 aide: "Il compte tant qu'un responsable ne l'a pas levé." });
 
-    let gravite = "simple";
+    let gravite = depart;
     corps.querySelectorAll("[data-g]").forEach(b => b.addEventListener("click", () => {
       gravite = b.dataset.g;
       corps.querySelectorAll("[data-g]").forEach(x => x.classList.toggle("est-choisie", x === b));
@@ -1303,7 +1322,8 @@
       titre: "Avertir " + u.pseudo, corps,
       actions: [
         { label: "Annuler", onClick: f => f() },
-        { label: "Donner l'avertissement", variante: "principal", icone: "alerte",
+        { label: dejaLa ? "Enregistrer" : "Donner l'avertissement",
+          variante: "principal", icone: dejaLa ? "check" : "alerte",
           onClick: async (fermer, k, btn) => {
             const motif = k.querySelector("#a-motif").value.trim();
             if (motif.length < 3) {
@@ -1318,6 +1338,24 @@
             if (isNaN(quand) || quand > new Date()) quand = new Date();
 
             btn.disabled = true;
+
+            /* ---- Correction d'un avertissement déjà posé ---- */
+            if (dejaLa) {
+              const maj = {
+                gravite, motif,
+                note: k.querySelector("#a-note").value.trim(),
+                at: quand.toISOString()
+              };
+              const rc = await appliquer(
+                Object.assign({ op: "avert-maj", uid: u.id, id: dejaLa.id }, maj),
+                () => { Object.assign(dejaLa, maj); });
+              if (!rc.ok) {
+                btn.disabled = false;
+                return U.toast("Enregistrement impossible : " + rc.error, "err");
+              }
+              fermer();
+              return U.toast("Avertissement corrigé" + suite(rc), "ok");
+            }
 
             /* On construit l'avertissement ici : le serveur le range tel
                quel, et à défaut c'est lui qu'on écrit dans le brouillon. */
