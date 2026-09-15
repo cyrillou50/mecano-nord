@@ -2738,31 +2738,25 @@ async function nomAtelier(quel) {
    fiche de la personne, où il reste lisible et où il s'additionne — trois
    semaines de suite, ça finit par se voir.
 
-   Un « rappel à l'ordre », la gravité la plus légère : une semaine creuse
-   n'est pas une faute, c'est un fait qu'on note. Il cesse de compter au bout
-   de deux mois, comme n'importe quel avertissement à échéance — un manquement
-   d'il y a six mois n'a pas à peser encore.
+   Un avertissement, pas un rappel à l'ordre : ne pas faire ses heures n'est
+   pas un fait qu'on note en passant. Et sans échéance — il compte tant qu'un
+   responsable ne l'a pas levé à la main, sur la fiche.
 
    Pour ne signaler personne, il n'y a rien de plus à régler : le minimum à 0
    (par garage ou sur une fiche) vide déjà la liste, et donc celle-ci. */
 
-const AVERT_JOURS = 56;
-
 /** L'avertissement que le bilan pose sur une fiche. */
 function avertDuBilan(g, atelier, semaine, nom) {
-  const fin = new Date();
-  fin.setDate(fin.getDate() + AVERT_JOURS);
   return {
     /* La semaine et le garage dans l'identifiant : renvoyer le bilan deux
        fois n'écrit rien de plus, « avert-add » refusant un doublon. */
     id: "recap-" + semaine + "-" + atelier,
     at: new Date().toISOString(),
     by: texte(nom || "Bilan hebdomadaire", 60),
-    gravite: "rappel",
+    gravite: "simple",
     motif: "Heures de la semaine non atteintes",
     note: (g.seconds ? dureeCourte(g.seconds) : "aucun service") +
       " sur " + g.seuil + " h attendues — semaine " + semaine + ".",
-    expire: jourDe(fin),
     leve: false, levePar: "", leveLe: null
   };
 }

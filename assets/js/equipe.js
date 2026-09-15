@@ -1369,7 +1369,6 @@
   function ligneAvert(a, u, peut) {
     const g = MNStore.graviteDe(a.gravite);
     const actif = MNStore.avertActif(a);
-    const perime = !a.leve && a.expire && a.expire < MNDuty.jourLocal();
 
     return '<div class="av' + (actif ? "" : " is-off") + '" style="--grav:' + esc(g.couleur) + '">' +
       '<span class="av__pastille">' + esc(g.court) + "</span>" +
@@ -1379,11 +1378,10 @@
         '<div class="av__meta">' +
           fdatetime(a.at) +
           (a.by ? " · par " + esc(a.by) : "") +
-          (a.expire ? " · compte jusqu'au " + esc(jourCourt(a.expire)) : "") +
           (a.leve
             ? ' · <span class="av__leve">levé' + (a.levePar ? " par " + esc(a.levePar) : "") +
               (a.leveLe ? " le " + esc(jourCourt(String(a.leveLe).slice(0, 10))) : "") + "</span>"
-            : perime ? ' · <span class="av__leve">échu, ne compte plus</span>' : "") +
+            : "") +
         "</div>" +
       "</div>" +
       (peut
@@ -1400,14 +1398,6 @@
   /** Fenêtre de saisie d'un avertissement. */
   function avertir(u) {
     const auj = MNDuty.jourLocal();
-    /* Une échéance à trois mois par défaut : un avertissement sans fin
-       n'existe que pour peser, et ce n'est pas le but. */
-    const dans3mois = (function () {
-      const d = new Date(auj + "T12:00:00");
-      d.setMonth(d.getMonth() + 3);
-      return MNDuty.jourLocal(d);
-    })();
-
     const body = document.createElement("div");
     body.className = "editor";
     body.innerHTML =
@@ -1424,14 +1414,9 @@
       '<div class="field"><label class="label" for="a-note">Précisions (facultatif)</label>' +
         '<textarea class="textarea" id="a-note" maxlength="600" ' +
           'placeholder="Ce qui s\'est passé, ce qui est attendu ensuite…"></textarea></div>' +
-      '<div class="editor__grid">' +
-        '<div class="field"><label class="label" for="a-date">Date des faits</label>' +
-          '<input class="input" id="a-date" type="date" value="' + auj + '" max="' + auj + '"></div>' +
-        '<div class="field"><label class="label" for="a-exp">Compte jusqu\'au</label>' +
-          '<input class="input" id="a-exp" type="date" value="' + dans3mois + '">' +
-          '<p class="hint">Passée cette date il reste lisible, mais ne compte plus. ' +
-            "Vide = sans échéance.</p></div>" +
-      "</div>";
+      '<div class="field"><label class="label" for="a-date">Date des faits</label>' +
+        '<input class="input" id="a-date" type="date" value="' + auj + '" max="' + auj + '">' +
+        '<p class="hint">Il compte tant qu\'un responsable ne l\'a pas levé.</p></div>';
 
     let gravite = "simple";
     body.querySelectorAll("[data-g]").forEach(b => b.addEventListener("click", () => {
@@ -1465,8 +1450,7 @@
                 (u.avertissements || []).map(x => x.id)),
               at: quand.toISOString(), by: me.pseudo,
               gravite, motif,
-              note: body.querySelector("#a-note").value.trim(),
-              expire: body.querySelector("#a-exp").value || null
+              note: body.querySelector("#a-note").value.trim()
             });
 
             const r = await appliquer(
@@ -1484,7 +1468,7 @@
             const d = await MNWebhook.sendAvertissement({
               action: "pose", pseudo: u.pseudo,
               gravite: MNStore.graviteDe(a.gravite).nom,
-              motif: a.motif, note: a.note, expire: a.expire, by: me.pseudo
+              motif: a.motif, note: a.note, by: me.pseudo
             });
             MNUI.toast(d.ok
               ? "Avertissement donné et annoncé sur Discord" + suite(r)

@@ -337,7 +337,6 @@ window.MNWebhook = (function () {
       });
     }
     f.push({ name: "Gravité", value: "**" + i.gravite + "**", inline: true });
-    if (i.expire) f.push({ name: "Compte jusqu'au", value: jourFr(i.expire), inline: true });
     if (i.motif) f.push({ name: "Motif", value: String(i.motif).slice(0, 1024) });
     if (i.note && i.action === "pose") {
       f.push({ name: "Précisions", value: String(i.note).slice(0, 1024) });

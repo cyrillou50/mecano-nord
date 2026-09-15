@@ -356,20 +356,17 @@ window.MNStore = (function () {
       gravite: GRAVITES.some(g => g.id === t.gravite) ? t.gravite : "simple",
       motif: String(t.motif || "").trim().slice(0, 120),
       note: String(t.note || "").slice(0, 600),
-      /* Échéance facultative : passée, l'avertissement ne compte plus, mais
-         reste lisible. Un manquement de l'an dernier ne doit pas peser
-         éternellement. */
-      expire: jour(t.expire),
-      /* Levé à la main, avant l'échéance. */
+      /* Pas d'échéance : un avertissement compte tant qu'on ne l'a pas levé.
+         Le champ qui existait avant n'est plus recopié — il disparaît des
+         fiches à la première écriture du catalogue. */
       leve: t.leve === true,
       levePar: String(t.levePar || "").slice(0, 60),
       leveLe: t.leveLe || null
     };
   }
 
-  /** Un avertissement pèse-t-il encore aujourd'hui ? */
-  const avertActif = a =>
-    !!a && !a.leve && (!a.expire || a.expire >= jourLocal());
+  /** Un avertissement pèse-t-il encore aujourd'hui ? Tant qu'il n'est pas levé. */
+  const avertActif = a => !!a && !a.leve;
 
   /**
    * Le poids cumulé des avertissements qui comptent encore.

@@ -1247,7 +1247,6 @@
   function ligneAvert(a, peut) {
     const g = MNStore.graviteDe(a.gravite);
     const actif = MNStore.avertActif(a);
-    const echu = !a.leve && a.expire && a.expire < MNDuty.jourLocal();
 
     return '<div class="av' + (actif ? "" : " est-eteint") +
       '" style="--grav:' + U.esc(g.couleur) + '">' +
@@ -1257,11 +1256,10 @@
         (a.note ? '<p class="av__note">' + U.esc(a.note) + "</p>" : "") +
         '<div class="av__meta">' + U.esc(dateheure(a.at)) +
           (a.by ? " · par " + U.esc(a.by) : "") +
-          (a.expire ? " · compte jusqu'au " + U.esc(jourCourt(a.expire)) : "") +
           (a.leve
             ? ' · <i class="av__leve">levé' + (a.levePar ? " par " + U.esc(a.levePar) : "") +
               (a.leveLe ? " le " + U.esc(jourCourt(String(a.leveLe).slice(0, 10))) : "") + "</i>"
-            : echu ? ' · <i class="av__leve">échu, ne compte plus</i>' : "") +
+            : "") +
         "</div>" +
       "</div>" +
       (peut
@@ -1277,14 +1275,6 @@
 
   function avertir(u) {
     const auj = MNDuty.jourLocal();
-    /* Une échéance à trois mois par défaut : un avertissement sans fin
-       n'existe que pour peser, et ce n'est pas le but. */
-    const dans3mois = (function () {
-      const d = new Date(auj + "T12:00:00");
-      d.setMonth(d.getMonth() + 3);
-      return MNDuty.jourLocal(d);
-    })();
-
     const corps = document.createElement("div");
     corps.className = "pile";
     corps.innerHTML =
@@ -1299,13 +1289,9 @@
                 repere: "Ex. Véhicule rendu sans les freins" }) +
       U.champ({ id: "a-note", label: "Précisions (facultatif)", type: "zone", max: 600,
                 repere: "Ce qui s'est passé, ce qui est attendu ensuite…" }) +
-      '<div class="cols-2">' +
-        U.champ({ id: "a-date", label: "Date des faits", type: "date", valeur: auj,
-                  plafond: auj }) +
-        U.champ({ id: "a-exp", label: "Compte jusqu'au", type: "date", valeur: dans3mois,
-                  aide: "Passée cette date il reste lisible, mais ne compte plus. " +
-                        "Vide = sans échéance." }) +
-      "</div>";
+      U.champ({ id: "a-date", label: "Date des faits", type: "date", valeur: auj,
+                plafond: auj,
+                aide: "Il compte tant qu'un responsable ne l'a pas levé." });
 
     let gravite = "simple";
     corps.querySelectorAll("[data-g]").forEach(b => b.addEventListener("click", () => {
@@ -1340,8 +1326,7 @@
                 (u.avertissements || []).map(x => x.id)),
               at: quand.toISOString(), by: moi.pseudo,
               gravite, motif,
-              note: k.querySelector("#a-note").value.trim(),
-              expire: k.querySelector("#a-exp").value || null
+              note: k.querySelector("#a-note").value.trim()
             });
 
             const r = await appliquer(
@@ -1359,7 +1344,7 @@
             const d = await MNWebhook.sendAvertissement({
               action: "pose", pseudo: u.pseudo,
               gravite: MNStore.graviteDe(a.gravite).nom,
-              motif: a.motif, note: a.note, expire: a.expire, by: moi.pseudo
+              motif: a.motif, note: a.note, by: moi.pseudo
             });
             U.toast(d.ok
               ? "Avertissement donné et annoncé sur Discord" + suite(r)

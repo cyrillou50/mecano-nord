@@ -223,7 +223,6 @@ window.V2Shell = (function () {
               (a.note ? '<p class="av__note">' + esc(a.note) + "</p>" : "") +
               '<div class="av__meta">' + esc(dateLongue(a.at)) +
                 (a.by ? " · par " + esc(a.by) : "") +
-                (a.expire ? " · compte jusqu'au " + esc(jourLong(a.expire)) : "") +
               "</div></div></div>";
         }).join("") + "</div>",
       actions: [{

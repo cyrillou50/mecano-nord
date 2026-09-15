@@ -765,7 +765,6 @@ window.MNUI = (function () {
             (a.note ? '<p class="av__note">' + esc(a.note) + "</p>" : "") +
             '<div class="av__meta">' + fdate(a.at) +
               (a.by ? " · par " + esc(a.by) : "") +
-              (a.expire ? " · compte jusqu'au " + esc(fjour(a.expire)) : "") +
             "</div></div></div>";
       }).join("") + "</div>";
 
