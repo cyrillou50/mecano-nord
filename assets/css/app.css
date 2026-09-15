@@ -561,31 +561,6 @@
 .avchip:hover { background: color-mix(in srgb, var(--grav) 26%, transparent); }
 .avchip svg { width: 15px; height: 15px; flex: none; }
 
-/* ---- La photo d'un employé ------------------------------------------------
-   Elle remplit le carré des initiales, ni plus ni moins : une fiche ne doit
-   pas s'allonger parce qu'on a mis une photo. */
-.av-photo {
-  /* En absolu, et non dans le flux : le cadre centre ses enfants, et un
-     enfant centré garde la taille de son contenu au lieu de remplir. */
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  object-fit: cover;
-  /* Le visage est en haut d'un portrait, jamais au milieu : un cadrage
-     centré coupe la tête d'une photo en pied. */
-  object-position: 50% 30%;
-  border-radius: inherit;
-  /* Une photo détourée laisserait voir la couleur du grade au travers. */
-  background: var(--surface-2);
-  display: block;
-}
-/* Les ronds et carrés qui peuvent porter une photo la coupent à leur forme,
-   et lui servent de repère : c'est sur eux qu'elle se cale. */
-.userchip__av, .avatar, .staffhead__av, .eq-tete__av, .enl__av {
-  overflow: hidden;
-  position: relative;
-}
-
-
 /* Les deux garages, l'actuel allume. Montrer les deux plutot que la seule
    destination : on sait ou l'on est sans avoir a deviner ce que le mot
    designe, et on va a cote d'un clic. */
@@ -611,68 +586,4 @@
   background: var(--pink-ink);
   color: var(--pink-soft);
   cursor: default;
-}
-
-/* ---- Qui est sur le site ---------------------------------------------------
-   Un point qui bat et un chiffre : de quoi savoir d'un coup d'œil qu'on n'est
-   pas seul, sans prendre la place d'un vrai bouton. */
-
-.enchip {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 7px 13px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--toxic) 13%, transparent);
-  border: 1px solid color-mix(in srgb, var(--toxic) 42%, transparent);
-  color: var(--toxic);
-  font-family: var(--font-display);
-  font-size: 12.5px; font-weight: 700;
-  letter-spacing: .04em;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background .14s;
-}
-.enchip:hover { background: color-mix(in srgb, var(--toxic) 24%, transparent); }
-.enchip__pt {
-  width: 8px; height: 8px; flex: none;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 9px currentColor;
-  animation: enl-bat 2.4s ease-in-out infinite;
-}
-@keyframes enl-bat { 50% { opacity: .3; } }
-/* Le mouvement n'apporte rien à qui le refuse, et gêne ceux qu'il fatigue. */
-@media (prefers-reduced-motion: reduce) { .enchip__pt { animation: none; } }
-
-.enl { display: flex; flex-direction: column; gap: 2px; }
-.enl__l {
-  display: flex; align-items: center; gap: 11px;
-  padding: 9px 10px;
-  border-radius: var(--r-sm);
-}
-.enl__l:nth-child(odd) { background: rgba(255, 255, 255, .03); }
-.enl__av {
-  width: 34px; height: 34px; flex: none;
-  display: grid; place-items: center;
-  border-radius: 50%;
-  font-family: var(--font-display); font-weight: 800; font-size: 13px;
-  color: var(--on-accent);
-}
-.enl__id { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
-.enl__id b { font-size: 14px; }
-.enl__id span { font-size: 12px; }
-/* Le garage ne se lit que s'il y en a deux, mais l'écrire toujours évite de
-   se demander lequel on regarde. */
-.enl__ou {
-  flex: none;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  font-size: 11px; color: var(--muted);
-}
-.enl__t { flex: none; font-size: 12px; color: var(--dim); white-space: nowrap; }
-
-@media (max-width: 760px) {
-  .enchip span { display: none; }
-  .enchip { padding: 7px 10px; }
-  .enl__ou { display: none; }
 }

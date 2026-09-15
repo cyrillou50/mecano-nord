@@ -412,12 +412,6 @@ window.MNUI = (function () {
       "</a>" +
       '<nav class="topnav">' + navHtml(active) + "</nav>" +
       '<div class="topbar__spacer"></div>' +
-      /* Qui a le site ouvert en ce moment. Le jeton n'apparaît que pour qui a
-         le droit de le voir — c'est `presence.js` qui en décide. */
-      (window.MNPresence && MNPresence.peutVoir()
-        ? '<button class="enchip" id="btn-enligne" title="Qui est sur le site en ce moment">' +
-          '<i class="enchip__pt"></i><span>' + MNPresence.liste().length + "</span></button>"
-        : "") +
       /* Un dossier qui pèse reste sous les yeux, même une fois la fenêtre
          d'arrivée refermée. Le jeton rouvre le détail : la page Équipe est
          réservée aux responsables, un mécano n'y accéderait pas. */
@@ -466,9 +460,6 @@ window.MNUI = (function () {
         : "");
 
     brancherNav(el);
-
-    const enl = document.getElementById("btn-enligne");
-    if (enl) enl.addEventListener("click", montrerEnLigne);
 
     const av = document.getElementById("btn-av");
     if (av) av.addEventListener("click", () => montrerAvertissements(mesAvertissements(), false));
@@ -636,15 +627,6 @@ window.MNUI = (function () {
     document.body.dataset.page = opt.page || "";
     mountTopbar(opt.page);
 
-    /* On se signale, et le compte du jeton suit ce que le serveur répond. */
-    if (window.MNPresence) {
-      MNPresence.demarrer();
-      MNPresence.onChange(l => {
-        const n = document.querySelector("#btn-enligne span");
-        if (n) n.textContent = String(l.length);
-      });
-    }
-
     /* Un brouillon peut attendre depuis la visite d'hier — un onglet fermé
        trop tôt, une connexion coupée. On ne sait qu'ici qui est là et ce
        qu'il a le droit de faire : c'est le moment de le faire partir. */
@@ -662,58 +644,6 @@ window.MNUI = (function () {
     /* Après la page : un avertissement doit se voir, mais pas retarder
        l'affichage de ce qu'on venait faire. */
     rappelAvertissements();
-  }
-
-  /* ---- Qui est sur le site --------------------------------------------------
-     À ne pas confondre avec le service : on peut lire le livret sans avoir
-     badgé, et badger sans garder la page ouverte. Le jeton dit donc « en
-     ligne », jamais « en service ».
-
-     Qui a le droit de le voir se décide dans `presence.js`, sur une seule
-     ligne : ouvrir cette liste à tout le monde doit rester une décision, pas
-     un oubli. */
-
-  function ligneEnLigne(p) {
-    const u = MNStore.usersActifs().find(x => x.id === p.id);
-    const r = u ? MNStore.roleOf(u) : null;
-    const photo = MNStore.photoDeId(p.id);
-    /* Le catalogue d'abord, ce que le navigateur annonce ensuite : c'est lui
-       qui fait foi pour le nom comme pour le grade. */
-    const nom = (u && u.pseudo) || p.pseudo || p.id;
-    return '<div class="enl__l">' +
-      '<span class="enl__av"' + (r ? ' style="background:' + esc(r.color) + '"' : "") + ">" +
-        (photo
-          ? '<img class="av-photo" src="' + esc(photo) + '" alt="" decoding="async">'
-          : esc(initials(nom))) +
-      "</span>" +
-      '<div class="enl__id"><b>' + esc(nom) + "</b>" +
-        (r ? '<span style="color:' + esc(r.color) + '">' + esc(r.name) + "</span>" : "") +
-      "</div>" +
-      '<span class="enl__ou">' + esc(MNStore.courtAtelier(p.atelier)) + "</span>" +
-      '<span class="enl__t">' + esc(ago(new Date(p.depuis).getTime())) + "</span>" +
-    "</div>";
-  }
-
-  async function montrerEnLigne() {
-    /* La liste du jeton peut dater du dernier battement : on redemande avant
-       d'ouvrir, sinon on montre qui était là il y a trois quarts de minute. */
-    await MNPresence.battre();
-    const gens = MNPresence.liste();
-    const body = document.createElement("div");
-    body.innerHTML =
-      '<p class="hint" style="margin-bottom:14px">Qui a le site ouvert en ce ' +
-        "moment, et depuis quand. Ce n'est pas le service : on peut lire le " +
-        "livret sans avoir badgé, et badger sans garder la page ouverte.</p>" +
-      (gens.length
-        ? '<div class="enl">' + gens.map(ligneEnLigne).join("") + "</div>"
-        : '<p class="empty">Personne — pas même toi, ce qui veut dire que le ' +
-          "serveur de l'atelier ne répond pas.</p>");
-
-    modal({
-      title: gens.length > 1 ? gens.length + " personnes en ligne"
-                             : gens.length + " personne en ligne",
-      body
-    });
   }
 
   /* ---- Avertissements reçus ------------------------------------------------------
