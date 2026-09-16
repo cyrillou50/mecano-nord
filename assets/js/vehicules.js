@@ -176,13 +176,6 @@
 
   const COLONNES = ["Catégorie", "Nom", "Coffres", "Maj", "Raison"];
 
-  /* « Nom » est la deuxième colonne, donc B, et « Maj » la quatrième, donc D.
-     Les données commencent ligne 2 : la première est l'en-tête. Le dollar
-     fige la colonne sans figer la ligne, pour que la règle suive chaque
-     ligne vers le bas. */
-  const PLAGE_NOM = "B2:B";
-  const FORMULE_MAJ = '=$D2=""';
-
   function lignesExport() {
     /* L'ordre des catégories est celui du parc, donc celui de la liste à
        l'écran. Le tri est stable : à catégorie égale, les véhicules gardent
@@ -246,17 +239,6 @@
     }
   }
 
-  /**
-   * En CSV. Le point-virgule plutôt que la virgule : c'est ce qu'attend un
-   * tableur en français, et une virgule couperait « 1,2 t » en deux colonnes.
-   */
-  const enCsv = l => [COLONNES].concat(l)
-    .map(r => r.map(c => {
-      const s = String(c);
-      return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-    }).join(";"))
-    .join("\r\n");
-
   function exporter() {
     const l = lignesExport();
     if (!l.length) return MNUI.toast("Aucun véhicule à sortir", "err");
@@ -280,37 +262,6 @@
         "comprises. Pour avoir en plus les menus déroulants sur la colonne " +
         "Catégorie, une fois collé : <b>Format → Convertir en tableau</b>. " +
         "Sheets le retient pour les fois d'après.</span></div>" +
-
-      /* Des réglages qui ne se devinent pas, et qui ne se font qu'une fois. */
-      '<div class="field"><span class="label">À régler une fois dans la feuille</span>' +
-        '<p class="hint" style="margin-bottom:10px">Pour que le <b>nom passe en ' +
-          "bleu</b> tant que <b>Maj</b> est vide — les véhicules qui restent à " +
-          "faire sautent alors aux yeux. Dans <b>Format → Mise en forme " +
-          "conditionnelle</b> :</p>" +
-        '<div class="editor__grid" style="margin-bottom:10px">' +
-          '<div class="field">' +
-            '<label class="label" for="v-plage">Appliquer à la plage</label>' +
-            '<input class="input mono" id="v-plage" readonly value="' +
-              esc(PLAGE_NOM) + '">' +
-            '<p class="hint">La colonne des noms, sans la ligne d\'en-tête.</p>' +
-          "</div>" +
-          '<div class="field">' +
-            '<label class="label" for="v-formule-c">La formule personnalisée est</label>' +
-            '<input class="input mono" id="v-formule-c" readonly value="' +
-              esc(FORMULE_MAJ) + '">' +
-            '<p class="hint">Puis, en style : couleur du texte en bleu.</p>' +
-          "</div>" +
-        "</div>" +
-        '<button class="btn btn--ghost btn--sm" type="button" id="v-formule">' +
-          svg("copy") + "<span>Copier la formule</span></button>" +
-        '<p class="hint" style="margin-top:10px"><b>Les deux vont ensemble.</b> ' +
-          "La formule parle de la <i>première ligne de la plage</i> : avec " +
-          "<b>B2:B</b> c\'est <b>$D2</b>. Appliquée à B1:B, la même formule " +
-          "décalerait tout d\'une ligne et colorerait les mauvais noms.</p>" +
-        '<p class="hint">Ensuite, pour remettre la liste à jour sans effacer ' +
-          "cette règle ni tes couleurs : colle avec <b>Ctrl+Maj+V</b> " +
-          "(valeurs seules) plutôt qu\'un collage normal.</p>" +
-      "</div>" +
       '<div class="field"><span class="label">Aperçu</span>' +
         '<pre class="mono" style="max-height:220px;overflow:auto;margin:0;' +
           'font-size:12px;line-height:1.6">' +
@@ -319,35 +270,11 @@
           (l.length > 8 ? "\n… et " + (l.length - 8) + " de plus" : "") +
         "</pre></div>";
 
-    /* La fenêtre n'est pas encore à l'écran, mais son corps existe déjà et
-       elle l'accueillera tel quel : on peut brancher dessus dès maintenant. */
-    const bf = body.querySelector("#v-formule");
-    if (bf) {
-      bf.addEventListener("click", () => MNUI.copy(FORMULE_MAJ,
-        "Formule copiée — colle-la dans « La formule personnalisée est »"));
-    }
-
     MNUI.modal({
       title: "Sortir la liste pour un tableur",
       body,
       actions: [
         { label: "Fermer", variant: "btn--ghost", onClick: c => c() },
-        {
-          label: "Télécharger (.csv)", variant: "btn--ghost", icon: "download",
-          onClick: () => {
-            const nom = "vehicules-" + MNDuty.jourLocal() + ".csv";
-            /* Le BOM : sans lui, un tableur ouvre le fichier en latin-1 et
-               « Catégorie » arrive en « CatÃ©gorie ». */
-            const b = new Blob(["\ufeff" + enCsv(l)],
-              { type: "text/csv;charset=utf-8" });
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(b);
-            a.download = nom;
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-            MNUI.toast("Fichier " + nom + " téléchargé", "ok");
-          }
-        },
         {
           label: "Copier", variant: "btn--primary", icon: "copy",
           onClick: async close => { if (await copierTableau(l)) close(); }
@@ -579,7 +506,7 @@
           (canEdit
             ? '<button class="btn btn--ghost btn--sm" id="v-export" ' +
               'title="Sortir la liste pour un tableur">' +
-              svg("download") + "</button>"
+              svg("copy") + "</button>"
             : "") +
           (canEdit
             ? '<button class="btn btn--ghost btn--sm" id="v-cats" title="Catégories">' +
