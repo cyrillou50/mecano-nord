@@ -94,7 +94,7 @@
       corps: l.length
         ? '<div class="pile pile--sm">' + l.map(e =>
             '<div class="rang">' +
-              '<span class="avatar avatar--sm">' + U.esc(U.initiales(e.pseudo)) + "</span>" +
+              '<span class="avatar avatar--sm">' + vignette(e) + "</span>" +
               "<b>" + U.esc(e.pseudo) + "</b>" +
               '<span class="pousse nombre muet txt-sm">' + U.esc(MNDuty.sinceDur(e.since, true)) + "</span>" +
             "</div>").join("") + "</div>"
@@ -168,5 +168,20 @@
         if (l[i]) n.textContent = MNDuty.sinceDur(l[i].since, true);
       });
     }, 30000);
+  }
+
+  /**
+   * Le rond d'une personne : sa photo si elle en a une, ses initiales sinon.
+   * Le rond ne change pas de taille — une photo ne doit pas faire enfler la
+   * ligne.
+   */
+  function vignette(x) {
+    const src = MNStore.photoDeId(x && x.id);
+    if (!src) return U.esc(U.initiales(x && x.pseudo));
+    /* Une photo détourée laisse voir le cadre autour du sujet : on rogne son
+       vide, dès que ses pixels sont lisibles. */
+    MNImagier.serrer(src);
+    return '<img class="av-photo" src="' + U.esc(src) +
+      '" alt="" loading="lazy" decoding="async">';
   }
 })();

@@ -19,7 +19,9 @@
   let recherche = "";
   let hote = null;
 
+  let sous = "";       // sous-catégorie affichée, "" = toutes
   const K_CAT = "v2.fact.cat";
+  const K_SOUS = "v2.fact.sous";
   const K_PLIS = "v2.fact.plis";
 
   /* Les sections fermées, retenues d'une visite à l'autre : replier trois
@@ -47,6 +49,7 @@
 
       panier = MNStore.getCart();
       cat = localStorage.getItem(K_CAT) || "";
+      sous = localStorage.getItem(K_SOUS) || "";
 
       const tetes = MNStore.topCategories().filter(c => objetsDe(c.id).length);
       if (!tetes.length) {
@@ -142,11 +145,15 @@
       /* Les sous-catégories ne filtrent plus, elles mènent : un clic descend
          à la section. Inutile d'en proposer une seule — on serait déjà
          dessus. */
-      (cles.length > 1 && !recherche
-        ? '<div class="onglets onglets--sous">' + sections().map(s =>
-            '<button class="onglet" data-vers="' + U.esc(s.cle) + '">' +
-              U.esc(s.nom || "Autres") +
-              ' <span class="muet">' + s.items.length + "</span></button>").join("") +
+      (toutesSections().length > 1 && !recherche
+        ? '<div class="onglets onglets--sous">' +
+            '<button class="onglet' + (sous ? "" : " is-actif") + '" data-vers="">' +
+              "Tout" + ' <span class="muet">' + objetsDe(cat).length + "</span></button>" +
+            toutesSections().map(s =>
+              '<button class="onglet' + (sous === s.cle ? " is-actif" : "") +
+                '" data-vers="' + U.esc(s.cle) + '">' +
+                U.esc(s.nom || "Autres") +
+                ' <span class="muet">' + s.items.length + "</span></button>").join("") +
           "</div>"
         : "") +
     "</div>";
@@ -159,7 +166,12 @@
    * Une sous-catégorie vide ne fait pas de section : un titre suivi de rien
    * n'apprend rien et prend une ligne.
    */
+  /** Les sections montrées : toutes, ou la seule choisie. */
   function sections() {
+    return sous ? toutesSections().filter(s => s.cle === sous) : toutesSections();
+  }
+
+  function toutesSections() {
     const out = MNStore.subCategories(cat)
       .map(c => ({ cle: c.id, nom: c.name, items: visibles().filter(i => i.category === c.id) }))
       .filter(s => s.items.length);
@@ -186,22 +198,18 @@
 
     hote.querySelectorAll("[data-cat]").forEach(b => b.addEventListener("click", () => {
       if (cat === b.dataset.cat) return;
-      cat = b.dataset.cat;
+      cat = b.dataset.cat; sous = "";
       localStorage.setItem(K_CAT, cat);
+      localStorage.setItem(K_SOUS, "");
       dessiner();
     }));
     hote.querySelectorAll("[data-vers]").forEach(b => b.addEventListener("click", () => {
-      const cle = b.dataset.vers;
-      /* Repliée, on l'ouvre d'abord : mener à un titre seul ne mène nulle
-         part. Le redessin complet remet aussi le bouton « tout replier » au
-         bon mot. */
-      if (plie(cle)) { basculer(cle); dessiner(); }
-      const tete = [].slice.call(hote.querySelectorAll("[data-plier]"))
-        .filter(x => x.dataset.plier === cle)[0];
-      /* Sans « behavior » : le défilement doux ne pose même pas la position
-         là où l'animation ne peut pas jouer, et le raccourci ne mènerait
-         alors nulle part. */
-      if (tete) tete.scrollIntoView({ block: "start" });
+      sous = b.dataset.vers;
+      localStorage.setItem(K_SOUS, sous);
+      /* Une section qu'on vient de choisir s'ouvre : la montrer repliée
+         reviendrait à n'avoir rien montré. */
+      if (sous && plie(sous)) basculer(sous);
+      dessiner();
     }));
 
     const bt = hote.querySelector('[data-a="plier-tout"]');

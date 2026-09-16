@@ -143,6 +143,21 @@
   const plisObjets = plis("mn.admin.folds");
   const plisCats = plis("mn.admin.catfolds");
 
+  /**
+   * Le rond d'un employé : sa photo si elle en a une, ses initiales sinon.
+   * Le rond ne change pas de taille — une photo ne doit pas faire enfler la
+   * ligne.
+   */
+  function vignetteEmploye(u) {
+    const src = MNStore.photoUrl(u);
+    if (!src) return U.esc(U.initiales(u.pseudo));
+    /* Une photo détourée laisse voir le cadre autour du sujet : on rogne son
+       vide, dès que ses pixels sont lisibles. */
+    MNImagier.serrer(src);
+    return '<img class="av-photo" src="' + U.esc(src) +
+      '" alt="" loading="lazy" decoding="async">';
+  }
+
   /* ---- Rendu ------------------------------------------------------------------- */
 
   function dessiner() {
@@ -1295,7 +1310,7 @@
       '" data-ligne="' + U.esc(u.id) + '">' +
       fleches(i, vus.length) +
       '<span class="avatar" style="background:' + U.esc(role.color) + '">' +
-        U.esc(U.initiales(u.pseudo)) + "</span>" +
+        vignetteEmploye(u) + "</span>" +
       '<div class="ad-corps">' +
         "<b>" + U.esc(u.pseudo) +
           (moi.uid === u.id ? " " + U.etiquette("toi", "action") : "") +
