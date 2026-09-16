@@ -3,3 +3,6 @@ assets/img/*-original.*
 
 # le serveur tourne sur le VPS, pas ici : on le garde en local, hors du depot
 serveur/
+
+# le bot Discord tourne sur le VPS, pas ici : hors du depot lui aussi
+bot/
