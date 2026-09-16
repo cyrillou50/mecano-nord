@@ -79,13 +79,13 @@ window.V2Shell = (function () {
           /* Une entrée qui n'ouvre qu'une fenêtre devient un bouton quand on
              est déjà sur sa page : recharger pour afficher une fenêtre serait
              absurde. La page écoute `data-a` et s'en charge. */
-          (e.fenetre === _page
+          (e.fenetre
             ? '<button type="button" class="navlien" data-a="hist" ' +
               'data-nom="' + esc(e.nom) + '">'
             : '<a class="navlien' + (e.id === _page ? " is-actif" : "") + '" href="' + esc(e.href) +
               '" data-nom="' + esc(e.nom) + '"' + (e.id === _page ? ' aria-current="page"' : "") + ">") +
             U().icone(e.icone) + "<span>" + esc(e.nom) + "</span>" +
-          (e.fenetre === _page ? "</button>" : "</a>")).join("") +
+          (e.fenetre ? "</button>" : "</a>")).join("") +
       "</div>").join("");
   }
 
@@ -569,6 +569,52 @@ window.V2Shell = (function () {
     rappelAvertissements();
   }
 
+  /* ---- L'historique des devis ------------------------------------------------
+     Une fenêtre et non une page : on y jette un œil, on la referme, et on
+     reprend ce qu'on faisait. Elle vit ici plutôt que dans la facturation
+     parce qu'on la demande depuis n'importe où — l'avoir laissée là-bas
+     obligeait à changer de page pour l'ouvrir. */
+
+  function historique() {
+    const U2 = U();
+    const l = MNStore.getBTs();
+    const m = U2.modale({
+      titre: "Devis enregistrés", large: true,
+      corps: l.length
+        ? U2.tableau(
+            [{ nom: "Client", rendu: b => U2.esc(b.client || "—") },
+             { nom: "Référence", rendu: b => '<span class="mono">' + U2.esc(b.ref) + "</span>" },
+             { nom: "Quand", rendu: b => U2.esc(new Date(b.at).toLocaleString("fr-FR")) },
+             { nom: "Par", cle: "by" },
+             { nom: "Objets", num: true, rendu: b => b.count || b.lines.length },
+             { nom: "", rendu: b =>
+                 U2.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
+                                 titre: "Supprimer", action: "rm-" + b.ref }) }],
+            l)
+        : U2.vide({ icone: "recu", titre: "Aucun bon enregistré",
+                    texte: "Les bons que tu enregistres apparaîtront ici." }),
+      actions: [{ label: "Fermer", onClick: f => f() }]
+    });
+
+    m.corps.querySelectorAll("[data-a^='rm-']").forEach(b =>
+      b.addEventListener("click", async () => {
+        const ref = b.dataset.a.slice(3);
+        const ok = await U2.confirmer({ titre: "Supprimer ce bon",
+          message: ref + " sera définitivement supprimé.", confirmer: "Supprimer",
+          danger: true });
+        if (!ok) return;
+        MNStore.removeBT(ref);
+        m.fermer();
+        historique();
+      }));
+  }
+
+  /* Les deux barres se redessinent : on écoute le document, une fois. */
+  document.addEventListener("click", e => {
+    const b = e.target.closest && e.target.closest('[data-a="hist"]');
+    if (b) { e.preventDefault(); historique(); }
+  });
+
   /** Boutons propres à la page, posés dans la barre du haut. */
   function actions(html) {
     const z = document.getElementById("v2-actions");
@@ -589,6 +635,8 @@ window.V2Shell = (function () {
 
   return {
     demarrer, actions, refuser, basculerTiroir, brouillon, rafraichirMarque,
+    /* La facturation l'ouvre aussi, en arrivant sur l'ancre. */
+    historique,
     session: () => _session,
     peut: function () { return MNAuth.canAny.apply(null, arguments); }
   };

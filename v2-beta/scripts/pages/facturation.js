@@ -74,7 +74,7 @@
          deviendrait imprévisible. */
       if (location.hash === "#historique") {
         history.replaceState(null, "", location.pathname + location.search);
-        historique();
+        V2Shell.historique();
       }
     }
   });
@@ -533,44 +533,4 @@
   /* ---- Historique ---------------------------------------------------------------------
      Accessible depuis la barre du haut : c'est une consultation, pas une étape
      du travail en cours. */
-
-  /* Le bouton de la barre du haut et celui de la barre latérale portent la
-     même marque : une seule écoute suffit, posée sur le document parce que
-     les deux barres se redessinent. */
-  document.addEventListener("click", e => {
-    const b = e.target.closest && e.target.closest('[data-a="hist"]');
-    if (b) historique();
-  });
-
-  function historique() {
-    const l = MNStore.getBTs();
-    const m = U.modale({
-      titre: "Devis enregistrés", large: true,
-      corps: l.length
-        ? U.tableau(
-            [{ nom: "Client", rendu: b => U.esc(b.client || "—") },
-             { nom: "Référence", rendu: b => '<span class="mono">' + U.esc(b.ref) + "</span>" },
-             { nom: "Quand", rendu: b => U.esc(new Date(b.at).toLocaleString("fr-FR")) },
-             { nom: "Par", cle: "by" },
-             { nom: "Objets", num: true, rendu: b => b.count || b.lines.length },
-             { nom: "", rendu: b =>
-                 U.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
-                                titre: "Supprimer", action: "rm-" + b.ref }) }],
-            l)
-        : U.vide({ icone: "recu", titre: "Aucun bon enregistré",
-                   texte: "Les bons que tu enregistres apparaîtront ici." }),
-      actions: [{ label: "Fermer", onClick: f => f() }]
-    });
-
-    m.corps.querySelectorAll("[data-a^='rm-']").forEach(b =>
-      b.addEventListener("click", async () => {
-        const ref = b.dataset.a.slice(3);
-        const ok = await U.confirmer({ titre: "Supprimer ce bon",
-          message: ref + " sera définitivement supprimé.", confirmer: "Supprimer", danger: true });
-        if (!ok) return;
-        MNStore.removeBT(ref);
-        m.fermer();
-        historique();
-      }));
-  }
 })();

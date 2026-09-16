@@ -49,8 +49,10 @@ V2.NAV = [
       /* L'historique n'est pas une page : c'est une fenêtre sur la
          facturation. Depuis ailleurs on y va par l'ancre, et la page
          l'ouvre en arrivant. */
+      /* Une fenêtre, pas une page : elle s'ouvre sur place, d'où qu'on soit.
+         L'adresse reste pour les cas où le script n'a pas pris la main. */
       { id: "historique", nom: "Historique", href: "facturation.html#historique",
-        icone: "horloge", perm: ["bt"], fenetre: "facturation" }
+        icone: "horloge", perm: ["bt"], fenetre: true }
     ]
   },
   {

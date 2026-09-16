@@ -1321,7 +1321,17 @@ window.MNStore = (function () {
     }
   }
 
+  const adresseServeur = c =>
+    String((c && c.settings && c.settings.serveur) || "").replace(/\/+$/, "");
+
   async function load() {
+    /* La graine est le catalogue tel qu'il était à la dernière publication :
+       elle porte donc déjà l'adresse du serveur. On demande au serveur SANS
+       attendre le dépôt — les deux allers-retours se recouvrent au lieu de
+       s'additionner, et c'est ce qui laissait l'écran noir entre deux pages. */
+    const graine = normalize(window.MN_CATALOG_SEED || {});
+    const course = catalogueDuServeur(graine);
+
     let published = null;
     try {
       const url = (window.MN_CONFIG.catalogUrl || "data/catalog.json") + "?v=" + Date.now();
@@ -1329,11 +1339,17 @@ window.MNStore = (function () {
       if (r.ok) { published = normalize(await r.json()); _origin = "remote"; _depot = published; }
     } catch (_) { /* file:// ou fichier absent → on retombe sur la graine */ }
 
-    if (!published) { published = normalize(window.MN_CATALOG_SEED || {}); _origin = "seed"; }
+    if (!published) { published = graine; _origin = "seed"; }
 
     /* Le serveur fait autorité quand il en tient un : c'est là que la
-       publication écrit, et sans attendre une reconstruction du site. */
-    const distant = await catalogueDuServeur(published);
+       publication écrit, et sans attendre une reconstruction du site.
+
+       On garde la réponse lancée plus tôt, sauf si le dépôt annonce une autre
+       adresse que la graine — on aurait alors interrogé le mauvais serveur, et
+       il faut redemander au bon. */
+    const distant = adresseServeur(published) === adresseServeur(graine)
+      ? await course
+      : await catalogueDuServeur(published);
     if (distant && new Date(distant.updatedAt) >= new Date(published.updatedAt)) {
       published = distant;
       _origin = "serveur";
