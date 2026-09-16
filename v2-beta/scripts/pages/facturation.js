@@ -16,12 +16,27 @@
 
   let panier = {};
   let cat = "";        // catégorie principale
-  let sous = "";       // sous-catégorie, "" = tout, "__direct" = rangés ici
   let recherche = "";
   let hote = null;
 
   const K_CAT = "v2.fact.cat";
-  const K_SOUS = "v2.fact.sous";
+  const K_PLIS = "v2.fact.plis";
+
+  /* Les sections fermées, retenues d'une visite à l'autre : replier trois
+     sections chaque matin n'est pas un réglage, c'est une corvée. */
+  const plisLire = () => {
+    try { return JSON.parse(localStorage.getItem(K_PLIS)) || []; }
+    catch (_) { return []; }
+  };
+  const plisEcrire = l => {
+    try { localStorage.setItem(K_PLIS, JSON.stringify(l)); } catch (_) { /* rien */ }
+  };
+  const plie = cle => plisLire().indexOf(cle) !== -1;
+  const basculer = cle => {
+    const l = plisLire(), i = l.indexOf(cle);
+    if (i === -1) l.push(cle); else l.splice(i, 1);
+    plisEcrire(l);
+  };
 
   V2Shell.demarrer({
     page: "facturation",
@@ -32,7 +47,6 @@
 
       panier = MNStore.getCart();
       cat = localStorage.getItem(K_CAT) || "";
-      sous = localStorage.getItem(K_SOUS) || "";
 
       const tetes = MNStore.topCategories().filter(c => objetsDe(c.id).length);
       if (!tetes.length) {
@@ -40,7 +54,7 @@
           texte: "Aucun objet n'est encore publié. Ajoute-les depuis l'administration." });
         return;
       }
-      if (!tetes.some(c => c.id === cat)) { cat = tetes[0].id; sous = ""; }
+      if (!tetes.some(c => c.id === cat)) cat = tetes[0].id;
 
       dessiner();
     }
@@ -61,14 +75,11 @@
   };
 
   /** Ce que le catalogue doit montrer, une fois catégorie et recherche appliquées. */
+  /** Les résultats d'une recherche, à travers tout le catalogue. */
   function affiches() {
-    let l = objetsDe(cat);
-    if (sous === "__direct") l = l.filter(i => i.category === cat);
-    else if (sous) l = l.filter(i => i.category === sous);
-
     const q = recherche.trim().toLowerCase();
-    if (q) l = visibles().filter(i => i.name.toLowerCase().indexOf(q) !== -1);
-    return l;
+    if (!q) return objetsDe(cat);
+    return visibles().filter(i => i.name.toLowerCase().indexOf(q) !== -1);
   }
 
   /** L'objet déjà au panier qui interdit celui-ci, s'il y en a un. */
@@ -106,32 +117,51 @@
       .filter(x => x.items.length);
     const direct = visibles().filter(i => i.category === cat);
 
+    /* Tout replier n'a de sens que s'il y a des sections à replier, et pas
+       pendant une recherche, qui les fait disparaître. */
+    const cles = sections().map(s => s.cle);
+    const toutPlie = cles.length > 0 && cles.every(plie);
+
     return '<div class="pile pile--sm" style="margin-bottom:var(--e-4)">' +
       '<div class="rang">' +
         '<div class="fact__rech">' + U.icone("recherche") +
           '<input class="saisie" id="f-q" type="search" placeholder="Chercher un objet…" ' +
             'value="' + U.esc(recherche) + '" autocomplete="off">' +
         "</div>" +
+        (cles.length > 1 && !recherche
+          ? U.bouton(toutPlie ? "Tout déplier" : "Tout replier",
+              { variante: "fantome", taille: "sm", icone: "chevron", action: "plier-tout" })
+          : "") +
       "</div>" +
 
       '<div class="onglets" role="tablist">' + tetes.map(x =>
         '<button class="onglet' + (x.c.id === cat && !recherche ? " is-actif" : "") +
           '" data-cat="' + U.esc(x.c.id) + '" role="tab">' + U.esc(x.c.name) +
           ' <span class="muet">' + x.items.length + "</span></button>").join("") + "</div>" +
-
-      (ss.length && !recherche
-        ? '<div class="onglets onglets--fin">' +
-            onglet("", "Tout", objetsDe(cat).length) +
-            (direct.length ? onglet("__direct", "Autres", direct.length) : "") +
-            ss.map(x => onglet(x.c.id, x.c.name, x.items.length)).join("") +
-          "</div>"
-        : "") +
     "</div>";
   }
 
-  const onglet = (id, nom, n) =>
-    '<button class="onglet' + (sous === id ? " is-actif" : "") + '" data-sous="' + U.esc(id) + '">' +
-      U.esc(nom) + ' <span class="muet">' + n + "</span></button>";
+  /**
+   * Les sections de la catégorie ouverte : une par sous-catégorie qui a des
+   * objets, plus « Autres » pour ceux rangés directement dessous.
+   *
+   * Une sous-catégorie vide ne fait pas de section : un titre suivi de rien
+   * n'apprend rien et prend une ligne.
+   */
+  function sections() {
+    const out = MNStore.subCategories(cat)
+      .map(c => ({ cle: c.id, nom: c.name, items: visibles().filter(i => i.category === c.id) }))
+      .filter(s => s.items.length);
+
+    const direct = visibles().filter(i => i.category === cat);
+    /* Les objets rangés dans la catégorie elle-même passent en tête : ce sont
+       les plus courants, et les reléguer sous les sous-catégories les
+       cacherait. Ils ne prennent un titre que s'il y a autre chose à côté. */
+    if (direct.length) {
+      out.unshift({ cle: cat + "|direct", nom: out.length ? "Autres" : "", items: direct });
+    }
+    return out;
+  }
 
   function brancherBarre() {
     const q = $("#f-q");
@@ -145,29 +175,68 @@
 
     hote.querySelectorAll("[data-cat]").forEach(b => b.addEventListener("click", () => {
       if (cat === b.dataset.cat) return;
-      cat = b.dataset.cat; sous = "";
+      cat = b.dataset.cat;
       localStorage.setItem(K_CAT, cat);
-      localStorage.setItem(K_SOUS, "");
       dessiner();
     }));
-    hote.querySelectorAll("[data-sous]").forEach(b => b.addEventListener("click", () => {
-      sous = b.dataset.sous;
-      localStorage.setItem(K_SOUS, sous);
-      dessiner();
-    }));
+    const bt = hote.querySelector('[data-a="plier-tout"]');
+    if (bt) {
+      bt.addEventListener("click", () => {
+        const cles = sections().map(s => s.cle);
+        /* Tout ou rien : à moitié replié, le bouton replie le reste. */
+        plisEcrire(cles.every(plie) ? [] : cles);
+        dessiner();
+      });
+    }
   }
 
   function dessinerCatalogue() {
-    const l = affiches();
     const zone = $("#f-catalogue");
+    const grille = l => '<div class="grille grille--sm">' + l.map(carteObjet).join("") + "</div>";
 
-    if (!l.length) {
+    /* La recherche coupe à travers les catégories : on la montre à plat,
+       ranger ses résultats par section n'aurait pas de sens. */
+    if (recherche.trim()) {
+      const l = affiches();
+      zone.innerHTML = l.length
+        ? grille(l)
+        : U.vide({ icone: "recherche", titre: "Aucun objet",
+                   texte: "Rien ne correspond à « " + recherche + " »." });
+      return brancherCartes(zone);
+    }
+
+    const secs = sections();
+    if (!secs.length) {
       zone.innerHTML = U.vide({ icone: "recherche", titre: "Aucun objet",
-        texte: recherche ? "Rien ne correspond à « " + recherche + " »."
-                         : "Cette catégorie est vide." });
+        texte: "Cette catégorie est vide." });
       return;
     }
-    zone.innerHTML = '<div class="grille grille--sm">' + l.map(carteObjet).join("") + "</div>";
+
+    /* Une seule section sans nom : c'est une catégorie sans sous-catégorie,
+       un titre unique au-dessus de tout n'apprendrait rien. */
+    if (secs.length === 1 && !secs[0].nom) {
+      zone.innerHTML = grille(secs[0].items);
+      return brancherCartes(zone);
+    }
+
+    zone.innerHTML = secs.map(s =>
+      '<div class="ad-bloc' + (plie(s.cle) ? " est-plie" : "") + '">' +
+        '<div class="ad-tete ad-tete--sous" data-plier="' + U.esc(s.cle) + '" ' +
+          'role="button" tabindex="0" aria-expanded="' + (plie(s.cle) ? "false" : "true") + '">' +
+          U.icone("chevron", "ad-tete__chev") + U.esc(s.nom || "Autres") +
+          '<span class="ad-tete__n">' + s.items.length + "</span>" +
+        "</div>" +
+        '<div class="ad-plie">' + grille(s.items) + "</div>" +
+      "</div>").join("");
+
+    zone.querySelectorAll("[data-plier]").forEach(t => {
+      const ouvrir = () => { basculer(t.dataset.plier); dessiner(); };
+      t.addEventListener("click", ouvrir);
+      /* C'est un bouton : il doit répondre au clavier comme tel. */
+      t.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ouvrir(); }
+      });
+    });
     brancherCartes(zone);
   }
 
