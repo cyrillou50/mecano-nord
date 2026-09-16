@@ -2519,3 +2519,32 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
   color: var(--txt);
   overflow: hidden;
 }
+
+/* ---- La barre d'onglets qui défile, et ses deux flèches -------------------
+   La barre garde sa propre barre de défilement cachée : les flèches disent
+   déjà qu'il y a autre chose, et deux indications pour la même chose
+   encombrent une rangée déjà pleine. */
+
+.ongl-barre { display: flex; align-items: center; gap: var(--e-1); }
+.ongl-barre .onglets {
+  flex: 1; min-width: 0;
+  scrollbar-width: none;
+}
+.ongl-barre .onglets::-webkit-scrollbar { display: none; }
+
+.ongl-fleche {
+  flex: none;
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-1);
+  background: var(--c-creux);
+  color: var(--c-second);
+  cursor: pointer;
+  transition: color var(--m-vif), background var(--m-vif);
+}
+.ongl-fleche:hover { background: var(--c-carte); color: var(--c-texte); }
+.ongl-fleche svg { width: 16px; height: 16px; }
+/* Le chevron pointe vers le bas : on le tourne. */
+.ongl-fleche--g svg { transform: rotate(90deg); }
+.ongl-fleche--d svg { transform: rotate(-90deg); }

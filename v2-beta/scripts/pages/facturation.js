@@ -138,6 +138,17 @@
         '<button class="onglet' + (x.c.id === cat && !recherche ? " is-actif" : "") +
           '" data-cat="' + U.esc(x.c.id) + '" role="tab">' + U.esc(x.c.name) +
           ' <span class="muet">' + x.items.length + "</span></button>").join("") + "</div>" +
+
+      /* Les sous-catégories ne filtrent plus, elles mènent : un clic descend
+         à la section. Inutile d'en proposer une seule — on serait déjà
+         dessus. */
+      (cles.length > 1 && !recherche
+        ? '<div class="onglets onglets--sous">' + sections().map(s =>
+            '<button class="onglet" data-vers="' + U.esc(s.cle) + '">' +
+              U.esc(s.nom || "Autres") +
+              ' <span class="muet">' + s.items.length + "</span></button>").join("") +
+          "</div>"
+        : "") +
     "</div>";
   }
 
@@ -179,6 +190,20 @@
       localStorage.setItem(K_CAT, cat);
       dessiner();
     }));
+    hote.querySelectorAll("[data-vers]").forEach(b => b.addEventListener("click", () => {
+      const cle = b.dataset.vers;
+      /* Repliée, on l'ouvre d'abord : mener à un titre seul ne mène nulle
+         part. Le redessin complet remet aussi le bouton « tout replier » au
+         bon mot. */
+      if (plie(cle)) { basculer(cle); dessiner(); }
+      const tete = [].slice.call(hote.querySelectorAll("[data-plier]"))
+        .filter(x => x.dataset.plier === cle)[0];
+      /* Sans « behavior » : le défilement doux ne pose même pas la position
+         là où l'animation ne peut pas jouer, et le raccourci ne mènerait
+         alors nulle part. */
+      if (tete) tete.scrollIntoView({ block: "start" });
+    }));
+
     const bt = hote.querySelector('[data-a="plier-tout"]');
     if (bt) {
       bt.addEventListener("click", () => {

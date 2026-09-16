@@ -18,6 +18,10 @@
   let hote = null, moi = null;
   let brouillon = null;
   let onglet = "";
+  /* La position de la barre d'onglets, gardée entre deux rendus. `null` tant
+     qu'on n'a rien affiché : au tout premier coup, c'est l'onglet courant
+     qu'on montre, même s'il est loin à droite. */
+  let defileOnglets = null;
   let filtre = "";
 
   const ONGLETS = [
@@ -145,16 +149,22 @@
     V2Shell.brouillon(dessiner);
 
     hote.innerHTML =
-      '<div class="onglets onglets--fin" id="a-onglets">' + permis().map(o =>
-        '<button class="onglet' + (o.id === onglet ? " is-actif" : "") +
-          '" data-o="' + o.id + '">' + U.icone(o.icone) + "<span>" + U.esc(o.nom) + "</span>" +
-          (o.n ? '<span class="onglet__n">' + o.n() + "</span>" : "") +
-        "</button>").join("") + "</div>" +
+      '<div class="ongl-barre">' +
+        fleche("g") +
+        '<div class="onglets onglets--fin" id="a-onglets">' + permis().map(o =>
+          '<button class="onglet' + (o.id === onglet ? " is-actif" : "") +
+            '" data-o="' + o.id + '">' + U.icone(o.icone) + "<span>" + U.esc(o.nom) + "</span>" +
+            (o.n ? '<span class="onglet__n">' + o.n() + "</span>" : "") +
+          "</button>").join("") + "</div>" +
+        fleche("d") +
+      "</div>" +
       '<div id="a-vue" style="margin-top:var(--e-4)"></div>';
 
     hote.querySelectorAll("[data-o]").forEach(b => b.addEventListener("click", () => {
       onglet = b.dataset.o; filtre = ""; dessiner();
     }));
+
+    brancherBarreOnglets();
 
     ({
       objets: vueObjets, cats: vueCats, res: vueRes, ctypes: vueCtypes,
@@ -162,6 +172,69 @@
       livret: vueLivret,
       theme: vueTheme, discord: vueDiscord, site: vueSite, publier: vuePublier
     }[onglet] || aVenir)($("#a-vue"));
+  }
+
+  /* ---- La barre d'onglets, qui défile ----------------------------------------
+     Douze onglets ne tiennent pas sur un portable. La barre défile déjà ;
+     restait à le dire, et à ne pas la renvoyer au début à chaque clic. */
+
+  const fleche = ou =>
+    '<button class="ongl-fleche ongl-fleche--' + ou + '" data-defile="' + ou + '" hidden ' +
+      'aria-label="Voir les onglets de ' + (ou === "g" ? "gauche" : "droite") + '">' +
+      U.icone("chevron") + "</button>";
+
+  function brancherBarreOnglets() {
+    const barre = $("#a-onglets");
+    if (!barre) return;
+    const fleches = hote.querySelectorAll("[data-defile]");
+
+    /* Une flèche ne se montre que s'il reste quelque chose de ce côté : sinon
+       elle promet un ailleurs qui n'existe pas. Deux pixels de marge, les
+       navigateurs arrondissant le défilement. */
+    const majFleches = () => {
+      const reste = barre.scrollWidth - barre.clientWidth;
+      fleches.forEach(f => {
+        f.hidden = reste <= 2 ||
+          (f.dataset.defile === "g" ? barre.scrollLeft <= 2
+                                    : barre.scrollLeft >= reste - 2);
+      });
+    };
+
+    if (defileOnglets === null) {
+      /* Premier affichage : on montre l'onglet courant. Ensuite, c'est la
+         position gardée qui vaut — choisir un onglet ne doit pas renvoyer la
+         barre au début, ni faire disparaître celui qu'on vient de prendre. */
+      const actif = barre.querySelector(".onglet.is-actif");
+      if (actif) actif.scrollIntoView({ inline: "nearest", block: "nearest" });
+    } else {
+      barre.scrollLeft = defileOnglets;
+    }
+    defileOnglets = barre.scrollLeft;
+    majFleches();
+
+    /* Ce qui bouge la barre met à jour dans la foulée : la position retenue
+       et les deux flèches. */
+    const note = () => { defileOnglets = barre.scrollLeft; majFleches(); };
+
+    /* L'évènement voit ce que le code ne fait pas lui-même : un glissement au
+       doigt, la molette, le clavier. Il ne sert qu'à ça — on ne lui confie
+       plus la mise à jour, il n'arrive pas partout. */
+    barre.addEventListener("scroll", note);
+
+    fleches.forEach(f => f.addEventListener("click", () => {
+      /* Un peu moins qu'une largeur de barre : on garde un onglet ou deux en
+         commun d'un écran à l'autre, sinon on perd le fil.
+
+         On pose la position plutôt que de demander un défilement doux : sans
+         composition graphique, le doux ne joue pas l'animation ET ne pose pas
+         la position — la flèche ne ferait alors rien du tout. */
+      const pas = Math.max(120, Math.round(barre.clientWidth * 0.7));
+      barre.scrollLeft += f.dataset.defile === "g" ? -pas : pas;
+      note();
+    }));
+
+    /* La fenêtre change de taille : ce qui dépassait peut ne plus dépasser. */
+    window.addEventListener("resize", majFleches);
   }
 
   /* ---- Livret ---------------------------------------------------------------
