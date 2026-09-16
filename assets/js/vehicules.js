@@ -166,6 +166,95 @@
     return out;
   }
 
+  /* ---- Sortir la liste pour un tableur --------------------------------------
+     Les colonnes sont celles de la feuille de suivi : la catégorie, le nom, le
+     coffre, puis « Maj » et « Raison », laissées vides — elles appartiennent à
+     la feuille et le site n'a pas à écraser ce qu'on y a noté.
+
+     On sort ce qui est affiché, filtres compris : le bouton est sur la liste,
+     et sortir autre chose que ce qu'on regarde serait une surprise. */
+
+  const COLONNES = ["Catégorie", "Nom", "Coffres", "Maj", "Raison"];
+
+  function lignesExport() {
+    return liste().map(v => [catOf(v).name, v.name, v.coffre || "", "", ""]);
+  }
+
+  /** Des tabulations : collé dans une feuille, ça tombe dans les cases. */
+  const enTsv = l => [COLONNES].concat(l)
+    .map(r => r.map(c => String(c).replace(/[\t\r\n]+/g, " ")).join("\t"))
+    .join("\n");
+
+  /**
+   * En CSV. Le point-virgule plutôt que la virgule : c'est ce qu'attend un
+   * tableur en français, et une virgule couperait « 1,2 t » en deux colonnes.
+   */
+  const enCsv = l => [COLONNES].concat(l)
+    .map(r => r.map(c => {
+      const s = String(c);
+      return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(";"))
+    .join("\r\n");
+
+  function exporter() {
+    const l = lignesExport();
+    if (!l.length) return MNUI.toast("Aucun véhicule à sortir", "err");
+
+    const body = document.createElement("div");
+    body.className = "editor";
+    body.innerHTML =
+      '<p class="hint">' + l.length + " véhicule" + (l.length > 1 ? "s" : "") +
+        (liste().length === P().vehicles.length
+          ? ""
+          : " — ceux que les filtres laissent voir") +
+        ", dans l'ordre de la liste.</p>" +
+      '<div class="field"><span class="label">Colonnes</span>' +
+        '<div class="row row--wrap">' + COLONNES.map(c =>
+          '<span class="permtag">' + esc(c) + "</span>").join("") + "</div>" +
+        '<p class="hint"><b>Maj</b> et <b>Raison</b> sortent vides : elles sont ' +
+          "à toi, et les remplir ici effacerait ce que tu as noté dans la " +
+          "feuille.</p></div>" +
+      '<div class="field"><span class="label">Aperçu</span>' +
+        '<pre class="mono" style="max-height:220px;overflow:auto;margin:0;' +
+          'font-size:12px;line-height:1.6">' +
+          esc([COLONNES.join("  ·  ")].concat(
+            l.slice(0, 8).map(r => r.slice(0, 3).join("  ·  "))).join("\n")) +
+          (l.length > 8 ? "\n… et " + (l.length - 8) + " de plus" : "") +
+        "</pre></div>";
+
+    MNUI.modal({
+      title: "Sortir la liste pour un tableur",
+      body,
+      actions: [
+        { label: "Fermer", variant: "btn--ghost", onClick: c => c() },
+        {
+          label: "Télécharger (.csv)", variant: "btn--ghost", icon: "download",
+          onClick: () => {
+            const nom = "vehicules-" + MNDuty.jourLocal() + ".csv";
+            /* Le BOM : sans lui, un tableur ouvre le fichier en latin-1 et
+               « Catégorie » arrive en « CatÃ©gorie ». */
+            const b = new Blob(["\ufeff" + enCsv(l)],
+              { type: "text/csv;charset=utf-8" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(b);
+            a.download = nom;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+            MNUI.toast("Fichier " + nom + " téléchargé", "ok");
+          }
+        },
+        {
+          label: "Copier", variant: "btn--primary", icon: "copy",
+          onClick: async close => {
+            const ok = await MNUI.copy(enTsv(l),
+              "Copié — colle dans la feuille, les colonnes se placent toutes seules");
+            if (ok) close();
+          }
+        }
+      ]
+    });
+  }
+
   /**
    * Rend compte d'une écriture. Le parc distant est déjà à jour côté serveur ;
    * on ne redessine qu'ensuite pour ne pas montrer un état qui n'a pas pris.
@@ -384,6 +473,13 @@
         '<span class="hint">' + valides.length + " véhicule" + (valides.length > 1 ? "s" : "") +
           (attente.length ? " · " + attente.length + " en attente" : "") + "</span>" +
         '<span class="row" style="gap:4px">' +
+          /* Réservé à qui monte les véhicules : pour les autres, ce tableau
+             ne correspond à aucun travail. */
+          (canEdit
+            ? '<button class="btn btn--ghost btn--sm" id="v-export" ' +
+              'title="Sortir la liste pour un tableur">' +
+              svg("download") + "</button>"
+            : "") +
           (canEdit
             ? '<button class="btn btn--ghost btn--sm" id="v-cats" title="Catégories">' +
               svg("layers") + "</button>"
@@ -394,6 +490,9 @@
             "<span>" + (canEdit ? "Ajouter" : "Proposer") + "</span></button>" +
         "</span>" +
       "</div>";
+
+    const bx = $("#v-export");
+    if (bx) bx.addEventListener("click", exporter);
 
     const corps = host.querySelector(".stafflist__body");
     if (corps && scrollListe) corps.scrollTop = scrollListe;
