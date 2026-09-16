@@ -166,123 +166,6 @@
     return out;
   }
 
-  /* ---- Sortir la liste pour un tableur --------------------------------------
-     Les colonnes sont celles de la feuille de suivi : la catégorie, le nom, le
-     coffre, puis « Maj » et « Raison », laissées vides — elles appartiennent à
-     la feuille et le site n'a pas à écraser ce qu'on y a noté.
-
-     On sort ce qui est affiché, filtres compris : le bouton est sur la liste,
-     et sortir autre chose que ce qu'on regarde serait une surprise. */
-
-  const COLONNES = ["Catégorie", "Nom", "Coffres", "Maj", "Raison"];
-
-  function lignesExport() {
-    /* L'ordre des catégories est celui du parc, donc celui de la liste à
-       l'écran. Le tri est stable : à catégorie égale, les véhicules gardent
-       l'ordre affiché, A→Z ou Z→A selon ce qui est choisi. */
-    const rang = {};
-    P().cats.forEach((c, i) => { rang[c.id] = i; });
-    /* Une catégorie disparue passe en dernier plutôt que de remonter en
-       tête : ces véhicules-là sont à reclasser, pas à lire en premier. */
-    const ou = v => (rang[v.category] === undefined ? 9999 : rang[v.category]);
-
-    return liste().slice()
-      .sort((a, b) => ou(a) - ou(b))
-      .map(v => [catOf(v).name, v.name, v.coffre || "", "", ""]);
-  }
-
-  /** Des tabulations : collé dans une feuille, ça tombe dans les cases. */
-  const enTsv = l => [COLONNES].concat(l)
-    .map(r => r.map(c => String(c).replace(/[\t\r\n]+/g, " ")).join("\t"))
-    .join("\n");
-
-  /**
-   * Le même tableau, en HTML, pour que le collage arrive déjà dessiné.
-   *
-   * Les styles sont écrits sur chaque cellule : un tableur ne lit pas de
-   * feuille de style, il ne regarde que ce qui est posé sur la cellule
-   * elle-même.
-   */
-  function enHtml(l) {
-    const cell = (t, entete) =>
-      "<" + (entete ? "th" : "td") + ' style="border:1px solid #9aa0a6;padding:4px 8px;' +
-        (entete ? "background:#0b5c3f;color:#ffffff;font-weight:700;text-align:left" : "") +
-        '">' + esc(t) + "</" + (entete ? "th" : "td") + ">";
-
-    return '<table style="border-collapse:collapse">' +
-      "<thead><tr>" + COLONNES.map(c => cell(c, true)).join("") + "</tr></thead>" +
-      "<tbody>" + l.map(r =>
-        "<tr>" + r.map(c => cell(c, false)).join("") + "</tr>").join("") +
-      "</tbody></table>";
-  }
-
-  /**
-   * Dépose les deux versions d'un coup. Celui qui colle choisit : un tableur
-   * prend le tableau, un champ de texte prend les tabulations.
-   *
-   * `ClipboardItem` demande une page servie en HTTPS, ce qu'est le site. En
-   * local sans HTTPS, ou sur un navigateur qui ne l'a pas, on retombe sur le
-   * texte seul — moins joli, jamais bloquant.
-   */
-  async function copierTableau(l) {
-    const html = enHtml(l), tsv = enTsv(l);
-    try {
-      await navigator.clipboard.write([new ClipboardItem({
-        "text/html": new Blob([html], { type: "text/html" }),
-        "text/plain": new Blob([tsv], { type: "text/plain" })
-      })]);
-      MNUI.toast("Copié — colle dans la feuille, le tableau arrive dessiné", "ok");
-      return true;
-    } catch (_) {
-      return MNUI.copy(tsv,
-        "Copié — colle dans la feuille, les colonnes se placent toutes seules");
-    }
-  }
-
-  function exporter() {
-    const l = lignesExport();
-    if (!l.length) return MNUI.toast("Aucun véhicule à sortir", "err");
-
-    const body = document.createElement("div");
-    body.className = "editor";
-    body.innerHTML =
-      '<p class="hint">' + l.length + " véhicule" + (l.length > 1 ? "s" : "") +
-        (liste().length === P().vehicles.length
-          ? ""
-          : " — ceux que les filtres laissent voir") +
-        ", dans l'ordre de la liste.</p>" +
-      '<div class="field"><span class="label">Colonnes</span>' +
-        '<div class="row row--wrap">' + COLONNES.map(c =>
-          '<span class="permtag">' + esc(c) + "</span>").join("") + "</div>" +
-        '<p class="hint"><b>Maj</b> et <b>Raison</b> sortent vides : elles sont ' +
-          "à toi, et les remplir ici effacerait ce que tu as noté dans la " +
-          "feuille.</p></div>" +
-      '<div class="alert alert--info">' + svg("info") +
-        "<span>Le tableau arrive <b>déjà dessiné</b> : en-tête et bordures " +
-        "comprises. Pour avoir en plus les menus déroulants sur la colonne " +
-        "Catégorie, une fois collé : <b>Format → Convertir en tableau</b>. " +
-        "Sheets le retient pour les fois d'après.</span></div>" +
-      '<div class="field"><span class="label">Aperçu</span>' +
-        '<pre class="mono" style="max-height:220px;overflow:auto;margin:0;' +
-          'font-size:12px;line-height:1.6">' +
-          esc([COLONNES.join("  ·  ")].concat(
-            l.slice(0, 8).map(r => r.slice(0, 3).join("  ·  "))).join("\n")) +
-          (l.length > 8 ? "\n… et " + (l.length - 8) + " de plus" : "") +
-        "</pre></div>";
-
-    MNUI.modal({
-      title: "Sortir la liste pour un tableur",
-      body,
-      actions: [
-        { label: "Fermer", variant: "btn--ghost", onClick: c => c() },
-        {
-          label: "Copier", variant: "btn--primary", icon: "copy",
-          onClick: async close => { if (await copierTableau(l)) close(); }
-        }
-      ]
-    });
-  }
-
   /**
    * Rend compte d'une écriture. Le parc distant est déjà à jour côté serveur ;
    * on ne redessine qu'ensuite pour ne pas montrer un état qui n'a pas pris.
@@ -501,13 +384,6 @@
         '<span class="hint">' + valides.length + " véhicule" + (valides.length > 1 ? "s" : "") +
           (attente.length ? " · " + attente.length + " en attente" : "") + "</span>" +
         '<span class="row" style="gap:4px">' +
-          /* Réservé à qui monte les véhicules : pour les autres, ce tableau
-             ne correspond à aucun travail. */
-          (canEdit
-            ? '<button class="btn btn--ghost btn--sm" id="v-export" ' +
-              'title="Sortir la liste pour un tableur">' +
-              svg("copy") + "</button>"
-            : "") +
           (canEdit
             ? '<button class="btn btn--ghost btn--sm" id="v-cats" title="Catégories">' +
               svg("layers") + "</button>"
@@ -518,9 +394,6 @@
             "<span>" + (canEdit ? "Ajouter" : "Proposer") + "</span></button>" +
         "</span>" +
       "</div>";
-
-    const bx = $("#v-export");
-    if (bx) bx.addEventListener("click", exporter);
 
     const corps = host.querySelector(".stafflist__body");
     if (corps && scrollListe) corps.scrollTop = scrollListe;
