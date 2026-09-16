@@ -371,6 +371,9 @@
   overflow-x: auto;
 }
 .onglet {
+  /* En ligne : l'icône, le nom, le compteur. Sans ça, ils s'empilent. */
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  flex: none;
   padding: var(--e-2) var(--e-4);
   border-radius: var(--r-1);
   color: var(--c-second);
@@ -380,6 +383,9 @@
   white-space: nowrap;
   transition: background var(--m-vif), color var(--m-vif);
 }
+/* La taille manquait, et un svg sans taille en prend une de trois cents
+   pixels : c'est ce qui faisait une barre haute comme une carte. */
+.onglet svg { width: 16px; height: 16px; flex: none; }
 .onglet:hover { color: var(--c-texte); }
 .onglet.is-actif { background: var(--c-carte); color: var(--c-action-doux); box-shadow: var(--o-1); }
 
@@ -551,6 +557,7 @@
 .fact__rech .saisie { padding-left: var(--e-7); }
 
 .onglets--fin .onglet { font-size: var(--t-xs); padding: var(--e-1) var(--e-3); }
+.onglets--fin .onglet svg { width: 14px; height: 14px; }
 /* Pendant une recherche, les onglets ne décrivent plus ce qui est montré. */
 .onglets.is-eteint { opacity: .4; pointer-events: none; }
 
