@@ -177,13 +177,67 @@
   const COLONNES = ["Catégorie", "Nom", "Coffres", "Maj", "Raison"];
 
   function lignesExport() {
-    return liste().map(v => [catOf(v).name, v.name, v.coffre || "", "", ""]);
+    /* L'ordre des catégories est celui du parc, donc celui de la liste à
+       l'écran. Le tri est stable : à catégorie égale, les véhicules gardent
+       l'ordre affiché, A→Z ou Z→A selon ce qui est choisi. */
+    const rang = {};
+    P().cats.forEach((c, i) => { rang[c.id] = i; });
+    /* Une catégorie disparue passe en dernier plutôt que de remonter en
+       tête : ces véhicules-là sont à reclasser, pas à lire en premier. */
+    const ou = v => (rang[v.category] === undefined ? 9999 : rang[v.category]);
+
+    return liste().slice()
+      .sort((a, b) => ou(a) - ou(b))
+      .map(v => [catOf(v).name, v.name, v.coffre || "", "", ""]);
   }
 
   /** Des tabulations : collé dans une feuille, ça tombe dans les cases. */
   const enTsv = l => [COLONNES].concat(l)
     .map(r => r.map(c => String(c).replace(/[\t\r\n]+/g, " ")).join("\t"))
     .join("\n");
+
+  /**
+   * Le même tableau, en HTML, pour que le collage arrive déjà dessiné.
+   *
+   * Les styles sont écrits sur chaque cellule : un tableur ne lit pas de
+   * feuille de style, il ne regarde que ce qui est posé sur la cellule
+   * elle-même.
+   */
+  function enHtml(l) {
+    const cell = (t, entete) =>
+      "<" + (entete ? "th" : "td") + ' style="border:1px solid #9aa0a6;padding:4px 8px;' +
+        (entete ? "background:#0b5c3f;color:#ffffff;font-weight:700;text-align:left" : "") +
+        '">' + esc(t) + "</" + (entete ? "th" : "td") + ">";
+
+    return '<table style="border-collapse:collapse">' +
+      "<thead><tr>" + COLONNES.map(c => cell(c, true)).join("") + "</tr></thead>" +
+      "<tbody>" + l.map(r =>
+        "<tr>" + r.map(c => cell(c, false)).join("") + "</tr>").join("") +
+      "</tbody></table>";
+  }
+
+  /**
+   * Dépose les deux versions d'un coup. Celui qui colle choisit : un tableur
+   * prend le tableau, un champ de texte prend les tabulations.
+   *
+   * `ClipboardItem` demande une page servie en HTTPS, ce qu'est le site. En
+   * local sans HTTPS, ou sur un navigateur qui ne l'a pas, on retombe sur le
+   * texte seul — moins joli, jamais bloquant.
+   */
+  async function copierTableau(l) {
+    const html = enHtml(l), tsv = enTsv(l);
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([tsv], { type: "text/plain" })
+      })]);
+      MNUI.toast("Copié — colle dans la feuille, le tableau arrive dessiné", "ok");
+      return true;
+    } catch (_) {
+      return MNUI.copy(tsv,
+        "Copié — colle dans la feuille, les colonnes se placent toutes seules");
+    }
+  }
 
   /**
    * En CSV. Le point-virgule plutôt que la virgule : c'est ce qu'attend un
@@ -214,6 +268,11 @@
         '<p class="hint"><b>Maj</b> et <b>Raison</b> sortent vides : elles sont ' +
           "à toi, et les remplir ici effacerait ce que tu as noté dans la " +
           "feuille.</p></div>" +
+      '<div class="alert alert--info">' + svg("info") +
+        "<span>Le tableau arrive <b>déjà dessiné</b> : en-tête et bordures " +
+        "comprises. Pour avoir en plus les menus déroulants sur la colonne " +
+        "Catégorie, une fois collé : <b>Format → Convertir en tableau</b>. " +
+        "Sheets le retient pour les fois d'après.</span></div>" +
       '<div class="field"><span class="label">Aperçu</span>' +
         '<pre class="mono" style="max-height:220px;overflow:auto;margin:0;' +
           'font-size:12px;line-height:1.6">' +
@@ -245,11 +304,7 @@
         },
         {
           label: "Copier", variant: "btn--primary", icon: "copy",
-          onClick: async close => {
-            const ok = await MNUI.copy(enTsv(l),
-              "Copié — colle dans la feuille, les colonnes se placent toutes seules");
-            if (ok) close();
-          }
+          onClick: async close => { if (await copierTableau(l)) close(); }
         }
       ]
     });
