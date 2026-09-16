@@ -245,3 +245,8 @@
   font-size: 9.5px; font-weight: 800;
   letter-spacing: .14em; text-transform: uppercase;
 }
+
+.marque__jeton--perso {
+  background: none;
+  color: var(--c-action-doux);
+}

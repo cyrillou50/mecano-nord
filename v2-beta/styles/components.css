@@ -2526,11 +2526,7 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
    encombrent une rangée déjà pleine. */
 
 .ongl-barre { display: flex; align-items: center; gap: var(--e-1); }
-.ongl-barre .onglets {
-  flex: 1; min-width: 0;
-  scrollbar-width: none;
-}
-.ongl-barre .onglets::-webkit-scrollbar { display: none; }
+.ongl-barre .onglets { flex: 1; min-width: 0; }
 
 .ongl-fleche {
   flex: none;
@@ -2548,3 +2544,14 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
 /* Le chevron pointe vers le bas : on le tourne. */
 .ongl-fleche--g svg { transform: rotate(90deg); }
 .ongl-fleche--d svg { transform: rotate(-90deg); }
+
+/* ---- La grille de la facturation ------------------------------------------
+   Un nombre de colonnes, et non une largeur de carte : c'est le nombre
+   d'objets par ligne qu'on a en tête en cherchant, pas leur largeur. Il
+   descend par paliers plutôt que de laisser les cartes se tasser. */
+
+.grille--fact { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1500px) { .grille--fact { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 1150px) { .grille--fact { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 820px)  { .grille--fact { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px)  { .grille--fact { grid-template-columns: 1fr; } }

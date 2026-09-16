@@ -47,7 +47,8 @@ window.V2Shell = (function () {
        court laisserait deviner. */
     const ici = MNAuth.atelier() ? MNStore.nomAtelier(MNAuth.atelier()) : b.name;
     return '<a class="sidebar__marque" href="index.html">' +
-      '<span class="marque__jeton">' + logo + "</span>" +
+      '<span class="marque__jeton' + (b.logo ? " marque__jeton--perso" : "") + '">' +
+        logo + "</span>" +
       '<span class="marque__txt tronque"><b>' + esc(ici) + "</b>" +
         "<span>" + (V2.VERSION.beta ? "V2 bêta" : esc(b.tagline)) + "</span></span>" +
     "</a>";
@@ -75,10 +76,16 @@ window.V2Shell = (function () {
       '<div class="navgroupe">' +
         '<div class="navgroupe__titre">' + esc(g.groupe) + "</div>" +
         g.entrees.map(e =>
-          '<a class="navlien' + (e.id === _page ? " is-actif" : "") + '" href="' + esc(e.href) +
-            '" data-nom="' + esc(e.nom) + '"' + (e.id === _page ? ' aria-current="page"' : "") + ">" +
+          /* Une entrée qui n'ouvre qu'une fenêtre devient un bouton quand on
+             est déjà sur sa page : recharger pour afficher une fenêtre serait
+             absurde. La page écoute `data-a` et s'en charge. */
+          (e.fenetre === _page
+            ? '<button type="button" class="navlien" data-a="hist" ' +
+              'data-nom="' + esc(e.nom) + '">'
+            : '<a class="navlien' + (e.id === _page ? " is-actif" : "") + '" href="' + esc(e.href) +
+              '" data-nom="' + esc(e.nom) + '"' + (e.id === _page ? ' aria-current="page"' : "") + ">") +
             U().icone(e.icone) + "<span>" + esc(e.nom) + "</span>" +
-          "</a>").join("") +
+          (e.fenetre === _page ? "</button>" : "</a>")).join("") +
       "</div>").join("");
   }
 

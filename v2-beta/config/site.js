@@ -50,7 +50,7 @@ V2.NAV = [
          facturation. Depuis ailleurs on y va par l'ancre, et la page
          l'ouvre en arrivant. */
       { id: "historique", nom: "Historique", href: "facturation.html#historique",
-        icone: "horloge", perm: ["bt"] }
+        icone: "horloge", perm: ["bt"], fenetre: "facturation" }
     ]
   },
   {

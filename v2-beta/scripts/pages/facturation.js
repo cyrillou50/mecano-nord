@@ -217,7 +217,7 @@
 
   function dessinerCatalogue() {
     const zone = $("#f-catalogue");
-    const grille = l => '<div class="grille grille--sm">' + l.map(carteObjet).join("") + "</div>";
+    const grille = l => '<div class="grille grille--fact">' + l.map(carteObjet).join("") + "</div>";
 
     /* La recherche coupe à travers les catégories : on la montre à plat,
        ranger ses résultats par section n'aurait pas de sens. */
@@ -313,6 +313,12 @@
       champ.addEventListener("change", () => poser(id, Number(champ.value) || 0));
       /* Cliquer la carte ajoute : c'est le geste le plus fréquent. */
       el.addEventListener("click", () => poser(id, (panier[id] || 0) + 1));
+      /* Et le clic droit retire, comme en V1 : on se trompe d'un objet bien
+         plus souvent qu'on ne veut le menu du navigateur sur une vignette. */
+      el.addEventListener("contextmenu", e => {
+        e.preventDefault();
+        poser(id, (panier[id] || 0) - 1);
+      });
     });
   }
 
