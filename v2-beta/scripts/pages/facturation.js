@@ -51,15 +51,31 @@
       cat = localStorage.getItem(K_CAT) || "";
       sous = localStorage.getItem(K_SOUS) || "";
 
+      /* Le bouton de la barre du haut : ici et pas au chargement du fichier,
+         où la barre n'existe pas encore. */
+      V2Shell.actions(U.bouton("Historique", { variante: "fantome", taille: "sm",
+        icone: "recu", action: "hist" }));
+
       const tetes = MNStore.topCategories().filter(c => objetsDe(c.id).length);
       if (!tetes.length) {
         hote.innerHTML = U.vide({ icone: "boite", titre: "Catalogue vide",
           texte: "Aucun objet n'est encore publié. Ajoute-les depuis l'administration." });
-        return;
+      } else {
+        if (!tetes.some(c => c.id === cat)) cat = tetes[0].id;
+        dessiner();
       }
-      if (!tetes.some(c => c.id === cat)) cat = tetes[0].id;
 
-      dessiner();
+      /* Arrivé depuis le menu d'une autre page. La fenêtre s'ouvre une fois la
+         page en place — avant, elle s'ouvrait sur un écran qui n'existait pas
+         encore et sur un catalogue pas encore lu.
+
+         On efface l'ancre aussitôt : sinon un rafraîchissement rouvrirait la
+         fenêtre sans qu'on l'ait demandé, et le bouton « précédent »
+         deviendrait imprévisible. */
+      if (location.hash === "#historique") {
+        history.replaceState(null, "", location.pathname + location.search);
+        historique();
+      }
     }
   });
 
@@ -280,8 +296,12 @@
 
     const couts = Object.keys(it.cost || {}).map(rid => {
       const r = MNStore.resourceById(rid);
-      return r ? '<span class="objet__cout">' + U.esc(r.name) + " ×" +
-        U.nombre(it.cost[rid] * Math.max(1, q)) + "</span>" : "";
+      /* L'image de la ressource plutôt que son nom, comme en V1 : on
+         reconnaît un bidon d'huile d'un coup d'œil, on lit « Huile
+         moteur » ligne par ligne. Le nom reste au survol, pour qui doute. */
+      return r ? '<span class="objet__cout" style="color:' + U.esc(r.color) +
+        '" title="' + U.esc(r.name) + '">' + mnIcon(r.icon) +
+        "<i>" + U.nombre(it.cost[rid] * Math.max(1, q)) + "</i></span>" : "";
     }).join("");
 
     return '<article class="objet' + (q ? " is-pris" : "") + (bloc ? " is-bloque" : "") +
@@ -514,20 +534,13 @@
      Accessible depuis la barre du haut : c'est une consultation, pas une étape
      du travail en cours. */
 
-  V2Shell.actions(U.bouton("Historique", { variante: "fantome", taille: "sm",
-    icone: "recu", action: "hist" }));
+  /* Le bouton de la barre du haut et celui de la barre latérale portent la
+     même marque : une seule écoute suffit, posée sur le document parce que
+     les deux barres se redessinent. */
   document.addEventListener("click", e => {
     const b = e.target.closest && e.target.closest('[data-a="hist"]');
     if (b) historique();
   });
-
-  /* Arrivé depuis le menu d'une autre page. On efface l'ancre aussitôt :
-     sinon un rafraîchissement rouvrirait la fenêtre sans qu'on l'ait
-     demandé, et le bouton « précédent » deviendrait imprévisible. */
-  if (location.hash === "#historique") {
-    history.replaceState(null, "", location.pathname + location.search);
-    setTimeout(historique, 0);
-  }
 
   function historique() {
     const l = MNStore.getBTs();
