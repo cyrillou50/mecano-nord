@@ -556,8 +556,10 @@
 }
 .fact__rech .saisie { padding-left: var(--e-7); }
 
-.onglets--fin .onglet { font-size: var(--t-xs); padding: var(--e-1) var(--e-3); }
-.onglets--fin .onglet svg { width: 14px; height: 14px; }
+/* Plus fins que les onglets ordinaires, mais c'est la navigation de la page :
+   la plus petite taille du site y était illisible. */
+.onglets--fin .onglet { font-size: var(--t-sm); padding: var(--e-2) var(--e-3); }
+.onglets--fin .onglet svg { width: 16px; height: 16px; }
 /* Pendant une recherche, les onglets ne décrivent plus ce qui est montré. */
 .onglets.is-eteint { opacity: .4; pointer-events: none; }
 
@@ -1411,10 +1413,10 @@
   cursor: pointer;
   user-select: none;
 }
-.ad-tete--cat  { font-size: var(--t-md); color: var(--c-texte); }
-.ad-tete--sous { font-size: var(--t-sm); }
+.ad-tete--cat  { font-size: var(--t-lg); color: var(--c-texte); }
+.ad-tete--sous { font-size: var(--t-md); }
 .ad-tete:hover { color: var(--c-action-doux); }
-.ad-tete__chev { width: 15px; height: 15px; transition: transform var(--m-vif); }
+.ad-tete__chev { width: 17px; height: 17px; transition: transform var(--m-vif); }
 .est-plie > .ad-tete .ad-tete__chev { transform: rotate(-90deg); }
 .ad-tete__n {
   padding: 0 6px;

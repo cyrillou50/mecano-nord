@@ -148,6 +148,10 @@
   padding: var(--e-5) var(--e-5) var(--e-8);
   max-width: var(--l-max);
   width: 100%;
+  /* Centré, et non rangé à gauche : au-delà du plafond, tout le vide
+     s'entassait d'un seul côté et la page paraissait de travers. Partagé, il
+     ne se remarque plus — et aucune ligne ne change de longueur. */
+  margin-inline: auto;
 }
 
 /* ---- Tablette : barre latérale réduite aux icônes ------------------------- */
