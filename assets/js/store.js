@@ -1324,37 +1324,72 @@ window.MNStore = (function () {
   const adresseServeur = c =>
     String((c && c.settings && c.settings.serveur) || "").replace(/\/+$/, "");
 
-  async function load() {
-    /* La graine est le catalogue tel qu'il était à la dernière publication :
-       elle porte donc déjà l'adresse du serveur. On demande au serveur SANS
-       attendre le dépôt — les deux allers-retours se recouvrent au lieu de
-       s'additionner, et c'est ce qui laissait l'écran noir entre deux pages. */
+  /* ---- Ce qu'on a vu la dernière fois --------------------------------------
+     Le dernier catalogue publié rencontré, gardé pour repartir sans attendre.
+     Voir le commentaire de `load`. */
+
+  const K_VU = "mn.catalog.vu";
+
+  function lireVu() {
+    try {
+      const raw = localStorage.getItem(K_VU);
+      if (!raw) return null;
+      const o = JSON.parse(raw);
+      if (!o || !o.cat) return null;
+      return { cat: normalize(o.cat), origine: o.origine === "serveur" ? "serveur" : "remote" };
+    } catch (_) {
+      /* Illisible : on l'oublie plutôt que d'y revenir à chaque page. */
+      try { localStorage.removeItem(K_VU); } catch (__) { /* rien */ }
+      return null;
+    }
+  }
+
+  function ecrireVu(cat, origine) {
+    /* Pas la graine : elle est déjà dans le site, et s'en souvenir reviendrait
+       à figer une version qu'on a justement pu remplacer. */
+    if (origine === "seed") return;
+    try { localStorage.setItem(K_VU, JSON.stringify({ origine, cat })); }
+    catch (_) { /* place manquante : tant pis, on attendra le réseau */ }
+  }
+
+  /**
+   * Va chercher la version publiée, des deux côtés à la fois.
+   *
+   * La graine porte l'adresse du serveur — elle est écrite dans le site à la
+   * publication, en même temps que le dépôt. On interroge donc le serveur sans
+   * attendre le dépôt : les deux allers-retours se recouvrent au lieu de
+   * s'additionner. On ne repasse en série que si le dépôt annonce une autre
+   * adresse, auquel cas on aurait interrogé le mauvais serveur.
+   */
+  async function chercher() {
     const graine = normalize(window.MN_CATALOG_SEED || {});
     const course = catalogueDuServeur(graine);
 
-    let published = null;
+    let published = null, origine = "seed", depot = null;
     try {
       const url = (window.MN_CONFIG.catalogUrl || "data/catalog.json") + "?v=" + Date.now();
       const r = await fetch(url, { cache: "no-store" });
-      if (r.ok) { published = normalize(await r.json()); _origin = "remote"; _depot = published; }
+      if (r.ok) { published = normalize(await r.json()); origine = "remote"; depot = published; }
     } catch (_) { /* file:// ou fichier absent → on retombe sur la graine */ }
 
-    if (!published) { published = graine; _origin = "seed"; }
+    if (!published) published = graine;
 
     /* Le serveur fait autorité quand il en tient un : c'est là que la
-       publication écrit, et sans attendre une reconstruction du site.
-
-       On garde la réponse lancée plus tôt, sauf si le dépôt annonce une autre
-       adresse que la graine — on aurait alors interrogé le mauvais serveur, et
-       il faut redemander au bon. */
+       publication écrit, sans attendre une reconstruction du site. */
     const distant = adresseServeur(published) === adresseServeur(graine)
       ? await course
       : await catalogueDuServeur(published);
     if (distant && new Date(distant.updatedAt) >= new Date(published.updatedAt)) {
       published = distant;
-      _origin = "serveur";
+      origine = "serveur";
     }
+    return { published, origine, depot };
+  }
+
+  /** Pose une version publiée : le brouillon garde la priorité. */
+  function poser(published, origine) {
     _published = published;
+    _origin = origine;
 
     let local = null;
     try {
@@ -1362,8 +1397,11 @@ window.MNStore = (function () {
       if (raw) local = normalize(JSON.parse(raw));
     } catch (_) { localStorage.removeItem(K_LOCAL); }
 
-    /* Un brouillon plus vieux que la version en ligne = déjà publié ailleurs. */
-    if (local && _origin !== "seed" && new Date(local.updatedAt) <= new Date(published.updatedAt)) {
+    /* Un brouillon plus vieux que la version en ligne = déjà publié ailleurs.
+       L'instantané ne peut être que plus ancien que la réalité : il ne peut
+       donc pas faire supprimer un brouillon à tort, au pire en garder un que
+       le rafraîchissement effacera. */
+    if (local && origine !== "seed" && new Date(local.updatedAt) <= new Date(published.updatedAt)) {
       localStorage.removeItem(K_LOCAL);
       local = null;
     }
@@ -1373,6 +1411,53 @@ window.MNStore = (function () {
     emit();
     return _catalog;
   }
+
+  /* Un seul rafraîchissement à la fois : deux pages ouvertes côte à côte ne
+     doivent pas doubler les requêtes. */
+  let _enFond = null;
+
+  function rafraichirEnFond() {
+    if (_enFond) return _enFond;
+    _enFond = chercher().then(r => {
+      _depot = r.depot;
+      ecrireVu(r.published, r.origine);
+      /* On ne repose que si c'est vraiment autre chose : sinon on ferait
+         sauter la page pour rien. */
+      const avant = _published && _published.updatedAt;
+      if (!avant || r.origine !== _origin ||
+          new Date(r.published.updatedAt) > new Date(avant)) {
+        poser(r.published, r.origine);
+      }
+    }).catch(() => { /* réseau coupé : on garde ce qu'on a */ });
+    _enFond.finally(() => { _enFond = null; });
+    return _enFond;
+  }
+
+  /**
+   * Le catalogue, prêt à afficher.
+   *
+   * On repart du dernier publié qu'on ait vu — la page se peint sans attendre
+   * le réseau — et la version réelle arrive derrière. Si elle est plus
+   * récente, tout est reposé et `onChange` prévient.
+   *
+   * Première visite : il faut bien attendre une fois.
+   */
+  async function load() {
+    const vu = lireVu();
+    if (!vu) {
+      const r = await chercher();
+      _depot = r.depot;
+      ecrireVu(r.published, r.origine);
+      return poser(r.published, r.origine);
+    }
+
+    poser(vu.cat, vu.origine);
+    rafraichirEnFond();
+    return _catalog;
+  }
+
+  /** Force une relecture, sans rien casser si une est déjà en route. */
+  const relire = () => rafraichirEnFond();
 
   /* ---- Brouillon -------------------------------------------------------- */
 
@@ -1608,7 +1693,7 @@ window.MNStore = (function () {
   const clearBTs = () => localStorage.removeItem(K_BTS);
 
   return {
-    load, normalize, slugify, uniqueId, clone, onChange, recordPromotion,
+    load, relire, normalize, slugify, uniqueId, clone, onChange, recordPromotion,
     saveDraft, discardDraft, adopter, toJSON, download,
     catalog, published, depot, hasDraft, origin, settings, brand, api,
     roleById, roleOf, itemById, resourceById, categoryById,
