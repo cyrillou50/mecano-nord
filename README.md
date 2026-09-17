@@ -271,23 +271,38 @@ Sans serveur, elle est simplement intégrée au fichier de données.
 ## Structure des fichiers
 
 ```
-index.html              page de facturation
+index.html              tableau de bord — la page d'accueil
+facturation.html        les devis
 admin.html              panneau administratif
+  … une page = un fichier HTML + un script
+
+config/site.js          navigation, chemins, version
+styles/                 tokens · base · components · layout
+components/ui.js        les briques d'interface
+scripts/                shell.js (le cadre) + pages/ (une par page)
+services/               données : catalogue, connexion, pointage, Discord…
+
 data/catalog.json       ← toutes les données du site (publié via l'admin)
+data/duty.json          le tableau de service
 assets/img/             tes propres visuels (PNG, SVG...)
-assets/css/             base.css · app.css · admin.css
-assets/js/
-  config.js             réglages de secours (rarement à toucher)
-  icons.js              bibliothèque d'icônes vectorielles
-  catalog.seed.js       copie de secours du catalogue (mode hors-ligne)
-  store.js              chargement / brouillon / calculs
-  auth.js               connexion pseudo + permissions
-  github.js             publication automatique
-  ui.js                 briques d'interface communes
-  app.js                page de facturation
-  admin.js              panneau admin
+
+v1/                     l'ancienne interface, gardée en état de marche
 .nojekyll               indispensable pour GitHub Pages
 ```
+
+### L'ancienne interface
+
+Le site a changé d'allure ; l'ancienne version n'a pas été jetée. Elle reste
+joignable en ajoutant `/v1/` à l'adresse — par exemple
+`…github.io/mecano-nord/v1/` — et travaille sur **les mêmes données** : mêmes
+employés, mêmes devis, même pointage. Ce n'est pas une copie figée, c'est le
+même atelier vu autrement.
+
+Elle est là au cas où : si quelque chose coince en pleine session, l'équipe a
+une adresse qui répond tout de suite.
+
+Pour qui veut modifier le code, l'intérieur est décrit dans
+[ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 

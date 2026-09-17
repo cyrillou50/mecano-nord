@@ -14,6 +14,10 @@
   min-height: 100vh;
 }
 
+/* Avant d'être entré, il n'y a qu'une carte : la grille à deux colonnes n'a
+   rien à ranger et la pousserait contre le bord. */
+.app--portail { display: block; }
+
 /* ---- Barre latérale ------------------------------------------------------ */
 
 .sidebar {

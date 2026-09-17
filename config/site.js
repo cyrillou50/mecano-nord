@@ -11,24 +11,24 @@ window.V2 = window.V2 || {};
 /* ---- Identité de la version --------------------------------------------- */
 
 V2.VERSION = {
-  numero: "2.0.0-beta.1",
-  /* Tant que ceci est vrai, le bandeau et la pastille « BÊTA » s'affichent.
-     Le jour du passage en production, une seule ligne à changer. */
-  beta: true,
-  /* La V2 écrit dans les mêmes données que la V1 : ce n'est pas un bac à
-     sable. On le dit à l'écran plutôt que de le laisser découvrir. */
-  donneesPartagees: true
+  numero: "2.0.0",
+  /* Le jour venu, une seule ligne a changé : le bandeau et la pastille
+     « BÊTA » ont disparu avec elle. */
+  beta: false,
+  /* Sans objet hors bêta : les deux versions ont toujours écrit dans les mêmes
+     données, mais il n'y a plus de « site officiel » distinct à côté. */
+  donneesPartagees: false
 };
 
 /* ---- Données --------------------------------------------------------------
-   La V2 vit dans un sous-dossier : le catalogue et les images restent ceux de
-   la V1, un cran au-dessus. C'est voulu — les deux versions parlent du même
-   atelier. */
+   Le site est à la racine : catalogue, pointage et images sont à côté de lui.
+   L'ancienne version, rangée dans /v1/, lit exactement les mêmes fichiers —
+   un seul catalogue, un seul tableau de service, les mêmes employés. */
 
 window.MN_CONFIG = window.MN_CONFIG || {};
-MN_CONFIG.catalogUrl = "../data/catalog.json";
-MN_CONFIG.dutyFile = "../data/duty.json";
-MN_CONFIG.imgDir = "../assets/img";
+MN_CONFIG.catalogUrl = "data/catalog.json";
+MN_CONFIG.dutyFile = "data/duty.json";
+MN_CONFIG.imgDir = "assets/img";
 
 /* ---- Navigation -----------------------------------------------------------
    Une seule source pour la barre latérale, le menu mobile et le fil d'Ariane.
