@@ -1909,6 +1909,16 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--c-action); outli
    Du texte suivi, à lire d'une traite : une largeur de lecture confortable et
    des paragraphes aérés valent mieux qu'une pleine page dense. */
 
+/* ---- La carte « où j'en suis » ---------------------------------------------
+   Un SVG sans largeur declaree s'etale jusqu'a remplir son conteneur. La
+   rangee generique n'en impose aucune — celle-ci le fait, a la taille du texte
+   qu'elle accompagne. */
+
+.moi__ligne > span {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+}
+.moi__ligne svg { width: 16px; height: 16px; flex: none; }
+
 /* ---- La recherche qui traverse tout ---------------------------------------
    Une liste courte et dense : on la parcourt à la flèche, pas à la souris, et
    elle ne doit jamais pousser la fenêtre plus bas que l'écran. */

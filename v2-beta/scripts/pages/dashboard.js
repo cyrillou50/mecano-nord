@@ -74,7 +74,7 @@
 
     /* Une jauge sans objectif ne mesure rien : on écrit alors la raison. */
     const heures =
-      '<div class="rang">' +
+      '<div class="rang moi__ligne">' +
         '<span>' + U.icone("horloge") + " Cette semaine</span>" +
         '<b class="pousse nombre">' + U.esc(MNDuty.dur(e.secondes, true)) + "</b>" +
       "</div>" +
@@ -88,7 +88,7 @@
           "</p>");
 
     const dossier = averts.length
-      ? '<div class="rang" style="margin-top:var(--e-3)">' +
+      ? '<div class="rang moi__ligne" style="margin-top:var(--e-3)">' +
           "<span>" + U.icone("alerte") + " À mon dossier</span>" +
           '<b class="pousse nombre">' + averts.length + "</b>" +
         "</div>" +
