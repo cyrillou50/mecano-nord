@@ -84,12 +84,29 @@ window.MNWebhook = (function () {
    */
   const has = kind => !!relayUrl() || isValid(conf()[salon(kind)]);
 
-  /** Chemin relatif → adresse absolue, indispensable pour l'avatar Discord. */
+  /**
+   * Chemin du catalogue → adresse absolue, indispensable pour l'avatar Discord :
+   * il va chercher l'image depuis ses serveurs, pas depuis le navigateur.
+   */
   function absUrl(u) {
     const s = String(u || "").trim();
     if (!s) return "";
     if (/^https?:\/\//i.test(s)) return s;
-    return location.origin + location.pathname.replace(/[^/]*$/, "") + s.replace(/^\.?\//, "");
+
+    /* Image hébergée par le serveur de l'atelier : il en donne déjà l'adresse
+       complète. Sans serveur, rien — mieux qu'une adresse morte. */
+    if (s.indexOf("srv:") === 0) {
+      try { return MNStore.imageUrl(s.slice(4)) || ""; } catch (_) { return ""; }
+    }
+
+    /* Fichier livré avec le site. Le chemin part de la racine ; une version
+       qui vit dans un sous-dossier doit remonter d'un cran, et seule une
+       vraie résolution d'URL sait le faire. */
+    const m = s.match(/(?:^|\/)assets\/img\/([\w.-]+)$/);
+    const dossier = (window.MN_CONFIG && MN_CONFIG.imgDir) || "assets/img";
+    const rel = m ? dossier + "/" + m[1] : s.replace(/^\.?\//, "");
+    try { return new URL(rel, document.baseURI).href; }
+    catch (_) { return location.origin + location.pathname.replace(/[^/]*$/, "") + rel; }
   }
 
   const COLORS = {
