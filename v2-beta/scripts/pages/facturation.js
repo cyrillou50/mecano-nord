@@ -202,6 +202,21 @@
     return out;
   }
 
+  /* La porte de sortie d'un écran vide. Le champ de recherche vit dans la
+     barre du haut, pas dans la zone qu'on vient de redessiner : on le vide
+     lui, puis on repeint. */
+  function brancherSortie(zone) {
+    const b = zone.querySelector('[data-a="vider-q"]');
+    if (!b) return;
+    b.addEventListener("click", () => {
+      recherche = "";
+      const q = $("#f-q");
+      if (q) q.value = "";
+      hote.querySelectorAll(".onglets").forEach(o => o.classList.remove("is-eteint"));
+      dessinerCatalogue();
+    });
+  }
+
   function brancherBarre() {
     const q = $("#f-q");
     q.addEventListener("input", () => {
@@ -250,8 +265,11 @@
       zone.innerHTML = l.length
         ? grille(l)
         : U.vide({ icone: "recherche", titre: "Aucun objet",
-                   texte: "Rien ne correspond à « " + recherche + " »." });
-      return brancherCartes(zone);
+                   texte: "Rien ne correspond à « " + recherche + " ».",
+                   action: U.bouton("Effacer la recherche",
+                     { variante: "doux", taille: "sm", action: "vider-q" }) });
+      brancherCartes(zone);
+      return brancherSortie(zone);
     }
 
     const secs = sections();

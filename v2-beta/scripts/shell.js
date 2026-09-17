@@ -682,7 +682,10 @@ window.V2Shell = (function () {
                                  titre: "Supprimer", action: "rm-" + b.ref }) }],
             l)
         : U2.vide({ icone: "recu", titre: "Aucun bon enregistré",
-                    texte: "Les bons que tu enregistres apparaîtront ici." }),
+                    texte: "Les bons que tu enregistres apparaîtront ici.",
+                    action: _page === "facturation" ? "" :
+                      U2.bouton("Aller à la facturation",
+                        { href: "facturation.html", variante: "doux", taille: "sm" }) }),
       actions: [{ label: "Fermer", onClick: f => f() }]
     });
 

@@ -134,7 +134,15 @@
 
     if (!gs.length) {
       z.innerHTML = U.vide({ icone: "recherche", titre: "Rien ne correspond",
-                             texte: "Aucune émote ne contient « " + filtre + " »." });
+                             texte: "Aucune émote ne contient « " + filtre + " ».",
+                             action: U.bouton("Effacer la recherche",
+                               { variante: "doux", taille: "sm", action: "vider-q" }) });
+      z.querySelector('[data-a="vider-q"]').addEventListener("click", () => {
+        filtre = "";
+        const q = $("#em-q");
+        if (q) q.value = "";
+        dessinerListe();
+      });
       return;
     }
 

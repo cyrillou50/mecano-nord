@@ -162,7 +162,10 @@
       '<div class="duo__corps">' +
         (l.length
           ? l.map(ligne).join("")
-          : '<p class="champ__aide" style="padding:var(--e-3)">Aucun véhicule ne correspond.</p>') +
+          : U.vide({ icone: "recherche", titre: "Aucun véhicule",
+                     texte: "Aucun véhicule ne correspond aux filtres posés.",
+                     action: U.bouton("Effacer les filtres",
+                       { variante: "doux", taille: "sm", action: "vider-f" }) })) +
       "</div>" +
 
       '<div class="duo__pied">' +
@@ -198,6 +201,12 @@
   }
 
   function brancherListe() {
+    const vf = $("#v-liste").querySelector('[data-a="vider-f"]');
+    if (vf) vf.addEventListener("click", () => {
+      q = ""; fCarb = ""; fCat = ""; fEtoile = ""; fPlaces = ""; fCoffre = "";
+      dessinerListe();
+    });
+
     const champ = $("#v-q");
     champ.addEventListener("input", () => {
       q = champ.value;

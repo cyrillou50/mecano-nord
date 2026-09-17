@@ -548,13 +548,16 @@
                 x.items.map(it => ligneObjet(it, x.s, x.items)).join(""))).join(""));
           }).join("")
         : U.vide({ icone: "boite", titre: "Aucun objet",
-                   texte: "Clique sur « Nouvel objet » pour commencer." }));
+                   texte: "Les objets sont ce qu'on facture : pièces, prestations, forfaits.",
+                   action: U.bouton("Nouvel objet",
+                     { variante: "principal", icone: "plus", action: "add" }) }));
 
     barreAteliers(z, vueObjets,
       id => brouillon.items.filter(x => MNStore.estDeAtelier(x, id)).length);
 
     brancherRecherche(z, "#a-cherche", () => vueObjets(z));
-    z.querySelector('[data-a="add"]').addEventListener("click", () => editerObjet(null));
+    z.querySelectorAll('[data-a="add"]').forEach(b =>
+      b.addEventListener("click", () => editerObjet(null)));
 
     const tp = z.querySelector('[data-a="plier-tout"]');
     if (tp) tp.addEventListener("click", () => {
@@ -1109,9 +1112,12 @@
           }).join("") + "</div>"
         : U.vide({ icone: "ressource", titre: "Aucune ressource",
                    texte: "Crée d'abord tes matières premières (plastique, métal…), " +
-                          "tu pourras ensuite les affecter aux objets." }));
+                          "tu pourras ensuite les affecter aux objets.",
+                   action: U.bouton("Nouvelle ressource",
+                     { variante: "principal", icone: "plus", action: "add" }) }));
 
-    z.querySelector('[data-a="add"]').addEventListener("click", () => editerRes(null));
+    z.querySelectorAll('[data-a="add"]').forEach(b =>
+      b.addEventListener("click", () => editerRes(null)));
     brancherLignes(z, brouillon.resources, {
       edit: r => editerRes(r), del: r => supprimerRes(r)
     });
@@ -1183,7 +1189,9 @@
               "</div></div>").join("") + "</div>"
         : U.vide({ icone: "contrat", titre: "Aucun type",
                    texte: "Réparation, Convoi, Fourniture… Ils servent à ranger " +
-                          "et à filtrer les contrats." })) +
+                          "et à filtrer les contrats.",
+                   action: U.bouton("Nouveau type",
+                     { variante: "principal", icone: "plus", action: "add" }) })) +
       '<p class="champ__aide" style="margin-top:var(--e-4)">La durée proposée remplit la ' +
         "date d'expiration à la création d'un contrat de ce type. Elle reste modifiable, " +
         "et <b>0</b> ne propose rien.</p>";
@@ -1191,7 +1199,8 @@
     barreAteliers(z, vueCtypes,
       id => (brouillon.contractTypes || []).filter(x => MNStore.estDeAtelier(x, id)).length);
 
-    z.querySelector('[data-a="add"]').addEventListener("click", () => editerCtype(null));
+    z.querySelectorAll('[data-a="add"]').forEach(b =>
+      b.addEventListener("click", () => editerCtype(null)));
     brancherLignes(z, brouillon.contractTypes || [], {
       edit: t => editerCtype(t), del: t => supprimerCtype(t)
     }, dIci(brouillon.contractTypes || []));
@@ -1269,7 +1278,9 @@
         return (vivants.length
           ? '<div class="pile pile--sm">' + vivants.map(ligneUser).join("") + "</div>"
           : U.vide({ icone: "equipe", titre: "Aucun employé",
-                     texte: "Ajoute les noms de ton équipe pour qu'ils puissent se connecter." })) +
+                     texte: "Ajoute les noms de ton équipe pour qu'ils puissent se connecter.",
+                     action: U.bouton("Nouvel employé",
+                       { variante: "principal", icone: "plus", action: "add" }) })) +
         '<div style="margin-top:var(--e-4)">' + U.alerte({
           ton: "info",
           texte: "Le nom est la seule chose à retenir. Le code d'accès est facultatif : " +
@@ -1286,7 +1297,8 @@
     barreAteliers(z, vueUsers, id => brouillon.users.filter(
       x => !MNStore.estArchive(x) && MNStore.estDeAtelier(x, id)).length);
 
-    z.querySelector('[data-a="add"]').addEventListener("click", () => editerUser(null));
+    z.querySelectorAll('[data-a="add"]').forEach(b =>
+      b.addEventListener("click", () => editerUser(null)));
     brancherLignes(z, brouillon.users, {
       edit: u => editerUser(u),
       del: u => supprimerUser(u),

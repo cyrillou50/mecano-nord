@@ -119,6 +119,9 @@
       if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
     });
 
+    const vq = hote.querySelector('[data-a="vider-q"]');
+    if (vq) vq.addEventListener("click", () => { filtre = ""; dessiner(); });
+
     const add = hote.querySelector('[data-a="add"]');
     if (add) add.addEventListener("click", () => editer(null));
 
@@ -134,7 +137,11 @@
         ? l.map(carte).join("")
         : U.vide({ icone: "recherche",
                    titre: filtre ? "Rien ne correspond" : "Personne n'est inscrit",
-                   texte: filtre ? "Aucune inscription ne contient « " + filtre + " »." : "" })) +
+                   texte: filtre ? "Aucune inscription ne contient « " + filtre + " »." : "",
+                   action: filtre
+                     ? U.bouton("Effacer la recherche",
+                         { variante: "doux", taille: "sm", action: "vider-q" })
+                     : "" })) +
 
       (lev.length
         ? '<div class="pile pile--sm">' +
