@@ -72,6 +72,17 @@ window.MN_ICON_GROUPS = {
 /* Rendu d'une icône.
    `id` accepte :  un identifiant du jeu ci-dessus  |  « srv:nom.png », image
    hébergée par le serveur de l'atelier  |  une URL d'image  |  un emoji. */
+/* Un fichier livré avec le site : le chemin gardé dans le catalogue part de la
+   racine, et une version qui vit dans un sous-dossier ne le trouverait pas tel
+   quel. On le refait depuis le dossier que la version déclare. Même règle que
+   pour les photos de fiche, côté magasin. */
+function fichierDuDepot(chemin) {
+  const m = String(chemin).match(/(?:^|\/)assets\/img\/([\w.-]+)$/);
+  if (!m) return chemin;
+  const dossier = (window.MN_CONFIG && MN_CONFIG.imgDir) || "assets/img";
+  return dossier + "/" + m[1];
+}
+
 window.mnIcon = function (id, cls) {
   const klass = cls ? ' class="' + cls + '"' : "";
   const open = '<svg' + klass + ' viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
@@ -91,7 +102,7 @@ window.mnIcon = function (id, cls) {
   }
 
   if (/^(https?:\/\/|\.{0,2}\/|data:image)/i.test(id) || /\.(png|jpe?g|webp|gif|svg|avif)$/i.test(id)) {
-    return img(id);
+    return img(fichierDuDepot(id));
   }
 
   const txt = String(id).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
