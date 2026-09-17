@@ -192,7 +192,7 @@
         MNDuty.dur(MNDuty.secondsFor(moi.uid, Date.now() - 7 * 86400000), true));
       maj('[data-mien="tot"]', MNDuty.dur(MNDuty.secondsFor(moi.uid), true));
       const g = document.querySelector('[data-mien="jauge"]');
-      if (g) g.innerHTML = jauge(sem);
+      if (g) g.innerHTML = jauge();
     }, 30000);
   }
 
@@ -358,41 +358,21 @@
     { hour: "2-digit", minute: "2-digit" });
 
   /**
-   * Ai-je posé des congés sur cette semaine ? On regarde la semaine entière,
-   * pas seulement les jours passés : des congés prévus pour vendredi comptent
-   * déjà le lundi, exactement comme dans le récapitulatif du dimanche.
+   * Où j'en suis des heures attendues cette semaine.
+   *
+   * Le raisonnement — congés posés, arrivée en cours de semaine, dispense —
+   * vit dans MNDuty : le tableau de bord le lit aussi, et les deux doivent
+   * dire la même chose.
    */
-  function congesCetteSemaine() {
-    const lundi = MNDuty.weekStart();
-    const a = MNDuty.jourLocal(new Date(lundi));
-    const b = MNDuty.jourLocal(new Date(lundi + 6 * 86400000));
-    return MNDuty.congesOf(moi.uid, true).some(c => c.from <= b && c.to >= a);
-  }
-
-  /** Où j'en suis des heures attendues cette semaine. */
-  function jauge(sec) {
-    const objectif = objectifIci();
-    if (!objectif) return "";
-    /* Exempté : aucun minimum ne lui est demandé, il n'y a donc pas de reste
-       à faire à afficher. */
-    if (MNDuty.sansMinimum(moi.uid)) return U.esc("aucun minimum hebdomadaire attendu");
-    /* Une première semaine n'est pas une semaine entière : on ne réclame pas
-       à quelqu'un les jours d'avant son arrivée. */
-    if (MNDuty.premiereSemaine(moi.uid)) {
-      return U.esc("arrivé cette semaine — aucun minimum attendu");
-    }
-    /* Un congé posé n'est pas un manquement : on ne réclame pas des heures à
-       quelqu'un qui avait prévu de ne pas être là, et le récapitulatif du
-       dimanche ne le signalera pas non plus. */
-    if (congesCetteSemaine()) return U.esc("congés cette semaine — aucun minimum attendu");
-    const but = objectif * 3600;
-    const fait = sec >= but;
-    return '<span class="jauge' + (fait ? " est-fait" : "") + '">' +
-        '<span class="jauge__p" style="width:' +
-          Math.min(100, Math.round((sec / but) * 100)) + '%"></span></span>' +
-      U.esc(fait
-        ? "objectif de " + objectif + " h atteint"
-        : "encore " + MNDuty.dur(but - sec, true) + " avant " + objectif + " h");
+  function jauge() {
+    const e = MNDuty.etatSemaine(moi.uid, objectifIci());
+    if (!e.objectif) return "";
+    if (e.exempt) return U.esc(e.raison);
+    return '<span class="jauge' + (e.fait ? " est-fait" : "") + '">' +
+        '<span class="jauge__p" style="width:' + e.part + '%"></span></span>' +
+      U.esc(e.fait
+        ? "objectif de " + e.objectif + " h atteint"
+        : "encore " + MNDuty.dur(e.reste, true) + " avant " + e.objectif + " h");
   }
 
   function monTemps(z) {
@@ -411,7 +391,7 @@
         '<span class="tuile__label">' + U.icone("horloge") + "Cette semaine</span>" +
         '<span class="tuile__val nombre" data-mien="sem">' +
           U.esc(MNDuty.dur(sem, true)) + "</span>" +
-        '<span class="tuile__pied" data-mien="jauge">' + jauge(sem) + "</span>" +
+        '<span class="tuile__pied" data-mien="jauge">' + jauge() + "</span>" +
       "</div>";
 
     z.innerHTML =

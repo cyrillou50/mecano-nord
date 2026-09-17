@@ -27,6 +27,7 @@
 
       hote.innerHTML =
         salutation(session) +
+        moi(session) +
         chiffres() +
         '<div class="cols-2" style="margin-top:var(--e-4)">' +
           enService() +
@@ -58,6 +59,52 @@
 
   const dateLongue = () => new Date().toLocaleDateString("fr-FR",
     { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  /* ---- Moi -----------------------------------------------------------------
+     Le reste de la page dit où en est l'atelier. Celle-ci dit où j'en suis,
+     moi — la question qu'on se pose vraiment en arrivant le matin.
+
+     Le verdict sur les heures vient de MNDuty, pas d'ici : la page Service
+     affiche la même jauge, et deux calculs finiraient par dire deux choses. */
+
+  function moi(s) {
+    const e = MNDuty.etatSemaine(s.uid, MNStore.minimumPour(s.uid, MNAuth.atelier()));
+    const enService = !!MNDuty.entryOf(s.uid);
+    const averts = ((s.user && s.user.avertissements) || []).filter(MNStore.avertActif);
+
+    /* Une jauge sans objectif ne mesure rien : on écrit alors la raison. */
+    const heures =
+      '<div class="rang">' +
+        '<span>' + U.icone("horloge") + " Cette semaine</span>" +
+        '<b class="pousse nombre">' + U.esc(MNDuty.dur(e.secondes, true)) + "</b>" +
+      "</div>" +
+      (e.exempt
+        ? '<p class="champ__aide">' + U.esc(e.raison) + "</p>"
+        : '<span class="jauge' + (e.fait ? " est-fait" : "") + '">' +
+            '<span class="jauge__p" style="width:' + e.part + '%"></span></span>' +
+          '<p class="champ__aide">' + U.esc(e.fait
+            ? "objectif de " + e.objectif + " h atteint"
+            : "encore " + MNDuty.dur(e.reste, true) + " avant " + e.objectif + " h") +
+          "</p>");
+
+    const dossier = averts.length
+      ? '<div class="rang" style="margin-top:var(--e-3)">' +
+          "<span>" + U.icone("alerte") + " À mon dossier</span>" +
+          '<b class="pousse nombre">' + averts.length + "</b>" +
+        "</div>" +
+        '<p class="champ__aide">' + U.esc(averts.length > 1
+          ? "avertissements en cours"
+          : "avertissement en cours") + "</p>"
+      : "";
+
+    return '<div style="margin-bottom:var(--e-4)">' + U.carte({
+      titre: enService ? "Tu es en service" : "Où j'en suis",
+      actions: U.bouton(enService ? "Mon service" : "Pointer",
+        { href: "service.html", variante: enService ? "fantome" : "principal",
+          taille: "sm", icone: "horloge" }),
+      corps: heures + dossier
+    }) + "</div>";
+  }
 
   /** Les quatre chiffres qui disent l'état de l'atelier en un coup d'œil. */
   function chiffres() {

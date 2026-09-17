@@ -789,6 +789,52 @@ window.MNDuty = (function () {
     }
   }
 
+  /** Des congés posés sur la semaine en cours, déjà passés ou encore à venir. */
+  function congesSurLaSemaine(uid) {
+    const lundi = weekStart();
+    const a = jourLocal(new Date(lundi));
+    const b = jourLocal(new Date(lundi + 6 * 86400000));
+    return congesOf(uid, true).some(c => c.from <= b && c.to >= a);
+  }
+
+  /**
+   * Où en est quelqu'un de ses heures sur la semaine en cours.
+   *
+   * Une seule règle pour deux affichages — la jauge de la page Service et le
+   * tableau de bord doivent dire la même chose, sans quoi on lirait deux
+   * verdicts pour une seule question. Les trois exemptions sont celles que le
+   * récapitulatif du dimanche applique aussi : on ne reproche pas des heures à
+   * qui avait prévu de ne pas être là, à qui vient d'arriver, ni à qui en est
+   * dispensé.
+   *
+   * @param {string} uid
+   * @param {number} objectif heures attendues sur la semaine
+   * @returns {{secondes:number, but:number, objectif:number, exempt:boolean,
+   *            raison:string, fait:boolean, reste:number, part:number}}
+   */
+  function etatSemaine(uid, objectif) {
+    const secondes = secondsFor(uid, weekStart());
+    const heures = Number(objectif) || 0;
+    const but = heures * 3600;
+
+    const exempte = raison => ({
+      secondes, but, objectif: heures, exempt: true, raison,
+      fait: true, reste: 0, part: 100
+    });
+
+    if (!heures) return exempte("aucun minimum hebdomadaire réglé");
+    if (sansMinimum(uid)) return exempte("aucun minimum hebdomadaire attendu");
+    if (premiereSemaine(uid)) return exempte("arrivé cette semaine — aucun minimum attendu");
+    if (congesSurLaSemaine(uid)) return exempte("congés cette semaine — aucun minimum attendu");
+
+    return {
+      secondes, but, objectif: heures, exempt: false, raison: "",
+      fait: secondes >= but,
+      reste: Math.max(0, but - secondes),
+      part: Math.min(100, Math.round((secondes / but) * 100))
+    };
+  }
+
   /** Secondes cumulées par employé sur les N derniers jours. */
   function totals(days) {
     const since = Date.now() - (days || 7) * 86400000;
@@ -836,6 +882,7 @@ window.MNDuty = (function () {
     conges, congesOf, congeOf, congeById, enConge, chevauche,
     setConge, clearConge, jourLocal, nbJours,
     logOf, secondsFor, weekStart, sansMinimum, premiereSemaine,
+    congesSurLaSemaine, etatSemaine,
     totals, dur, sinceDur, secBetween, minutesBetween
   };
 })();
