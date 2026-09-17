@@ -409,7 +409,7 @@
       titre: "« " + (o.nom || "Cet onglet") + " » n'est pas encore repris",
       texte: "La V2 se construit onglet par onglet. Celui-ci fonctionne " +
              "normalement sur le site officiel.",
-      action: U.bouton("Ouvrir dans la V1", { href: "../admin.html", variante: "doux",
+      action: U.bouton("Ouvrir dans l'ancienne version", { href: "v1/admin.html", variante: "doux",
                                               icone: "fleche" })
     });
   }

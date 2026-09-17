@@ -100,15 +100,18 @@ window.V2Shell = (function () {
     "</button>";
   }
 
+  /* Éteint depuis le passage en production. On garde le mécanisme : la
+     prochaine version d'essai se rallume en basculant « beta » dans site.js,
+     et c'était tout l'intérêt de cette ligne. */
+
   function bandeauBeta() {
     if (!V2.VERSION.beta) return "";
     return '<div class="betabar" role="status">' +
-      '<span class="betapuce">V2 bêta</span>' +
+      '<span class="betapuce">Version d\'essai</span>' +
       (V2.VERSION.donneesPartagees
         ? "<b>Attention</b><span>cette version écrit dans les <b>vraies données</b> de " +
-          "l'atelier : ce que tu crées ici apparaît aussi sur le site officiel.</span>"
+          "l'atelier : ce que tu crées ici compte pour de bon.</span>"
         : "<span>Version d'essai.</span>") +
-      '<a class="pousse" href="../index.html">Revenir au site officiel</a>' +
     "</div>";
   }
 
@@ -172,7 +175,7 @@ window.V2Shell = (function () {
     if (moi) moi.addEventListener("click", e => {
       e.stopPropagation();
       U().menu(moi, [
-        { nom: "Site officiel (V1)", icone: "fleche", onClick: () => { location.href = "../index.html"; } },
+        { nom: "Ancienne version", icone: "fleche", onClick: () => { location.href = "v1/index.html"; } },
         { separateur: true },
         { nom: "Se déconnecter", icone: "sortie", onClick: deconnexion }
       ]);
@@ -491,10 +494,10 @@ window.V2Shell = (function () {
   async function deconnexion() {
     const ok = await U().confirmer({
       titre: "Se déconnecter",
-      message: "Tu reviendras à l'écran de connexion du site officiel.",
+      message: "Tu reviendras à l'écran de connexion.",
       confirmer: "Se déconnecter"
     });
-    if (ok) { MNAuth.logout(); location.href = "../index.html"; }
+    if (ok) { MNAuth.logout(); location.href = "index.html"; }
   }
 
   /* ---- Tiroir mobile -------------------------------------------------------------- */

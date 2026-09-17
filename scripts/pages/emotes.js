@@ -308,7 +308,7 @@
             '<span class="ad-ico" id="e-img-prev">' +
               mnIcon((e && e.image) || "etoile") + "</span>" +
             '<input class="saisie" id="e-img" maxlength="300" style="flex:1" value="' +
-              U.esc(e ? e.image : "") + '" placeholder="../assets/img/souder.png">' +
+              U.esc(e ? e.image : "") + '" placeholder="assets/img/souder.png">' +
             U.bouton("Choisir", { taille: "sm", action: "img-pick" }) +
           "</div>" +
           '<p class="champ__aide">Facultatif. Une capture du geste se reconnaît ' +
