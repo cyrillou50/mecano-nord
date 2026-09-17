@@ -1909,6 +1909,34 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--c-action); outli
    Du texte suivi, à lire d'une traite : une largeur de lecture confortable et
    des paragraphes aérés valent mieux qu'une pleine page dense. */
 
+/* ---- La recherche qui traverse tout ---------------------------------------
+   Une liste courte et dense : on la parcourt à la flèche, pas à la souris, et
+   elle ne doit jamais pousser la fenêtre plus bas que l'écran. */
+
+.pal {
+  margin-top: var(--e-3);
+  max-height: 46vh;
+  overflow: auto;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.pal__r {
+  display: flex; align-items: center; gap: var(--e-3);
+  width: 100%;
+  padding: var(--e-2) var(--e-3);
+  border: 0; border-radius: var(--r-2);
+  background: none; color: var(--c-second);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.pal__r svg { width: 17px; height: 17px; flex: none; }
+.pal__r:hover { background: rgba(255, 255, 255, .05); color: var(--c-texte); }
+.pal__r.is-actif { background: var(--c-action-fond); color: var(--c-action-doux); }
+.pal__nom { flex: 1; min-width: 0; }
+.pal__genre {
+  flex: none;
+  font-size: var(--t-xs);
+  color: var(--c-faible);
+}
+
 .livret { font-size: var(--t-md); line-height: 1.75; }
 .livret p { margin: 0 0 var(--e-3); }
 .livret p:last-child { margin-bottom: 0; }

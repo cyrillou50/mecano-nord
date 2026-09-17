@@ -48,6 +48,8 @@
       if (!V2Shell.peut("bt", "admin")) return V2Shell.refuser(hote, "la facturation");
 
       panier = MNStore.getCart();
+      /* Le terme vient de la recherche globale, s'il y en avait une. */
+      recherche = V2Shell.motCherche();
       cat = localStorage.getItem(K_CAT) || "";
       sous = localStorage.getItem(K_SOUS) || "";
 

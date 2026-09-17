@@ -27,6 +27,7 @@
     page: "vehicules",
     titre: "Véhicules",
     pret: async function (session, h) {
+      q = V2Shell.motCherche() || q;
       hote = h; moi = session;
       peutEcrire = V2Shell.peut("vehicles", "admin");
       peutValider = V2Shell.peut("vehicles_validate", "vehicles", "admin");

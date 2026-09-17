@@ -133,6 +133,11 @@ window.V2Shell = (function () {
           '<div class="rang pousse" id="v2-actions"></div>' +
           boutonAtelier() +
           '<div id="v2-avert"></div>' +
+          U().bouton("", { icone: "recherche", variante: "fantome",
+                           titre: "Rechercher (Ctrl+K)", action: "chercher" }) +
+          (_page === "livret" ? ""
+            : U().bouton("", { icone: "info", variante: "fantome",
+                               titre: "Le livret", action: "aide" })) +
           (MNTheme.libre()
             ? U().bouton("", { icone: "palette", variante: "fantome", titre: "Apparence",
                                action: "theme" })
@@ -153,6 +158,12 @@ window.V2Shell = (function () {
       b.addEventListener("click", () => {
         if (MNAuth.setAtelier(b.dataset.vers)) location.reload();
       }));
+
+    const ch = app.querySelector('[data-a="chercher"]');
+    if (ch) ch.addEventListener("click", palette);
+
+    const ai = app.querySelector('[data-a="aide"]');
+    if (ai) ai.addEventListener("click", aide);
 
     const th = app.querySelector('[data-a="theme"]');
     if (th) th.addEventListener("click", choisirTheme);
@@ -716,6 +727,278 @@ window.V2Shell = (function () {
     if (b) { e.preventDefault(); historique(); }
   });
 
+  /* ---- Le livret, sans quitter sa page ---------------------------------------
+     Deux services ne servent qu'à l'afficher : la mise en forme du texte riche
+     et les polices déposées. Les charger sur chaque page ferait payer à toutes
+     ce dont une seule se sert — on ne va les chercher qu'au premier clic.
+
+     Les chemins sont relatifs à la page, et toutes les pages de la V2 vivent
+     dans le même dossier : ils valent donc partout. */
+
+  const SERVICES_LIVRET = ["services/polices.js", "services/texte.js"];
+  let _livretEnRoute = null;
+
+  function chargerServicesLivret() {
+    if (window.MNTexte && window.MNPolices) return Promise.resolve();
+    if (_livretEnRoute) return _livretEnRoute;
+    _livretEnRoute = Promise.all(SERVICES_LIVRET.map(src => new Promise((ok, non) => {
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = ok;
+      s.onerror = () => non(new Error("« " + src + " » n'a pas pu être chargé."));
+      document.head.appendChild(s);
+    })));
+    /* Un échec ne doit pas condamner les clics suivants : le réseau peut
+       revenir. */
+    _livretEnRoute.catch(() => { _livretEnRoute = null; });
+    return _livretEnRoute;
+  }
+
+  async function aide() {
+    const U2 = U();
+    const peutEcrire = MNAuth.canAny("admin", "items");
+
+    const m = U2.modale({
+      titre: "Le livret", large: true,
+      corps: '<p class="champ__aide">Un instant…</p>',
+      actions: [
+        { label: "Ouvrir la page", onClick: f => { f(); location.href = "livret.html"; } },
+        { label: "Fermer", variante: "principal", icone: "check", onClick: f => f() }
+      ]
+    });
+
+    try {
+      await chargerServicesLivret();
+    } catch (e) {
+      /* La fenêtre a pu être refermée pendant le chargement. */
+      if (!m.corps.isConnected) return;
+      m.corps.innerHTML = U2.alerte({
+        ton: "erreur", titre: "Le livret n'a pas pu s'ouvrir",
+        texte: String((e && e.message) || e)
+      });
+      return;
+    }
+    if (!m.corps.isConnected) return;
+
+    /* Les polices déposées : sans elles, un livret écrit avec l'une d'elles
+       s'afficherait dans celle du site, sans qu'on comprenne pourquoi. */
+    try { MNPolices.charger().catch(() => { /* le livret se lit quand même */ }); }
+    catch (_) { /* idem */ }
+
+    const texte = MNStore.livretDe(MNAuth.atelier()).trim();
+    m.corps.innerHTML = texte
+      ? '<div class="livret">' + MNTexte.pourAffichage(texte) + "</div>"
+      : U2.vide({
+          icone: "contrat",
+          titre: "Le livret n'a pas encore été écrit",
+          texte: peutEcrire
+            ? "C'est là qu'on note les tarifs et les marches à suivre."
+            : "Un responsable doit s'en charger.",
+          action: peutEcrire
+            ? U2.bouton("L'écrire", { href: "admin.html", variante: "doux", taille: "sm" })
+            : ""
+        });
+  }
+
+  /* ---- Aller droit au but ------------------------------------------------------
+     La recherche globale mène à une page ET lui passe ce qu'on cherchait : sans
+     quoi elle ouvrirait « Véhicules » et laisserait chercher à la main, ce qui
+     ne fait gagner qu'un clic.
+
+     Le terme voyage dans l'adresse, et la page l'efface en le lisant : un
+     rafraîchissement ne doit pas refiltrer ce qu'on avait fini par élargir. */
+
+  function motCherche() {
+    let mot = "";
+    try {
+      mot = new URLSearchParams(location.search).get("q") || "";
+    } catch (_) { return ""; }
+    if (!mot) return "";
+    try {
+      history.replaceState(null, "", location.pathname + location.hash);
+    } catch (_) { /* sans historique, tant pis : le terme restera dans l'adresse */ }
+    return mot;
+  }
+
+  /* ---- La recherche qui traverse tout ------------------------------------------ */
+
+  const sansAccent = s => String(s || "").toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  /** Tout ce qu'on sait chercher, sans charger quoi que ce soit de plus. */
+  function gisements() {
+    const g = [];
+
+    navVisible().forEach(grp => grp.entrees.forEach(e => {
+      if (e.fenetre) return;   /* une fenêtre n'est pas un endroit où aller */
+      g.push({ genre: "Page", nom: e.nom, icone: e.icone, href: e.href });
+    }));
+
+    try {
+      MNStore.catalog().items
+        .filter(i => i.enabled && MNStore.estDeAtelier(i, MNAuth.atelier()))
+        .forEach(i => g.push({
+          genre: "Objet", nom: i.name, icone: "boite",
+          href: "facturation.html?q=" + encodeURIComponent(i.name)
+        }));
+    } catch (_) { /* catalogue illisible : on cherchera ailleurs */ }
+
+    if (MNAuth.canAny("equipe", "admin")) {
+      try {
+        MNStore.usersDeAtelier(MNAuth.atelier()).forEach(u => g.push({
+          genre: "Employé", nom: u.pseudo, icone: "equipe",
+          href: "equipe.html?q=" + encodeURIComponent(u.pseudo)
+        }));
+      } catch (_) { /* équipe illisible */ }
+    }
+
+    try {
+      (MNParc.parc().vehicles || []).forEach(v => g.push({
+        genre: "Véhicule", nom: v.name, icone: "vehicule",
+        href: "vehicules.html?q=" + encodeURIComponent(v.name)
+      }));
+    } catch (_) { /* parc pas encore chargé */ }
+
+    return g;
+  }
+
+  /**
+   * Les meilleures réponses à ce qu'on tape.
+   *
+   * Ce qui commence par le terme passe devant ce qui le contient : taper
+   * « pei » doit proposer « Peinture » avant « Kit de peinture ». À rang égal,
+   * les pages d'abord — on tape rarement trois lettres pour tomber sur un objet
+   * quand une page porte le même nom.
+   */
+  function trouver(mot, tout) {
+    const q = sansAccent(mot).trim();
+    if (!q) return tout.filter(x => x.genre === "Page").slice(0, 8);
+
+    const RANG = { Page: 0, Objet: 1, "Employé": 2, "Véhicule": 3 };
+    return tout
+      .map(x => {
+        const n = sansAccent(x.nom);
+        const p = n.indexOf(q);
+        if (p === -1) return null;
+        return { x, score: (p === 0 ? 0 : 1000) + p * 10 + (RANG[x.genre] || 9) };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.score - b.score || a.x.nom.localeCompare(b.x.nom))
+      .slice(0, 12)
+      .map(r => r.x);
+  }
+
+  let _paletteOuverte = false;
+
+  function palette() {
+    if (_paletteOuverte) return;
+    _paletteOuverte = true;
+
+    const U2 = U();
+    let tout = gisements();
+    let choix = 0, liste = trouver("", tout);
+
+    const corps = document.createElement("div");
+    corps.innerHTML =
+      '<input class="saisie" id="pal-q" autocomplete="off" ' +
+        'placeholder="Une page, un objet, quelqu\'un, un véhicule…">' +
+      '<div class="pal" id="pal-l"></div>' +
+      '<p class="champ__aide" style="margin-top:var(--e-3)">' +
+        "↑ ↓ pour choisir, Entrée pour ouvrir, Échap pour fermer.</p>";
+
+    const m = U2.modale({
+      titre: "Rechercher", corps,
+      actions: [{ label: "Fermer", onClick: f => f() }]
+    });
+
+    /* La modale se referme par la croix, le voile ou Échap : sans ça, la
+       palette se croirait ouverte pour toujours et le raccourci ne
+       répondrait plus. */
+    const obs = new MutationObserver(() => {
+      if (!document.body.contains(m.element)) { obs.disconnect(); _paletteOuverte = false; }
+    });
+    obs.observe(document.body, { childList: true });
+
+    const zone = corps.querySelector("#pal-l");
+    const champ = corps.querySelector("#pal-q");
+
+    function peindre() {
+      zone.innerHTML = liste.length
+        ? liste.map((x, i) =>
+            '<button type="button" class="pal__r' + (i === choix ? " is-actif" : "") +
+              '" data-i="' + i + '">' +
+              U2.icone(x.icone) +
+              '<span class="pal__nom tronque">' + esc(x.nom) + "</span>" +
+              '<span class="pal__genre">' + esc(x.genre) + "</span>" +
+            "</button>").join("")
+        : '<p class="champ__aide" style="padding:var(--e-3)">Rien ne correspond.</p>';
+
+      zone.querySelectorAll("[data-i]").forEach(b =>
+        b.addEventListener("click", () => ouvrir(Number(b.dataset.i))));
+
+      const actif = zone.querySelector(".is-actif");
+      if (actif && actif.scrollIntoView) actif.scrollIntoView({ block: "nearest" });
+    }
+
+    function ouvrir(i) {
+      const x = liste[i];
+      if (!x) return;
+      m.fermer();
+      location.href = x.href;
+    }
+
+    champ.addEventListener("input", () => {
+      liste = trouver(champ.value, tout);
+      choix = 0;
+      peindre();
+    });
+
+    champ.addEventListener("keydown", e => {
+      if (e.key === "ArrowDown") { e.preventDefault(); choix = Math.min(choix + 1, liste.length - 1); peindre(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); choix = Math.max(choix - 1, 0); peindre(); }
+      else if (e.key === "Enter") { e.preventDefault(); ouvrir(choix); }
+    });
+
+    peindre();
+    champ.focus();
+
+    /* Le parc arrive du serveur : sans lui, aucun véhicule ne sortirait depuis
+       une page qui ne s'en sert pas. On le demande maintenant, et on repeint
+       quand il est là — si la fenêtre est encore ouverte. */
+    if (!(MNParc.parc().vehicles || []).length) {
+      MNParc.load().then(() => {
+        if (!corps.isConnected) return;
+        tout = gisements();
+        liste = trouver(champ.value, tout);
+        choix = 0;
+        peindre();
+      }).catch(() => { /* pas de parc : on cherche sans lui */ });
+    }
+  }
+
+  /* ---- Les raccourcis -----------------------------------------------------------
+     Deux, pas douze : on ne retient que ce qu'on utilise tous les jours.
+
+     « / » est le réflexe de tout le monde pour chercher, mais il faut se garder
+     d'attraper la barre obliques quand quelqu'un est en train d'écrire — dans
+     un champ, dans une zone de texte, ou dans le livret qui s'édite au clavier. */
+
+  const enTrainDEcrire = () => {
+    const a = document.activeElement;
+    if (!a) return false;
+    const t = (a.tagName || "").toLowerCase();
+    return t === "input" || t === "textarea" || t === "select" || a.isContentEditable;
+  };
+
+  document.addEventListener("keydown", e => {
+    const k = (e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K");
+    if (k) { e.preventDefault(); palette(); return; }
+    if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey && !enTrainDEcrire()) {
+      e.preventDefault();
+      palette();
+    }
+  });
+
   /** Boutons propres à la page, posés dans la barre du haut. */
   function actions(html) {
     const z = document.getElementById("v2-actions");
@@ -736,6 +1019,8 @@ window.V2Shell = (function () {
 
   return {
     demarrer, actions, refuser, basculerTiroir, brouillon, rafraichirMarque,
+    /* Le terme venu de la recherche globale, que la page doit reprendre. */
+    motCherche,
     /* La facturation l'ouvre aussi, en arrivant sur l'ancre. */
     historique,
     session: () => _session,

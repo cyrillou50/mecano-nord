@@ -19,13 +19,14 @@
 
   let hote = null, moi = null;
   let peutGerer = false;
-  let filtre = "";
+  let filtre = "";   /* repris de la recherche globale au démarrage */
   let voirLevees = false;
 
   V2Shell.demarrer({
     page: "blacklist",
     titre: "Blacklist",
     pret: async function (session, h) {
+      filtre = V2Shell.motCherche() || filtre;
       hote = h; moi = session;
       peutGerer = V2Shell.peut("blacklist", "admin");
       await L.load(true).catch(e => console.error(e));

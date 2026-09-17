@@ -19,7 +19,7 @@
 
   let hote = null;
   let peutGerer = false;
-  let filtre = "";
+  let filtre = "";   /* repris de la recherche globale au démarrage */
 
   /* Un serveur de jeu en a des centaines : les catégories se replient, et
      l'état tient dans le navigateur — c'est un confort de lecture. */
@@ -41,6 +41,7 @@
     page: "emotes",
     titre: "Émotes",
     pret: async function (session, h) {
+      filtre = V2Shell.motCherche() || filtre;
       hote = h;
       peutGerer = V2Shell.peut("emotes", "items", "admin");
       await L.load(true).catch(e => console.error(e));

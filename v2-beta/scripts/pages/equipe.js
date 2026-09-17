@@ -19,7 +19,7 @@
   let hote = null, moi = null;
   let brouillon = null;          // copie de travail du catalogue
   let sel = null;
-  let filtre = "";
+  let filtre = "";   /* repris de la recherche globale au démarrage */
   let peutEditer = false, voitNotes = false, peutAvertir = false;
   let voirMasques = false, ranger = false;
   let vueArchives = false;      /* la liste montre-t-elle les partis ? */
@@ -30,6 +30,7 @@
     page: "equipe",
     titre: "Équipe",
     pret: async function (session, h) {
+      filtre = V2Shell.motCherche() || filtre;
       hote = h; moi = session;
 
       /* La page est ouverte à tous : chacun consulte les fiches. Seuls les
