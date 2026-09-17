@@ -223,7 +223,20 @@
 
 @media (max-width: 560px) {
   .contenu { padding: var(--e-3) var(--e-3) var(--e-8); }
-  .topbar { padding-inline: var(--e-3); }
+  .topbar {
+    padding-inline: var(--e-3);
+    flex-wrap: wrap;
+    row-gap: var(--e-2);
+  }
+}
+
+/* Vrai à toutes les largeurs : un titre de page est ce qui se comprime, les
+   boutons ne se coupent pas en deux. */
+.topbar__titre {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---- Bandeau bêta ---------------------------------------------------------
