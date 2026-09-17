@@ -366,10 +366,25 @@
 
     if (q) panier[id] = q; else delete panier[id];
     panier = MNStore.setCart(panier);
+    crierPanier();
 
     dessinerCatalogue();
     dessinerPanier();
   }
+
+  /* La pastille du menu et les autres onglets suivent le panier : encore
+     faut-il le leur dire. Le squelette écoute, on annonce. */
+  const crierPanier = () =>
+    document.dispatchEvent(new CustomEvent("v2:panier"));
+
+  /* Un devis repris depuis l'historique arrive par là : le panier a déjà été
+     remplacé, il ne reste qu'à se remettre à jour sans recharger la page. */
+  document.addEventListener("v2:panier", e => {
+    if (!e.detail || !e.detail.repris || !hote) return;
+    panier = MNStore.getCart();
+    dessinerCatalogue();
+    dessinerPanier();
+  });
 
   /* ---- Panier ------------------------------------------------------------------ */
 
@@ -453,6 +468,7 @@
       });
       if (!ok) return;
       panier = MNStore.setCart({});
+      crierPanier();
       dessinerCatalogue(); dessinerPanier();
       U.toast("Panier vidé", "ok");
     });
@@ -514,6 +530,7 @@
             };
             MNStore.addBT(bt);
             panier = MNStore.setCart({});
+            crierPanier();
 
             fermer();
             dessinerCatalogue(); dessinerPanier();

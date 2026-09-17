@@ -110,6 +110,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Un devis en cours n'est pas un simple décompte : il appelle. On le teinte
+   de l'accent, là où le compteur ordinaire reste discret. */
+.navlien__n--vif {
+  background: var(--c-action-fond);
+  color: var(--c-action-doux);
+  font-weight: 600;
+}
+
 .sidebar__pied {
   padding: var(--e-3);
   border-top: 1px solid var(--c-bord);

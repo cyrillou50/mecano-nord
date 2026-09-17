@@ -83,7 +83,8 @@ window.V2Shell = (function () {
             ? '<button type="button" class="navlien" data-a="hist" ' +
               'data-nom="' + esc(e.nom) + '">'
             : '<a class="navlien' + (e.id === _page ? " is-actif" : "") + '" href="' + esc(e.href) +
-              '" data-nom="' + esc(e.nom) + '"' + (e.id === _page ? ' aria-current="page"' : "") + ">") +
+              '" data-id="' + esc(e.id) + '" data-nom="' + esc(e.nom) + '"' +
+              (e.id === _page ? ' aria-current="page"' : "") + ">") +
             U().icone(e.icone) + "<span>" + esc(e.nom) + "</span>" +
           (e.fenetre ? "</button>" : "</a>")).join("") +
       "</div>").join("");
@@ -272,6 +273,39 @@ window.V2Shell = (function () {
     const neufs = mesAvertissements().filter(a => vus.indexOf(a.id) === -1);
     if (neufs.length) montrerAvertissements(neufs, true);
   }
+
+  /* ---- Ce qui attend au panier ------------------------------------------------
+     Le panier survit au changement de page, et c'est voulu : on commence un
+     devis, on va vérifier une fiche véhicule, on revient. Seulement rien ne le
+     rappelait depuis les autres pages, et un devis commencé s'oubliait.
+
+     Une pastille sur l'entrée « Facturation » suffit. Elle ne demande pas
+     d'aller voir : elle dit qu'il y a quelque chose en cours. */
+
+  function nbPanier() {
+    try {
+      const c = MNStore.getCart();
+      return Object.keys(c).reduce((n, k) => n + (c[k] > 0 ? c[k] : 0), 0);
+    } catch (_) { return 0; }
+  }
+
+  function majPastillePanier() {
+    const n = nbPanier();
+    document.querySelectorAll('.navlien[data-id="facturation"]').forEach(a => {
+      const p = a.querySelector(".navlien__n");
+      if (!n) { if (p) p.remove(); return; }
+      const txt = n + " objet" + (n > 1 ? "s" : "") + " au panier";
+      if (p) { p.textContent = n; p.title = txt; return; }
+      a.insertAdjacentHTML("beforeend",
+        '<span class="navlien__n navlien__n--vif" title="' + esc(txt) + '">' + n + "</span>");
+    });
+  }
+
+  /* Qui touche au panier le dit, ici ou dans un autre onglet. */
+  document.addEventListener("v2:panier", majPastillePanier);
+  window.addEventListener("storage", e => {
+    if (!e.key || e.key.indexOf("cart") !== -1) majPastillePanier();
+  });
 
   /** Le nom ou le logo de l'atelier a changé : on repeint la marque plutôt
       que de remonter toute la page, qui perdrait la saisie en cours. */
@@ -565,6 +599,7 @@ window.V2Shell = (function () {
 
     /* Après la page : un avertissement doit se voir, mais pas retarder
        l'affichage de ce qu'on venait faire. */
+    majPastillePanier();
     rafraichirJetonAvert();
     rappelAvertissements();
   }
@@ -574,6 +609,59 @@ window.V2Shell = (function () {
      reprend ce qu'on faisait. Elle vit ici plutôt que dans la facturation
      parce qu'on la demande depuis n'importe où — l'avoir laissée là-bas
      obligeait à changer de page pour l'ouvrir. */
+
+  /**
+   * Remet au panier les lignes d'un devis déjà enregistré.
+   *
+   * Le même client revient, ou une ligne était fausse : sans ça, tout se
+   * ressaisissait à la main. On ne recopie que ce qui existe encore au
+   * catalogue, et on le dit AVANT d'agir — après, on aura changé de page et
+   * plus personne ne lira le message.
+   */
+  async function reprendre(bon) {
+    const U2 = U();
+
+    const gardees = [], perdues = [];
+    (bon.lines || []).forEach(l => {
+      (MNStore.itemById(l.id) ? gardees : perdues).push(l);
+    });
+
+    if (!gardees.length) {
+      U2.toast("Aucun objet de ce devis n'existe encore au catalogue", "err");
+      return;
+    }
+
+    const encours = nbPanier();
+    const soucis = [];
+    if (perdues.length) {
+      soucis.push(perdues.length > 1
+        ? perdues.length + " objets ne sont plus au catalogue : ils seront laissés de côté."
+        : "Un objet n'est plus au catalogue : il sera laissé de côté.");
+    }
+    if (encours) {
+      soucis.push("Le devis en cours (" + encours + " objet" +
+        (encours > 1 ? "s" : "") + ") sera remplacé.");
+    }
+
+    if (soucis.length) {
+      const ok = await U2.confirmer({
+        titre: "Reprendre " + bon.ref,
+        message: soucis.join(" "),
+        confirmer: "Reprendre"
+      });
+      if (!ok) return;
+    }
+
+    const panier = {};
+    gardees.forEach(l => { panier[l.id] = (panier[l.id] || 0) + l.qty; });
+    MNStore.setCart(panier);
+    document.dispatchEvent(new CustomEvent("v2:panier", { detail: { repris: true } }));
+
+    /* Déjà sur place : la page se remet d'elle-même en écoutant l'événement,
+       et on ne recharge pas pour rien. Ailleurs : on y va. */
+    if (_page === "facturation") U2.toast("Devis " + bon.ref + " repris", "ok");
+    else location.href = "facturation.html";
+  }
 
   function historique() {
     const U2 = U();
@@ -588,6 +676,8 @@ window.V2Shell = (function () {
              { nom: "Par", cle: "by" },
              { nom: "Objets", num: true, rendu: b => b.count || b.lines.length },
              { nom: "", rendu: b =>
+                 U2.bouton("", { icone: "rafraichir", variante: "fantome", taille: "sm",
+                                 titre: "Reprendre ce devis", action: "re-" + b.ref }) +
                  U2.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
                                  titre: "Supprimer", action: "rm-" + b.ref }) }],
             l)
@@ -595,6 +685,14 @@ window.V2Shell = (function () {
                     texte: "Les bons que tu enregistres apparaîtront ici." }),
       actions: [{ label: "Fermer", onClick: f => f() }]
     });
+
+    m.corps.querySelectorAll("[data-a^='re-']").forEach(b =>
+      b.addEventListener("click", () => {
+        const bon = l.find(x => x.ref === b.dataset.a.slice(3));
+        if (!bon) return;
+        m.fermer();
+        reprendre(bon);
+      }));
 
     m.corps.querySelectorAll("[data-a^='rm-']").forEach(b =>
       b.addEventListener("click", async () => {
