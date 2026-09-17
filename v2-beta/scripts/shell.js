@@ -548,6 +548,113 @@ window.V2Shell = (function () {
     if ((sb && sb.classList.contains("is-ouvert")) || voile) basculerTiroir(false);
   });
 
+  /* ---- Connexion ----------------------------------------------------------------
+     Le même écran que la V1, avec les habits de la V2. Les règles vivent dans
+     MNAuth : on ne fait que les montrer. */
+
+  function connexion() {
+    const U2 = U();
+    const app = document.getElementById("app");
+    /* Pas de barre latérale tant qu'on n'est pas entré : la grille du site ne
+       s'applique pas ici, sans quoi la carte se rangerait dans la colonne du
+       menu. */
+    app.classList.add("app--portail");
+
+    const b = MNStore.brand();
+    const premier = MNAuth.users().length === 0;
+    const invites = MNStore.settings().auth.allowGuests;
+    const logo = b.logo ? mnIcon(b.logo) : esc(U2.initiales(b.name));
+
+    app.innerHTML =
+      '<div class="portail"><div class="portail__carte">' +
+        '<div class="portail__logo' + (b.logo ? " portail__logo--perso" : "") + '">' +
+          logo + "</div>" +
+        '<h1 class="portail__titre">' + esc(b.name) + "</h1>" +
+        '<p class="portail__slogan">' + esc(b.tagline) + "</p>" +
+
+        (premier
+          ? '<div style="margin-bottom:var(--e-4)">' + U2.alerte({
+              ton: "alerte", titre: "Première connexion",
+              texte: "Aucun employé n'est enregistré : le nom que tu saisis deviendra " +
+                     "patron, avec tous les droits."
+            }) + "</div>"
+          : "") +
+
+        '<form class="pile" id="p-form" autocomplete="off">' +
+          U2.champ({ id: "p-pseudo", label: "Prénom & Nom", repere: "Ex. Rico Martin", max: 40 }) +
+          '<div id="p-pinwrap"' + (premier ? "" : " hidden") + ">" +
+            U2.champ({ id: "p-pin", label: "Code d'accès" + (premier ? " (facultatif)" : ""),
+                       type: "password", repere: "••••", clavier: "numeric" }) +
+          "</div>" +
+          /* Seulement pour qui travaille dans les deux : une question sans
+             alternative n'est pas une question. */
+          '<div class="champ" id="p-ouwrap" hidden>' +
+            '<span class="champ__label">Où travailles-tu aujourd\'hui ?</span>' +
+            '<div class="segbar" id="p-ou">' +
+              MNStore.ATELIERS.map((a, i) =>
+                '<button class="seg' + (i === 0 ? " is-on" : "") + '" type="button" data-ou="' +
+                  esc(a.id) + '">' + esc(a.nom) + "</button>").join("") +
+            "</div>" +
+          "</div>" +
+          '<div id="p-err"></div>' +
+          '<button class="btn btn--principal btn--bloc" type="submit">' +
+            U2.icone("fleche") + "<span>Entrer dans l'atelier</span></button>" +
+        "</form>" +
+
+        '<p class="portail__pied">' +
+          (premier ? "Choisis bien : ce nom sera le compte patron de l'atelier."
+            : invites ? "Nom libre : tu peux entrer avec le nom que tu veux."
+            : "Ton nom doit avoir été enregistré par un responsable.") +
+        "</p>" +
+      "</div></div>";
+
+    const form = app.querySelector("#p-form");
+    const pseudo = app.querySelector("#p-pseudo");
+    const pinWrap = app.querySelector("#p-pinwrap");
+    const pin = app.querySelector("#p-pin");
+    const err = app.querySelector("#p-err");
+    const ouWrap = app.querySelector("#p-ouwrap");
+    const ouBar = app.querySelector("#p-ou");
+    let ou = MNStore.ATELIERS[0].id;
+
+    const direErreur = m => {
+      err.innerHTML = m
+        ? '<div style="margin-top:var(--e-2)">' +
+          U2.alerte({ ton: "erreur", texte: m }) + "</div>"
+        : "";
+    };
+
+    ouBar.querySelectorAll("[data-ou]").forEach(x => x.addEventListener("click", () => {
+      ou = x.dataset.ou;
+      ouBar.querySelectorAll("[data-ou]").forEach(y => y.classList.toggle("is-on", y === x));
+    }));
+
+    /* Le champ du code n'apparaît que si le nom saisi en réclame un, et le
+       choix du garage que si la personne travaille dans les deux. */
+    pseudo.addEventListener("input", () => {
+      const faut = MNAuth.needsPin(pseudo.value);
+      if (!premier && faut !== !pinWrap.hidden) pinWrap.hidden = !faut;
+
+      const siens = MNAuth.ateliersDe(pseudo.value);
+      const choix = siens.length > 1;
+      if (choix !== !ouWrap.hidden) ouWrap.hidden = !choix;
+      /* Un seul garage : c'est le sien qui part, pas celui affiché. */
+      if (!choix && siens.length) ou = siens[0];
+      direErreur("");
+    });
+
+    form.addEventListener("submit", e => {
+      e.preventDefault();
+      const r = MNAuth.login(pseudo.value, pin.value, ou);
+      if (r.ok) { location.reload(); return; }
+      if (r.code === "pin-requis") { pinWrap.hidden = false; pin.focus(); }
+      direErreur(r.message);
+      if (r.code === "pin-faux") { pin.value = ""; pin.focus(); }
+    });
+
+    pseudo.focus();
+  }
+
   /* ---- Démarrage -------------------------------------------------------------------
      La séquence est celle de la V1 : catalogue, thème, session. On la reprend
      telle quelle pour que les deux versions se comportent pareil. */
@@ -576,10 +683,9 @@ window.V2Shell = (function () {
 
     _session = MNAuth.session();
     if (!_session) {
-      /* La connexion reste celle de la V1 : un seul endroit où l'on entre son
-         mot de passe, et une seule session pour les deux versions. */
-      const suite = encodeURIComponent(location.pathname.split("/").pop() || "index.html");
-      location.href = "../index.html?v2=" + suite;
+      /* Chez nous, et non plus dans la V1 : la session est la même des deux
+         côtés, mais on n'envoie personne se connecter dans une archive. */
+      connexion();
       return;
     }
 
