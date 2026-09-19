@@ -676,6 +676,80 @@ window.MNStore = (function () {
     return minimumDe(ou);
   };
 
+  /* ---- Maintenance -----------------------------------------------------------
+     Voir la note de `normalize`. On lit la version publiée : c'est elle que
+     tout le monde partage, un brouillon n'engage que son auteur. */
+
+  const MAINTENANCE_OFF = { actif: false, message: "", depuis: "", par: "" };
+
+  function maintenance() {
+    const c = _published || _catalog;
+    return (c && c.settings && c.settings.maintenance) || MAINTENANCE_OFF;
+  }
+
+  /**
+   * Le grade tout en haut de la liste, c'est-à-dire le plus haut du site.
+   * La même règle que partout ailleurs : le catalogue range les grades du plus
+   * haut au plus bas, et c'est cet ordre qui fait foi.
+   */
+  function gradeDeTete() {
+    const c = _published || _catalog;
+    return ((c && c.roles) || [])[0] || null;
+  }
+
+  /**
+   * Cette fiche tient-elle le plus haut grade, dans l'un quelconque de ses
+   * garages ? On regarde tous les siens : il doit pouvoir rouvrir le site
+   * depuis n'importe lequel.
+   */
+  function estCreateur(u) {
+    const tete = gradeDeTete();
+    if (!u || !tete) return false;
+    if (u.roleId === tete.id) return true;
+    return ateliersDe(u).some(ou => roleIdDe(u, ou) === tete.id);
+  }
+
+  /** Le site est-il fermé pour cette fiche ? Sans fiche (invité) : oui. */
+  const fermePour = u => maintenance().actif && !estCreateur(u);
+
+  /* Les pages déjà ouvertes quand la maintenance commence doivent l'apprendre
+     sans qu'on les recharge. On demande au serveur, une fois par minute et
+     seulement quand l'onglet est à l'écran : un onglet en arrière-plan n'a
+     personne devant lui, et le catalogue pèse ses 70 Ko. Le retour sur
+     l'onglet vérifie tout de suite.
+
+     On ne lit que le serveur, pas la copie du dépôt : c'est lui qui reçoit
+     l'interrupteur. S'il annonce plus récent que ce qu'on tient, on repasse
+     par le chemin ordinaire, qui repose tout et prévient les pages. */
+  let _veille = null;
+
+  function veiller() {
+    if (_veille) return;
+    const tour = async () => {
+      if (document.visibilityState !== "visible" || !_published) return;
+      const d = await catalogueDuServeur(_published);
+      if (d && new Date(d.updatedAt) > new Date(_published.updatedAt)) relire();
+    };
+    _veille = setInterval(tour, 60000);
+    document.addEventListener("visibilitychange", tour);
+  }
+
+  /**
+   * Appelle `rappel(etat)` chaque fois que la maintenance change — début, fin,
+   * ou message modifié.
+   */
+  function surveillerMaintenance(rappel) {
+    let vu = JSON.stringify(maintenance());
+    onChange(() => {
+      const m = maintenance();
+      const s = JSON.stringify(m);
+      if (s === vu) return;
+      vu = s;
+      try { rappel(m); } catch (e) { console.error(e); }
+    });
+    veiller();
+  }
+
   /** Les grades proposés dans un atelier. */
   const rolesDeAtelier = ou =>
     (_catalog.roles || []).filter(r => estDeAtelier(r, ou));
@@ -788,6 +862,21 @@ window.MNStore = (function () {
         });
         return o;
       })(s.minimum),
+      /* Le site fermé pour maintenance. La normalisation ne garde que ce
+         qu'elle connaît : sans cette entrée, l'état serait effacé au premier
+         chargement. Il ne se change QUE par l'interrupteur
+         (MNGitHub.basculerMaintenance) : une publication ordinaire recopie
+         l'état du serveur au lieu du sien, pour qu'un vieux brouillon ne
+         rouvre ni ne referme le site en douce. */
+      maintenance: (function (m) {
+        m = m && typeof m === "object" ? m : {};
+        return {
+          actif: m.actif === true,
+          message: String(m.message || "").slice(0, 300),
+          depuis: String(m.depuis || ""),
+          par: String(m.par || "").slice(0, 60)
+        };
+      })(s.maintenance),
       /* Adresse de ton serveur (VPS). Une seule à renseigner : le site en
          déduit /duty.json, /relais, /publier et /sante. Avec elle, personne
          n'a besoin de jeton — ni pour pointer, ni pour publier. */
@@ -1702,6 +1791,7 @@ window.MNStore = (function () {
     ateliersDe, estDeAtelier, usersDeAtelier, rolesDeAtelier, normAteliers,
     setAtelier, atelier, roleIdDe, estMasqueIci, estMasquePartout,
     minimumDe, minimumPour, livretDe,
+    maintenance, gradeDeTete, estCreateur, fermePour, surveillerMaintenance,
     memeGroupe, membresDuGroupe, blacklistDuGroupe, groupesConnus,
     memeNom, soucisHomonyme,
     MOTIFS_DEPART, motifDepart, estArchive, archiverUser, reintegrerUser,

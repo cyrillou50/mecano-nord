@@ -268,6 +268,41 @@ Sans serveur, elle est simplement intégrée au fichier de données.
 
 ---
 
+## 7. Fermer le site pour maintenance
+
+Pour travailler tranquille — refaire le catalogue, réorganiser les grades —
+sans que l'équipe utilise le site pendant ce temps.
+
+**Qui peut le faire :** le grade **tout en haut de la liste** des grades
+(aujourd'hui *Créateur du Site*). Pas le droit « admin » : la Patronne l'a
+aussi, et elle ne peut pas fermer le site.
+
+**Fermer :** menu en bas de la barre latérale (ton nom) → **Mettre en
+maintenance**. Tu peux laisser un message, par exemple « retour vers 18 h ».
+
+**Pendant ce temps :**
+
+- tout le monde voit un écran de maintenance, avec ton message — sur la
+  nouvelle version **et** sur l'ancienne (`/v1/`) ;
+- les pages déjà ouvertes sont coupées **dans la minute** ;
+- toi, tu gardes le site, avec un bandeau rouge en haut pour ne pas oublier
+  que la porte est fermée ;
+- si ta session a expiré, le lien discret **Accès créateur** sous l'écran de
+  maintenance te laisse te reconnecter.
+
+**Rouvrir :** le bouton **Rouvrir le site** du bandeau rouge (ou le même menu).
+Les écrans de maintenance restés ouverts reviennent d'eux-mêmes dans la minute.
+
+> Ce que la maintenance ne coupe pas : le bot Discord, le récapitulatif du
+> dimanche et le serveur lui-même continuent de tourner. Les gens en service au
+> moment de la fermeture le restent — ils ne peuvent simplement pas se dépointer
+> sur le site avant la réouverture.
+>
+> Comme la connexion par nom, c'est une barrière d'usage et non un coffre-fort :
+> quelqu'un qui sait ouvrir la console du navigateur pourrait la contourner.
+
+---
+
 ## Structure des fichiers
 
 ```

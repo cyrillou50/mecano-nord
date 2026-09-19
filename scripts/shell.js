@@ -128,6 +128,7 @@ window.V2Shell = (function () {
 
       "<div>" +
         bandeauBeta() +
+        '<div id="v2-maint"></div>' +
         '<div id="v2-brouillon"></div>' +
         '<header class="topbar">' +
           U().bouton("", { icone: "menu", variante: "fantome", titre: "Ouvrir le menu",
@@ -174,11 +175,20 @@ window.V2Shell = (function () {
     const moi = document.getElementById("v2-moi");
     if (moi) moi.addEventListener("click", e => {
       e.stopPropagation();
-      U().menu(moi, [
-        { nom: "Ancienne version", icone: "fleche", onClick: () => { location.href = "v1/index.html"; } },
-        { separateur: true },
-        { nom: "Se déconnecter", icone: "sortie", onClick: deconnexion }
-      ]);
+      /* Construit au clic, pas au montage : l'entrée doit dire l'état du
+         moment, et il a pu changer depuis. */
+      const items = [
+        { nom: "Ancienne version", icone: "fleche", onClick: () => { location.href = "v1/index.html"; } }
+      ];
+      if (MNStore.estCreateur(_session && _session.user)) {
+        items.push({ separateur: true });
+        items.push(MNStore.maintenance().actif
+          ? { nom: "Rouvrir le site", icone: "check", onClick: rouvrirSite }
+          : { nom: "Mettre en maintenance", icone: "reglages", onClick: fermerSite });
+      }
+      items.push({ separateur: true });
+      items.push({ nom: "Se déconnecter", icone: "sortie", onClick: deconnexion });
+      U().menu(moi, items);
     });
   }
 
@@ -555,7 +565,8 @@ window.V2Shell = (function () {
      Le même écran que la V1, avec les habits de la V2. Les règles vivent dans
      MNAuth : on ne fait que les montrer. */
 
-  function connexion() {
+  /** @param {Function} [retour] pour revenir à l'écran d'où l'on vient */
+  function connexion(retour) {
     const U2 = U();
     const app = document.getElementById("app");
     /* Pas de barre latérale tant qu'on n'est pas entré : la grille du site ne
@@ -609,7 +620,10 @@ window.V2Shell = (function () {
             : invites ? "Nom libre : tu peux entrer avec le nom que tu veux."
             : "Ton nom doit avoir été enregistré par un responsable.") +
         "</p>" +
+        (retour ? '<button type="button" class="portail__discret" data-a="retour">Retour</button>' : "") +
       "</div></div>";
+
+    if (retour) app.querySelector('[data-a="retour"]').addEventListener("click", retour);
 
     const form = app.querySelector("#p-form");
     const pseudo = app.querySelector("#p-pseudo");
@@ -658,6 +672,119 @@ window.V2Shell = (function () {
     pseudo.focus();
   }
 
+  /* ---- Maintenance -----------------------------------------------------------------
+     L'état vit dans le catalogue publié ; la règle « qui peut entrer » dans
+     MNStore, partagée avec l'ancienne version. Ici, seulement ce qu'on voit. */
+
+  const depuisQuand = iso => {
+    const d = new Date(iso);
+    return isNaN(d) ? "" : d.toLocaleString("fr-FR",
+      { weekday: "long", hour: "2-digit", minute: "2-digit" });
+  };
+
+  /** Ce que voient tous ceux qui ne sont pas le créateur. */
+  function ecranMaintenance() {
+    const U2 = U();
+    const app = document.getElementById("app");
+    app.classList.add("app--portail");
+    const b = MNStore.brand();
+    const m = MNStore.maintenance();
+    const logo = b.logo ? mnIcon(b.logo) : esc(U2.initiales(b.name));
+    document.title = "Maintenance · " + b.name;
+
+    app.innerHTML =
+      '<div class="portail"><div class="portail__carte">' +
+        '<div class="portail__logo' + (b.logo ? " portail__logo--perso" : "") + '">' +
+          logo + "</div>" +
+        '<h1 class="portail__titre">' + esc(b.name) + "</h1>" +
+        '<p class="portail__slogan">' + esc(b.tagline) + "</p>" +
+        '<div class="maint">' +
+          U2.icone("reglages") +
+          "<b>Site en maintenance</b>" +
+          (m.message ? '<p class="maint__mot">' + esc(m.message) + "</p>" : "") +
+          '<p class="maint__aide">Le site est fermé le temps d\'une mise à jour. ' +
+            "Cette page se rouvrira d'elle-même dès que ce sera terminé.</p>" +
+          (m.depuis ? '<p class="maint__depuis">Depuis ' + esc(depuisQuand(m.depuis)) + "</p>" : "") +
+        "</div>" +
+        /* Discret, mais là : le créateur doit pouvoir entrer même si sa
+           session a expiré pendant la maintenance. */
+        '<button type="button" class="portail__discret" data-a="createur">Accès créateur</button>' +
+      "</div></div>";
+
+    app.querySelector('[data-a="createur"]').addEventListener("click", () =>
+      connexion(ecranMaintenance));
+  }
+
+  /** Le rappel du créateur : la porte est fermée, et voici comment la rouvrir. */
+  function majBandeauMaintenance() {
+    const z = document.getElementById("v2-maint");
+    if (!z) return;
+    const m = MNStore.maintenance();
+    if (!m.actif) { z.innerHTML = ""; return; }
+    z.innerHTML =
+      '<div class="maintbar" role="status">' +
+        U().icone("alerte") +
+        "<b>Maintenance</b>" +
+        "<span>Le site est fermé à tout le monde sauf à toi" +
+          (m.message ? " — « " + esc(m.message) + " »" : "") + ".</span>" +
+        U().bouton("Rouvrir le site", { variante: "principal", taille: "sm",
+                                        icone: "check", action: "rouvrir" }) +
+      "</div>";
+    z.querySelector('[data-a="rouvrir"]').addEventListener("click", rouvrirSite);
+  }
+
+  function fermerSite() {
+    const U2 = U();
+    U2.modale({
+      titre: "Mettre le site en maintenance",
+      corps:
+        '<div class="pile">' +
+          "<p>Tout le monde sera coupé du site — la nouvelle version comme " +
+            "l'ancienne, et les pages déjà ouvertes dans la minute. Toi seul " +
+            "pourras encore entrer, jusqu'à ce que tu le rouvres.</p>" +
+          U2.champ({ id: "mt-mot", label: "Message affiché (facultatif)", type: "zone",
+                     max: 300, repere: "Ex. Mise à jour du catalogue, retour vers 18 h." }) +
+          '<div id="mt-err"></div>' +
+        "</div>",
+      actions: [
+        { label: "Annuler", onClick: f => f() },
+        { label: "Fermer le site", variante: "danger", icone: "alerte",
+          onClick: async (fermer, corps, btn) => {
+            btn.disabled = true;
+            try {
+              await MNGitHub.basculerMaintenance(true, corps.querySelector("#mt-mot").value);
+              fermer();
+              U2.toast("Site en maintenance — toi seul peux entrer", "ok");
+              majBandeauMaintenance();
+            } catch (e) {
+              btn.disabled = false;
+              corps.querySelector("#mt-err").innerHTML = U2.alerte({
+                ton: "erreur", titre: "Le site n'a pas été fermé",
+                texte: String((e && e.message) || e)
+              });
+            }
+          } }
+      ]
+    });
+  }
+
+  async function rouvrirSite() {
+    const ok = await U().confirmer({
+      titre: "Rouvrir le site",
+      message: "Tout le monde pourra de nouveau entrer. Les écrans de maintenance " +
+               "restés ouverts se rouvriront d'eux-mêmes dans la minute.",
+      confirmer: "Rouvrir"
+    });
+    if (!ok) return;
+    try {
+      await MNGitHub.basculerMaintenance(false);
+      U().toast("Site rouvert", "ok");
+      majBandeauMaintenance();
+    } catch (e) {
+      U().toast("Le site n'a pas été rouvert : " + String((e && e.message) || e), "err");
+    }
+  }
+
   /* ---- Démarrage -------------------------------------------------------------------
      La séquence est celle de la V1 : catalogue, thème, session. On la reprend
      telle quelle pour que les deux versions se comportent pareil. */
@@ -685,6 +812,23 @@ window.V2Shell = (function () {
     try { MNTheme.refresh(); } catch (_) { /* thème facultatif */ }
 
     _session = MNAuth.session();
+
+    /* La maintenance passe avant tout, connexion comprise : quelqu'un qui
+       n'est pas encore entré n'a pas à voir un formulaire qui ne mènerait
+       nulle part.
+
+       Et si elle commence ou finit pendant qu'on est là — sur le site, sur
+       l'écran de connexion ou sur celui de maintenance — on recharge : c'est
+       la seule façon de couper net une page en cours, ses minuteries et ses
+       fenêtres comprises. Le créateur, lui, ne voit que son bandeau changer. */
+    const qui = () => _session && _session.user;
+    const fermeAuDepart = MNStore.fermePour(qui());
+    MNStore.surveillerMaintenance(() => {
+      if (MNStore.fermePour(qui()) !== fermeAuDepart) location.reload();
+      else majBandeauMaintenance();
+    });
+    if (fermeAuDepart) { ecranMaintenance(); return; }
+
     if (!_session) {
       /* Chez nous, et non plus dans la V1 : la session est la même des deux
          côtés, mais on n'envoie personne se connecter dans une archive. */
@@ -700,6 +844,7 @@ window.V2Shell = (function () {
       MNStore.nomAtelier(MNAuth.atelier()) + (V2.VERSION.beta ? " (V2 bêta)" : "");
 
     monter(o.titre || "");
+    majBandeauMaintenance();
 
     /* Un brouillon peut attendre depuis la visite d'hier — un onglet fermé
        trop tôt, une connexion coupée. On ne sait qu'ici qui est là et ce

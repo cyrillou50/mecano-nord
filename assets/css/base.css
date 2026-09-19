@@ -680,6 +680,12 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 .gate__form { display: flex; flex-direction: column; gap: 15px; }
 .gate__foot { margin-top: 20px; text-align: center; font-size: 12.5px; color: var(--dim); line-height: 1.6; }
+/* Un lien plutôt qu'un bouton : l'accès créateur n'est pas pour tout le monde,
+   et ne doit pas avoir l'air d'une porte ouverte. */
+.gate__lien {
+  border: 0; background: none; padding: 0;
+  color: inherit; font: inherit; text-decoration: underline; cursor: pointer;
+}
 
 .alert {
   display: flex; gap: 10px;

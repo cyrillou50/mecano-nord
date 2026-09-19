@@ -1961,6 +1961,47 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--c-action); outli
   color: var(--c-faible); font-size: var(--t-xs);
 }
 
+/* ---- Maintenance -------------------------------------------------------------
+   L'écran reprend la carte de connexion : même logo, même place. On reconnaît
+   le site, on comprend qu'il est fermé, on sait qu'il reviendra. */
+
+.maint {
+  display: grid; justify-items: center; gap: var(--e-2);
+  padding: var(--e-4);
+  border-radius: var(--r-3);
+  background: rgba(255, 169, 46, .08);
+  border: 1px solid rgba(255, 169, 46, .3);
+}
+.maint svg { width: 28px; height: 28px; color: var(--c-alerte); }
+.maint b { font-family: var(--f-titre); font-size: var(--t-lg); letter-spacing: .04em; }
+.maint p { margin: 0; }
+.maint__mot { font-weight: 600; color: var(--c-texte); }
+.maint__aide { font-size: var(--t-sm); color: var(--c-second); }
+.maint__depuis { font-size: var(--t-xs); color: var(--c-faible); }
+
+/* Un lien plutôt qu'un bouton : il n'est pas pour tout le monde, et ne doit
+   pas avoir l'air d'une porte ouverte. */
+.portail__discret {
+  margin-top: var(--e-4);
+  border: 0; background: none;
+  color: var(--c-faible); font: inherit; font-size: var(--t-xs);
+  text-decoration: underline; cursor: pointer;
+}
+.portail__discret:hover { color: var(--c-second); }
+
+/* Le rappel du créateur : rouge, parce que la porte est fermée pour tous les
+   autres et qu'on l'oublie vite. */
+.maintbar {
+  display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap;
+  padding: var(--e-2) var(--e-4);
+  background: rgba(255, 59, 92, .12);
+  border-bottom: 1px solid rgba(255, 59, 92, .35);
+  font-size: var(--t-sm);
+}
+.maintbar > svg { width: 17px; height: 17px; flex: none; color: #ff8095; }
+.maintbar > b { font-family: var(--f-titre); letter-spacing: .1em; text-transform: uppercase; color: #ff8095; }
+.maintbar > span { color: var(--c-second); flex: 1; min-width: 0; }
+
 /* ---- La carte « où j'en suis » ---------------------------------------------
    Un SVG sans largeur declaree s'etale jusqu'a remplir son conteneur. La
    rangee generique n'en impose aucune — celle-ci le fait, a la taille du texte

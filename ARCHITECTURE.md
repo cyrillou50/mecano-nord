@@ -238,6 +238,40 @@ pas diverger.
 
 ---
 
+## Maintenance
+
+Le site fermé à tous sauf au plus haut grade. L'état vit dans le catalogue,
+sous `settings.maintenance` : c'est ce que toutes les pages lisent déjà, et le
+serveur le garde tel qu'on le lui envoie.
+
+| Où | Quoi |
+|---|---|
+| `MNStore.maintenance()` | l'état **publié** — jamais celui d'un brouillon |
+| `MNStore.gradeDeTete()` | le premier grade de la liste, c'est-à-dire le plus haut |
+| `MNStore.estCreateur(fiche)` | tient-elle ce grade, dans l'un de ses garages ? |
+| `MNStore.fermePour(fiche)` | le site est-il fermé pour elle ? (sans fiche : oui) |
+| `MNStore.surveillerMaintenance(rappel)` | prévient les pages ouvertes d'un changement |
+| `MNGitHub.basculerMaintenance(actif, message)` | **le seul** moyen de changer l'état |
+
+Trois choses à ne pas défaire :
+
+* **Seule la bascule change l'état.** Elle relit le catalogue du serveur, n'y
+  touche qu'à la maintenance, et le renvoie. Une publication ordinaire, elle,
+  recopie l'état du serveur à la place de celui du brouillon : un brouillon
+  commencé avant une fermeture, publié après, rouvrirait sinon le site en
+  douce.
+* **Le créateur, c'est le grade en tête de liste,** pas un identifiant. Un
+  grade se renomme, se supprime, se recrée : on ne veut pas découvrir ce jour-là
+  que plus personne ne peut rouvrir.
+* **Les deux interfaces ferment.** `/v1/` lit la même règle ; sans elle,
+  l'ancienne version serait une porte dérobée.
+
+Les pages ouvertes relisent le serveur **une fois par minute, onglet visible
+seulement** (le catalogue pèse ~70 Ko), et tout de suite au retour sur
+l'onglet. Un changement recharge la page : c'est la seule façon de couper net
+ses minuteries et ses fenêtres. Le serveur limite à 60 requêtes par minute et
+par adresse ; la surveillance en ajoute une.
+
 ## Version et bandeau d'essai
 
 `config/site.js` :
