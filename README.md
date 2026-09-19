@@ -334,7 +334,8 @@ employés, mêmes devis, même pointage. Ce n'est pas une copie figée, c'est le
 même atelier vu autrement.
 
 Elle est là au cas où : si quelque chose coince en pleine session, l'équipe a
-une adresse qui répond tout de suite.
+une adresse qui répond tout de suite. **Aucun bouton du site n'y mène** — c'est
+une roue de secours, pas une destination : on y va en tapant l'adresse.
 
 Pour qui veut modifier le code, l'intérieur est décrit dans
 [ARCHITECTURE.md](ARCHITECTURE.md).

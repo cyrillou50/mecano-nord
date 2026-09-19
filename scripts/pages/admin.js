@@ -186,7 +186,7 @@
       users: vueUsers, roles: vueRoles, images: vueImages,
       livret: vueLivret,
       theme: vueTheme, discord: vueDiscord, site: vueSite, publier: vuePublier
-    }[onglet] || aVenir)($("#a-vue"));
+    }[onglet] || ongletInconnu)($("#a-vue"));
   }
 
   /* ---- La barre d'onglets, qui défile ----------------------------------------
@@ -401,16 +401,12 @@
     });
   }
 
-  /** Onglet pas encore repris : on le dit, et on renvoie là où il marche. */
-  function aVenir(z) {
-    const o = ONGLETS.find(x => x.id === onglet) || {};
+  /** Un onglet inconnu — retenu d'une visite où il existait encore. */
+  function ongletInconnu(z) {
     z.innerHTML = U.vide({
-      icone: o.icone || "reglages",
-      titre: "« " + (o.nom || "Cet onglet") + " » n'est pas encore repris",
-      texte: "La V2 se construit onglet par onglet. Celui-ci fonctionne " +
-             "normalement sur le site officiel.",
-      action: U.bouton("Ouvrir dans l'ancienne version", { href: "v1/admin.html", variante: "doux",
-                                              icone: "fleche" })
+      icone: "reglages",
+      titre: "Cet onglet n'existe plus",
+      texte: "Choisis-en un autre dans la barre ci-dessus."
     });
   }
 

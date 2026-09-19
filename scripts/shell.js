@@ -177,16 +177,13 @@ window.V2Shell = (function () {
       e.stopPropagation();
       /* Construit au clic, pas au montage : l'entrée doit dire l'état du
          moment, et il a pu changer depuis. */
-      const items = [
-        { nom: "Ancienne version", icone: "fleche", onClick: () => { location.href = "v1/index.html"; } }
-      ];
+      const items = [];
       if (MNStore.estCreateur(_session && _session.user)) {
-        items.push({ separateur: true });
         items.push(MNStore.maintenance().actif
           ? { nom: "Rouvrir le site", icone: "check", onClick: rouvrirSite }
           : { nom: "Mettre en maintenance", icone: "reglages", onClick: fermerSite });
+        items.push({ separateur: true });
       }
-      items.push({ separateur: true });
       items.push({ nom: "Se déconnecter", icone: "sortie", onClick: deconnexion });
       U().menu(moi, items);
     });

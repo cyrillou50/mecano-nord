@@ -33,6 +33,9 @@ mecano-nord/
 
 ### L'ancienne version
 
+Aucun lien de l'interface n'y mène, volontairement : c'est une roue de secours,
+on y va en tapant `/v1/` dans l'adresse. N'en rajoutez pas.
+
 `/v1/` n'est pas une archive morte : c'est la même application, sur les
 **mêmes données**. Un seul `data/catalog.json`, un seul tableau de service,
 les mêmes employés. Elle est là pour qu'on puisse y revenir tout de suite si
