@@ -246,9 +246,39 @@ window.MNGitHub = (function () {
    * @param {string} json     le catalogue complet
    * @param {string} [message] message de commit, si commit il y a
    */
+  /**
+   * La maintenance ne voyage pas avec un brouillon : on envoie l'état que le
+   * serveur tient à cet instant, pas celui du jour où le brouillon a été
+   * commencé. Serveur muet : ce que la page sait de plus récent.
+   */
+  async function garderMaintenance(json) {
+    let cat;
+    try { cat = JSON.parse(json); } catch (_) { return json; }
+
+    let etat = null;
+    const base = catalogueUrl();
+    if (base) {
+      try {
+        const r = await fetch(base + "?t=" + Date.now(), { cache: "no-store" });
+        if (r.ok) {
+          const s = await r.json();
+          etat = s && s.settings && s.settings.maintenance;
+        }
+      } catch (_) { /* injoignable : on se rabat sur ce qu'on sait */ }
+    }
+    if (!etat) {
+      try { etat = MNStore.maintenance(); } catch (_) { etat = null; }
+    }
+
+    cat.settings = cat.settings || {};
+    cat.settings.maintenance = etat || { actif: false, message: "", depuis: "", par: "" };
+    return JSON.stringify(cat, null, 2) + "\n";
+  }
+
   async function publish(json, message) {
     const c = repoConfig();
     const msg = message || "Mise à jour du catalogue depuis le panneau admin";
+    json = await garderMaintenance(json);
 
     /* Le serveur garde désormais le catalogue lui-même : l'écriture y est
        immédiate, sans commit ni reconstruction. La copie du dépôt reste en
@@ -472,6 +502,69 @@ window.MNGitHub = (function () {
   }
 
   /**
+   * Ferme ou rouvre le site.
+   *
+   * On relit le catalogue du serveur et on n'y touche qu'à la maintenance :
+   * voir la note en tête de ce changement. La date du catalogue avance, et
+   * c'est ce qui fait relire toutes les pages ouvertes.
+   *
+   * Un brouillon en attente part d'abord : la date qui avance le rendrait
+   * sinon « plus ancien que la version en ligne », et il serait jeté.
+   *
+   * @param {boolean} actif
+   * @param {string} [message] ce que verront les autres, ex. « retour vers 18 h »
+   * @returns {Promise<object>} le nouvel état
+   */
+  async function basculerMaintenance(actif, message) {
+    const base = catalogueUrl();
+    if (!base) {
+      throw err("server", "Aucun serveur n'est configuré : c'est lui qui garde le " +
+        "catalogue que tout le monde lit. Renseigne son adresse dans " +
+        "Administration → Le site.");
+    }
+
+    if (MNStore.hasDraft() && !dejaEnvoye()) {
+      await partir();
+      if (echec) {
+        throw err("server", "Tes modifications en cours n'ont pas pu partir (" +
+          echec.message + "). Règle ça d'abord : la maintenance les ferait " +
+          "passer pour périmées, et elles seraient perdues.");
+      }
+    }
+
+    const r = await fetch(base + "?t=" + Date.now(), { cache: "no-store" });
+    if (r.status === 404) {
+      throw err("server", "Ton serveur ne garde pas encore le catalogue : la " +
+        "maintenance ne pourrait atteindre personne.");
+    }
+    if (!r.ok) throw err("server", "Le serveur n'a pas rendu le catalogue (" + r.status + ").");
+    const cat = await r.json();
+    if (!cat || !Array.isArray(cat.items) || !Array.isArray(cat.users)) {
+      throw err("server", "Le serveur a rendu autre chose qu'un catalogue.");
+    }
+
+    let qui = "";
+    try { qui = (MNAuth.session() || {}).pseudo || ""; } catch (_) { /* rien */ }
+
+    cat.settings = cat.settings || {};
+    cat.settings.maintenance = actif
+      ? { actif: true, message: String(message || "").trim().slice(0, 300),
+          depuis: new Date().toISOString(), par: qui }
+      : { actif: false, message: "", depuis: "", par: "" };
+    cat.updatedAt = new Date().toISOString();
+
+    if (!(await versServeurCatalogue(JSON.stringify(cat, null, 2) + "\n"))) {
+      throw err("server", "Ton serveur ne garde pas encore le catalogue : la " +
+        "maintenance ne pourrait atteindre personne.");
+    }
+
+    /* La page qui a basculé l'apprend comme les autres : par le chemin
+       ordinaire, qui repose le catalogue et prévient qui écoute. */
+    await MNStore.relire();
+    return MNStore.maintenance();
+  }
+
+  /**
    * L'état de l'envoi, dit en français, pour les bandeaux.
    * Renvoie null quand l'automatique ne peut rien faire : à la page, alors, de
    * dire ce qu'elle disait avant — elle seule sait de quoi elle parle.
@@ -524,6 +617,7 @@ window.MNGitHub = (function () {
     putText, putFiles, uploadImage, imageBrute, renameFile,
     serveurUrl, catalogueUrl, canPublish,
     autoActif, voieAuto, serveurPrendCatalogue, etatAuto, motAuto, onAuto,
-    reveiller: programmer, publierMaintenant: () => partir()
+    reveiller: programmer, publierMaintenant: () => partir(),
+    basculerMaintenance
   };
 })();

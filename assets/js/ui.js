@@ -587,6 +587,39 @@ window.MNUI = (function () {
     inPseudo.focus();
   }
 
+  /* ---- Maintenance ------------------------------------------------------------
+     Voir MNStore.fermePour : la règle est partagée avec la nouvelle version. */
+
+  function ecranMaintenance() {
+    const gate = document.getElementById("gate");
+    const app = document.getElementById("app");
+    if (app) app.hidden = true;
+    if (!gate) return;
+    gate.hidden = false;
+
+    const b = MNStore.brand();
+    const m = MNStore.maintenance();
+    const mark = brandMark();
+    document.title = "Maintenance — " + b.name;
+
+    gate.innerHTML =
+      '<div class="gate__card">' +
+        '<div class="gate__logo' + (mark.custom ? " gate__logo--custom" : "") + '">' + mark.html + "</div>" +
+        '<h1 class="gate__title">' + esc(b.name) + "</h1>" +
+        '<p class="gate__tag">' + esc(b.tagline) + "</p>" +
+        '<div class="alert alert--warn">' + svg("alert") +
+          "<span><b>Site en maintenance.</b> " +
+          (m.message ? esc(m.message) + " " : "") +
+          "Cette page se rouvrira d'elle-même dès que ce sera terminé.</span></div>" +
+        /* Discret, mais là : le créateur doit pouvoir entrer même si sa
+           session a expiré pendant la maintenance. */
+        '<p class="gate__foot"><button type="button" class="gate__lien" id="g-createur">' +
+          "Accès créateur</button></p>" +
+      "</div>";
+
+    gate.querySelector("#g-createur").addEventListener("click", showGate);
+  }
+
   /* ---- Démarrage d'une page -------------------------------------------------- */
 
   /**
@@ -606,6 +639,16 @@ window.MNUI = (function () {
 
     document.title = MNStore.brand().name + " — " + (opt.title || "Facturation");
     syncFavicon();
+
+    /* La maintenance passe avant tout, connexion comprise. Si elle commence
+       ou finit pendant qu'on est là, on recharge : c'est la seule façon de
+       couper net une page en cours. */
+    const qui = () => { const s = MNAuth.session(); return s && s.user; };
+    const fermeAuDepart = MNStore.fermePour(qui());
+    MNStore.surveillerMaintenance(() => {
+      if (MNStore.fermePour(qui()) !== fermeAuDepart) location.reload();
+    });
+    if (fermeAuDepart) { ecranMaintenance(); return; }
 
     if (!MNAuth.session()) { showGate(); return; }
 
