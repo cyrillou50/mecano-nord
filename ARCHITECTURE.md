@@ -258,9 +258,12 @@ trois semaines. Le serveur, lui, borne pour de bon — le tableau part en entier
 à chaque chargement de page, et son poids suit le nombre de services (~250 Ko
 pour 1000).
 
-Côté affichage, les semaines s'accumulent sans fin : la fiche n'en dessine
-qu'une poignée, les précédentes viennent à la demande, et un résumé en tête
-donne le total sans rien dérouler.
+Côté affichage, les semaines s'accumulent sans fin : la fiche les range par
+**année → mois → semaine → jour**, chaque étage replié tenant sur une ligne.
+Seuls l'année et le mois les plus récents s'ouvrent d'avance. Une semaine à
+cheval sur deux mois est classée au mois de son **lundi** : chaque service ne
+compte ainsi qu'une fois, et le total d'un mois est la somme de ce qu'il
+montre.
 
 ## Maintenance
 
