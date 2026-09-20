@@ -241,6 +241,27 @@ pas diverger.
 
 ---
 
+## La profondeur de l'historique de service
+
+Le journal des services est **commun à tout l'atelier** : une fiche employé n'y
+lit que ses propres lignes. Sa profondeur se règle donc en nombre de services,
+tous employés confondus, et à deux endroits qui doivent rester dans cet ordre :
+
+| Où | Rôle |
+|---|---|
+| `MAX_LOG` de `serveur/serveur.js` | ce que le serveur **garde** (1000 ≈ six mois à une trentaine de personnes) |
+| `MAX_LOG` de `services/duty.js` | ce que le site garde **en mémoire** — au moins aussi haut |
+
+Si le site coupe plus bas que le serveur, il jette en lisant des semaines qui
+existent : c'est exactement ce qui faisait croire que l'historique s'arrêtait à
+trois semaines. Le serveur, lui, borne pour de bon — le tableau part en entier
+à chaque chargement de page, et son poids suit le nombre de services (~250 Ko
+pour 1000).
+
+Côté affichage, les semaines s'accumulent sans fin : la fiche n'en dessine
+qu'une poignée, les précédentes viennent à la demande, et un résumé en tête
+donne le total sans rien dérouler.
+
 ## Maintenance
 
 Le site fermé à tous sauf au plus haut grade. L'état vit dans le catalogue,

@@ -676,6 +676,8 @@
       });
     }
 
+    brancherHistorique(u);
+
     const g = z.querySelector('[data-a="grade"]');
     if (g) g.addEventListener("click", () => promouvoir(u));
     const e = z.querySelector('[data-a="edit"]');
@@ -869,10 +871,24 @@
 
   /* ---- Historique de service --------------------------------------------------
      Regroupé par semaine puis par jour : une ligne par journée avec ses
-     créneaux et son total, plutôt qu'une longue liste plate. */
+     créneaux et son total, plutôt qu'une longue liste plate.
+
+     Les semaines s'accumulent sans fin — un an de service en fait cinquante-
+     deux, et la fiche descendrait indéfiniment. On en montre une poignée, du
+     plus récent au plus ancien, et les précédentes viennent à la demande. Un
+     résumé en tête donne la vue longue sans faire défiler quoi que ce soit. */
+
+  const PAS_SEMAINES = 6;
+  let _semVues = PAS_SEMAINES, _semPour = "";
 
   function historique(u, on) {
-    const log = MNDuty.logOf(u.id).slice(0, 200);
+    /* Tout ce que le tableau partagé garde : c'est lui qui borne l'histoire,
+       plus l'affichage. */
+    const log = MNDuty.logOf(u.id);
+
+    /* En changeant de fiche, on repart du début : le « voir plus » de la
+       précédente ne concerne pas celle-ci. */
+    if (_semPour !== u.id) { _semPour = u.id; _semVues = PAS_SEMAINES; }
 
     /* Le compteur doit rester joignable pour être rafraîchi chaque seconde :
        on écrit l'encart plutôt que de passer par `alerte()`. */
@@ -933,8 +949,29 @@
       s.jours.forEach(j => j.creneaux.sort((a, b) => a.a - b.a));
     });
 
-    return section("Historique de service", log.length, enTete +
-      semaines.map(s =>
+    const total = semaines.reduce((n, s) => n + s.secondes, 0);
+    const montrees = semaines.slice(0, _semVues);
+    const reste = semaines.length - montrees.length;
+
+    const resume =
+      '<div class="eq-histo__tot">' +
+        "<span>" + semaines.length + " semaine" + (semaines.length > 1 ? "s" : "") +
+          " · " + log.length + " service" + (log.length > 1 ? "s" : "") + "</span>" +
+        '<b class="nombre">' + U.esc(MNDuty.dur(total, true)) + "</b>" +
+      "</div>";
+
+    const encore = reste
+      ? '<div class="eq-histo__plus">' +
+          U.bouton(reste > 1 ? "Voir " + Math.min(reste, PAS_SEMAINES) + " semaines de plus"
+                             : "Voir la semaine précédente",
+                   { variante: "doux", taille: "sm", icone: "chevron", action: "plus-sem" }) +
+          '<span class="champ__aide">' + reste + " semaine" + (reste > 1 ? "s" : "") +
+            " plus ancienne" + (reste > 1 ? "s" : "") + "</span>" +
+        "</div>"
+      : "";
+
+    return '<div id="e-histo">' + section("Historique de service", log.length, enTete + resume +
+      montrees.map(s =>
         "<details class=\"eq-sem\"" + (s.cle === cette ? " open" : "") + ">" +
           '<summary class="eq-sem__tete">' +
             '<span class="eq-sem__nom">' + U.esc(s.nom) +
@@ -957,7 +994,24 @@
               '<b class="nombre">' +
                 U.esc(MNDuty.dur(Math.round(s.secondes / s.jours.length))) + "</b></div>" +
           "</div>" +
-        "</details>").join(""));
+        "</details>").join("") + encore) + "</div>";
+  }
+
+  /**
+   * Le bouton « voir plus » ne redessine que son bloc : refaire la fiche
+   * entière la ferait remonter en haut, alors qu'on vient justement de
+   * descendre jusqu'ici pour cliquer.
+   */
+  function brancherHistorique(u) {
+    const b = document.querySelector('#e-histo [data-a="plus-sem"]');
+    if (!b) return;
+    b.addEventListener("click", () => {
+      _semVues += PAS_SEMAINES;
+      const z = document.getElementById("e-histo");
+      if (!z) return;
+      z.outerHTML = historique(u, MNDuty.isOn(u.id));
+      brancherHistorique(u);
+    });
   }
 
   /** « Semaine du 3 au 9 août 2026 », sans répéter ce qui se devine. */

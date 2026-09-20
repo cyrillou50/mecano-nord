@@ -1961,6 +1961,26 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--c-action); outli
   color: var(--c-faible); font-size: var(--t-xs);
 }
 
+/* ---- Historique de service ----------------------------------------------------
+   Le total en tête donne la vue longue sans dérouler ; le bouton du bas va
+   chercher les semaines plus anciennes. */
+
+.eq-histo__tot {
+  display: flex; align-items: center; gap: var(--e-3);
+  padding: var(--e-2) var(--e-3);
+  margin-bottom: var(--e-2);
+  border-radius: var(--r-2);
+  background: var(--c-fond-doux, rgba(255, 255, 255, .04));
+  font-size: var(--t-sm); color: var(--c-second);
+}
+.eq-histo__tot b { margin-left: auto; color: var(--c-texte); }
+
+.eq-histo__plus {
+  display: flex; align-items: center; gap: var(--e-3);
+  margin-top: var(--e-3);
+}
+.eq-histo__plus .champ__aide { margin: 0; }
+
 /* ---- Maintenance -------------------------------------------------------------
    L'écran reprend la carte de connexion : même logo, même place. On reconnaît
    le site, on comprend qu'il est fermé, on sait qu'il reviendra. */
