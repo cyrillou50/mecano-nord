@@ -154,7 +154,18 @@ window.MNRegistre = (function () {
     const i = r.contrats.findIndex(x => x.id === propre.id);
     if (i === -1) r.contrats.unshift(propre); else r.contrats[i] = propre;
     r.updatedAt = new Date().toISOString();
-    return envoyer({ op: "set", contrat: propre });
+    const envoi = await envoyer({ op: "set", contrat: propre });
+
+    /* Le serveur nous rend le registre tel qu'il l'a écrit : s'il a perdu en
+       route ce qu'on venait d'y mettre, c'est qu'il ne connaît pas encore ces
+       champs. On le signale — sinon la radio saisie disparaît en silence. */
+    if (envoi.ok && _distant) {
+      const rendu = (registre().contrats || []).find(x => x.id === propre.id);
+      if (rendu && ((propre.radio && !rendu.radio) || (propre.vendu && !rendu.vendu))) {
+        return Object.assign({}, envoi, { tropAncien: true });
+      }
+    }
+    return envoi;
   }
 
   async function removeContrat(id) {

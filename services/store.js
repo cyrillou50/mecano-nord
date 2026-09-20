@@ -237,6 +237,14 @@ window.MNStore = (function () {
          pour autant : c'est un fait à signaler, pas un état à lui imposer. */
       expire: jour(t.expire),
       lignes: (Array.isArray(t.lignes) ? t.lignes : []).slice(0, 200).map(normLigne),
+      /* La radio du client : c'est par là qu'on le joint quand c'est prêt.
+         Une fréquence, pas un identifiant — on garde ce qui est tapé. */
+      radio: String(t.radio || "").slice(0, 40),
+      /* La vente a-t-elle eu lieu ? Distinct de l'état : celui-ci parle de
+         l'accord, celle-là de la marchandise. */
+      vendu: t.vendu === true,
+      venduLe: t.venduLe || null,
+      venduPar: String(t.venduPar || "").slice(0, 60),
       creePar: String(t.creePar || "").slice(0, 60),
       creeLe: t.creeLe || null,
       majPar: String(t.majPar || "").slice(0, 60),

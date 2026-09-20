@@ -241,6 +241,24 @@ pas diverger.
 
 ---
 
+## Ajouter un champ à un contrat (ou à un véhicule, un congé…)
+
+Tout ce qui vit **sur le serveur** y est reconstruit à l'arrivée, à partir
+d'une liste blanche : `nettoyerContrat`, `nettoyerVehicule`, `nettoyerLigne`…
+Un champ que le serveur ne connaît pas est **effacé à l'enregistrement**, et
+l'appel réussit quand même. Il faut donc le déclarer partout :
+
+| Fichier | Ce qu'on y ajoute |
+|---|---|
+| `services/store.js` + son jumeau | le champ dans `normContrat` |
+| `serveur/serveur.js` | le même champ dans `nettoyerContrat` |
+| `assets/js/contrats.js` | le recopier tel quel — l'ancienne interface ne l'édite pas, elle ne doit pas l'effacer |
+
+Et tant que le VPS n'a pas la nouvelle version du serveur, le champ ne tient
+pas. `setContrat` compare donc ce qu'il a envoyé à ce que le serveur renvoie
+et signale `tropAncien` : la page le dit, au lieu de laisser croire que la
+saisie est passée.
+
 ## La profondeur de l'historique de service
 
 Le journal des services est **commun à tout l'atelier** : une fiche employé n'y
