@@ -19,7 +19,9 @@ window.MNImagier = (function () {
 
   let cache = null;
 
-  const esc = s => MNUI.esc(s);
+  /* L'interface de cette version. La copie de /v1/ appelle MNUI : ce sont
+     deux bibliothèques différentes, pas un oubli. */
+  const esc = s => V2UI.esc(s);
   const surServeur = () => MNStore.imagesHebergees();
 
   async function api(corps) {
@@ -314,67 +316,74 @@ window.MNImagier = (function () {
 
     const body = document.createElement("div");
     body.innerHTML =
-      '<div class="row" style="margin-bottom:12px">' +
-        '<button class="btn btn--primary" id="g-up" type="button">' + MNUI.svg("upload") +
-          "<span>Déposer une photo</span></button>" +
+      '<div class="rang" style="margin-bottom:var(--e-3)">' +
+        V2UI.bouton("Déposer une photo", { variante: "principal", taille: "sm",
+                                           icone: "nuage", action: "up", type: "button" }) +
         '<input type="file" id="g-file" accept="image/*" hidden>' +
-        '<button class="btn btn--ghost" id="g-refresh" type="button">' + MNUI.svg("refresh") +
-          "<span>Actualiser</span></button>" +
-        '<span class="spacer"></span>' +
-        '<button class="btn btn--ghost" id="g-none" type="button">' + MNUI.svg("x") +
-          "<span>Aucune</span></button>" +
+        V2UI.bouton("Actualiser", { variante: "fantome", taille: "sm",
+                                    icone: "rafraichir", action: "maj", type: "button" }) +
+        '<span class="pousse">' +
+          V2UI.bouton("Aucune", { variante: "fantome", taille: "sm",
+                                  icone: "croix", action: "vide", type: "button" }) +
+        "</span>" +
       "</div>" +
-      '<div id="g-grid"><p class="hint">Lecture de la bibliothèque…</p></div>' +
-      '<div class="field" style="margin-top:12px">' +
-        '<label class="label" for="g-url">Ou colle une adresse</label>' +
-        '<input class="input mono" id="g-url" value="' + esc(actuel) +
+      '<div id="g-grid"><p class="champ__aide">Lecture de la bibliothèque…</p></div>' +
+      '<div class="champ" style="margin-top:var(--e-3)">' +
+        '<label class="champ__label" for="g-url">Ou colle une adresse</label>' +
+        '<input class="saisie mono" id="g-url" value="' + esc(actuel) +
           '" placeholder="https://… ou assets/img/bf400.png"></div>';
 
     const grid = body.querySelector("#g-grid");
     const champ = body.querySelector("#g-url");
 
     const peindre = async force => {
-      grid.innerHTML = '<p class="hint">Lecture de la bibliothèque…</p>';
+      grid.innerHTML = '<p class="champ__aide">Lecture de la bibliothèque…</p>';
       let refs = [];
       try { refs = await lister(force); } catch (_) { /* rien de listable */ }
 
       if (!refs.length) {
-        grid.innerHTML = '<p class="hint">Aucune image pour le moment. ' +
+        grid.innerHTML = '<p class="champ__aide">Aucune image pour le moment. ' +
           "Clique sur <b>Déposer une photo</b> pour en ajouter une.</p>";
         return;
       }
+      /* La même grille que l'administration : une image choisie se reconnaît
+         au même endroit du site, quelle que soit la page. */
       grid.innerHTML =
-        '<div class="iconlist" style="grid-template-columns:repeat(auto-fill,minmax(78px,1fr));max-height:300px">' +
+        '<div class="ad-icones ad-icones--img">' +
           refs.map(x =>
             '<button type="button" data-ref="' + esc(x.ref) + '" title="' + esc(x.name) +
               (x.serveur ? " — sur le serveur" : " — dans le dépôt") + '"' +
-              (x.ref === sel ? ' class="is-on"' : "") +
+              (x.ref === sel ? ' class="est-choisie"' : "") +
               '><img src="' + esc(src(x.ref)) + '" alt="" loading="lazy"></button>').join("") +
         "</div>" +
-        '<p class="hint" style="margin-top:8px">' + refs.length + " image" +
+        '<p class="champ__aide" style="margin-top:var(--e-2)">' + refs.length + " image" +
           (refs.length > 1 ? "s" : "") + "</p>";
 
       grid.querySelectorAll("[data-ref]").forEach(b => b.addEventListener("click", () => {
         sel = b.dataset.ref;
         champ.value = sel;
-        grid.querySelectorAll("[data-ref]").forEach(x => x.classList.toggle("is-on", x === b));
+        grid.querySelectorAll("[data-ref]").forEach(x =>
+          x.classList.toggle("est-choisie", x === b));
       }));
     };
     peindre(false);
 
-    body.querySelector("#g-refresh").addEventListener("click", () => peindre(true));
-    champ.addEventListener("input", () => { sel = champ.value.trim(); });
-    body.querySelector("#g-none").addEventListener("click", () => { sel = ""; champ.value = ""; });
+    const bouton = a => body.querySelector('[data-a="' + a + '"]');
 
-    body.querySelector("#g-up").addEventListener("click", () => body.querySelector("#g-file").click());
+    bouton("maj").addEventListener("click", () => peindre(true));
+    champ.addEventListener("input", () => { sel = champ.value.trim(); });
+    bouton("vide").addEventListener("click", () => { sel = ""; champ.value = ""; });
+
+    bouton("up").addEventListener("click", () => body.querySelector("#g-file").click());
     body.querySelector("#g-file").addEventListener("change", async e => {
       const file = e.target.files[0];
       e.target.value = "";
       if (!file) return;
 
-      const bouton = body.querySelector("#g-up");
-      bouton.disabled = true;
-      bouton.innerHTML = MNUI.svg("refresh") + "<span>Envoi…</span>";
+      const bUp = bouton("up");
+      const avant = bUp.innerHTML;
+      bUp.disabled = true;
+      bUp.innerHTML = V2UI.icone("rafraichir") + "<span>Envoi…</span>";
       try {
         const data = await depuisFichier(file, max);
         /* Sans serveur, on garde l'image dans les données plutôt que
@@ -383,7 +392,7 @@ window.MNImagier = (function () {
         if (!surServeur() && !MNGitHub.canPublish()) {
           sel = data;
           champ.value = data;
-          MNUI.toast("Image intégrée aux données — aucun serveur pour l'héberger", "info");
+          V2UI.toast("Image intégrée aux données — aucun serveur pour l'héberger", "info");
         } else {
           sel = await deposer(data, file.name);
           champ.value = sel;
@@ -393,27 +402,25 @@ window.MNImagier = (function () {
              tout de suite plutôt que de laisser chercher. */
           const t = await taille(data);
           const petit = Math.max(t.w, t.h);
-          MNUI.toast(petit && petit < 360
+          V2UI.toast(petit && petit < 360
             ? "Photo déposée — mais elle ne fait que " + t.w + "×" + t.h +
               " px : elle sera floue en grand, cherche une image plus grande"
             : "Photo déposée", petit && petit < 360 ? "info" : "ok");
         }
       } catch (err) {
-        MNUI.toast("Dépôt impossible : " + err.message, "err");
+        V2UI.toast("Dépôt impossible : " + err.message, "err");
       } finally {
-        bouton.disabled = false;
-        bouton.innerHTML = MNUI.svg("upload") + "<span>Déposer une photo</span>";
+        bUp.disabled = false;
+        bUp.innerHTML = avant;
       }
     });
 
-    MNUI.modal({
-      title: "Bibliothèque d'images", body,
+    V2UI.modale({
+      titre: "Bibliothèque d'images", corps: body,
       actions: [
-        { label: "Annuler", variant: "btn--ghost", onClick: c => c() },
-        {
-          label: "Choisir", variant: "btn--primary", icon: "check",
-          onClick: c => { cb(sel); c(); }
-        }
+        { label: "Annuler", onClick: f => f() },
+        { label: "Choisir", variante: "principal", icone: "check",
+          onClick: f => { cb(sel); f(); } }
       ]
     });
   }

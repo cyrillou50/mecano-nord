@@ -60,6 +60,10 @@ doivent se comporter exactement pareil sur les données.
 | `services/editeur.js` | `assets/js/editeur.js` |
 | `services/duty.js` | `assets/js/duty.js` — à une ligne près, le chemin du fichier |
 
+`services/imagier.js` **n'en est pas un** : les deux fichiers se ressemblent,
+mais celui-ci parle à `V2UI` et celui de `/v1/` à `MNUI`. Ce sont deux
+bibliothèques d'interface différentes — ne les réalignez pas.
+
 **Toucher à l'un, c'est toucher à l'autre.** Le vérifier :
 
 ```sh
