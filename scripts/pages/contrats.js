@@ -227,11 +227,12 @@
           : '<p class="champ__aide">Aucune ligne.' +
             (peutEcrire ? " Clique sur « Modifier » pour en ajouter." : "") + "</p>") +
 
-        '<div class="grille grille--sm" style="margin-top:var(--e-4)">' +
-          U.tuile({ label: "Pièces", valeur: t.pieces, icone: "boite" }) +
-          (t.secondes ? U.tuile({ label: "Fabrication", valeur: U.duree(t.secondes),
-            icone: "horloge", ton: "alerte" }) : "") +
-        "</div>" +
+        (t.secondes
+          ? '<div class="grille grille--sm" style="margin-top:var(--e-4)">' +
+              U.tuile({ label: "Fabrication", valeur: U.duree(t.secondes),
+                        icone: "horloge", ton: "alerte" }) +
+            "</div>"
+          : "") +
 
         /* Ce que le client doit apporter, et si l'échange a eu lieu : les deux
            questions qu'on vient poser à un contrat. Ce que l'atelier sort du
