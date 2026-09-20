@@ -666,7 +666,6 @@
           : '<p class="vide">Aucune prestation portée à ce contrat.</p>') +
         '<div class="troc">' +
           "<div><h3>Le client apporte</h3><p>" + tas(t.demande) + "</p></div>" +
-          "<div><h3>L'atelier sort du stock</h3><p>" + tas(t.resources) + "</p></div>" +
         "</div>" +
         (t.secondes ? '<div class="bloc"><h3>Temps de fabrication</h3><p>' +
           U.esc(U.duree(t.secondes)) + "</p></div>" : "") +
