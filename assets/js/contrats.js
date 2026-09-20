@@ -657,6 +657,12 @@
               expire: body.querySelector("#k-expire").value || null,
               etat: body.querySelector("#k-etat").value,
               lignes: propres,
+              /* Cette version ne les édite pas : elle les repasse tels quels
+                 plutôt que de les effacer. */
+              radio: cur.radio || "",
+              vendu: cur.vendu === true,
+              venduLe: cur.venduLe || null,
+              venduPar: cur.venduPar || "",
               creePar: cur.creePar || me.pseudo,
               creeLe: cur.creeLe || maintenant,
               majPar: me.pseudo,

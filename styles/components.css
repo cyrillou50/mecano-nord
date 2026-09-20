@@ -1961,6 +1961,28 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--c-action); outli
   color: var(--c-faible); font-size: var(--t-xs);
 }
 
+/* ---- La vente d'un contrat ----------------------------------------------------
+   Vert quand c'est fait, sourd tant que ça ne l'est pas : la réponse doit se
+   lire sans lire. */
+
+.k-vente {
+  display: flex; align-items: flex-start; gap: var(--e-3);
+  margin-top: var(--e-3);
+  padding: var(--e-3);
+  border-radius: var(--r-2);
+  background: var(--c-carte-2);
+  border: 1px solid var(--c-bord);
+}
+.k-vente svg { width: 20px; height: 20px; flex: none; color: var(--c-faible); }
+.k-vente b { display: block; }
+.k-vente p { margin: 2px 0 0; font-size: var(--t-sm); color: var(--c-second); }
+
+.k-vente.est-faite {
+  background: rgba(168, 255, 82, .08);
+  border-color: rgba(168, 255, 82, .3);
+}
+.k-vente.est-faite svg { color: var(--c-succes, #a8ff52); }
+
 /* ---- Historique de service ----------------------------------------------------
    Le total en tête donne la vue longue sans dérouler ; le bouton du bas va
    chercher les semaines plus anciennes. */

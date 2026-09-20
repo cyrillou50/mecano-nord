@@ -208,6 +208,7 @@
 
         '<div class="grille grille--sm" style="margin-bottom:var(--e-4)">' +
           boite("Client", k.client) +
+          boite("Radio", k.radio) +
           boite("Type", type ? type.name : k.type) +
           boite("Référence", k.ref) +
           boite("Établi le", dateCourte(k.creeLe)) +
@@ -232,11 +233,13 @@
             icone: "horloge", ton: "alerte" }) : "") +
         "</div>" +
 
-        /* Les deux versants du troc, côte à côte : c'est ce qu'on vient lire
-           sur un contrat. */
+        /* Ce que le client doit apporter, et si l'échange a eu lieu : les deux
+           questions qu'on vient poser à un contrat. Ce que l'atelier sort du
+           stock se relit sur la ligne de l'objet, et reste imprimé sur le
+           contrat papier. */
         '<div class="cols-2" style="margin-top:var(--e-4)">' +
           versant("Le client apporte", t.demande, "Aucune contrepartie convenue.") +
-          versant("L'atelier sort du stock", t.resources, "Rien : que des lignes libres.") +
+          panneauVente(k) +
         "</div>" +
 
         (k.note ? '<div style="margin-top:var(--e-4)"><span class="champ__label">Note</span>' +
@@ -255,6 +258,30 @@
       '<span class="tuile__val" style="font-size:var(--t-lg)">' +
       (valeur ? U.esc(valeur) : "—") + "</span></div>";
 
+  /* La vente est distincte de l'état du contrat : celui-ci parle de l'accord,
+     celle-là de la marchandise. Un contrat « en cours » peut être payé, un
+     contrat « terminé » attendre encore son échange. */
+  const panneauVente = k =>
+    '<div class="carte carte--plate"><div class="carte__corps">' +
+      '<span class="champ__label">Vente</span>' +
+      '<div class="k-vente' + (k.vendu ? " est-faite" : "") + '">' +
+        U.icone(k.vendu ? "check" : "horloge") +
+        "<div><b>" + (k.vendu ? "Vente effectuée" : "Pas encore effectuée") + "</b>" +
+          (k.vendu
+            ? "<p>" + U.esc(k.venduLe ? dateCourte(k.venduLe) : "") +
+              (k.venduPar ? " · par " + U.esc(k.venduPar) : "") + "</p>"
+            : "<p>Rien n'a encore été échangé.</p>") +
+        "</div>" +
+      "</div>" +
+      (peutEcrire
+        ? '<div style="margin-top:var(--e-3)">' +
+            U.bouton(k.vendu ? "Annuler la vente" : "Marquer la vente comme effectuée",
+              { variante: k.vendu ? "fantome" : "principal", taille: "sm",
+                icone: k.vendu ? "croix" : "check", action: "vente" }) +
+          "</div>"
+        : "") +
+    "</div></div>";
+
   const versant = (titre, l, vide) =>
     '<div class="carte carte--plate"><div class="carte__corps">' +
       '<span class="champ__label">' + U.esc(titre) + "</span>" +
@@ -272,7 +299,43 @@
     b("pdf").addEventListener("click", () => imprimer(k));
     if (b("mod")) b("mod").addEventListener("click", () => editer(k));
     if (b("sup")) b("sup").addEventListener("click", () => supprimer(k));
+    if (b("vente")) b("vente").addEventListener("click", () => basculerVente(k));
   }
+
+  /**
+   * Marque la vente faite, ou revient dessus. On n'écrit que ce qui change :
+   * le reste du contrat est recopié tel quel, sans repasser par le formulaire.
+   */
+  async function basculerVente(k) {
+    const fait = !k.vendu;
+    if (!fait) {
+      const ok = await U.confirmer({
+        titre: "Annuler la vente",
+        message: "Le contrat repassera en « pas encore effectuée ».",
+        confirmer: "Annuler la vente"
+      });
+      if (!ok) return;
+    }
+
+    const now = new Date().toISOString();
+    const r = await MNRegistre.setContrat(Object.assign(MNStore.clone(k), {
+      vendu: fait,
+      venduLe: fait ? now : null,
+      venduPar: fait ? moi.pseudo : "",
+      majPar: moi.pseudo, majLe: now
+    }));
+    if (!r.ok) return U.toast(r.error || "Enregistrement impossible", "err");
+
+    dessiner();
+    if (r.tropAncien) return U.toast(SERVEUR_ANCIEN, "err");
+    U.toast(fait ? "Vente notée comme effectuée" : "Vente annulée", "ok");
+  }
+
+  /* Le serveur d'avant ces champs les efface en réécrivant le contrat : mieux
+     vaut le dire que laisser croire que c'est enregistré. */
+  const SERVEUR_ANCIEN = "Ton serveur est trop ancien : la radio et la vente " +
+    "ne sont pas gardées. Recopie serveur/serveur.js sur le VPS, puis " +
+    "redémarre-le.";
 
   async function supprimer(k) {
     const ok = await U.confirmer({
@@ -307,10 +370,12 @@
     const corps = document.createElement("div");
     corps.className = "pile";
     corps.innerHTML =
+      U.champ({ id: "k-t", label: "Objet du contrat", valeur: cur.titre, max: 120,
+                repere: "Ex. Remise en état du convoi" }) +
       '<div class="cols-2">' +
-        U.champ({ id: "k-t", label: "Objet du contrat", valeur: cur.titre, max: 120,
-                  repere: "Ex. Remise en état du convoi" }) +
         U.champ({ id: "k-cl", label: "Client", valeur: cur.client, max: 80 }) +
+        U.champ({ id: "k-ra", label: "Radio du client", valeur: cur.radio, max: 40,
+                  repere: "Ex. 123.4", aide: "Pour le joindre quand c'est prêt." }) +
       "</div>" +
       '<div class="cols-3">' +
         U.champ({ id: "k-ref", label: "Référence", valeur: cur.ref, max: 40 }) +
@@ -326,6 +391,13 @@
         '<div class="champ"><span class="champ__label">&nbsp;</span>' +
           '<p class="champ__aide">Un type peut proposer une durée : la choisir remplit ' +
           "la date, qui reste modifiable.</p></div>" +
+      "</div>" +
+      /* La vente n'est pas l'état : on peut créer un contrat déjà payé. */
+      '<div class="champ">' +
+        U.champ({ id: "k-vd", type: "bascule", label: "Vente effectuée",
+                  valeur: cur.vendu }) +
+        '<p class="champ__aide">L\'échange a eu lieu — indépendant de l\'état ' +
+          "du contrat, qui parle de l'accord.</p>" +
       "</div>" +
       '<div class="carte carte--plate"><div class="carte__corps">' +
         '<span class="champ__label">Lignes du contrat</span>' +
@@ -502,6 +574,7 @@
         { label: "Enregistrer", variante: "principal", icone: "check",
           onClick: async (fermer, c, btn) => {
             const g = s => c.querySelector(s).value.trim();
+            const vendu = () => c.querySelector("#k-vd").checked;
             const titre = g("#k-t");
             if (!titre) return U.toast("L'objet du contrat est obligatoire", "err");
 
@@ -517,6 +590,12 @@
               expire: c.querySelector("#k-ex").value || null,
               etat: c.querySelector("#k-et").value,
               lignes: lignes.filter(l => l.itemId || String(l.name).trim()),
+              radio: g("#k-ra"),
+              /* Qui et quand : posés au moment où la case se coche, gardés
+                 tels quels si elle l'était déjà. */
+              vendu: vendu(),
+              venduLe: vendu() ? (cur.venduLe || now) : null,
+              venduPar: vendu() ? (cur.venduPar || moi.pseudo) : "",
               creePar: cur.creePar || moi.pseudo,
               creeLe: cur.creeLe || now,
               majPar: moi.pseudo, majLe: now
@@ -527,6 +606,7 @@
             }
             sel = cur.id || sel;
             fermer(); dessiner();
+            if (r.tropAncien) return U.toast(SERVEUR_ANCIEN, "err");
             U.toast(neuf ? "Contrat créé" : "Contrat mis à jour", "ok");
           } }
       ]
