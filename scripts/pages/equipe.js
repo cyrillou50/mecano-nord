@@ -676,8 +676,6 @@
       });
     }
 
-    brancherHistorique(u);
-
     const g = z.querySelector('[data-a="grade"]');
     if (g) g.addEventListener("click", () => promouvoir(u));
     const e = z.querySelector('[data-a="edit"]');
@@ -874,21 +872,15 @@
      créneaux et son total, plutôt qu'une longue liste plate.
 
      Les semaines s'accumulent sans fin — un an de service en fait cinquante-
-     deux, et la fiche descendrait indéfiniment. On en montre une poignée, du
-     plus récent au plus ancien, et les précédentes viennent à la demande. Un
-     résumé en tête donne la vue longue sans faire défiler quoi que ce soit. */
-
-  const PAS_SEMAINES = 6;
-  let _semVues = PAS_SEMAINES, _semPour = "";
+     deux, et la fiche descendrait indéfiniment. On les range donc par année et
+     par mois : replié, chaque niveau tient sur une ligne, et l'on descend
+     jusqu'au jour cherché sans jamais dérouler le reste. Un résumé en tête
+     donne la vue longue sans rien ouvrir du tout. */
 
   function historique(u, on) {
     /* Tout ce que le tableau partagé garde : c'est lui qui borne l'histoire,
        plus l'affichage. */
     const log = MNDuty.logOf(u.id);
-
-    /* En changeant de fiche, on repart du début : le « voir plus » de la
-       précédente ne concerne pas celle-ci. */
-    if (_semPour !== u.id) { _semPour = u.id; _semVues = PAS_SEMAINES; }
 
     /* Le compteur doit rester joignable pour être rafraîchi chaque seconde :
        on écrit l'encart plutôt que de passer par `alerte()`. */
@@ -950,8 +942,36 @@
     });
 
     const total = semaines.reduce((n, s) => n + s.secondes, 0);
-    const montrees = semaines.slice(0, _semVues);
-    const reste = semaines.length - montrees.length;
+
+    /* Semaines → mois → années. Une semaine à cheval sur deux mois est classée
+       au mois de son lundi : chaque service ne compte ainsi qu'une fois, et le
+       total d'un mois est bien la somme de ce qu'il montre. */
+    const annees = [];
+    semaines.forEach(s => {
+      const d = new Date(s.cle);
+      const an = d.getFullYear(), mo = d.getMonth();
+
+      let A = annees.find(x => x.an === an);
+      if (!A) { A = { an, secondes: 0, services: 0, semaines: 0, mois: [] }; annees.push(A); }
+      A.secondes += s.secondes; A.services += s.services; A.semaines++;
+
+      let M = A.mois.find(x => x.mo === mo);
+      if (!M) {
+        M = { mo, secondes: 0, services: 0, semaines: [],
+              nom: d.toLocaleDateString("fr-FR", { month: "long" }) };
+        A.mois.push(M);
+      }
+      M.secondes += s.secondes; M.services += s.services; M.semaines.push(s);
+    });
+
+    /* Du plus récent au plus ancien, à tous les étages : c'est dans ce sens
+       qu'on cherche. Le journal arrive déjà ainsi, mais une entrée corrigée à
+       la main peut le désordonner. */
+    annees.sort((a, b) => b.an - a.an);
+    annees.forEach(A => {
+      A.mois.sort((a, b) => b.mo - a.mo);
+      A.mois.forEach(M => M.semaines.sort((a, b) => b.cle - a.cle));
+    });
 
     const resume =
       '<div class="eq-histo__tot">' +
@@ -960,19 +980,16 @@
         '<b class="nombre">' + U.esc(MNDuty.dur(total, true)) + "</b>" +
       "</div>";
 
-    const encore = reste
-      ? '<div class="eq-histo__plus">' +
-          U.bouton(reste > 1 ? "Voir " + Math.min(reste, PAS_SEMAINES) + " semaines de plus"
-                             : "Voir la semaine précédente",
-                   { variante: "doux", taille: "sm", icone: "chevron", action: "plus-sem" }) +
-          '<span class="champ__aide">' + reste + " semaine" + (reste > 1 ? "s" : "") +
-            " plus ancienne" + (reste > 1 ? "s" : "") + "</span>" +
-        "</div>"
-      : "";
+    /* Ouverts d'avance : l'année et le mois les plus récents, pour tomber
+       directement sur ce qu'on vient de faire. Plus bas, la semaine en cours —
+       ou la dernière, s'il n'y a rien eu cette semaine. */
+    const premiere = semaines[0];
 
-    return '<div id="e-histo">' + section("Historique de service", log.length, enTete + resume +
-      montrees.map(s =>
-        "<details class=\"eq-sem\"" + (s.cle === cette ? " open" : "") + ">" +
+    const pluriel = (n, mot) => n + " " + mot + (n > 1 ? "s" : "");
+
+    const rendreSemaine = s =>
+        "<details class=\"eq-sem\"" +
+          (s.cle === cette || s === premiere ? " open" : "") + ">" +
           '<summary class="eq-sem__tete">' +
             '<span class="eq-sem__nom">' + U.esc(s.nom) +
               (s.cle === cette ? " " + U.etiquette("en cours", "succes") : "") + "</span>" +
@@ -994,24 +1011,32 @@
               '<b class="nombre">' +
                 U.esc(MNDuty.dur(Math.round(s.secondes / s.jours.length))) + "</b></div>" +
           "</div>" +
-        "</details>").join("") + encore) + "</div>";
-  }
+        "</details>";
 
-  /**
-   * Le bouton « voir plus » ne redessine que son bloc : refaire la fiche
-   * entière la ferait remonter en haut, alors qu'on vient justement de
-   * descendre jusqu'ici pour cliquer.
-   */
-  function brancherHistorique(u) {
-    const b = document.querySelector('#e-histo [data-a="plus-sem"]');
-    if (!b) return;
-    b.addEventListener("click", () => {
-      _semVues += PAS_SEMAINES;
-      const z = document.getElementById("e-histo");
-      if (!z) return;
-      z.outerHTML = historique(u, MNDuty.isOn(u.id));
-      brancherHistorique(u);
-    });
+    const rendreMois = (M, premierDeLAnnee, anneeCourante) =>
+      '<details class="eq-mois"' + (premierDeLAnnee && anneeCourante ? " open" : "") + ">" +
+        '<summary class="eq-mois__tete">' +
+          '<span class="eq-mois__nom">' + U.esc(M.nom) + "</span>" +
+          '<span class="eq-meta">' + pluriel(M.semaines.length, "semaine") + " · " +
+            pluriel(M.services, "service") + "</span>" +
+          '<b class="nombre">' + U.esc(MNDuty.dur(M.secondes, true)) + "</b>" +
+        "</summary>" +
+        '<div class="eq-mois__corps">' + M.semaines.map(rendreSemaine).join("") + "</div>" +
+      "</details>";
+
+    return '<div id="e-histo">' + section("Historique de service", log.length, enTete + resume +
+      annees.map((A, i) =>
+        '<details class="eq-an"' + (i === 0 ? " open" : "") + ">" +
+          '<summary class="eq-an__tete">' +
+            '<span class="eq-an__nom">' + A.an + "</span>" +
+            '<span class="eq-meta">' + pluriel(A.semaines, "semaine") + " · " +
+              pluriel(A.services, "service") + "</span>" +
+            '<b class="nombre">' + U.esc(MNDuty.dur(A.secondes, true)) + "</b>" +
+          "</summary>" +
+          '<div class="eq-an__corps">' +
+            A.mois.map((M, j) => rendreMois(M, j === 0, i === 0)).join("") +
+          "</div>" +
+        "</details>").join("")) + "</div>";
   }
 
   /** « Semaine du 3 au 9 août 2026 », sans répéter ce qui se devine. */

@@ -1975,11 +1975,51 @@ label.motif:has(input:focus-visible) { outline: 2px solid var(--c-action); outli
 }
 .eq-histo__tot b { margin-left: auto; color: var(--c-texte); }
 
-.eq-histo__plus {
+/* Les deux étages au-dessus de la semaine. */
+.eq-an { margin-bottom: var(--e-2); }
+.eq-mois { margin-bottom: 2px; }
+
+.eq-an__tete, .eq-mois__tete {
   display: flex; align-items: center; gap: var(--e-3);
-  margin-top: var(--e-3);
+  padding: var(--e-2) var(--e-3);
+  border-radius: var(--r-2);
+  cursor: pointer;
+  list-style: none;
+  transition: background var(--m-vif);
 }
-.eq-histo__plus .champ__aide { margin: 0; }
+.eq-an__tete::-webkit-details-marker,
+.eq-mois__tete::-webkit-details-marker { display: none; }
+.eq-an__tete:hover, .eq-mois__tete:hover { background: var(--raise); }
+
+.eq-an__tete::before, .eq-mois__tete::before {
+  content: "›";
+  flex: none;
+  color: var(--c-faible);
+  font-size: var(--t-lg);
+  transition: transform var(--m-vif);
+}
+.eq-an[open] > .eq-an__tete::before,
+.eq-mois[open] > .eq-mois__tete::before { transform: rotate(90deg); }
+
+.eq-an__tete { background: var(--c-carte-2); }
+.eq-an__nom {
+  flex: 1; min-width: 0;
+  font-family: var(--f-titre); font-size: var(--t-lg); letter-spacing: .06em;
+}
+.eq-mois__nom {
+  flex: 1; min-width: 0;
+  font-weight: 600;
+  /* « septembre » sort en minuscules de toLocaleDateString. */
+  text-transform: capitalize;
+}
+.eq-an__tete > b, .eq-mois__tete > b {
+  font-family: var(--f-titre); color: var(--c-action-doux);
+}
+.eq-meta { font-size: var(--t-xs); color: var(--c-faible); white-space: nowrap; }
+
+/* Le retrait dit l'imbrication ; il reste discret pour tenir en 390 px. */
+.eq-an__corps { padding: var(--e-2) 0 var(--e-2) var(--e-2); }
+.eq-mois__corps { padding: var(--e-2) 0 0 var(--e-2); }
 
 /* ---- Maintenance -------------------------------------------------------------
    L'écran reprend la carte de connexion : même logo, même place. On reconnaît
