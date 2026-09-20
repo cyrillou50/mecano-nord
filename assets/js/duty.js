@@ -14,7 +14,12 @@ window.MNDuty = (function () {
 
   const FILE = "data/duty.json";
   const K_LOCAL = "mn.duty.local";
-  const MAX_LOG = 120;
+  /* Ce que le site garde en mémoire du journal partagé. À tenir AU MOINS aussi
+     haut que la limite du serveur (voir MAX_LOG dans serveur.js) : plus bas, le
+     site jetterait en lisant des semaines que le serveur conserve — et une fin
+     de service repartirait tronquée vers un serveur trop ancien pour appliquer
+     des opérations. */
+  const MAX_LOG = 1000;
 
   let _board = null;
   let _souci = "";           // dernier problème rencontré, affiché à l'écran
