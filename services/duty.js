@@ -25,6 +25,9 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
 
   let _board = null;
   let _souci = "";           // dernier problème rencontré, affiché à l'écran
+  /* Le tableau en main vient-il bien du serveur ? Faux tant qu'on n'a pas
+     réussi à le lire, et c'est ce qui interdit de l'y réécrire. */
+  let _fiable = false;
 
   const empty = () => ({ updatedAt: new Date(0).toISOString(), onDuty: [], log: [], conges: [] });
 
@@ -135,6 +138,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
     let remote = null;
     const base = baseUrl();
     _souci = "";
+    _fiable = false;   // reconquis seulement si la lecture aboutit
 
     /* La base partagée fait autorité quand elle est configurée. */
     if (base) {
@@ -143,6 +147,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
         if (r.ok) {
           const j = await r.json();
           remote = j ? normalize(j) : empty();   // base vide : ce n'est pas une erreur
+          _fiable = true;
         } else {
           _souci = "La base partagée a répondu " + r.status + ".";
         }
@@ -293,7 +298,15 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
 
   let _ops = null;          // null = pas encore su, true/false ensuite
 
-  /** Sonde une seule fois : le serveur annonce-t-il « ops » ? */
+  /**
+   * Le serveur annonce-t-il « ops » ? Rend true, false, ou **null** quand on
+   * n'a pas pu le lui demander.
+   *
+   * La réponse n'est retenue que s'il a répondu. Un serveur en train de
+   * redémarrer n'est pas un vieux serveur, et conclure « non » une fois pour
+   * toutes faisait basculer chaque geste suivant sur le remplacement du
+   * tableau entier.
+   */
   async function supporteOps() {
     if (_ops !== null) return _ops;
     const base = baseUrl();
@@ -301,17 +314,27 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
     try {
       const sante = base.replace(/[^/]*$/, "") + "sante";
       const r = await fetchDelai(sante, { cache: "no-store" }, 4000);
-      const j = r.ok ? await r.json() : null;
+      if (!r.ok) return null;          // il répondra peut-être mieux tout à l'heure
+      const j = await r.json();
       _ops = !!(j && j.ops);
     } catch (_) {
-      _ops = false;
+      return null;                     // injoignable : on ne conclut rien
     }
     return _ops;
   }
 
-  /** Envoie une opération. Renvoie null si ce mode n'est pas disponible. */
+  /**
+   * Envoie une opération.
+   *
+   * Rend null — et l'appelant se rabat alors sur le tableau entier —
+   * seulement quand le serveur a répondu qu'il ne sait pas faire les
+   * opérations. S'il n'a pas répondu du tout, on rend une erreur : un serveur
+   * muet ne doit jamais déclencher un remplacement complet.
+   */
   async function envoyerOp(op) {
-    if (!(await supporteOps())) return null;
+    const sait = await supporteOps();
+    if (sait === null) return { ok: false, error: "Serveur injoignable." };
+    if (!sait) return null;
     try {
       const r = await fetchDelai(baseUrl(), {
         method: "POST",
@@ -328,7 +351,7 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
       }
       if (!r.ok) return { ok: false, error: "Serveur : erreur " + r.status };
       const j = await r.json();
-      if (j.board) { _board = normalize(j.board); saveLocal(_board); }
+      if (j.board) { _board = normalize(j.board); saveLocal(_board); _fiable = true; }
       return { ok: true, deja: !!j.deja, seconds: j.seconds, retires: j.retires };
     } catch (e) {
       return { ok: false, error: e.name === "AbortError"
@@ -346,6 +369,15 @@ const FILE = (window.MN_CONFIG && MN_CONFIG.dutyFile) || "data/duty.json";
   async function push(b, message) {
     /* Base partagée : un simple PUT, rien à installer pour personne. */
     const base = baseUrl();
+
+    /* Dernier verrou : ceci REMPLACE le tableau du serveur. Tant qu'on n'a
+       pas réussi à le lire au moins une fois, ce qu'on a en main ne vaut
+       rien — et l'écrire effacerait le travail de tout le monde. */
+    if (base && !_fiable) {
+      return { ok: false, error: _souci ||
+        "Le tableau de service n'a pas pu être lu : rien n'a été enregistré." };
+    }
+
     if (base) {
       try {
         const r = await fetchDelai(base, {

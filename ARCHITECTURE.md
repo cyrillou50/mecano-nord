@@ -322,6 +322,59 @@ pas. `setContrat` compare donc ce qu'il a envoyé à ce que le serveur renvoie
 et signale `tropAncien` : la page le dit, au lieu de laisser croire que la
 saisie est passée.
 
+## Pourquoi un onglet ne peut plus effacer le tableau de service
+
+C'est arrivé : le 23 septembre 2026, un redémarrage du serveur a suffi à vider
+les pointages, les personnes en service **et** les congés d'un seul coup. La
+mécanique mérite d'être écrite, parce qu'elle est contre-intuitive.
+
+Le site parle au serveur de deux façons. La bonne, c'est l'**opération** : « il
+prend son service », et le serveur lit, applique, écrit. L'autre est un repli
+pour un serveur trop ancien pour les connaître : le site envoie **tout le
+tableau**, qui remplace celui du serveur. Le premier ne peut rien perdre ; le
+second peut tout perdre.
+
+L'enchaînement était le suivant :
+
+1. Le serveur redémarre. Un onglet resté ouvert n'arrive plus à lire le
+   tableau et retombe sur `data/duty.json`, le fichier de secours du dépôt —
+   deux pointages d'exemple.
+2. Quelqu'un clique sur *Pointer*. Le site demande « sais-tu faire les
+   opérations ? », n'obtient pas de réponse, et en conclut **non** — pour
+   toute la vie de l'onglet.
+3. L'écriture échoue aussi, mais elle a horodaté la copie locale à
+   maintenant. Or, quand le local est plus récent que le serveur, c'est le
+   local qui gagne : c'est fait pour qu'un pointage pris hors ligne ne se
+   perde pas.
+4. Le serveur revient. Le geste suivant passe par le repli — puisque le site
+   croit avoir affaire à un vieux serveur — et envoie sa copie périmée, qui
+   remplace tout.
+
+Trois verrous, chacun suffisant, tous nécessaires parce qu'ils ne couvrent pas
+les mêmes cas :
+
+| Où | Ce qu'il empêche |
+|---|---|
+| `supporteOps` | conclure « vieux serveur » alors qu'il n'a **pas répondu**. La réponse n'est retenue que si elle existe ; sinon on redemandera. |
+| `envoyerOp` | qu'un serveur muet déclenche le repli. Il rend `null` — donc « passe par le tableau entier » — seulement si le serveur a **dit** qu'il ne sait pas faire les opérations. |
+| `push` | réécrire un tableau qu'on n'a jamais réussi à lire (`_fiable`). |
+
+Et un quatrième, côté serveur, parce que les trois premiers vivent dans un
+fichier que les navigateurs gardent en cache : **le serveur refuse un
+remplacement complet par un tableau entièrement vide** quand le sien ne l'est
+pas. Ça ne gêne rien — « Tout effacer » est une opération, qui garde les
+congés et l'autre garage — et ça protège même un onglet ouvert depuis des
+jours avec l'ancien script.
+
+> Le repli « tableau entier » ne sert plus à rien en production : le serveur
+> annonce `ops: true` depuis longtemps. Si un jour il disparaît, ces verrous
+> disparaîtront avec lui.
+
+Deux bancs gardent tout ça : `banc-vidage.js` (le serveur refuse) et
+`banc-panne.html` (un redémarrage avec un onglet ouvert, relais coupable à
+l'appui). Tous deux échouent si on retire les verrous — c'est ce qui les rend
+utiles.
+
 ## La profondeur de l'historique de service
 
 Le journal des services est **commun à tout l'atelier** : une fiche employé n'y
