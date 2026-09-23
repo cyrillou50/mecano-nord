@@ -143,7 +143,8 @@
             '<div class="rang">' +
               '<span class="avatar avatar--sm">' + vignette(e) + "</span>" +
               "<b>" + U.esc(e.pseudo) + "</b>" +
-              '<span class="pousse nombre muet txt-sm">' + U.esc(MNDuty.sinceDur(e.since, true)) + "</span>" +
+              '<span class="pousse nombre muet txt-sm" data-depuis="' +
+                U.esc(e.since) + '">' + U.esc(MNDuty.sinceDur(e.since, true)) + "</span>" +
             "</div>").join("") + "</div>"
         : U.vide({ icone: "horloge", titre: "Atelier vide", texte: "Personne n'a pointé." })
     });
@@ -209,10 +210,8 @@
   function brancher(hote) {
     /* Les durées de service avancent : on les rafraîchit sans redessiner. */
     setInterval(() => {
-      const l = MNDuty.board().onDuty.slice()
-        .sort((a, b) => new Date(a.since) - new Date(b.since));
-      hote.querySelectorAll(".carte .rang .pousse.nombre").forEach((n, i) => {
-        if (l[i]) n.textContent = MNDuty.sinceDur(l[i].since, true);
+      hote.querySelectorAll("[data-depuis]").forEach(n => {
+        n.textContent = MNDuty.sinceDur(n.dataset.depuis, true);
       });
     }, 30000);
   }
