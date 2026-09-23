@@ -322,11 +322,58 @@ pas. `setContrat` compare donc ce qu'il a envoyé à ce que le serveur renvoie
 et signale `tropAncien` : la page le dit, au lieu de laisser croire que la
 saisie est passée.
 
+## Un document refusé n'est pas un document vide
+
+**C'est ce qui a vidé le tableau de service le 23 septembre 2026**, et la
+cause tient en deux lignes qui ne se parlaient pas :
+
+```js
+const MAX_LOG = 1000;                                   // on garde six mois
+if (onDuty.length > 60 || log.length > 300 || …) return null;   // …mais pas ici
+```
+
+En portant `MAX_LOG` de 300 à 1000 pour garder six mois de services, le
+plafond du **nettoyage** est resté à 300. Passé le 301ᵉ pointage, `nettoyer`
+refusait donc le fichier que le serveur venait lui-même d'écrire. Et la route
+lisait ce refus ainsi :
+
+```js
+const actuel = nettoyer(await lire()) || VIDE;   // ← le piège
+```
+
+Un fichier **refusé** devenait un tableau **vide**. L'opération suivante —
+n'importe laquelle : pointer, dépointer, effacer une ligne — s'appliquait donc
+au néant, et ce néant était écrit. Pointages, personnes en service et congés
+partaient ensemble, en un clic, sans erreur affichée.
+
+La règle, désormais, et elle vaut pour tous les fichiers du serveur :
+
+| Le fichier | Ce qu'on en fait |
+|---|---|
+| absent | le document vide — c'est un premier démarrage |
+| présent, refusé au nettoyage | **on lève** : l'appel échoue en 500 et rien n'est écrit |
+
+`lireTableau`, `lireParc`, `lireRegistre` et `lireAgenda` appliquent toutes
+les quatre cette règle. Perdre une écriture est un désagrément ; écrire le
+vide par-dessus six mois de travail n'en est pas un.
+
+> **Deux plafonds qui parlent du même nombre doivent être le même nombre.**
+> Celui de `nettoyer` suit maintenant `MAX_LOG`. C'est la seule protection qui
+> ne se périme pas.
+
+`banc-plafond.js` garde tout ça : un historique de 301, 350 et 450 qui survit
+à une suppression, à un pointage et à une correction, un fichier vraiment
+refusé qui n'est pas écrasé, et un dossier neuf qui reste utilisable. Sans les
+deux corrections, il tombe à 6 OK / 8 FAIL.
+
+---
+
 ## Pourquoi un onglet ne peut plus effacer le tableau de service
 
-C'est arrivé : le 23 septembre 2026, un redémarrage du serveur a suffi à vider
-les pointages, les personnes en service **et** les congés d'un seul coup. La
-mécanique mérite d'être écrite, parce qu'elle est contre-intuitive.
+Une seconde fragilité, trouvée en cherchant la première, et réelle elle aussi :
+un redémarrage du serveur suffisait à faire écrire à un onglet resté ouvert un
+tableau périmé par-dessus le bon. La mécanique mérite d'être écrite, parce
+qu'elle est contre-intuitive.
 
 Le site parle au serveur de deux façons. La bonne, c'est l'**opération** : « il
 prend son service », et le serveur lit, applique, écrit. L'autre est un repli
