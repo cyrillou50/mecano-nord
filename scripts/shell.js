@@ -177,7 +177,10 @@ window.V2Shell = (function () {
       e.stopPropagation();
       /* Construit au clic, pas au montage : l'entrée doit dire l'état du
          moment, et il a pu changer depuis. */
-      const items = [];
+      const items = [{
+        nom: lieADiscord() ? "Mon compte Discord" : "Lier mon Discord",
+        icone: "nuage", onClick: lierDiscord
+      }, { separateur: true }];
       if (MNStore.estCreateur(_session && _session.user)) {
         items.push(MNStore.maintenance().actif
           ? { nom: "Rouvrir le site", icone: "check", onClick: rouvrirSite }
@@ -669,6 +672,103 @@ window.V2Shell = (function () {
     pseudo.focus();
   }
 
+  /* ---- Le compte Discord ----------------------------------------------------
+     Pointer depuis Discord suppose que le bot sache qui l'on est sur le site.
+     Un code fait le pont : le bot le donne en privé dans Discord — lui seul y
+     connaît notre identifiant — et on le colle ici, où le site sait qui est
+     connecté. Ni l'un ni l'autre n'a besoin de connaître l'autre monde, et le
+     code prouve au passage que les deux comptes sont bien à la même personne. */
+
+  const lieADiscord = () =>
+    !!(_session && _session.user && _session.user.discord);
+
+  async function lierDiscord() {
+    const U2 = U();
+
+    /* Sans ce service, ni lier ni délier ne pourraient partir : on le dit
+       plutôt que d'ouvrir une fenêtre dont les boutons ne feraient rien. */
+    try {
+      await chargerEquipeOps();
+    } catch (e) {
+      return U2.toast(String((e && e.message) || e), "err");
+    }
+
+    const lie = lieADiscord();
+
+    const corps = document.createElement("div");
+    corps.className = "pile";
+    corps.innerHTML = lie
+      ? U2.alerte({ ton: "succes", titre: "Ton compte Discord est lié",
+                    texte: "Tu peux pointer depuis Discord avec « /service »." }) +
+        '<p class="champ__aide">Compte lié : <span class="mono">' +
+          esc(_session.user.discord) + "</span></p>"
+      : "<p>Pour pointer depuis Discord, il faut lier les deux comptes une " +
+        "fois pour toutes.</p>" +
+        '<ol class="pile pile--sm" style="margin:0;padding-left:var(--e-5)">' +
+          "<li>Dans Discord, tape <b>/lier</b>. Le bot te répond en privé " +
+            "avec un code.</li>" +
+          "<li>Colle-le ici. Il est valable dix minutes.</li>" +
+        "</ol>" +
+        U2.champ({ id: "lk-code", label: "Le code donné par le bot",
+                   repere: "Ex. K7M2QP", max: 16 }) +
+        '<div id="lk-err"></div>';
+
+    U2.modale({
+      titre: lie ? "Mon compte Discord" : "Lier mon compte Discord",
+      corps,
+      actions: lie
+        ? [{ label: "Fermer", onClick: f => f() },
+           { label: "Délier", variante: "danger", icone: "croix",
+             onClick: (fermer, c, btn) => delier(fermer, btn) }]
+        : [{ label: "Annuler", onClick: f => f() },
+           { label: "Lier", variante: "principal", icone: "check",
+             onClick: (fermer, c, btn) => poserLien(fermer, c, btn) }]
+    });
+  }
+
+  /** Dit pourquoi ça n'a pas marché, sans laisser croire que c'est passé. */
+  function soucisLien(r) {
+    if (r === null) {
+      return "Le serveur ne gère pas encore la liaison, ou des modifications " +
+             "attendent d'être publiées. Réessaie après la publication.";
+    }
+    return (r && r.error) || "La liaison n'a pas pu être enregistrée.";
+  }
+
+  async function poserLien(fermer, corps, btn) {
+    const U2 = U();
+    const code = corps.querySelector("#lk-code").value.trim();
+    if (!code) return U2.toast("Colle d'abord le code donné par le bot", "err");
+
+    btn.disabled = true;
+    const r = await MNEquipe.envoyer({ op: "lier", uid: _session.uid, code });
+    if (!r || !r.ok) {
+      btn.disabled = false;
+      corps.querySelector("#lk-err").innerHTML =
+        U2.alerte({ ton: "erreur", texte: soucisLien(r) });
+      return;
+    }
+
+    /* Le catalogue revient du serveur : la session doit le relire, sinon le
+       menu continuerait de proposer de lier. */
+    try { MNAuth.refresh(); _session = MNAuth.session(); } catch (_) { /* rien */ }
+    fermer();
+    U2.toast("Compte Discord lié — tu peux pointer avec « /service »", "ok");
+  }
+
+  async function delier(fermer, btn) {
+    const U2 = U();
+    btn.disabled = true;
+    const r = await MNEquipe.envoyer({ op: "delier", uid: _session.uid });
+    if (!r || !r.ok) {
+      btn.disabled = false;
+      return U2.toast(soucisLien(r), "err");
+    }
+    try { MNAuth.refresh(); _session = MNAuth.session(); } catch (_) { /* rien */ }
+    fermer();
+    U2.toast("Compte Discord délié", "ok");
+  }
+
   /* ---- Maintenance -----------------------------------------------------------------
      L'état vit dans le catalogue publié ; la règle « qui peut entrer » dans
      MNStore, partagée avec l'ancienne version. Ici, seulement ce qu'on voit. */
@@ -986,13 +1086,18 @@ window.V2Shell = (function () {
      Les chemins sont relatifs à la page, et toutes les pages de la V2 vivent
      dans le même dossier : ils valent donc partout. */
 
-  const SERVICES_LIVRET = ["services/polices.js", "services/texte.js"];
-  let _livretEnRoute = null;
+  /* Certains services ne servent qu'à une fenêtre du squelette. Les poser sur
+     chaque page ferait payer à toutes ce dont une seule se sert : on va les
+     chercher au premier clic, une fois. */
 
-  function chargerServicesLivret() {
-    if (window.MNTexte && window.MNPolices) return Promise.resolve();
-    if (_livretEnRoute) return _livretEnRoute;
-    _livretEnRoute = Promise.all(SERVICES_LIVRET.map(src => new Promise((ok, non) => {
+  const _enRoute = {};
+
+  function charger(srcs, pret) {
+    if (pret()) return Promise.resolve();
+    const cle = srcs.join("|");
+    if (_enRoute[cle]) return _enRoute[cle];
+
+    _enRoute[cle] = Promise.all(srcs.map(src => new Promise((ok, non) => {
       const s = document.createElement("script");
       s.src = src;
       s.onload = ok;
@@ -1001,9 +1106,18 @@ window.V2Shell = (function () {
     })));
     /* Un échec ne doit pas condamner les clics suivants : le réseau peut
        revenir. */
-    _livretEnRoute.catch(() => { _livretEnRoute = null; });
-    return _livretEnRoute;
+    _enRoute[cle].catch(() => { delete _enRoute[cle]; });
+    return _enRoute[cle];
   }
+
+  const chargerServicesLivret = () =>
+    charger(["services/polices.js", "services/texte.js"],
+            () => !!(window.MNTexte && window.MNPolices));
+
+  /* Les gestes de fiche : ils ne vivent que sur la page Équipe, et la liaison
+     Discord se fait depuis n'importe où. */
+  const chargerEquipeOps = () =>
+    charger(["services/equipeops.js"], () => !!window.MNEquipe);
 
   async function aide() {
     const U2 = U();

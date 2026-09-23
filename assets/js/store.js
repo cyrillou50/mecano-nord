@@ -1184,6 +1184,11 @@ window.MNStore = (function () {
         grades: normGrades(u.grades, roleIds),
         /* Sans mention, l'employé est du Nord : l'atelier d'origine. */
         ateliers: normAteliers(u.ateliers, [ATELIER_DEFAUT]),
+        /* Le compte Discord lié, s'il y en a un : c'est lui qui permet de
+           pointer depuis Discord. Il ne se pose pas à la main — un code fait
+           le pont, et prouve que les deux comptes sont à la même personne.
+           Sans cette ligne, la normalisation l'effacerait au chargement. */
+        discord: String(u.discord || "").replace(/[^0-9]/g, "").slice(0, 32),
         /* Exempté du minimum hebdomadaire : ses heures comptent et s'affichent
            comme celles de tout le monde, mais il n'est jamais signalé pour un
            minimum non atteint. (`horsRecap` : le nom d'avant, quand le réglage

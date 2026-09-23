@@ -245,6 +245,33 @@ pas diverger.
 
 ---
 
+## Le pont entre Discord et le site
+
+Le bot ne connaît que des identifiants Discord ; le site ne connaît que des
+fiches. Le serveur de l'atelier fait le pont, et **aucun des deux n'a à
+connaître l'autre monde** :
+
+1. `/lier` → le bot demande un code au serveur (`POST /lien`), qui le retient
+   dix minutes en mémoire, attaché à l'identifiant Discord. Le bot est le seul
+   à connaître cet identifiant.
+2. La personne colle le code sur le site → `{ op: "lier", uid, code }` sur
+   `/equipe`. Le site est le seul à savoir qui est connecté.
+3. Le serveur rapproche les deux et écrit `users[].discord`.
+
+Le code ne sert qu'une fois, et un même compte Discord ne peut pas être lié à
+deux fiches. Un redémarrage du serveur perd les codes en attente : sans
+importance, on en redemande un.
+
+Ensuite, `/service` lit `GET /lien/qui?discord=…` — qui ne rend que de quoi
+pointer, jamais la fiche entière — puis envoie l'opération de pointage
+habituelle sur `/duty`. Un pointage venu de Discord est donc le même qu'un
+pointage venu du site.
+
+> `users[].discord` doit être déclaré dans `normalize` (`store.js` et son
+> jumeau), sans quoi il serait effacé au premier chargement. L'opération
+> `fiche` du serveur, elle, ne touche qu'aux champs qu'on lui envoie : un
+> champ déjà posé survit à une modification de fiche.
+
 ## Ajouter un champ à un contrat (ou à un véhicule, un congé…)
 
 Tout ce qui vit **sur le serveur** y est reconstruit à l'arrivée, à partir

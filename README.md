@@ -268,7 +268,41 @@ Sans serveur, elle est simplement intégrée au fichier de données.
 
 ---
 
-## 7. Fermer le site pour maintenance
+## 7. Pointer depuis Discord
+
+Chacun peut prendre et quitter son service depuis Discord, avec `/service`.
+Il faut d'abord relier les deux comptes, **une fois pour toutes** :
+
+1. Dans Discord, tape **`/lier`**. Le bot répond, à toi seul, avec un code de
+   six lettres valable dix minutes.
+2. Sur le site, clique sur ton nom en bas à gauche → **Lier mon Discord**, et
+   colle le code.
+
+C'est fait. Ensuite, `/service` suffit :
+
+| | |
+|---|---|
+| `/service action:Prendre mon service` | comme le bouton *Pointer* du site |
+| `/service action:Quitter mon service` | le temps est compté comme d'habitude |
+
+Un pointage fait depuis Discord est un pointage comme un autre : il apparaît
+sur la page Service, compte dans les heures de la semaine et dans le
+récapitulatif du lundi.
+
+**Le code passe par Discord, jamais par quelqu'un d'autre.** C'est ce qui
+garantit que la fiche liée est bien la tienne — et ça marche même pour un
+apprenti, qui n'a accès à aucune fiche.
+
+Pour défaire le lien : même menu → **Mon compte Discord** → *Délier*. Un
+responsable peut aussi le retirer depuis la fiche, si quelqu'un part.
+
+> Le bot ne prévient pas le salon de service quand on pointe depuis Discord :
+> c'est le site qui compose ces messages-là. La confirmation n'est visible que
+> de toi.
+
+---
+
+## 8. Fermer le site pour maintenance
 
 Pour travailler tranquille — refaire le catalogue, réorganiser les grades —
 sans que l'équipe utilise le site pendant ce temps.
