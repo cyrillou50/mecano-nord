@@ -284,10 +284,20 @@ C'est fait. Ensuite, `/service` suffit :
 |---|---|
 | `/service action:Prendre mon service` | comme le bouton *Pointer* du site |
 | `/service action:Quitter mon service` | le temps est compté comme d'habitude |
+| `atelier:` | dans quel garage — voir juste en dessous |
 
 Un pointage fait depuis Discord est un pointage comme un autre : il apparaît
 sur la page Service, compte dans les heures de la semaine et dans le
 récapitulatif du lundi.
+
+**Dans quel garage ?** Qui ne travaille que dans un garage n'a rien à
+préciser, le bot prend le sien. Qui est inscrit dans les deux **doit** choisir
+avec l'option `atelier`, sinon son pointage tomberait dans le mauvais salon ;
+le bot le lui dira plutôt que de deviner. Demander un garage où l'on ne
+travaille pas est refusé.
+
+En **quittant** son service, rien à repréciser : c'est le garage de la prise
+qui compte, et le serveur l'a sous les yeux.
 
 **Le code passe par Discord, jamais par quelqu'un d'autre.** C'est ce qui
 garantit que la fiche liée est bien la tienne — et ça marche même pour un
@@ -296,9 +306,9 @@ apprenti, qui n'a accès à aucune fiche.
 Pour défaire le lien : même menu → **Mon compte Discord** → *Délier*. Un
 responsable peut aussi le retirer depuis la fiche, si quelqu'un part.
 
-> Le bot ne prévient pas le salon de service quand on pointe depuis Discord :
-> c'est le site qui compose ces messages-là. La confirmation n'est visible que
-> de toi.
+> **Le salon de service est prévenu**, exactement comme pour un pointage fait
+> sur le site, et dans le salon du garage concerné. La confirmation que te
+> répond le bot, elle, n'est visible que de toi.
 
 ---
 

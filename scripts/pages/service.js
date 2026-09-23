@@ -815,9 +815,11 @@
                    (e.forced ? " " + U.etiquette("sorti par un gérant") : "") +
                    (e.corrigePar ? " " + U.etiquette("corrigé par " + e.corrigePar, "alerte") : "") },
                { nom: "Durée", num: true, rendu: e => U.esc(MNDuty.dur(e.seconds, true)) },
-               { nom: "", rendu: (e, i) => peutGerer
+               { nom: "", rendu: e => peutGerer
                    ? U.bouton("", { icone: "crayon", variante: "fantome", taille: "sm",
-                       titre: "Corriger les heures", action: "fix-" + e.id + "|" + e.in })
+                       titre: "Corriger les heures", action: "fix-" + e.id + "|" + e.in }) +
+                     U.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
+                       titre: "Effacer ce pointage", action: "rml-" + e.id + "|" + e.in })
                    : "" }],
               log)
           : U.vide({ icone: "horloge", titre: "Aucun pointage enregistré" })
@@ -832,6 +834,42 @@
         x.id === s.slice(0, coupe) && x.in === s.slice(coupe + 1));
       if (e) corriger(e); else U.toast("Ce pointage n'existe plus", "err");
     }));
+
+    z.querySelectorAll("[data-a^='rml-']").forEach(b => b.addEventListener("click", () => {
+      const s = b.dataset.a.slice(4);
+      const coupe = s.indexOf("|");
+      effacerPointage(s.slice(0, coupe), s.slice(coupe + 1));
+    }));
+  }
+
+  /**
+   * Efface une ligne de l'historique.
+   * @param {string} uid  la personne
+   * @param {string} iso  son heure d'arrivée, qui distingue la ligne
+   */
+  async function effacerPointage(uid, iso) {
+    /* On relit au moment du clic : entre l'affichage et maintenant, quelqu'un
+       a pu dépointer et décaler toute la liste. */
+    const i = MNDuty.board().log.findIndex(x => x.id === uid && x.in === iso);
+    if (i === -1) return U.toast("Ce pointage n'existe plus", "err");
+    const e = MNDuty.board().log[i];
+
+    const ok = await U.confirmer({
+      titre: "Effacer ce pointage",
+      message: "Le créneau de « " + e.pseudo + " » du " +
+        new Date(e.in).toLocaleString("fr-FR",
+          { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) +
+        " sera retiré de l'historique. Ses heures de la semaine baisseront " +
+        "d'autant.",
+      confirmer: "Effacer", danger: true
+    });
+    if (!ok) return;
+
+    const r = await MNDuty.removeLog(i, moi.pseudo);
+    dessiner();
+    if (r && r.already) return U.toast("Ce pointage n'existe plus", "err");
+    if (r && r.shareError) return U.toast(r.shareError, "err");
+    U.toast("Pointage effacé", "ok");
   }
 
   async function viderHisto() {

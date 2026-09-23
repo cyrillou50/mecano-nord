@@ -267,6 +267,38 @@ pointer, jamais la fiche entière — puis envoie l'opération de pointage
 habituelle sur `/duty`. Un pointage venu de Discord est donc le même qu'un
 pointage venu du site.
 
+### Qui annonce le pointage
+
+Le salon de service doit être prévenu dans les deux cas, mais **une seule
+fois**. La règle est portée par l'opération elle-même, par le drapeau
+`annonce` :
+
+| Qui pointe | `annonce` | Qui envoie le message |
+|---|---|---|
+| le site | absent | le site, comme il l'a toujours fait |
+| le bot | `true` | le **serveur**, depuis la route `/duty` |
+
+C'est le serveur qui compose et envoie pour le bot, parce que **lui seul
+connaît les adresses des salons** — une par garage. Le bot n'a donc aucune
+adresse Discord en dur, et le message reste identique à celui du site
+(`sendDuty` dans `services/webhook.js` en est le modèle, au mot près).
+
+Rien n'est annoncé quand l'opération n'a rien changé (`r.deja`) : pointer deux
+fois ne fait pas deux messages.
+
+### Dans quel salon
+
+À la **prise** de service, le garage vient de la commande : un seul garage sur
+la fiche et il est choisi d'office, deux et il faut le dire, un garage qui
+n'est pas le sien est refusé. Cette règle tient dans une fonction pure,
+`atelierDuPointage(siens, choisi)`, précisément pour être vérifiable sans
+Discord au bout du fil.
+
+À la **fin** de service, le garage ne se redemande pas : la ligne qu'on vient
+de fermer est en tête de `board.log` et porte déjà celui de la prise. Le
+redemander serait une occasion de plus de se tromper, et permettrait de
+clore au sud un service pris au nord.
+
 > `users[].discord` doit être déclaré dans `normalize` (`store.js` et son
 > jumeau), sans quoi il serait effacé au premier chargement. L'opération
 > `fiche` du serveur, elle, ne touche qu'aux champs qu'on lui envoie : un
