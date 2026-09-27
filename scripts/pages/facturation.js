@@ -86,8 +86,14 @@
   /* Le catalogue suit l'atelier où l'on travaille : un objet réservé au Sud
      n'a rien à faire sur le devis du Nord. Sans mention, il est proposé
      partout — un catalogue déjà rempli ne se vide d'aucun côté. */
-  const visibles = () => MNStore.catalog().items.filter(i =>
-    i.enabled && MNStore.estDeAtelier(i, MNAuth.atelier()));
+  const visibles = () => {
+    /* Le grade peut retirer des objets du catalogue de celui qui vend : un
+       apprenti ne vend pas ce que l'atelier ne lui confie pas. */
+    const grade = (MNAuth.session() || {}).roleId;
+    return MNStore.catalog().items.filter(i =>
+      i.enabled && MNStore.estDeAtelier(i, MNAuth.atelier()) &&
+      MNStore.peutVendre(grade, i.id));
+  };
 
   /** Les objets d'une catégorie, sous-catégories comprises. */
   const objetsDe = id => {

@@ -1093,6 +1093,11 @@ window.MNStore = (function () {
     const permKeys = (window.MN_PERMS || []).map(p => p.key);
     const cleanPerms = p => (Array.isArray(p) ? p : []).filter(x => permKeys.indexOf(x) !== -1);
 
+    /* Les objets existent déjà — ils sont normalisés plus haut. Une
+       interdiction qui désigne un objet supprimé n'a plus de sens : on la
+       laisse tomber plutôt que de la traîner indéfiniment. */
+    const idsObjets = c.items.map(x => x.id);
+
     const seenRo = [];
     c.roles = (Array.isArray(c.roles) ? c.roles : []).map((r, i) => {
       const id = uniqueId(r.id || r.name, seenRo); seenRo.push(id);
@@ -1102,6 +1107,9 @@ window.MNStore = (function () {
         color: String(r.color || (window.MN_ROLE_COLORS || ["#ff2bd1"])[i % 10]),
         icon: r.icon || "i-badge",
         perms: cleanPerms(r.perms),
+        /* Ce que ce grade n'a pas le droit de vendre. Vide = il vend tout. */
+        objetsInterdits: (Array.isArray(r.objetsInterdits) ? r.objetsInterdits : [])
+          .map(String).filter(id => idsObjets.indexOf(id) !== -1),
         /* Sans mention, un grade vaut dans les deux ateliers. */
         ateliers: normAteliers(r.ateliers, TOUS_ATELIERS)
       };
@@ -1690,6 +1698,28 @@ window.MNStore = (function () {
   const roleById = id => (_catalog.roles || []).find(r => r.id === id) || null;
   const SANS_ROLE = { id: "", name: "Sans rôle", color: "#6a6280", perms: [] };
 
+  /**
+   * Ce grade a-t-il le droit de vendre cet objet ?
+   *
+   * Un grade inconnu — un invité, par exemple — ne se voit rien interdire :
+   * l'interdiction est un retrait explicite, jamais un défaut.
+   *
+   * @param {string} roleId le grade de la personne
+   * @param {string} itemId l'objet du catalogue
+   */
+  function peutVendre(roleId, itemId) {
+    const r = roleById(roleId);
+    if (!r) return true;
+    return (r.objetsInterdits || []).indexOf(String(itemId)) === -1;
+  }
+
+  /** Les objets qu'un grade ne peut pas vendre, dans l'ordre du catalogue. */
+  function objetsInterditsDe(roleId) {
+    const r = roleById(roleId);
+    const hors = (r && r.objetsInterdits) || [];
+    return (_catalog.items || []).filter(i => hors.indexOf(i.id) !== -1);
+  }
+
   /* Le grade d'ici d'abord, le principal ensuite : un grade supprimé au Sud ne
      doit pas priver quelqu'un de ses droits, il retombe sur le sien. */
   const roleOf = user => (user &&
@@ -1799,6 +1829,7 @@ window.MNStore = (function () {
     saveDraft, discardDraft, adopter, toJSON, download,
     catalog, published, depot, hasDraft, origin, settings, brand, api,
     roleById, roleOf, itemById, resourceById, categoryById,
+    peutVendre, objetsInterditsDe,
     topCategories, subCategories, categoryScope, itemLabel, totals, duree,
     ATELIERS, atelierById, nomAtelier, courtAtelier,
     ateliersDe, estDeAtelier, usersDeAtelier, rolesDeAtelier, normAteliers,

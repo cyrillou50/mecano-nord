@@ -81,6 +81,38 @@ comptes qui gèrent le catalogue ou l'équipe.
 Deux garde-fous : tu ne peux pas te désactiver toi-même, ni prendre (ou
 modifier) un rôle qui te retirerait la gestion de l'équipe.
 
+### Interdire des objets à un rôle
+
+Un apprenti n'a pas forcément à vendre tout le catalogue. Dans **Admin →
+Rôles**, ouvre un rôle : sous les permissions, la liste **« Objets que ce
+grade ne peut pas vendre »** propose tout le catalogue, groupé par catégorie,
+avec un champ de recherche.
+
+Ce que tu coches est ce qui est **interdit**. Un rôle sans rien de coché vend
+tout — c'est le cas par défaut, et un objet ajouté au catalogue plus tard est
+vendable par tout le monde tant que personne ne l'a interdit.
+
+L'objet interdit **disparaît purement et simplement** de la facturation et des
+contrats pour les gens de ce rôle : ils ne le voient pas barré, ils ne le
+voient pas du tout. Les autres rôles n'en savent rien.
+
+> L'interdiction est posée sur le **rôle**, pas sur l'objet. Supprimer un
+> objet du catalogue efface donc l'interdiction qui le visait : rien ne
+> traîne.
+
+### Heures minimum par semaine
+
+Dans **Admin → Le site**, la carte **« Heures minimum par semaine »** fixe ce
+qu'on attend de chacun — **un chiffre par garage**, le Sud n'ayant pas
+forcément le rythme du Nord. En dessous, la personne est signalée dans le
+récapitulatif du dimanche, et la page Service lui montre ce qu'il lui reste à
+faire.
+
+**0 = personne n'est signalé.** Les congés posés, les arrivées en cours de
+semaine et les personnes exemptées y échappent de toute façon. Un employé peut
+aussi avoir son propre minimum, réglé sur sa fiche, qui prime sur celui du
+garage.
+
 ---
 
 ## 3 bis. Service et Discord

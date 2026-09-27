@@ -304,6 +304,41 @@ clore au sud un service pris au nord.
 > `fiche` du serveur, elle, ne touche qu'aux champs qu'on lui envoie : un
 > champ déjà posé survit à une modification de fiche.
 
+## Interdire des objets à un grade
+
+L'interdiction est portée par le **rôle** (`roles[].objetsInterdits`), pas par
+l'objet. Deux raisons, et la seconde est la vraie :
+
+1. C'est ainsi que la question se pose — « que n'a pas le droit de vendre ce
+   grade ? », jamais « qui n'a pas le droit de vendre cet objet ? ».
+2. Un objet **ajouté** au catalogue est vendable par tout le monde sans que
+   personne n'ait à rouvrir neuf grades. Le défaut est permissif, et
+   l'interdiction est un retrait explicite.
+
+La règle vit dans le magasin, en un seul endroit :
+
+```js
+MNStore.peutVendre(roleId, itemId)   // un grade inconnu ne se voit rien interdire
+MNStore.objetsInterditsDe(roleId)    // pour l'affichage
+```
+
+Trois écrans la lisent — la facturation, les contrats et l'ancienne interface.
+Aucun ne refait le raisonnement, et aucun n'affiche l'objet barré : il
+disparaît, parce qu'un objet montré mais refusé ne fait qu'agacer.
+
+`normalize` ne garde que les interdictions qui désignent un objet **existant**
+(les objets sont normalisés avant les rôles, d'où l'ordre dans le fichier).
+Supprimer un objet efface donc l'interdiction qui le visait.
+
+> **Rien à redéployer côté serveur.** Le catalogue y est stocké tel quel — le
+> serveur ne vérifie que la présence de `items`, `roles` et `users` — donc un
+> nouveau champ de rôle y survit sans changement. Ce n'est vrai que du
+> catalogue : le tableau de service, le parc et les contrats, eux, sont
+> reconstruits à partir d'une liste blanche.
+
+`banc-roles.html` couvre la chaîne entière : le panneau, la case, l'écriture
+jusqu'au catalogue du serveur, et la tuile absente de la grille de l'apprenti.
+
 ## Ajouter un champ à un contrat (ou à un véhicule, un congé…)
 
 Tout ce qui vit **sur le serveur** y est reconstruit à l'arrivée, à partir

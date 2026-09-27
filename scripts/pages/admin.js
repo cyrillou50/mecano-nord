@@ -1511,7 +1511,12 @@
           '<div class="ad-corps">' +
             '<b style="color:' + U.esc(r.color) + '">' + U.esc(r.name) + "</b>" +
             '<div class="ad-meta"><i>' + n + " employé" + (n > 1 ? "s" : "") + "</i></div>" +
-            '<div class="ad-meta">' + pastillesDroits(r) + "</div>" +
+            '<div class="ad-meta">' + pastillesDroits(r) +
+              ((r.objetsInterdits || []).length
+                ? " " + U.etiquette(r.objetsInterdits.length + " objet" +
+                    (r.objetsInterdits.length > 1 ? "s" : "") + " interdit" +
+                    (r.objetsInterdits.length > 1 ? "s" : ""), "alerte")
+                : "") + "</div>" +
           "</div>" +
           '<div class="ad-actes">' +
             U.bouton("", { icone: "crayon", variante: "fantome", taille: "sm",
@@ -1579,7 +1584,16 @@
       "</div>" +
 
       '<div class="champ"><span class="champ__label">Permissions du rôle</span>' +
-        '<div class="ad-coches ad-coches--hautes" id="r-droits"></div></div>';
+        '<div class="ad-coches ad-coches--hautes" id="r-droits"></div></div>' +
+
+      '<div class="champ">' +
+        '<span class="champ__label">Objets que ce grade ne peut pas vendre</span>' +
+        '<input class="saisie" id="r-q" type="search" spellcheck="false" ' +
+          'placeholder="Chercher un objet" aria-label="Chercher un objet">' +
+        '<div class="ad-coches ad-coches--hautes" id="r-objets" ' +
+          'style="margin-top:var(--e-2)"></div>' +
+        '<p class="champ__aide" id="r-bilan"></p>' +
+      "</div>";
 
     const vue = corps.querySelector("#r-vue");
     corps.querySelector('[data-a="r-pick"]').addEventListener("click", () =>
@@ -1645,6 +1659,76 @@
     }
     peindre();
 
+    /* Les objets interdits à ce grade. */
+    let interdits = (cur.objetsInterdits || []).slice();
+    const zObjets = corps.querySelector("#r-objets");
+    const qObjets = corps.querySelector("#r-q");
+    const zBilan = corps.querySelector("#r-bilan");
+
+    const nomCategorie = id => {
+      const k = brouillon.categories.find(x => x.id === id);
+      return k ? k.name : "Sans catégorie";
+    };
+
+    function majBilan() {
+      const n = interdits.length;
+      const s = n > 1 ? "s" : "";
+      zBilan.textContent = n
+        ? n + " objet" + s + " interdit" + s + " à ce grade."
+        : "Ce grade peut vendre tout le catalogue.";
+    }
+
+    function peindreObjets() {
+      const q = qObjets.value.trim().toLowerCase();
+      const vus = brouillon.items.filter(it =>
+        !q || it.name.toLowerCase().indexOf(q) !== -1 ||
+        nomCategorie(it.category).toLowerCase().indexOf(q) !== -1);
+
+      /* Groupés par catégorie : le catalogue est trop long à plat. */
+      const groupes = [];
+      vus.forEach(it => {
+        let g = groupes.find(x => x.id === it.category);
+        if (!g) {
+          g = { id: it.category, nom: nomCategorie(it.category), objets: [] };
+          groupes.push(g);
+        }
+        g.objets.push(it);
+      });
+
+      zObjets.innerHTML = groupes.length
+        ? groupes.map(g =>
+            '<div class="ad-coches__titre">' + U.esc(g.nom) + "</div>" +
+            g.objets.map(it => {
+              /* Deux objets peuvent porter le même nom dans la même
+                 catégorie : c'est le garage qui les distingue. On ne le dit
+                 que quand il distingue vraiment. */
+              const dits = [];
+              const ou = it.ateliers || [];
+              if (ou.length === 1) dits.push(MNStore.nomAtelier(ou[0]));
+              if (!it.enabled) dits.push("désactivé au catalogue");
+              return '<button type="button" class="ad-coche' +
+                (interdits.indexOf(it.id) !== -1 ? " est-cochee" : "") +
+                '" data-o="' + U.esc(it.id) + '">' +
+                '<span class="ad-coche__case">' + U.icone("check") + "</span>" +
+                "<span><b>" + U.esc(it.name) + "</b>" +
+                (dits.length ? "<i>" + U.esc(dits.join(" · ")) + "</i>" : "") +
+                "</span></button>";
+            }).join("")).join("")
+        : '<p class="champ__aide" style="padding:var(--e-2)">Aucun objet ne correspond.</p>';
+
+      zObjets.querySelectorAll("[data-o]").forEach(b => b.addEventListener("click", () => {
+        const i = interdits.indexOf(b.dataset.o);
+        if (i === -1) interdits.push(b.dataset.o); else interdits.splice(i, 1);
+        /* On bascule la case sur place : tout repeindre remonterait la liste
+           en haut, et cocher trois objets d'affilée deviendrait pénible. */
+        b.classList.toggle("est-cochee", i === -1);
+        majBilan();
+      }));
+    }
+    qObjets.addEventListener("input", peindreObjets);
+    peindreObjets();
+    majBilan();
+
     U.modale({
       titre: neuf ? "Nouveau rôle" : "Modifier le rôle", corps,
       actions: [
@@ -1667,10 +1751,12 @@
             if (neuf) {
               brouillon.roles.push({
                 id: MNStore.uniqueId(nom, brouillon.roles.map(x => x.id)),
-                name: nom, color: teinte, icon: icone, perms: droits
+                name: nom, color: teinte, icon: icone, perms: droits,
+                objetsInterdits: interdits
               });
             } else {
               r.name = nom; r.color = teinte; r.icon = icone; r.perms = droits;
+              r.objetsInterdits = interdits;
             }
             valider(); fermer();
             U.toast(neuf ? "Rôle créé" : "Rôle mis à jour", "ok");
@@ -2384,6 +2470,23 @@
           "</div>"
         }) +
 
+        U.carte({ titre: "Heures minimum par semaine", corps:
+          '<p class="champ__aide" style="margin-bottom:var(--e-3)">' +
+            "En dessous de ce nombre d'heures, la personne est signalée dans le " +
+            "récapitulatif du dimanche, et la page Service lui montre ce qu'il lui reste " +
+            "à faire. Chaque garage a le sien : le Sud n'a pas forcément le même rythme " +
+            "que le Nord.</p>" +
+          '<div class="cols-2">' +
+            MNStore.ATELIERS.map(a =>
+              U.champ({ id: "s-min-" + a.id, label: a.nom, type: "number",
+                        min: 0, plafond: 168,
+                        valeur: MNStore.minimumDe(a.id) })).join("") +
+          "</div>" +
+          '<p class="champ__aide" style="margin-top:var(--e-3)">' +
+            "<b>0 = personne n'est signalé.</b> Les congés posés et les personnes " +
+            "exemptées y échappent de toute façon.</p>"
+        }) +
+
         U.carte({ titre: "Zone sensible", corps:
           '<p class="champ__aide" style="margin-bottom:var(--e-3)">Efface le brouillon local ' +
             "et recharge la version actuellement en ligne. Tes modifications non publiées " +
@@ -2415,6 +2518,16 @@
     z.querySelector("#s-nom").addEventListener("input", () => { if (!logo) peindreLogo(); });
 
     z.querySelector('[data-a="save"]').addEventListener("click", () => {
+      /* Un minimum par garage. Ce qu'un champ n'a pas su lire retombe sur ce
+         qui était réglé : mieux vaut ne rien changer que remettre à zéro. */
+      brouillon.settings.minimum = brouillon.settings.minimum || {};
+      MNStore.ATELIERS.forEach(a => {
+        const v = Number(z.querySelector("#s-min-" + a.id).value);
+        brouillon.settings.minimum[a.id] = isNaN(v)
+          ? MNStore.minimumDe(a.id)
+          : Math.max(0, Math.min(168, Math.round(v)));
+      });
+
       brouillon.settings.brand.name = z.querySelector("#s-nom").value.trim() || "Atelier";
       brouillon.settings.brand.tagline = z.querySelector("#s-slogan").value.trim();
       brouillon.settings.brand.logo = logo;

@@ -365,7 +365,10 @@
     let lignes = MNStore.clone(cur.lignes).map(l =>
       Object.assign({ demande: [] }, l, { demande: (l.demande || []).slice() }));
 
-    const objets = MNStore.catalog().items.filter(i => i.enabled);
+    /* Même règle qu'à la facturation : on ne s'engage pas par contrat sur un
+       objet qu'on n'a pas le droit de vendre. */
+    const objets = MNStore.catalog().items.filter(i =>
+      i.enabled && MNStore.peutVendre((moi || {}).roleId, i.id));
     const ress = MNStore.catalog().resources;
 
     const corps = document.createElement("div");
