@@ -1540,19 +1540,18 @@
 /* Liste de permissions : plus haute, chaque ligne portant sa description. */
 .ad-coches--hautes { max-height: 300px; }
 
-/* Un intertitre dans une liste à cocher. Quarante objets à plat ne se lisent
-   pas : il leur faut le nom de leur catégorie. Collant, parce qu'en faisant
-   défiler on perd sinon de vue ce qu'on est en train de cocher. */
-.ad-coches__titre {
-  position: sticky; top: calc(var(--e-2) * -1); z-index: 1;
-  margin: var(--e-2) calc(var(--e-2) * -1) 0;
-  padding: var(--e-2) var(--e-3) 4px;
-  background: var(--c-creux);
+/* Une liste à cocher sur trois niveaux : catégorie, sous-catégorie, objet.
+   Le retrait dit la hiérarchie — quarante objets à plat ne se lisent pas. */
+.ad-coche--tete { margin-top: var(--e-3); }
+.ad-coche--tete:first-child { margin-top: 0; }
+.ad-coche--tete b {
   font-size: var(--t-xs); font-weight: 700;
   text-transform: uppercase; letter-spacing: .06em;
-  color: var(--c-faible);
 }
-.ad-coches__titre:first-child { margin-top: calc(var(--e-2) * -1); }
+.ad-coche--sous { padding-left: var(--e-5); }
+.ad-coche--sous b { font-weight: 700; }
+.ad-coche--objet { padding-left: var(--e-6); }
+.ad-coche--objet b { font-weight: 500; }
 
 /* Étiquette d'absence : dite, mais sans insister. */
 .ad-etiq--vide { border-style: dashed; opacity: .7; }

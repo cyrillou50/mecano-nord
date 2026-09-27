@@ -85,20 +85,41 @@ modifier) un rôle qui te retirerait la gestion de l'équipe.
 
 Un apprenti n'a pas forcément à vendre tout le catalogue. Dans **Admin →
 Rôles**, ouvre un rôle : sous les permissions, la liste **« Objets que ce
-grade ne peut pas vendre »** propose tout le catalogue, groupé par catégorie,
-avec un champ de recherche.
+grade ne peut pas vendre »** propose tout le catalogue, avec un champ de
+recherche, sur trois niveaux :
 
-Ce que tu coches est ce qui est **interdit**. Un rôle sans rien de coché vend
-tout — c'est le cas par défaut, et un objet ajouté au catalogue plus tard est
-vendable par tout le monde tant que personne ne l'a interdit.
+```
+CUSTOMISATION            ← la catégorie entière
+  Carrosserie            ← une sous-catégorie entière
+    Kit phares xénon     ← un objet
+```
+
+**Tout se coche.** Ce que tu coches est ce qui est **interdit**. Cocher
+« Customisation » retire ses quatre sous-catégories d'un coup — leurs lignes
+se cochent alors et se verrouillent, puisque c'est décidé plus haut.
+
+Un rôle sans rien de coché vend tout : c'est le cas par défaut.
+
+Deux objets peuvent porter le même nom (ton catalogue a quatre « Kit de
+réparation »). Chaque ligne affiche donc son **garage** sous son nom quand
+l'objet n'appartient qu'à l'un des deux.
+
+La phrase sous la liste compte ce qui compte vraiment : **le nombre d'objets
+que la personne ne verra plus**, peu importe par quel bout tu l'as retiré.
 
 L'objet interdit **disparaît purement et simplement** de la facturation et des
 contrats pour les gens de ce rôle : ils ne le voient pas barré, ils ne le
 voient pas du tout. Les autres rôles n'en savent rien.
 
+> **Une catégorie interdite vaut aussi pour l'avenir.** Un objet que tu
+> ajouteras plus tard dans « Carrosserie » sera interdit sans que tu aies à y
+> revenir — c'est toute la différence avec cocher ses objets un par un.
+> À l'inverse, un objet ajouté dans une catégorie **non** interdite est
+> vendable par tout le monde tant que personne ne l'a retiré.
+
 > L'interdiction est posée sur le **rôle**, pas sur l'objet. Supprimer un
-> objet du catalogue efface donc l'interdiction qui le visait : rien ne
-> traîne.
+> objet — ou une catégorie — du catalogue efface donc l'interdiction qui le
+> visait : rien ne traîne.
 
 ### Heures minimum par semaine
 

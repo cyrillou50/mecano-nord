@@ -1097,6 +1097,7 @@ window.MNStore = (function () {
        interdiction qui désigne un objet supprimé n'a plus de sens : on la
        laisse tomber plutôt que de la traîner indéfiniment. */
     const idsObjets = c.items.map(x => x.id);
+    const idsCats = c.categories.map(x => x.id);
 
     const seenRo = [];
     c.roles = (Array.isArray(c.roles) ? c.roles : []).map((r, i) => {
@@ -1110,6 +1111,9 @@ window.MNStore = (function () {
         /* Ce que ce grade n'a pas le droit de vendre. Vide = il vend tout. */
         objetsInterdits: (Array.isArray(r.objetsInterdits) ? r.objetsInterdits : [])
           .map(String).filter(id => idsObjets.indexOf(id) !== -1),
+        /* Des catégories entières, sous-catégories comprises. */
+        categoriesInterdites: (Array.isArray(r.categoriesInterdites) ? r.categoriesInterdites : [])
+          .map(String).filter(id => idsCats.indexOf(id) !== -1),
         /* Sans mention, un grade vaut dans les deux ateliers. */
         ateliers: normAteliers(r.ateliers, TOUS_ATELIERS)
       };
@@ -1701,8 +1705,9 @@ window.MNStore = (function () {
   /**
    * Ce grade a-t-il le droit de vendre cet objet ?
    *
-   * Un grade inconnu — un invité, par exemple — ne se voit rien interdire :
-   * l'interdiction est un retrait explicite, jamais un défaut.
+   * Deux façons de le lui retirer : l'objet lui-même, ou la catégorie qui le
+   * contient. Un grade inconnu — un invité, par exemple — ne se voit rien
+   * interdire : l'interdiction est un retrait explicite, jamais un défaut.
    *
    * @param {string} roleId le grade de la personne
    * @param {string} itemId l'objet du catalogue
@@ -1710,14 +1715,29 @@ window.MNStore = (function () {
   function peutVendre(roleId, itemId) {
     const r = roleById(roleId);
     if (!r) return true;
-    return (r.objetsInterdits || []).indexOf(String(itemId)) === -1;
+
+    const id = String(itemId);
+    if ((r.objetsInterdits || []).indexOf(id) !== -1) return false;
+
+    const cats = r.categoriesInterdites || [];
+    if (!cats.length) return true;
+    const it = itemById(id);
+    if (!it) return true;
+
+    /* Interdire une catégorie interdit ce qu'elle contient, sous-catégories
+       comprises : « Customisation » ne porte aucun objet en direct, et la
+       cocher sans descendre n'interdirait rien du tout. */
+    return !cats.some(k => categoryScope(k).indexOf(it.category) !== -1);
   }
 
-  /** Les objets qu'un grade ne peut pas vendre, dans l'ordre du catalogue. */
+  /**
+   * Les objets qu'un grade ne peut pas vendre, dans l'ordre du catalogue.
+   * Ceux retirés par leur catégorie y sont compris : c'est ce qui compte
+   * pour qui regarde, peu importe par quel bout l'interdiction a été posée.
+   */
   function objetsInterditsDe(roleId) {
-    const r = roleById(roleId);
-    const hors = (r && r.objetsInterdits) || [];
-    return (_catalog.items || []).filter(i => hors.indexOf(i.id) !== -1);
+    if (!roleById(roleId)) return [];
+    return (_catalog.items || []).filter(i => !peutVendre(roleId, i.id));
   }
 
   /* Le grade d'ici d'abord, le principal ensuite : un grade supprimé au Sud ne

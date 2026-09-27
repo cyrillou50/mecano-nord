@@ -1249,6 +1249,20 @@
      deux questions différentes, et les mélanger rendait l'onglet illisible. */
 
   /** Les droits d'un rôle, en étiquettes. « admin » les résume toutes. */
+  /**
+   * Ce qu'on a retiré à un grade, dit en objets.
+   *
+   * On compte le résultat, pas les cases cochées : interdire une catégorie
+   * de dix objets et en interdire dix un à un reviennent au même pour celui
+   * qui vend, et c'est ce qu'il faut lire ici.
+   */
+  function retraits(role) {
+    const n = MNStore.objetsInterditsDe(role.id).length;
+    if (!n) return "";
+    const s = n > 1 ? "s" : "";
+    return " " + U.etiquette(n + " objet" + s + " retiré" + s, "alerte");
+  }
+
   function pastillesDroits(role) {
     const p = role.perms.indexOf("admin") !== -1 ? ["admin"] : role.perms;
     if (!p.length) return '<span class="etiq ad-etiq--vide">aucun droit</span>';
@@ -1511,12 +1525,7 @@
           '<div class="ad-corps">' +
             '<b style="color:' + U.esc(r.color) + '">' + U.esc(r.name) + "</b>" +
             '<div class="ad-meta"><i>' + n + " employé" + (n > 1 ? "s" : "") + "</i></div>" +
-            '<div class="ad-meta">' + pastillesDroits(r) +
-              ((r.objetsInterdits || []).length
-                ? " " + U.etiquette(r.objetsInterdits.length + " objet" +
-                    (r.objetsInterdits.length > 1 ? "s" : "") + " interdit" +
-                    (r.objetsInterdits.length > 1 ? "s" : ""), "alerte")
-                : "") + "</div>" +
+            '<div class="ad-meta">' + pastillesDroits(r) + retraits(r) + "</div>" +
           "</div>" +
           '<div class="ad-actes">' +
             U.bouton("", { icone: "crayon", variante: "fantome", taille: "sm",
@@ -1659,23 +1668,66 @@
     }
     peindre();
 
-    /* Les objets interdits à ce grade. */
+    /* Ce que ce grade ne peut pas vendre : des objets, et des catégories
+       entières. Les deux se cochent dans la même liste. */
     let interdits = (cur.objetsInterdits || []).slice();
+    let catsOff = (cur.categoriesInterdites || []).slice();
     const zObjets = corps.querySelector("#r-objets");
     const qObjets = corps.querySelector("#r-q");
     const zBilan = corps.querySelector("#r-bilan");
 
+    const categorieDe = id => brouillon.categories.find(x => x.id === id) || null;
     const nomCategorie = id => {
-      const k = brouillon.categories.find(x => x.id === id);
+      const k = categorieDe(id);
       return k ? k.name : "Sans catégorie";
     };
+    /* La catégorie au-dessus, ou "" pour une principale. */
+    const parentDe = id => {
+      const k = categorieDe(id);
+      return (k && k.parent) || "";
+    };
+    /* Interdite directement, ou par la catégorie qui la contient. */
+    const catCoupee = id => catsOff.indexOf(id) !== -1;
+    const catHeritee = id => {
+      const p = parentDe(id);
+      return !!p && catsOff.indexOf(p) !== -1;
+    };
+    const objetCoupe = it =>
+      catCoupee(it.category) || catHeritee(it.category) ||
+      interdits.indexOf(it.id) !== -1;
 
     function majBilan() {
-      const n = interdits.length;
+      /* On annonce le résultat, pas la façon d'y arriver : ce qui compte est
+         le nombre d'objets que la personne ne verra plus. */
+      const n = brouillon.items.filter(objetCoupe).length;
+      if (!n) { zBilan.textContent = "Ce grade peut vendre tout le catalogue."; return; }
       const s = n > 1 ? "s" : "";
-      zBilan.textContent = n
-        ? n + " objet" + s + " interdit" + s + " à ce grade."
-        : "Ce grade peut vendre tout le catalogue.";
+      const c = catsOff.length;
+      zBilan.textContent = n + " objet" + s + " retiré" + s + " à ce grade" +
+        (c ? " (dont " + c + " catégorie" + (c > 1 ? "s entières" : " entière") + ")" : "") + ".";
+    }
+
+    /** Une ligne à cocher. `bloquee` = décidée plus haut, on ne la touche pas. */
+    function ligne(attr, id, titre, sous, cochee, bloquee, classes) {
+      return '<button type="button" class="ad-coche' + (classes ? " " + classes : "") +
+        (cochee ? " est-cochee" : "") + (bloquee ? " est-bloquee" : "") +
+        '" ' + attr + '="' + U.esc(id) + '">' +
+        '<span class="ad-coche__case">' + U.icone("check") + "</span>" +
+        "<span><b>" + U.esc(titre) + "</b>" +
+        (sous ? "<i>" + U.esc(sous) + "</i>" : "") + "</span></button>";
+    }
+
+    function ligneObjet(it) {
+      /* Deux objets peuvent porter le même nom dans la même catégorie : c'est
+         le garage qui les distingue. On ne le dit que quand il distingue. */
+      const dits = [];
+      const ou = it.ateliers || [];
+      if (ou.length === 1) dits.push(MNStore.nomAtelier(ou[0]));
+      if (!it.enabled) dits.push("désactivé au catalogue");
+      const parCat = catCoupee(it.category) || catHeritee(it.category);
+      if (parCat) dits.push("toute la catégorie est interdite");
+      return ligne("data-o", it.id, it.name, dits.join(" · "),
+                   objetCoupe(it), parCat, "ad-coche--objet");
     }
 
     function peindreObjets() {
@@ -1684,50 +1736,59 @@
         !q || it.name.toLowerCase().indexOf(q) !== -1 ||
         nomCategorie(it.category).toLowerCase().indexOf(q) !== -1);
 
-      /* Groupés par catégorie : le catalogue est trop long à plat. */
-      const groupes = [];
-      vus.forEach(it => {
-        let g = groupes.find(x => x.id === it.category);
-        if (!g) {
-          g = { id: it.category, nom: nomCategorie(it.category), objets: [] };
-          groupes.push(g);
-        }
-        g.objets.push(it);
-      });
+      const parCat = {};
+      vus.forEach(it => { (parCat[it.category] = parCat[it.category] || []).push(it); });
 
-      zObjets.innerHTML = groupes.length
-        ? groupes.map(g =>
-            '<div class="ad-coches__titre">' + U.esc(g.nom) + "</div>" +
-            g.objets.map(it => {
-              /* Deux objets peuvent porter le même nom dans la même
-                 catégorie : c'est le garage qui les distingue. On ne le dit
-                 que quand il distingue vraiment. */
-              const dits = [];
-              const ou = it.ateliers || [];
-              if (ou.length === 1) dits.push(MNStore.nomAtelier(ou[0]));
-              if (!it.enabled) dits.push("désactivé au catalogue");
-              return '<button type="button" class="ad-coche' +
-                (interdits.indexOf(it.id) !== -1 ? " est-cochee" : "") +
-                '" data-o="' + U.esc(it.id) + '">' +
-                '<span class="ad-coche__case">' + U.icone("check") + "</span>" +
-                "<span><b>" + U.esc(it.name) + "</b>" +
-                (dits.length ? "<i>" + U.esc(dits.join(" · ")) + "</i>" : "") +
-                "</span></button>";
-            }).join("")).join("")
+      /* Deux niveaux, comme au catalogue. Les objets vivent presque tous dans
+         les sous-catégories : sans le niveau du dessus, « toute la
+         Customisation » demanderait de cocher ses quatre sous-catégories. */
+      const hauts = brouillon.categories.filter(k => !k.parent).map(k => ({
+        cat: k,
+        direct: parCat[k.id] || [],
+        sous: brouillon.categories.filter(s => s.parent === k.id)
+          .map(s => ({ cat: s, objets: parCat[s.id] || [] }))
+          .filter(s => s.objets.length)
+      })).filter(h => h.direct.length || h.sous.length);
+
+      zObjets.innerHTML = hauts.length
+        ? hauts.map(h =>
+            ligne("data-k", h.cat.id, h.cat.name, "", catCoupee(h.cat.id), false,
+                  "ad-coche--tete") +
+            h.direct.map(ligneObjet).join("") +
+            h.sous.map(s =>
+              ligne("data-k", s.cat.id, s.cat.name,
+                    catHeritee(s.cat.id) ? "comprise dans la catégorie du dessus" : "",
+                    catCoupee(s.cat.id) || catHeritee(s.cat.id), catHeritee(s.cat.id),
+                    "ad-coche--sous") +
+              s.objets.map(ligneObjet).join("")).join("")).join("")
         : '<p class="champ__aide" style="padding:var(--e-2)">Aucun objet ne correspond.</p>';
 
+      /* Cocher une catégorie change l'état de tout ce qu'elle contient : ici,
+         contrairement à un objet seul, il faut bien tout repeindre. On garde
+         la position de défilement, sinon la liste saute sous les doigts. */
+      zObjets.querySelectorAll("[data-k]").forEach(b => b.addEventListener("click", () => {
+        if (b.classList.contains("est-bloquee")) return;
+        const i = catsOff.indexOf(b.dataset.k);
+        if (i === -1) catsOff.push(b.dataset.k); else catsOff.splice(i, 1);
+        const ou = zObjets.scrollTop;
+        peindreObjets();
+        zObjets.scrollTop = ou;
+      }));
+
       zObjets.querySelectorAll("[data-o]").forEach(b => b.addEventListener("click", () => {
+        if (b.classList.contains("est-bloquee")) return;
         const i = interdits.indexOf(b.dataset.o);
         if (i === -1) interdits.push(b.dataset.o); else interdits.splice(i, 1);
-        /* On bascule la case sur place : tout repeindre remonterait la liste
-           en haut, et cocher trois objets d'affilée deviendrait pénible. */
+        /* Un objet seul ne change que sa propre case : on la bascule sur
+           place, sinon cocher trois objets d'affilée remonterait la liste. */
         b.classList.toggle("est-cochee", i === -1);
         majBilan();
       }));
+
+      majBilan();
     }
     qObjets.addEventListener("input", peindreObjets);
     peindreObjets();
-    majBilan();
 
     U.modale({
       titre: neuf ? "Nouveau rôle" : "Modifier le rôle", corps,
@@ -1752,11 +1813,12 @@
               brouillon.roles.push({
                 id: MNStore.uniqueId(nom, brouillon.roles.map(x => x.id)),
                 name: nom, color: teinte, icon: icone, perms: droits,
-                objetsInterdits: interdits
+                objetsInterdits: interdits, categoriesInterdites: catsOff
               });
             } else {
               r.name = nom; r.color = teinte; r.icon = icone; r.perms = droits;
               r.objetsInterdits = interdits;
+              r.categoriesInterdites = catsOff;
             }
             valider(); fermer();
             U.toast(neuf ? "Rôle créé" : "Rôle mis à jour", "ok");

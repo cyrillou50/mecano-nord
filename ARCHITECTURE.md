@@ -315,12 +315,29 @@ l'objet. Deux raisons, et la seconde est la vraie :
    personne n'ait à rouvrir neuf grades. Le défaut est permissif, et
    l'interdiction est un retrait explicite.
 
+Deux façons de retirer un objet : `roles[].objetsInterdits` (l'objet lui-même)
+et `roles[].categoriesInterdites` (toute une catégorie, **sous-catégories
+comprises** — `categoryScope` s'en charge, et c'est indispensable ici puisque
+les catégories principales ne portent aucun objet en direct).
+
+La différence entre les deux n'est pas cosmétique : une catégorie interdite
+**vaut pour ce qu'on y ajoutera plus tard**. Cocher ses objets un à un ne le
+ferait pas. C'est la seule raison pour laquelle elle est stockée telle quelle
+au lieu d'être dépliée en une liste d'objets à l'enregistrement.
+
 La règle vit dans le magasin, en un seul endroit :
 
 ```js
 MNStore.peutVendre(roleId, itemId)   // un grade inconnu ne se voit rien interdire
-MNStore.objetsInterditsDe(roleId)    // pour l'affichage
+MNStore.objetsInterditsDe(roleId)    // les deux causes confondues, pour l'affichage
 ```
+
+`objetsInterditsDe` passe par `peutVendre` plutôt que de relire les listes :
+ce qu'on affiche ne peut donc pas diverger de ce qu'on applique.
+
+> **L'interface compte des objets, pas des cases.** « 26 objets retirés » se
+> lit du premier coup ; « 1 catégorie et 1 objet » demande d'aller vérifier ce
+> que contient la catégorie.
 
 Trois écrans la lisent — la facturation, les contrats et l'ancienne interface.
 Aucun ne refait le raisonnement, et aucun n'affiche l'objet barré : il
@@ -336,8 +353,15 @@ Supprimer un objet efface donc l'interdiction qui le visait.
 > catalogue : le tableau de service, le parc et les contrats, eux, sont
 > reconstruits à partir d'une liste blanche.
 
-`banc-roles.html` couvre la chaîne entière : le panneau, la case, l'écriture
-jusqu'au catalogue du serveur, et la tuile absente de la grille de l'apprenti.
+`banc-roles.html` couvre la chaîne entière : le panneau, les cases aux trois
+niveaux, l'écriture jusqu'au catalogue du serveur, la tuile absente de la
+grille de l'apprenti — et l'objet ajouté **après coup** dans une catégorie
+interdite, que personne n'a coché et qui est pourtant déjà retiré. Sans les
+deux corrections il tombe à 15 échecs.
+
+> Ce banc écrit dans le catalogue du serveur d'essai, donc il le salit :
+> `preparer-roles.js` repose l'état de départ avant chaque passage. Un banc
+> qu'on ne peut pas rejouer ne sert qu'une fois.
 
 ## Ajouter un champ à un contrat (ou à un véhicule, un congé…)
 
