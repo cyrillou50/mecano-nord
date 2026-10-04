@@ -1171,6 +1171,25 @@
 .eq-ordre button:hover:not(:disabled) { color: var(--c-action-doux); }
 .eq-ordre button:disabled { opacity: .25; cursor: not-allowed; }
 
+/* Glisser une ligne pour la ranger. Le trait dit où elle tombera : au-dessus
+   ou au-dessous de la ligne survolée.
+
+   Un trait en pseudo-élément plutôt qu'une ombre intérieure : la ligne
+   sélectionnée en porte déjà une, et les deux s'écraseraient. */
+.eq-item[draggable="true"] { cursor: grab; }
+.eq-item[draggable="true"]:active { cursor: grabbing; }
+.eq-item.est-pris { opacity: .4; }
+.eq-item.est-cible-haut, .eq-item.est-cible-bas { position: relative; }
+.eq-item.est-cible-haut::after,
+.eq-item.est-cible-bas::after {
+  content: ""; position: absolute; left: 0; right: 0;
+  height: 2px; border-radius: 2px;
+  background: var(--c-action);
+  pointer-events: none;
+}
+.eq-item.est-cible-haut::after { top: -1px; }
+.eq-item.est-cible-bas::after { bottom: -1px; }
+
 /* Vert en service, rouge en congés : les deux s'excluent. */
 .eq-point {
   flex: none;

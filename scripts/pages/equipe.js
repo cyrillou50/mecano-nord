@@ -344,14 +344,16 @@
           ? U.bouton("Ajouter aux archives", { variante: "principal", taille: "sm",
                                                icone: "plus", bloc: true, action: "archadd" })
           : "") +
-        (ranger && filtre
-          ? '<p class="champ__aide">Vide la recherche pour réorganiser.</p>'
+        (ranger
+          ? '<p class="champ__aide">' + (filtre
+              ? "Vide la recherche pour réorganiser."
+              : "Glisse une ligne où tu veux, ou sers-toi des flèches.") + "</p>"
           : "") +
       "</div>" +
 
       '<div class="duo__corps">' +
         (l.length
-          ? l.map(u => ligne(u, trie)).join("")
+          ? l.map((u, p) => ligne(u, trie, p, l.length)).join("")
           : '<p class="champ__aide" style="padding:var(--e-3)">' +
             (vueArchives && !f && !tranche
               ? "Personne n'a encore quitté l'atelier. Les fiches des partants " +
@@ -374,21 +376,28 @@
     brancherListe(z);
   }
 
-  function ligne(u, trie) {
+  /**
+   * Une ligne de la liste.
+   * @param {object} u    l'employé
+   * @param {boolean} trie  on est en train de réorganiser
+   * @param {number} p    son rang DANS CE QUI EST AFFICHÉ, pas dans le fichier
+   * @param {number} n    le nombre de lignes affichées
+   */
+  function ligne(u, trie, p, n) {
     const r = grade(u);
     const on = MNDuty.isOn(u.id);
-    const i = brouillon.users.indexOf(u);
     const c = congeDuJour(u.id);
 
     return '<div class="duo__item eq-item' + (u.id === sel ? " is-actif" : "") +
-      (u.active ? "" : " est-eteint") + '" data-u="' + U.esc(u.id) +
-      '" role="button" tabindex="0">' +
+      (u.active ? "" : " est-eteint") + '" data-u="' + U.esc(u.id) + '"' +
+      (trie ? ' draggable="true"' : "") +
+      ' role="button" tabindex="0">' +
       (trie
         ? '<span class="eq-ordre">' +
             '<button data-mv="haut" data-u2="' + U.esc(u.id) + '"' +
-              (i === 0 ? " disabled" : "") + ' aria-label="Monter">▲</button>' +
+              (p === 0 ? " disabled" : "") + ' aria-label="Monter">▲</button>' +
             '<button data-mv="bas" data-u2="' + U.esc(u.id) + '"' +
-              (i === brouillon.users.length - 1 ? " disabled" : "") +
+              (p === n - 1 ? " disabled" : "") +
               ' aria-label="Descendre">▼</button>' +
           "</span>"
         : "") +
@@ -430,6 +439,114 @@
     "</div>";
   }
 
+  /* ---- Réorganiser ------------------------------------------------------------
+     Deux façons de faire : les flèches, et le glissement. Les deux passent
+     par `placer`, qui raisonne sur l'ordre AFFICHÉ.
+
+     C'est tout l'enjeu : le fichier contient aussi l'autre garage, les
+     masqués et les archives. Se décaler d'un cran dedans, c'est souvent
+     sauter par-dessus une fiche que personne ne voit — et ne rien déplacer à
+     l'écran. On s'ancre donc sur un voisin visible, et les invisibles restent
+     exactement où elles sont. */
+
+  /**
+   * Met quelqu'un à une nouvelle place dans la liste affichée.
+   * @param {string} uid  qui l'on déplace
+   * @param {number} vers sa place voulue, comptée **sans lui** (0 = en tête)
+   */
+  function placer(uid, vers) {
+    const vus = visibles();
+    const p = vus.findIndex(x => x.id === uid);
+    if (p === -1) return;
+
+    const reste = vus.filter(x => x.id !== uid);
+    const n = Math.max(0, Math.min(reste.length, vers));
+    if (n === p) return;                       // il est déjà là
+
+    const tous = brouillon.users;
+    const moi = tous.splice(tous.indexOf(vus[p]), 1)[0];
+
+    /* Devant la ligne qui occupera cette place — ou derrière la dernière,
+       s'il n'y a plus personne devant. */
+    const apres = reste[n];
+    if (apres) {
+      tous.splice(tous.indexOf(apres), 0, moi);
+    } else {
+      const dernier = reste[reste.length - 1];
+      tous.splice(dernier ? tous.indexOf(dernier) + 1 : tous.length, 0, moi);
+    }
+
+    brouillon = MNStore.saveDraft(brouillon);
+    V2Shell.brouillon(dessiner);
+    liste();
+  }
+
+  /**
+   * Le glisser-déposer de la liste.
+   *
+   * Les flèches restent : au doigt, le glissement du navigateur n'existe pas,
+   * et au clavier non plus.
+   */
+  function brancherGlisser(z) {
+    const lignes = z.querySelectorAll('.eq-item[draggable="true"]');
+    if (!lignes.length) return;
+
+    let pris = null;
+    const nettoyer = () => z.querySelectorAll(".eq-item").forEach(x =>
+      x.classList.remove("est-pris", "est-cible-haut", "est-cible-bas"));
+
+    /* La moitié du haut veut dire « avant cette ligne », celle du bas
+       « après » : c'est ce que le trait annonce. */
+    const versLeHaut = (el, e) => {
+      const r = el.getBoundingClientRect();
+      return (e.clientY - r.top) < r.height / 2;
+    };
+
+    lignes.forEach(el => {
+      el.addEventListener("dragstart", e => {
+        pris = el.dataset.u;
+        el.classList.add("est-pris");
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = "move";
+          /* Firefox refuse de démarrer un glissement sans donnée attachée. */
+          try { e.dataTransfer.setData("text/plain", pris); } catch (_) { /* rien */ }
+        }
+      });
+
+      el.addEventListener("dragend", () => { pris = null; nettoyer(); });
+
+      el.addEventListener("dragover", e => {
+        if (!pris || el.dataset.u === pris) return;
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+        const haut = versLeHaut(el, e);
+        el.classList.toggle("est-cible-haut", haut);
+        el.classList.toggle("est-cible-bas", !haut);
+      });
+
+      el.addEventListener("dragleave", () =>
+        el.classList.remove("est-cible-haut", "est-cible-bas"));
+
+      el.addEventListener("drop", e => {
+        e.preventDefault(); e.stopPropagation();
+        const qui = pris;
+        nettoyer(); pris = null;
+        if (!qui || el.dataset.u === qui) return;
+
+        const vus = visibles();
+        const p = vus.findIndex(x => x.id === qui);
+        const q = vus.findIndex(x => x.id === el.dataset.u);
+        if (p === -1 || q === -1) return;
+
+        /* La place visée se compte SANS la ligne qu'on déplace : la retirer
+           décale d'un cran tout ce qui la suivait. */
+        let vers = q > p ? q - 1 : q;
+        if (!versLeHaut(el, e)) vers += 1;
+        placer(qui, vers);
+      });
+    });
+  }
+
   function brancherListe(z) {
     const ch = z.querySelector("#e-cherche");
     ch.addEventListener("input", () => {
@@ -465,20 +582,21 @@
     if (t) t.addEventListener("click", () => {
       ranger = !ranger;
       liste();
-      U.toast(ranger ? "Réorganisation : utilise les flèches" : "Réorganisation terminée", "info");
+      U.toast(ranger
+        ? "Réorganisation : glisse les lignes, ou utilise les flèches"
+        : "Réorganisation terminée", "info");
     });
 
     z.querySelectorAll("[data-mv]").forEach(b => b.addEventListener("click", e => {
       e.stopPropagation();
       if (b.disabled) return;
-      const i = brouillon.users.findIndex(x => x.id === b.dataset.u2);
-      const j = i + (b.dataset.mv === "haut" ? -1 : 1);
-      if (j < 0 || j >= brouillon.users.length) return;
-      brouillon.users.splice(j, 0, brouillon.users.splice(i, 1)[0]);
-      brouillon = MNStore.saveDraft(brouillon);
-      V2Shell.brouillon(dessiner);
-      liste();
+      const vus = visibles();
+      const p = vus.findIndex(x => x.id === b.dataset.u2);
+      if (p === -1) return;
+      placer(b.dataset.u2, p + (b.dataset.mv === "haut" ? -1 : 1));
     }));
+
+    brancherGlisser(z);
 
     const m = z.querySelector('[data-a="masques"]');
     if (m) m.addEventListener("click", () => {

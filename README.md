@@ -81,6 +81,19 @@ comptes qui gèrent le catalogue ou l'équipe.
 Deux garde-fous : tu ne peux pas te désactiver toi-même, ni prendre (ou
 modifier) un rôle qui te retirerait la gestion de l'équipe.
 
+### Ranger la liste de l'équipe
+
+Dans **Équipe**, le bouton à droite de *Recruter* passe la liste en mode
+rangement. Deux façons de déplacer quelqu'un :
+
+- **Glisse la ligne** où tu veux. Un trait montre où elle tombera, au-dessus
+  ou au-dessous de celle que tu survoles.
+- **Les flèches ▲▼**, qui restent là pour le clavier et le téléphone — le
+  glisser du navigateur n'existe pas au doigt.
+
+L'ordre est celui de **ton garage**. Les fiches que tu ne vois pas — l'autre
+garage, les masquées, les archives — ne bougent pas d'un pouce.
+
 ### Interdire des objets à un rôle
 
 Un apprenti n'a pas forcément à vendre tout le catalogue. Dans **Admin →

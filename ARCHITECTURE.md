@@ -304,6 +304,37 @@ clore au sud un service pris au nord.
 > `fiche` du serveur, elle, ne touche qu'aux champs qu'on lui envoie : un
 > champ déjà posé survit à une modification de fiche.
 
+## Déplacer une ligne dans une liste filtrée
+
+Le piège a coûté la réorganisation de l'équipe : les flèches décalaient d'un
+cran dans `brouillon.users`, **le fichier entier**, alors que la liste à
+l'écran est filtrée — l'autre garage, les masqués, les archives.
+
+Entre deux voisins affichés dorment parfois vingt fiches invisibles. Le clic
+déplaçait alors la personne d'un cran dans le fichier, par-dessus une fiche
+que personne ne voit : **rien ne bougeait à l'écran**, et le bouton passait
+pour cassé au bout de quelques clics. Les flèches `disabled` étaient fausses
+pour la même raison — le premier affiché n'est presque jamais l'indice 0.
+
+La règle, pour toute liste qu'on peut réordonner :
+
+> **On raisonne sur l'ordre affiché, et on s'ancre sur un voisin visible.**
+> Jamais sur un indice dans la collection complète.
+
+`placer(uid, vers)` prend la place voulue **dans la liste affichée, comptée
+sans la ligne qu'on déplace**, retrouve le voisin visible correspondant, et
+insère juste devant lui dans le fichier. Les fiches invisibles restent où
+elles sont : on n'a rien à leur dire. Les flèches et le glisser-déposer
+passent tous les deux par là.
+
+C'est le même piège que celui du tableau de bord, où les heures d'un collègue
+s'écrivaient dans les siennes : **une position n'identifie rien**. Un élément
+doit porter de quoi se reconnaître — ici son `id`.
+
+`banc-ordre.html` le garde, et commence par vérifier qu'il y a bien des fiches
+invisibles entre des voisins affichés : sans ce trou, le banc validerait aussi
+l'ancien code. Sans le correctif, il tombe à 7 échecs.
+
 ## Interdire des objets à un grade
 
 L'interdiction est portée par le **rôle** (`roles[].objetsInterdits`), pas par
