@@ -153,11 +153,192 @@
     return tete + livret.slice(0, Math.max(0, place - COUPE.length)) + COUPE;
   }
 
+  /* ---- Sommaire ----------------------------------------------------------------
+     Le livret fait des milliers de caractères et une trentaine de sections
+     numérotées. Les retrouver à la molette est une corvée : on relève les
+     titres, on pose une ancre sur chacun, et une barre collante dit à la fois
+     où l'on est et où l'on peut aller.
+
+     Les ancres sont posées à l'AFFICHAGE, jamais dans le texte enregistré :
+     le livret appartient à qui l'écrit, et on ne lui glisse pas des attributs
+     dans le dos à chaque ouverture de page. */
+
+  /** Un identifiant d'ancre tiré d'un titre. */
+  function ancre(txt) {
+    const s = String(txt || "")
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")   // « é » devient « e »
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48);
+    return "l-" + (s || "section");
+  }
+
+  /**
+   * Pose une ancre sur chaque titre et relève le sommaire.
+   * @param {string} html le livret, déjà nettoyé pour l'affichage
+   * @returns {{html:string, entrees:Array<{id:string,texte:string,niveau:number}>}}
+   */
+  function avecAncres(html) {
+    const doc = new DOMParser().parseFromString('<div id="r">' + html + "</div>", "text/html");
+    const r = doc.getElementById("r");
+    if (!r) return { html, entrees: [] };
+
+    const pris = {};
+    const entrees = [];
+    r.querySelectorAll("h2, h3").forEach(h => {
+      const texte = (h.textContent || "").replace(/\s+/g, " ").trim();
+      if (!texte) return;
+      /* Deux sections peuvent porter le même nom : on numérote les suivantes
+         plutôt que de les faire pointer toutes au même endroit. */
+      let id = ancre(texte);
+      pris[id] = (pris[id] || 0) + 1;
+      if (pris[id] > 1) id += "-" + pris[id];
+      h.setAttribute("id", id);
+      entrees.push({ id, texte, niveau: h.tagName === "H3" ? 3 : 2 });
+    });
+    return { html: r.innerHTML, entrees };
+  }
+
+  /** La barre du sommaire. Rien du tout si le livret est court. */
+  function vueSommaire(entrees) {
+    if (entrees.length < 4) return "";
+    return '<nav class="som" id="l-som">' +
+      '<button type="button" class="som__barre" data-a="som" aria-expanded="false" ' +
+        'aria-controls="l-som-liste">' +
+        U.icone("contrat") +
+        '<span class="som__ou" id="l-som-ou">Sommaire</span>' +
+        '<span class="som__n">' + entrees.length + "</span>" +
+        '<span class="som__chev">' + U.icone("chevron") + "</span>" +
+      "</button>" +
+      '<div class="som__liste" id="l-som-liste" hidden>' +
+        entrees.map(e =>
+          '<a class="som__e' + (e.niveau === 3 ? " som__e--sous" : "") +
+            '" href="#' + U.esc(e.id) + '" data-va="' + U.esc(e.id) + '">' +
+            U.esc(e.texte) + "</a>").join("") +
+      "</div></nav>";
+  }
+
+  /* Les deux écoutes posées sur la fenêtre et le document : on garde de quoi
+     les retirer, sinon un second rendu de la page en empile une de plus. */
+  let surDefilement = null;
+  let surClicAilleurs = null;
+
+  function brancherSommaire() {
+    if (surDefilement) { window.removeEventListener("scroll", surDefilement); surDefilement = null; }
+    if (surClicAilleurs) { document.removeEventListener("click", surClicAilleurs); surClicAilleurs = null; }
+
+    const nav = $("#l-som");
+    if (!nav) return;
+
+    const barre = nav.querySelector('[data-a="som"]');
+    const liste = $("#l-som-liste");
+    const ou = $("#l-som-ou");
+    const liens = [].slice.call(liste.querySelectorAll("[data-va]"));
+    const titres = liens.map(a => document.getElementById(a.dataset.va)).filter(Boolean);
+
+    const ouvrir = v => {
+      liste.hidden = !v;
+      nav.classList.toggle("est-ouvert", v);
+      barre.setAttribute("aria-expanded", v ? "true" : "false");
+    };
+    barre.addEventListener("click", e => { e.stopPropagation(); ouvrir(liste.hidden); });
+
+    /* Ouvert, le sommaire couvre le texte : un clic ailleurs le referme. */
+    surClicAilleurs = e => { if (!nav.contains(e.target)) ouvrir(false); };
+    document.addEventListener("click", surClicAilleurs);
+
+    function aller(id) {
+      const h = document.getElementById(id);
+      if (!h) return;
+      /* Le glissement est agréable, mais pas pour tout le monde : qui a
+         demandé moins d'animations saute directement, comme le reste du site
+         (voir la requête « prefers-reduced-motion » dans les jetons). */
+      const doux = !window.matchMedia ||
+        !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      h.scrollIntoView({ behavior: doux ? "smooth" : "auto", block: "start" });
+      /* L'adresse suit, sans déclencher un second saut. */
+      try { history.replaceState(null, "", "#" + id); } catch (_) { /* rien */ }
+      /* Le repère suit tout de suite. Avec un défilement doux, les évènements
+         n'arrivent qu'au fil de l'animation : sans cette ligne, la barre
+         afficherait encore la section précédente pendant une seconde, juste
+         après qu'on a cliqué sur la suivante. */
+      marquer(h);
+
+      /* Un texte uniforme ne dit pas où l'on vient d'atterrir : on le signale
+         un instant. */
+      h.classList.add("est-vise");
+      setTimeout(() => h.classList.remove("est-vise"), 1600);
+    }
+
+    liens.forEach(a => a.addEventListener("click", e => {
+      e.preventDefault();
+      ouvrir(false);
+      aller(a.dataset.va);
+    }));
+
+    /* Où en est-on ? Le dernier titre passé sous la barre du haut. La barre
+       repliée l'affiche : le sommaire sert autant à se repérer qu'à sauter. */
+    /* Le seuil : un titre devient « celui où l'on est » dès qu'il passe sous
+       les deux barres. On le lit dans la marge que le CSS réserve déjà pour
+       l'atterrissage (scroll-margin-top), sinon les deux chiffres divergent
+       au premier changement de hauteur — et sauter à une section afficherait
+       le nom de la précédente. */
+    const seuil = (titres.length
+      ? parseFloat(getComputedStyle(titres[0]).scrollMarginTop) || 132
+      : 132) + 8;
+
+    /** Dit où l'on est, dans la barre et dans la liste. */
+    function marquer(h) {
+      ou.textContent = h ? (h.textContent || "").trim() : "Sommaire";
+      liens.forEach(a => a.classList.toggle("est-ici", !!h && a.dataset.va === h.id));
+    }
+
+    /** Le dernier titre passé sous les deux barres. */
+    function repere() {
+      let actif = null;
+      titres.forEach(h => { if (h.getBoundingClientRect().top <= seuil) actif = h; });
+      marquer(actif);
+    }
+
+    /* Une fois par image, pas une fois par évènement : le défilement en émet
+       des dizaines par seconde, et cinquante mesures de position à chaque
+       fois finiraient par se sentir. */
+    let prevu = false;
+    surDefilement = () => {
+      if (prevu) return;
+      prevu = true;
+      requestAnimationFrame(() => { prevu = false; repere(); });
+    };
+    window.addEventListener("scroll", surDefilement, { passive: true });
+    repere();
+
+    /* Une adresse qui désigne une section y emmène — mais seulement une fois
+       la page posée. Le livret charge ses polices après coup, et elles
+       changent la hauteur de chaque titre : sauter trop tôt, c'est viser une
+       position qui n'existera plus une seconde après, et atterrir cinquante
+       pixels plus haut que le bon endroit. */
+    const vise = decodeURIComponent((location.hash || "").slice(1));
+    if (vise && document.getElementById(vise)) {
+      const sauter = () => aller(vise);
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => setTimeout(sauter, 60)).catch(() => setTimeout(sauter, 200));
+      } else {
+        setTimeout(sauter, 200);
+      }
+    }
+  }
+
   /* ---- Rendu ---- */
 
   function dessiner() {
     const livret = MNStore.livretDe(MNAuth.atelier()).trim();
     const peutEcrire = V2Shell.peut("admin", "items");
+    /* Les ancres et le sommaire se préparent avant le rendu : la carte a
+       besoin des deux d'un coup. */
+    const pages = livret
+      ? avecAncres(MNTexte.pourAffichage(livret))
+      : { html: "", entrees: [] };
 
     /* La question d'abord : un apprenti arrive avec une question, pas avec
        l'envie de lire trois écrans. Le livret est juste dessous pour qui veut
@@ -185,7 +366,7 @@
             U.icone("crayon") + "<span>Le modifier</span></a>"
           : "",
         corps: livret
-          ? '<div class="livret">' + MNTexte.pourAffichage(livret) + "</div>"
+          ? vueSommaire(pages.entrees) + '<div class="livret">' + pages.html + "</div>"
           : '<p class="champ__aide">Le livret n\'a pas encore été écrit. ' +
             (peutEcrire
               ? "Tu peux t'en charger dans l'administration, onglet « Livret »."
@@ -194,6 +375,7 @@
 
     peindreFil();
     majAssistant();
+    brancherSommaire();
 
     hote.querySelector('[data-a="go"]').addEventListener("click", demander);
     $("#a-q").addEventListener("keydown", e => {

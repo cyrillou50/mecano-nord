@@ -304,6 +304,47 @@ clore au sud un service pris au nord.
 > `fiche` du serveur, elle, ne touche qu'aux champs qu'on lui envoie : un
 > champ déjà posé survit à une modification de fiche.
 
+## Le sommaire du livret
+
+Les ancres sont posées **à l'affichage**, jamais dans le texte enregistré
+(`avecAncres` dans `scripts/pages/livret.js`). Le livret appartient à qui
+l'écrit : on ne lui glisse pas des attributs dans le dos à chaque ouverture de
+page, et `MNTexte.nettoyer` n'aurait de toute façon pas gardé un `id`.
+
+L'identifiant vient du titre, accents transcrits ; un doublon est numéroté.
+Renommer une section change donc son adresse — c'est le prix d'un lien
+lisible, et il est assumé.
+
+### Deux chiffres qui doivent rester le même
+
+Un titre atterrit à `scroll-margin-top` du haut (la hauteur des deux barres).
+Le suivi « où suis-je » doit utiliser **ce même nombre** comme seuil, sinon
+sauter à une section affiche le nom de la précédente — à deux pixels près.
+Il est donc lu dans le CSS (`getComputedStyle(...).scrollMarginTop`) au lieu
+d'être recopié dans le JavaScript.
+
+### Le repère ne se contente pas d'écouter le défilement
+
+Après un clic, `aller()` marque la section tout de suite au lieu d'attendre
+l'évènement de défilement : avec un défilement doux, les évènements arrivent
+au fil de l'animation, et la barre afficherait encore la section précédente
+pendant une seconde.
+
+> **`scroll-behavior: smooth` est posé sur `html`** (`base.css`) : il
+> s'applique donc à *tout* défilement de la page, y compris un `scrollTo`
+> programmé. Il ignorait `prefers-reduced-motion` ; l'exception est
+> maintenant juste en dessous de la règle — et pas dans `tokens.css`, qui est
+> chargée **avant** et perdrait l'arbitrage à spécificité égale.
+>
+> Conséquence pour les bancs : sans forcer `--force-prefers-reduced-motion`,
+> **aucun défilement n'est observable** en navigateur sans interface, car une
+> animation ne s'exécute pas sous temps virtuel. `banc-sommaire.html` doit
+> être lancé avec ce drapeau.
+
+`requestAnimationFrame` ne tourne pas non plus dans une iframe sous temps
+virtuel : le banc vérifie donc le **calcul** du repère à la main, et son
+effet par les sauts, qui eux ne passent pas par l'animation.
+
 ## Le livret : un seul tamis, trois usages
 
 `MNTexte.nettoyer` réduit le HTML du livret à une liste blanche de balises,

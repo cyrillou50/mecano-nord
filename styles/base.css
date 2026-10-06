@@ -7,7 +7,16 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* Un saut de sommaire glisse jusqu'à la section plutôt que d'y téléporter :
+     on garde ainsi le fil de l'endroit d'où l'on vient. */
   scroll-behavior: smooth;
+}
+
+/* Sauf pour qui demande justement qu'on arrête de faire glisser les choses.
+   L'exception est ici et pas dans tokens.css : cette feuille-là est chargée
+   avant, et à spécificité égale c'est la dernière qui gagne. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
 }
 
 body {

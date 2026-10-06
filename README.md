@@ -81,6 +81,27 @@ comptes qui gèrent le catalogue ou l'équipe.
 Deux garde-fous : tu ne peux pas te désactiver toi-même, ni prendre (ou
 modifier) un rôle qui te retirerait la gestion de l'équipe.
 
+### Se déplacer dans le livret
+
+Dès que le livret dépasse quatre titres, une barre **Sommaire** apparaît
+au-dessus et **reste collée en haut** pendant qu'on lit. Elle sert deux fois :
+
+- elle **dit où tu es** — le nom de la section en cours s'y affiche ;
+- elle **ouvre la liste** de toutes les sections, sous-titres compris, et un
+  clic t'y emmène.
+
+Les sections gardent la numérotation que tu écris : « 7. PORT DU CUIR »
+apparaît tel quel dans le sommaire.
+
+Chaque section a sa propre adresse. `livret.html#l-7-port-du-cuir` ouvre le
+livret directement à cette section — pratique pour l'envoyer à quelqu'un sur
+Discord. L'adresse de la barre suit ce que tu lis, donc il suffit de la copier.
+
+> Le sommaire se construit tout seul à partir de tes titres. Tu n'as rien à
+> déclarer : écris un titre, il y apparaît. Renommer une section change son
+> adresse, en revanche — un lien envoyé il y a trois semaines pointera alors
+> sur le livret, mais plus sur la bonne section.
+
 ### Écrire le livret
 
 L'onglet **Livret** porte un éditeur de texte : gras, titres, listes, tailles,

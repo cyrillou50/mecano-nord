@@ -2807,3 +2807,83 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
 .objet__cout img,
 .objet__cout svg { width: 15px; height: 15px; flex: none; }
 .objet__cout i { font-style: normal; color: var(--c-faible); }
+
+/* ---- Sommaire du livret ------------------------------------------------------
+   Le livret fait plusieurs milliers de caractères et une trentaine de sections
+   numérotées. Une barre collante dit où l'on est et ouvre la liste : on ne
+   parcourt pas trente sections à la molette pour retrouver la septième. */
+
+.som {
+  position: sticky;
+  top: calc(var(--l-topbar) + var(--e-2));
+  z-index: var(--z-sticky);
+  margin-bottom: var(--e-4);
+}
+.som__barre {
+  display: flex; align-items: center; gap: var(--e-2);
+  width: 100%;
+  padding: var(--e-2) var(--e-3);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-2);
+  background: color-mix(in srgb, var(--c-carte) 92%, transparent);
+  backdrop-filter: blur(10px);
+  color: var(--c-texte);
+  font: inherit; text-align: left;
+  cursor: pointer;
+  transition: border-color var(--m-vif);
+}
+.som__barre:hover { border-color: var(--c-action); }
+.som__barre svg { width: 16px; height: 16px; flex: none; color: var(--c-faible); }
+.som__ou {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--t-sm); font-weight: 600;
+}
+.som__n {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: var(--r-plein);
+  background: var(--c-creux);
+  font-size: var(--t-xs); color: var(--c-faible);
+}
+.som__chev { display: flex; transition: transform var(--m-vif); }
+.som.est-ouvert .som__chev { transform: rotate(180deg); }
+
+.som__liste {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+  display: flex; flex-direction: column;
+  max-height: min(60vh, 420px); overflow-y: auto;
+  padding: var(--e-2);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-2);
+  background: var(--c-carte);
+  box-shadow: var(--o-2);
+}
+.som__e {
+  padding: 6px var(--e-3);
+  border-radius: var(--r-1);
+  color: var(--c-second);
+  font-size: var(--t-sm); line-height: 1.35;
+  text-decoration: none;
+}
+.som__e:hover {
+  background: rgba(255, 255, 255, .06);
+  color: var(--c-texte); text-decoration: none;
+}
+.som__e--sous {
+  padding-left: var(--e-5);
+  font-size: var(--t-xs); color: var(--c-faible);
+}
+.som__e.est-ici { background: var(--c-action-fond); color: var(--c-action-doux); }
+
+/* La barre du haut et celle du sommaire recouvrent le titre visé : on réserve
+   leur hauteur, sinon on atterrit systématiquement une ligne trop bas. */
+.livret h2, .livret h3 { scroll-margin-top: calc(var(--l-topbar) + 72px); }
+
+/* Un texte uniforme ne dit pas où l'on vient d'atterrir : on le signale un
+   instant, puis on s'efface. */
+.livret .est-vise { animation: som-vise 1.6s ease-out; border-radius: var(--r-1); }
+@keyframes som-vise {
+  0%, 40% { background: var(--c-action-fond); box-shadow: 0 0 0 6px var(--c-action-fond); }
+  100% { background: transparent; box-shadow: 0 0 0 6px transparent; }
+}
