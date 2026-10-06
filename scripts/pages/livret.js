@@ -203,13 +203,13 @@
   /** Le sommaire, tel qu'il se range dans la barre de gauche. */
   function vueSommaire(entrees) {
     if (entrees.length < 4) return "";
-    return '<div class="navgroupe">' +
-      '<div class="navgroupe__titre">Sommaire</div>' +
-      entrees.map(e =>
-        '<a class="som-lien' + (e.niveau === 3 ? " som-lien--sous" : "") +
-          '" href="#' + U.esc(e.id) + '" data-va="' + U.esc(e.id) + '">' +
-          U.esc(e.texte) + "</a>").join("") +
-    "</div>";
+    return '<div class="liv__titre">Sommaire</div>' +
+      '<div class="liv__liste">' +
+        entrees.map(e =>
+          '<a class="som-lien' + (e.niveau === 3 ? " som-lien--sous" : "") +
+            '" href="#' + U.esc(e.id) + '" data-va="' + U.esc(e.id) + '">' +
+            U.esc(e.texte) + "</a>").join("") +
+      "</div>";
   }
 
   /* L'écoute posée sur la fenêtre : on garde de quoi la retirer, sinon un
@@ -219,16 +219,15 @@
   function brancherSommaire(entrees) {
     if (surDefilement) { window.removeEventListener("scroll", surDefilement); surDefilement = null; }
 
-    /* Le sommaire vit dans la barre de gauche, pas dans la page : c'est la
-       coque qui tient la place, et elle la vide d'elle-même en changeant de
-       page. */
-    const zone = V2Shell.sousMenu(vueSommaire(entrees));
+    const zone = document.getElementById("l-som");
     if (!zone) return;
 
     const liens = [].slice.call(zone.querySelectorAll("[data-va]"));
     if (!liens.length) return;
     const titres = liens.map(a => document.getElementById(a.dataset.va)).filter(Boolean);
-    const barre = document.querySelector(".sidebar__nav");
+    /* La colonne défile pour elle-même : trente sections n'entrent pas dans
+       une hauteur d'écran. */
+    const barre = zone.querySelector(".liv__liste");
 
     /* Le seuil : un titre devient « celui où l'on est » dès qu'il passe sous
        la barre du haut. On le lit dans la marge que le CSS réserve déjà pour
@@ -289,9 +288,6 @@
 
     liens.forEach(a => a.addEventListener("click", e => {
       e.preventDefault();
-      /* Sur téléphone la barre est un tiroir ouvert par-dessus le texte :
-         il n'a plus rien à faire là une fois la section choisie. */
-      V2Shell.basculerTiroir(false);
       aller(a.dataset.va);
     }));
 
@@ -305,15 +301,6 @@
       requestAnimationFrame(() => { prevu = false; repere(); });
     };
     window.addEventListener("scroll", surDefilement, { passive: true });
-
-    /* Le menu principal remplit déjà la barre : sans ça, le sommaire naîtrait
-       sous la ligne de flottaison et personne ne saurait qu'il est là. On
-       l'amène sous les yeux en arrivant — le menu reste à un coup de molette
-       au-dessus, et on est de toute façon déjà sur la page Livret. */
-    if (barre) {
-      const r = zone.getBoundingClientRect(), rb = barre.getBoundingClientRect();
-      barre.scrollTop += r.top - rb.top;
-    }
 
     repere();
 
@@ -362,7 +349,12 @@
             "données du site pour te répondre. Il ne connaît que ça : s'il ne sait " +
             "pas, il te dira d'aller voir un responsable.</p>"
       }) +
-      '<div style="margin-top:var(--e-4)">' +
+      '<div class="liv' + (pages.entrees.length >= 4 ? " liv--deux" : "") +
+        '" style="margin-top:var(--e-4)">' +
+      (pages.entrees.length >= 4
+        ? '<nav class="liv__som" id="l-som" aria-label="Sommaire du livret">' +
+            vueSommaire(pages.entrees) + "</nav>"
+        : "") +
       U.carte({
         titre: "Le livret",
         actions: peutEcrire

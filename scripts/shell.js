@@ -90,19 +90,6 @@ window.V2Shell = (function () {
       "</div>").join("");
   }
 
-  /**
-   * Pose un bloc de navigation propre à la page, sous le menu principal.
-   * Une chaîne vide le retire. Rend la zone, pour y brancher ses écoutes.
-   *
-   * @param {string} html
-   * @returns {Element|null}
-   */
-  function sousMenu(html) {
-    const z = document.getElementById("v2-sousmenu");
-    if (z) z.innerHTML = html || "";
-    return z;
-  }
-
   function jetonEmploye() {
     const s = _session;
     if (!s) return "";
@@ -135,8 +122,7 @@ window.V2Shell = (function () {
     app.innerHTML =
       '<aside class="sidebar" id="v2-sidebar">' +
         marque() +
-        '<nav class="sidebar__nav" aria-label="Navigation principale">' + nav() +
-          '<div id="v2-sousmenu"></div>' + "</nav>" +
+        '<nav class="sidebar__nav" aria-label="Navigation principale">' + nav() + "</nav>" +
         '<div class="sidebar__pied">' + jetonEmploye() + "</div>" +
       "</aside>" +
 
@@ -1398,8 +1384,6 @@ window.V2Shell = (function () {
 
   return {
     demarrer, actions, refuser, basculerTiroir, brouillon, rafraichirMarque,
-    /* Le livret y range son sommaire. */
-    sousMenu,
     /* Le terme venu de la recherche globale, que la page doit reprendre. */
     motCherche,
     /* La facturation l'ouvre aussi, en arrivant sur l'ancre. */

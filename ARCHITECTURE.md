@@ -315,20 +315,24 @@ L'identifiant vient du titre, accents transcrits ; un doublon est numéroté.
 Renommer une section change donc son adresse — c'est le prix d'un lien
 lisible, et il est assumé.
 
-### Où il vit : la barre de gauche
+### Où il vit : une colonne de la page
 
-La coque réserve une place sous le menu principal (`#v2-sousmenu`) et
-l'expose par `V2Shell.sousMenu(html)`. **La coque tient la place et la forme,
-la page tient le contenu** : le livret y range son sommaire, une autre page y
-rangerait autre chose, et aucune des deux n'a à connaître l'intérieur de
-l'autre. Changer de page vide la zone d'elle-même, puisque la coque se
-remonte.
+Le sommaire est un panneau **à côté** de la carte du livret, pas dedans. Même
+gabarit que le panier de la facturation : une grille `232px | 1fr`, colonne
+de gauche collante.
 
-Le menu principal remplit déjà la hauteur : le sommaire naîtrait sous la ligne
-de flottaison. On amène donc la barre dessus en arrivant — on est de toute
-façon sur la page Livret, et le menu reste juste au-dessus.
+> **`.carte` porte `overflow: hidden`.** Un `position: sticky` placé à
+> l'intérieur n'a alors aucun effet : l'ancêtre qui coupe devient son
+> conteneur de défilement, et comme il ne défile pas, l'élément ne colle
+> jamais. C'est pour ça que le panneau est sorti de la carte — et le banc
+> le vérifie en mesurant où il se trouve **après** un saut, pas seulement sa
+> propriété CSS, qui était bonne pendant que le comportement ne l'était pas.
 
-> Le surlignage recentre la barre **à la main** (`scrollTop`), jamais avec
+Un premier essai l'avait mis dans la barre de navigation du site. C'était
+moins bien : trente entrées à la suite du menu allongeaient une barre qui n'a
+pas ce rôle, et le sommaire naissait sous la ligne de flottaison.
+
+> Le surlignage recentre la liste **à la main** (`scrollTop`), jamais avec
 > `scrollIntoView` : celui-ci remonte *tous* les ancêtres défilants, y compris
 > la page, et on se battrait avec le lecteur à chaque section franchie.
 

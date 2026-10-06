@@ -2809,14 +2809,51 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
 .objet__cout i { font-style: normal; color: var(--c-faible); }
 
 /* ---- Sommaire du livret ------------------------------------------------------
-   Il vit dans la barre de gauche, sous le menu. Trente sections numérotées :
-   plus serré que le menu principal, sinon ça ne tient pas. */
+   Une colonne de gauche qui accompagne le défilement, comme le panier de la
+   facturation : on garde le plan sous les yeux sans rien recouvrir du texte. */
 
-#v2-sousmenu:not(:empty) { margin-top: var(--e-4); }
+/* Le sommaire est un panneau À CÔTÉ de la carte, pas dedans : « .carte »
+   coupe ce qui dépasse (overflow: hidden), et un élément collant n'a aucun
+   effet sous un ancêtre qui coupe. */
+.liv--deux {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  gap: var(--e-4);
+  align-items: start;
+}
+
+.liv__som {
+  position: sticky;
+  top: calc(var(--l-topbar) + var(--e-4));
+  display: flex; flex-direction: column;
+  min-height: 0;
+  /* Ce qui reste de l'écran une fois la barre du haut passée : la liste
+     défile pour elle-même plutôt que d'allonger la page. */
+  max-height: calc(100vh - var(--l-topbar) - var(--e-7));
+  padding: var(--e-3) var(--e-2);
+  background: var(--c-carte);
+  border: 1px solid var(--c-bord);
+  border-radius: var(--r-3);
+}
+
+.liv__titre {
+  flex: none;
+  padding: 0 var(--e-2) var(--e-2);
+  font-family: var(--f-titre);
+  font-size: var(--t-xs); font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--c-faible);
+}
+
+.liv__liste {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px;
+}
 
 .som-lien {
   display: block;
-  padding: 5px var(--e-3);
+  padding: 5px var(--e-2);
   border-radius: var(--r-1);
   color: var(--c-second);
   font-size: var(--t-sm); line-height: 1.3;
@@ -2827,7 +2864,7 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
   color: var(--c-texte); text-decoration: none;
 }
 .som-lien--sous {
-  padding-left: var(--e-5);
+  padding-left: var(--e-4);
   font-size: var(--t-xs); color: var(--c-faible);
 }
 .som-lien.est-ici {
@@ -2836,9 +2873,15 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
   box-shadow: inset 2px 0 0 var(--c-action);
 }
 
-/* Seule la barre du haut recouvre le titre visé, maintenant que le sommaire
-   n'est plus au-dessus du texte : on ne réserve plus que sa hauteur. Le
-   repère lit ce même nombre, il suit donc tout seul. */
+/* Sous 1000 px, deux colonnes ne tiennent plus : le sommaire passe au-dessus
+   du texte, borné en hauteur pour ne pas repousser le livret d'un écran. */
+@media (max-width: 1000px) {
+  .liv--deux { grid-template-columns: minmax(0, 1fr); }
+  .liv__som { position: static; max-height: 210px; }
+}
+
+/* Seule la barre du haut recouvre le titre visé : on ne réserve que sa
+   hauteur. Le repère lit ce même nombre, il suit donc tout seul. */
 .livret h2, .livret h3 { scroll-margin-top: calc(var(--l-topbar) + var(--e-4)); }
 
 /* Un texte uniforme ne dit pas où l'on vient d'atterrir : on le signale un
