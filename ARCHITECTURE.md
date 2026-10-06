@@ -304,6 +304,35 @@ clore au sud un service pris au nord.
 > `fiche` du serveur, elle, ne touche qu'aux champs qu'on lui envoie : un
 > champ déjà posé survit à une modification de fiche.
 
+## Le livret : un seul tamis, trois usages
+
+`MNTexte.nettoyer` réduit le HTML du livret à une liste blanche de balises,
+d'attributs, de styles et de classes. Il tourne à **trois** moments, et c'est
+le même à chaque fois :
+
+| Quand | Pourquoi |
+|---|---|
+| à l'affichage (`pourAffichage`) | personne n'injecte de script dans une page que toute l'équipe lit |
+| à l'enregistrement (`html()` de l'éditeur) | ce qui part sur le serveur est déjà propre |
+| **au collage** | ce qu'on voit apparaître est ce qui sera gardé |
+
+Le troisième est le plus récent. L'éditeur n'intercepte un collage que si le
+**texte brut** du presse-papiers porte des balises (`MNTexte.estRiche`) :
+
+- coller `<h2>Titre</h2>` écrit à la main → mis en forme ;
+- copier un paragraphe depuis une page web → le texte brut est le texte
+  *visible*, sans balises, et le navigateur garde la main ;
+- coller du texte ordinaire → rien ne change.
+
+> **On ne regarde jamais le `text/html` du presse-papiers pour décider.** Un
+> éditeur de code y met du HTML de coloration syntaxique : s'y fier ferait
+> coller des balises en couleurs plutôt qu'un titre. Le texte brut dit ce que
+> la personne a réellement copié.
+
+`banc-coller.html` le garde, sécurité comprise : un `<script>`, un
+`onerror=` et un lien `javascript:` collés d'un bloc ne laissent que leur
+texte, et rien ne s'exécute. Sans le correctif il tombe à 10 échecs.
+
 ## Déplacer une ligne dans une liste filtrée
 
 Le piège a coûté la réorganisation de l'équipe : les flèches décalaient d'un

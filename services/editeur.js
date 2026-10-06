@@ -600,6 +600,36 @@ window.MNEditeur = (function () {
     zone.addEventListener("keyup", majBarre);
     zone.addEventListener("mouseup", majBarre);
 
+    /**
+     * Coller du balisage écrit à la main le met en forme.
+     *
+     * On ne regarde QUE le texte brut du presse-papiers. Copier depuis une
+     * page web y met le texte visible, sans balises : le navigateur garde
+     * alors la main, et rien ne change pour qui recopie un paragraphe. On
+     * n'intervient que lorsque ce qui est collé porte vraiment des balises —
+     * donc quand la personne colle du HTML pour de bon.
+     */
+    zone.addEventListener("paste", e => {
+      const presse = e.clipboardData;
+      if (!presse) return;
+
+      let brut = "";
+      try { brut = presse.getData("text/plain"); } catch (_) { return; }
+      if (!brut || !MNTexte.estRiche(brut)) return;
+
+      /* Le même tamis qu'à l'affichage : ce qui apparaît est exactement ce
+         qui sera gardé — scripts, styles et attributs douteux en moins. */
+      const propre = MNTexte.nettoyer(brut);
+      if (!propre) return;
+
+      e.preventDefault();
+      /* « insertHTML » reste annulable : un Ctrl+Z et le collage s'efface,
+         comme n'importe quelle frappe. */
+      try { document.execCommand("insertHTML", false, propre); }
+      catch (_) { return; }
+      changed();
+    });
+
     /** Les boutons s'allument selon ce qui est sous le curseur. */
     function majBarre() {
       const paires = [["gras", "bold"], ["italique", "italic"],

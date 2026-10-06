@@ -81,6 +81,22 @@ comptes qui gèrent le catalogue ou l'équipe.
 Deux garde-fous : tu ne peux pas te désactiver toi-même, ni prendre (ou
 modifier) un rôle qui te retirerait la gestion de l'équipe.
 
+### Écrire le livret
+
+L'onglet **Livret** porte un éditeur de texte : gras, titres, listes, tailles,
+couleurs, images. Un livret par garage.
+
+**Coller du HTML le met en forme.** Si ce que tu colles porte des balises —
+un livret récupéré d'une sauvegarde, un texte écrit ailleurs — l'éditeur les
+interprète au lieu de les afficher en toutes lettres. Coller du texte
+ordinaire, ou copier un paragraphe depuis une page web, ne change rien :
+c'est le navigateur qui s'en occupe, comme avant.
+
+Ce qui arrive passe par **le même filtre que l'affichage** : les scripts, les
+styles douteux et les liens `javascript:` sont retirés en chemin. Ce que tu
+vois apparaître est exactement ce qui sera enregistré. Un **Ctrl+Z** annule le
+collage comme n'importe quelle frappe.
+
 ### Ranger la liste de l'équipe
 
 Dans **Équipe**, le bouton à droite de *Recruter* passe la liste en mode
