@@ -200,71 +200,87 @@
     return { html: r.innerHTML, entrees };
   }
 
-  /** La barre du sommaire. Rien du tout si le livret est court. */
+  /** Le sommaire, tel qu'il se range dans la barre de gauche. */
   function vueSommaire(entrees) {
     if (entrees.length < 4) return "";
-    return '<nav class="som" id="l-som">' +
-      '<button type="button" class="som__barre" data-a="som" aria-expanded="false" ' +
-        'aria-controls="l-som-liste">' +
-        U.icone("contrat") +
-        '<span class="som__ou" id="l-som-ou">Sommaire</span>' +
-        '<span class="som__n">' + entrees.length + "</span>" +
-        '<span class="som__chev">' + U.icone("chevron") + "</span>" +
-      "</button>" +
-      '<div class="som__liste" id="l-som-liste" hidden>' +
-        entrees.map(e =>
-          '<a class="som__e' + (e.niveau === 3 ? " som__e--sous" : "") +
-            '" href="#' + U.esc(e.id) + '" data-va="' + U.esc(e.id) + '">' +
-            U.esc(e.texte) + "</a>").join("") +
-      "</div></nav>";
+    return '<div class="navgroupe">' +
+      '<div class="navgroupe__titre">Sommaire</div>' +
+      entrees.map(e =>
+        '<a class="som-lien' + (e.niveau === 3 ? " som-lien--sous" : "") +
+          '" href="#' + U.esc(e.id) + '" data-va="' + U.esc(e.id) + '">' +
+          U.esc(e.texte) + "</a>").join("") +
+    "</div>";
   }
 
-  /* Les deux écoutes posées sur la fenêtre et le document : on garde de quoi
-     les retirer, sinon un second rendu de la page en empile une de plus. */
+  /* L'écoute posée sur la fenêtre : on garde de quoi la retirer, sinon un
+     second rendu de la page en empile une de plus. */
   let surDefilement = null;
-  let surClicAilleurs = null;
 
-  function brancherSommaire() {
+  function brancherSommaire(entrees) {
     if (surDefilement) { window.removeEventListener("scroll", surDefilement); surDefilement = null; }
-    if (surClicAilleurs) { document.removeEventListener("click", surClicAilleurs); surClicAilleurs = null; }
 
-    const nav = $("#l-som");
-    if (!nav) return;
+    /* Le sommaire vit dans la barre de gauche, pas dans la page : c'est la
+       coque qui tient la place, et elle la vide d'elle-même en changeant de
+       page. */
+    const zone = V2Shell.sousMenu(vueSommaire(entrees));
+    if (!zone) return;
 
-    const barre = nav.querySelector('[data-a="som"]');
-    const liste = $("#l-som-liste");
-    const ou = $("#l-som-ou");
-    const liens = [].slice.call(liste.querySelectorAll("[data-va]"));
+    const liens = [].slice.call(zone.querySelectorAll("[data-va]"));
+    if (!liens.length) return;
     const titres = liens.map(a => document.getElementById(a.dataset.va)).filter(Boolean);
+    const barre = document.querySelector(".sidebar__nav");
 
-    const ouvrir = v => {
-      liste.hidden = !v;
-      nav.classList.toggle("est-ouvert", v);
-      barre.setAttribute("aria-expanded", v ? "true" : "false");
-    };
-    barre.addEventListener("click", e => { e.stopPropagation(); ouvrir(liste.hidden); });
+    /* Le seuil : un titre devient « celui où l'on est » dès qu'il passe sous
+       la barre du haut. On le lit dans la marge que le CSS réserve déjà pour
+       l'atterrissage (scroll-margin-top), sinon les deux chiffres divergent
+       au premier changement de hauteur — et sauter à une section surlignerait
+       la précédente. */
+    const seuil = (titres.length
+      ? parseFloat(getComputedStyle(titres[0]).scrollMarginTop) || 76
+      : 76) + 8;
 
-    /* Ouvert, le sommaire couvre le texte : un clic ailleurs le referme. */
-    surClicAilleurs = e => { if (!nav.contains(e.target)) ouvrir(false); };
-    document.addEventListener("click", surClicAilleurs);
+    /** Surligne la section où l'on se trouve, et la garde sous les yeux. */
+    function marquer(h) {
+      let vu = null;
+      liens.forEach(a => {
+        const on = !!h && a.dataset.va === h.id;
+        a.classList.toggle("est-ici", on);
+        if (on) vu = a;
+      });
+
+      /* La barre de gauche défile elle aussi, et trente sections n'y tiennent
+         pas. On recentre à la main plutôt qu'avec scrollIntoView : celui-ci
+         remonterait aussi la page, et on se battrait avec le lecteur. */
+      if (vu && barre) {
+        const r = vu.getBoundingClientRect(), rb = barre.getBoundingClientRect();
+        if (r.top < rb.top + 8 || r.bottom > rb.bottom - 8) {
+          barre.scrollTop += (r.top - rb.top) - (barre.clientHeight - r.height) / 2;
+        }
+      }
+    }
+
+    /** Le dernier titre passé sous la barre du haut. */
+    function repere() {
+      let actif = null;
+      titres.forEach(h => { if (h.getBoundingClientRect().top <= seuil) actif = h; });
+      marquer(actif);
+    }
 
     function aller(id) {
       const h = document.getElementById(id);
       if (!h) return;
       /* Le glissement est agréable, mais pas pour tout le monde : qui a
          demandé moins d'animations saute directement, comme le reste du site
-         (voir la requête « prefers-reduced-motion » dans les jetons). */
+         (voir « prefers-reduced-motion » dans base.css). */
       const doux = !window.matchMedia ||
         !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       h.scrollIntoView({ behavior: doux ? "smooth" : "auto", block: "start" });
       /* L'adresse suit, sans déclencher un second saut. */
       try { history.replaceState(null, "", "#" + id); } catch (_) { /* rien */ }
-      /* Le repère suit tout de suite. Avec un défilement doux, les évènements
-         n'arrivent qu'au fil de l'animation : sans cette ligne, la barre
-         afficherait encore la section précédente pendant une seconde, juste
-         après qu'on a cliqué sur la suivante. */
+      /* Le repère suit tout de suite : avec un défilement doux, les évènements
+         n'arrivent qu'au fil de l'animation, et le surlignage resterait une
+         seconde sur la section qu'on vient de quitter. */
       marquer(h);
-
       /* Un texte uniforme ne dit pas où l'on vient d'atterrir : on le signale
          un instant. */
       h.classList.add("est-vise");
@@ -273,33 +289,11 @@
 
     liens.forEach(a => a.addEventListener("click", e => {
       e.preventDefault();
-      ouvrir(false);
+      /* Sur téléphone la barre est un tiroir ouvert par-dessus le texte :
+         il n'a plus rien à faire là une fois la section choisie. */
+      V2Shell.basculerTiroir(false);
       aller(a.dataset.va);
     }));
-
-    /* Où en est-on ? Le dernier titre passé sous la barre du haut. La barre
-       repliée l'affiche : le sommaire sert autant à se repérer qu'à sauter. */
-    /* Le seuil : un titre devient « celui où l'on est » dès qu'il passe sous
-       les deux barres. On le lit dans la marge que le CSS réserve déjà pour
-       l'atterrissage (scroll-margin-top), sinon les deux chiffres divergent
-       au premier changement de hauteur — et sauter à une section afficherait
-       le nom de la précédente. */
-    const seuil = (titres.length
-      ? parseFloat(getComputedStyle(titres[0]).scrollMarginTop) || 132
-      : 132) + 8;
-
-    /** Dit où l'on est, dans la barre et dans la liste. */
-    function marquer(h) {
-      ou.textContent = h ? (h.textContent || "").trim() : "Sommaire";
-      liens.forEach(a => a.classList.toggle("est-ici", !!h && a.dataset.va === h.id));
-    }
-
-    /** Le dernier titre passé sous les deux barres. */
-    function repere() {
-      let actif = null;
-      titres.forEach(h => { if (h.getBoundingClientRect().top <= seuil) actif = h; });
-      marquer(actif);
-    }
 
     /* Une fois par image, pas une fois par évènement : le défilement en émet
        des dizaines par seconde, et cinquante mesures de position à chaque
@@ -311,13 +305,22 @@
       requestAnimationFrame(() => { prevu = false; repere(); });
     };
     window.addEventListener("scroll", surDefilement, { passive: true });
+
+    /* Le menu principal remplit déjà la barre : sans ça, le sommaire naîtrait
+       sous la ligne de flottaison et personne ne saurait qu'il est là. On
+       l'amène sous les yeux en arrivant — le menu reste à un coup de molette
+       au-dessus, et on est de toute façon déjà sur la page Livret. */
+    if (barre) {
+      const r = zone.getBoundingClientRect(), rb = barre.getBoundingClientRect();
+      barre.scrollTop += r.top - rb.top;
+    }
+
     repere();
 
     /* Une adresse qui désigne une section y emmène — mais seulement une fois
        la page posée. Le livret charge ses polices après coup, et elles
        changent la hauteur de chaque titre : sauter trop tôt, c'est viser une
-       position qui n'existera plus une seconde après, et atterrir cinquante
-       pixels plus haut que le bon endroit. */
+       position qui n'existera plus une seconde après. */
     const vise = decodeURIComponent((location.hash || "").slice(1));
     if (vise && document.getElementById(vise)) {
       const sauter = () => aller(vise);
@@ -328,6 +331,7 @@
       }
     }
   }
+
 
   /* ---- Rendu ---- */
 
@@ -366,7 +370,7 @@
             U.icone("crayon") + "<span>Le modifier</span></a>"
           : "",
         corps: livret
-          ? vueSommaire(pages.entrees) + '<div class="livret">' + pages.html + "</div>"
+          ? '<div class="livret">' + pages.html + "</div>"
           : '<p class="champ__aide">Le livret n\'a pas encore été écrit. ' +
             (peutEcrire
               ? "Tu peux t'en charger dans l'administration, onglet « Livret »."
@@ -375,7 +379,7 @@
 
     peindreFil();
     majAssistant();
-    brancherSommaire();
+    brancherSommaire(pages.entrees);
 
     hote.querySelector('[data-a="go"]').addEventListener("click", demander);
     $("#a-q").addEventListener("keydown", e => {

@@ -2809,76 +2809,37 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
 .objet__cout i { font-style: normal; color: var(--c-faible); }
 
 /* ---- Sommaire du livret ------------------------------------------------------
-   Le livret fait plusieurs milliers de caractères et une trentaine de sections
-   numérotées. Une barre collante dit où l'on est et ouvre la liste : on ne
-   parcourt pas trente sections à la molette pour retrouver la septième. */
+   Il vit dans la barre de gauche, sous le menu. Trente sections numérotées :
+   plus serré que le menu principal, sinon ça ne tient pas. */
 
-.som {
-  position: sticky;
-  top: calc(var(--l-topbar) + var(--e-2));
-  z-index: var(--z-sticky);
-  margin-bottom: var(--e-4);
-}
-.som__barre {
-  display: flex; align-items: center; gap: var(--e-2);
-  width: 100%;
-  padding: var(--e-2) var(--e-3);
-  border: 1px solid var(--c-bord);
-  border-radius: var(--r-2);
-  background: color-mix(in srgb, var(--c-carte) 92%, transparent);
-  backdrop-filter: blur(10px);
-  color: var(--c-texte);
-  font: inherit; text-align: left;
-  cursor: pointer;
-  transition: border-color var(--m-vif);
-}
-.som__barre:hover { border-color: var(--c-action); }
-.som__barre svg { width: 16px; height: 16px; flex: none; color: var(--c-faible); }
-.som__ou {
-  flex: 1; min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: var(--t-sm); font-weight: 600;
-}
-.som__n {
-  flex: none;
-  padding: 1px 7px;
-  border-radius: var(--r-plein);
-  background: var(--c-creux);
-  font-size: var(--t-xs); color: var(--c-faible);
-}
-.som__chev { display: flex; transition: transform var(--m-vif); }
-.som.est-ouvert .som__chev { transform: rotate(180deg); }
+#v2-sousmenu:not(:empty) { margin-top: var(--e-4); }
 
-.som__liste {
-  position: absolute; left: 0; right: 0; top: calc(100% + 4px);
-  display: flex; flex-direction: column;
-  max-height: min(60vh, 420px); overflow-y: auto;
-  padding: var(--e-2);
-  border: 1px solid var(--c-bord);
-  border-radius: var(--r-2);
-  background: var(--c-carte);
-  box-shadow: var(--o-2);
-}
-.som__e {
-  padding: 6px var(--e-3);
+.som-lien {
+  display: block;
+  padding: 5px var(--e-3);
   border-radius: var(--r-1);
   color: var(--c-second);
-  font-size: var(--t-sm); line-height: 1.35;
+  font-size: var(--t-sm); line-height: 1.3;
   text-decoration: none;
 }
-.som__e:hover {
-  background: rgba(255, 255, 255, .06);
+.som-lien:hover {
+  background: rgba(255, 255, 255, .05);
   color: var(--c-texte); text-decoration: none;
 }
-.som__e--sous {
+.som-lien--sous {
   padding-left: var(--e-5);
   font-size: var(--t-xs); color: var(--c-faible);
 }
-.som__e.est-ici { background: var(--c-action-fond); color: var(--c-action-doux); }
+.som-lien.est-ici {
+  background: var(--c-action-fond);
+  color: var(--c-action-doux);
+  box-shadow: inset 2px 0 0 var(--c-action);
+}
 
-/* La barre du haut et celle du sommaire recouvrent le titre visé : on réserve
-   leur hauteur, sinon on atterrit systématiquement une ligne trop bas. */
-.livret h2, .livret h3 { scroll-margin-top: calc(var(--l-topbar) + 72px); }
+/* Seule la barre du haut recouvre le titre visé, maintenant que le sommaire
+   n'est plus au-dessus du texte : on ne réserve plus que sa hauteur. Le
+   repère lit ce même nombre, il suit donc tout seul. */
+.livret h2, .livret h3 { scroll-margin-top: calc(var(--l-topbar) + var(--e-4)); }
 
 /* Un texte uniforme ne dit pas où l'on vient d'atterrir : on le signale un
    instant, puis on s'efface. */

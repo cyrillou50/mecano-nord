@@ -83,12 +83,15 @@ modifier) un rôle qui te retirerait la gestion de l'équipe.
 
 ### Se déplacer dans le livret
 
-Dès que le livret dépasse quatre titres, une barre **Sommaire** apparaît
-au-dessus et **reste collée en haut** pendant qu'on lit. Elle sert deux fois :
+Dès que le livret dépasse quatre titres, ses sections apparaissent dans la
+**barre de gauche**, sous le menu, et la barre s'y positionne en arrivant sur
+la page — le menu reste à un coup de molette au-dessus.
 
-- elle **dit où tu es** — le nom de la section en cours s'y affiche ;
-- elle **ouvre la liste** de toutes les sections, sous-titres compris, et un
-  clic t'y emmène.
+- Un clic sur une section **t'y emmène**.
+- La section où tu te trouves **reste surlignée** pendant que tu lis, et la
+  barre la garde sous les yeux toute seule.
+- Sur téléphone, le sommaire est dans le tiroir : le bouton ☰ l'ouvre, et
+  choisir une section le referme.
 
 Les sections gardent la numérotation que tu écris : « 7. PORT DU CUIR »
 apparaît tel quel dans le sommaire.

@@ -315,9 +315,26 @@ L'identifiant vient du titre, accents transcrits ; un doublon est numéroté.
 Renommer une section change donc son adresse — c'est le prix d'un lien
 lisible, et il est assumé.
 
+### Où il vit : la barre de gauche
+
+La coque réserve une place sous le menu principal (`#v2-sousmenu`) et
+l'expose par `V2Shell.sousMenu(html)`. **La coque tient la place et la forme,
+la page tient le contenu** : le livret y range son sommaire, une autre page y
+rangerait autre chose, et aucune des deux n'a à connaître l'intérieur de
+l'autre. Changer de page vide la zone d'elle-même, puisque la coque se
+remonte.
+
+Le menu principal remplit déjà la hauteur : le sommaire naîtrait sous la ligne
+de flottaison. On amène donc la barre dessus en arrivant — on est de toute
+façon sur la page Livret, et le menu reste juste au-dessus.
+
+> Le surlignage recentre la barre **à la main** (`scrollTop`), jamais avec
+> `scrollIntoView` : celui-ci remonte *tous* les ancêtres défilants, y compris
+> la page, et on se battrait avec le lecteur à chaque section franchie.
+
 ### Deux chiffres qui doivent rester le même
 
-Un titre atterrit à `scroll-margin-top` du haut (la hauteur des deux barres).
+Un titre atterrit à `scroll-margin-top` du haut (la hauteur de la barre du haut).
 Le suivi « où suis-je » doit utiliser **ce même nombre** comme seuil, sinon
 sauter à une section affiche le nom de la précédente — à deux pixels près.
 Il est donc lu dans le CSS (`getComputedStyle(...).scrollMarginTop`) au lieu
@@ -327,8 +344,8 @@ d'être recopié dans le JavaScript.
 
 Après un clic, `aller()` marque la section tout de suite au lieu d'attendre
 l'évènement de défilement : avec un défilement doux, les évènements arrivent
-au fil de l'animation, et la barre afficherait encore la section précédente
-pendant une seconde.
+au fil de l'animation, et le sommaire surlignerait encore la section qu'on
+vient de quitter pendant une seconde.
 
 > **`scroll-behavior: smooth` est posé sur `html`** (`base.css`) : il
 > s'applique donc à *tout* défilement de la page, y compris un `scrollTo`
