@@ -503,6 +503,35 @@ pas. `setContrat` compare donc ce qu'il a envoyé à ce que le serveur renvoie
 et signale `tropAncien` : la page le dit, au lieu de laisser croire que la
 saisie est passée.
 
+## Tout appel sortant a un délai
+
+`fetch` n'en a **aucun** par défaut. Si Discord, GitHub ou Google accepte la
+connexion puis ne répond jamais, l'attente dure indéfiniment — et la requête
+du site qui l'attendait reste ouverte, avec sa place dans le serveur. Assez
+de requêtes dans cet état, et plus rien de neuf n'est accepté : vu du
+dehors, « ça coupe, puis ça revient tout seul ».
+
+Le serveur et le bot passent donc tous leurs appels par `fetchDelai`, qui
+pose un `AbortSignal.timeout` quand l'appelant n'en a pas mis :
+
+| Vers | Délai | Pourquoi |
+|---|---|---|
+| un webhook Discord | 10 s | il répond en une seconde ou pas du tout |
+| l'API Discord (bot) | 12 s | une interaction doit être honorée vite |
+| GitHub | 30 s | une publication envoie des fichiers |
+| un modèle de langage | 60 s | il prend son temps, mais pas l'éternité |
+| le reste | 15 s | la valeur par défaut |
+
+> **Un délai n'est pas une panne de plus, c'est une panne en moins.** Sans
+> lui, l'erreur ne se voit nulle part : la requête ne revient pas, le journal
+> reste muet, et on cherche du côté du réseau.
+
+`banc-delais.js` le garde. Il place entre le serveur et Discord un faux salon
+qui accepte la connexion et ne répond jamais, puis vérifie que le pointage
+aboutit quand même, que le serveur continue de servir, et que le relais finit
+par rendre la main. Sans les délais, le banc ne se termine pas : il est coupé
+au bout de 45 secondes alors que la requête pendait encore.
+
 ## Un document refusé n'est pas un document vide
 
 **C'est ce qui a vidé le tableau de service le 23 septembre 2026**, et la
