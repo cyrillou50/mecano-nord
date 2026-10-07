@@ -197,13 +197,16 @@
      n'apprend rien à personne.
 
      On regarde la période, pas le jour de départ : un évènement commencé hier
-     et qui court jusqu'à demain se passe aussi aujourd'hui. */
+     et qui court jusqu'à demain se passe aussi aujourd'hui.
 
-  /** Ce qui court aujourd'hui : évènements en cours et absents du jour. */
+     Rien que le calendrier : les congés sont une absence, pas un rendez-vous,
+     et ils restent dans la carte des sept jours juste en dessous. */
+
+  /** Les évènements du calendrier qui courent aujourd'hui. */
   function ceQuiSePasseAujourdhui() {
     const auj = MNStore.jourLocal();
 
-    const evs = MNAgenda.events()
+    return MNAgenda.events()
       .filter(e => e.jour <= auj && (e.fin || e.jour) >= auj)
       .map(e => ({
         quoi: e.titre,
@@ -214,15 +217,6 @@
           : ""
       }))
       .sort((a, b) => (a.heure || "99:99").localeCompare(b.heure || "99:99"));
-
-    let absents = [];
-    try {
-      absents = MNDuty.conges(true)
-        .filter(c => c.from <= auj && c.to >= auj)
-        .map(c => ({ quoi: c.pseudo + " est en congés", heure: "", duree: "" }));
-    } catch (_) { /* service indisponible : les évènements restent utiles */ }
-
-    return evs.concat(absents);
   }
 
   function aujourdhui() {

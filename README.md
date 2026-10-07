@@ -68,8 +68,10 @@ Elle réunit, rangés par heure :
 
 - les évènements du jour, avec leur heure ;
 - ceux qui **courent** sur plusieurs jours et traversent aujourd'hui, marqués
-  *en cours* ;
-- qui est **en congés** aujourd'hui.
+  *en cours*.
+
+Rien que le calendrier : les congés sont une absence, pas un rendez-vous, et
+ils restent dans *Les sept prochains jours* juste en dessous.
 
 Elle n'apparaît que s'il y a quelque chose : une carte « rien aujourd'hui »
 n'apprend rien et pousse le reste vers le bas pour rien.
