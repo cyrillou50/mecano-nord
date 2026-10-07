@@ -58,6 +58,35 @@ La toute première personne qui se connecte devient automatiquement **patron**
 | **Le site** | Nom de l'entreprise, slogan, **logo**, réglages de connexion |
 | **Publier** | Envoyer les modifications en ligne |
 
+### Annoncer quelque chose à toute l'équipe
+
+**Admin → Le site → Annonce épinglée.** Tu écris un texte, tu choisis le ton
+(*Information* ou *Ça presse*) et le garage, puis **Épingler l'annonce**.
+
+Elle s'affiche aussitôt **tout en haut du tableau de bord**, avant le
+bonjour — c'est la première chose que chacun voit en arrivant sur le site.
+
+**Elle y reste jusqu'à ce que tu la retires.** Pas de date d'expiration, pas
+de croix pour la faire disparaître : une annonce qu'on peut écarter d'un clic
+n'est lue que par ceux qui l'auraient lue de toute façon. Les employés la
+voient, ils ne peuvent pas s'en débarrasser.
+
+Pour la retirer, deux chemins — le même résultat :
+
+- dans **Admin → Le site**, le bouton *Retirer l'annonce* ;
+- **directement sur le tableau de bord**, la petite corbeille à droite de
+  l'annonce, visible seulement par les responsables.
+
+Les deux boutons agissent **tout de suite** : ils n'attendent pas
+« Enregistrer les réglages ».
+
+> **Une seule annonce à la fois.** En épingler une nouvelle remplace la
+> précédente. C'est voulu : deux ou trois bandeaux empilés en haut de la page
+> et plus personne n'en lit aucun.
+
+Les retours à la ligne de ton texte deviennent des paragraphes. L'annonce
+indique qui l'a posée et quand.
+
 ### Rôles et permissions
 
 Les droits sont portés par le **rôle**, pas par la personne : tu crées

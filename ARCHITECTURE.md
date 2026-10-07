@@ -503,6 +503,42 @@ pas. `setContrat` compare donc ce qu'il a envoyé à ce que le serveur renvoie
 et signale `tropAncien` : la page le dit, au lieu de laisser croire que la
 saisie est passée.
 
+## L'annonce épinglée
+
+Même patron que la maintenance : un objet dans `settings`, reconstruit par
+`normalize` à partir d'une liste blanche, et une règle unique dans le magasin.
+
+```js
+MNStore.annonce()        // l'annonce du garage où l'on travaille, ou null
+MNStore.annonce("sud")   // celle d'un garage précis
+```
+
+Sans texte, `annonce()` rend `null` : on ne garde pas de coquille vide qui
+ferait croire à un réglage posé. Le tableau de bord n'a donc rien à vérifier
+de plus que « y en a-t-il une ? ».
+
+Trois choix qui tiennent ensemble, et dont aucun n'est un oubli :
+
+| Choix | Pourquoi |
+|---|---|
+| **une seule** annonce à la fois | deux ou trois bandeaux empilés et plus personne n'en lit aucun |
+| **aucune croix** pour le lecteur | une annonce qu'on écarte d'un clic n'est lue que par ceux qui l'auraient lue de toute façon |
+| **aucune expiration** | celui qui la pose décide quand elle s'en va ; une annonce qui disparaît toute seule est une annonce qu'on croyait affichée |
+
+Le bouton de retrait existe à deux endroits — l'administration et le tableau
+de bord — mais fait la même chose : vider `settings.annonce` et enregistrer.
+C'est le même geste au même endroit dans les données, pas deux mécanismes.
+
+> **Il agit tout de suite**, sans passer par « Enregistrer les réglages ».
+> Une annonce est une chose qu'on pose ou qu'on retire, pas un réglage qu'on
+> peaufine — et « jusqu'à ce que je la supprime » suppose que la supprimer
+> soit immédiat.
+
+`banc-annonce-site.html` couvre la chaîne entière : l'écriture, l'affichage en
+tête du tableau de bord, le refus d'une annonce vide, le ciblage par garage,
+ce qu'en voit un apprenti (il la lit, il ne peut pas la retirer), et le
+retrait depuis la page elle-même.
+
 ## Tout appel sortant a un délai
 
 `fetch` n'en a **aucun** par défaut. Si Discord, GitHub ou Google accepte la

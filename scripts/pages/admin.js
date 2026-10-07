@@ -2491,6 +2491,12 @@
 
   /* ---- Le site ------------------------------------------------------------------- */
 
+  /** Le garage d'une annonce : "" pour les deux, sinon son identifiant. */
+  function ouAnnonce(a) {
+    const l = (a && a.ateliers) || [];
+    return l.length === 1 ? l[0] : "";
+  }
+
   function vueSite(z) {
     const s = brouillon.settings;
 
@@ -2517,6 +2523,46 @@
                   "du nom qui s'affichent. Le logo apparaît dans la barre latérale et sur " +
                   "l'écran de connexion.</p>" +
               "</div></div></div>"
+        }) +
+
+        U.carte({ titre: "Annonce épinglée", corps:
+          '<p class="champ__aide" style="margin-bottom:var(--e-3)">' +
+            "Elle s'affiche en haut du tableau de bord, pour tout le monde, et " +
+            "<b>elle y reste tant que tu ne la retires pas</b> : personne ne peut " +
+            "la faire disparaître de son côté.</p>" +
+          U.champ({ id: "a-titre", label: "Titre (facultatif)", max: 80,
+                    valeur: (s.annonce && s.annonce.titre) || "",
+                    repere: "Ex. Fermeture exceptionnelle samedi" }) +
+          U.champ({ id: "a-texte", label: "Texte", type: "zone", lignes: 4, max: 2000,
+                    valeur: (s.annonce && s.annonce.texte) || "",
+                    repere: "Ce que l'équipe doit savoir en arrivant." }) +
+          '<div class="cols-2" style="margin-top:var(--e-3)">' +
+            U.champ({ id: "a-ton", label: "Ton", type: "liste",
+                      valeur: (s.annonce && s.annonce.ton) || "info",
+                      options: [{ valeur: "info", nom: "Information" },
+                                { valeur: "alerte", nom: "Ça presse" }] }) +
+            U.champ({ id: "a-ou", label: "Pour qui", type: "liste",
+                      valeur: ouAnnonce(s.annonce),
+                      options: [{ valeur: "", nom: "Les deux garages" }].concat(
+                        MNStore.ATELIERS.map(a => ({ valeur: a.id, nom: a.nom }))) }) +
+          "</div>" +
+          '<div class="rang" style="gap:var(--e-2);margin-top:var(--e-4)">' +
+            U.bouton("Épingler l'annonce", { variante: "principal", icone: "check",
+                                             action: "a-poser" }) +
+            U.bouton("Retirer l'annonce", { variante: "danger", icone: "poubelle",
+                                            action: "a-oter" }) +
+          "</div>" +
+          '<p class="champ__aide" style="margin-top:var(--e-3)">' +
+            "Ces deux boutons agissent tout de suite — ils n'attendent pas " +
+            "« Enregistrer les réglages ».</p>" +
+          (s.annonce && s.annonce.texte.trim()
+            ? '<p class="champ__aide" style="margin-top:var(--e-2)">' +
+              "Épinglée" + (s.annonce.par ? " par " + U.esc(s.annonce.par) : "") +
+              (s.annonce.depuis
+                ? " le " + U.esc(new Date(s.annonce.depuis).toLocaleString("fr-FR",
+                    { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))
+                : "") + ".</p>"
+            : "")
         }) +
 
         U.carte({ titre: "Connexion", corps:
@@ -2599,6 +2645,40 @@
       valider();
       V2Shell.rafraichirMarque();
       U.toast("Réglages enregistrés dans le brouillon", "ok");
+    });
+
+    /* L'annonce agit tout de suite : c'est une chose qu'on pose ou qu'on
+       retire, pas un réglage qu'on peaufine. */
+    z.querySelector('[data-a="a-poser"]').addEventListener("click", () => {
+      const texte = z.querySelector("#a-texte").value.trim();
+      if (!texte) return U.toast("Écris le texte de l'annonce", "err");
+      const ou = z.querySelector("#a-ou").value;
+      brouillon.settings.annonce = {
+        texte,
+        titre: z.querySelector("#a-titre").value.trim(),
+        ton: z.querySelector("#a-ton").value === "alerte" ? "alerte" : "info",
+        depuis: new Date().toISOString(),
+        par: moi.pseudo,
+        ateliers: ou ? [ou] : MNStore.ATELIERS.map(a => a.id)
+      };
+      valider();
+      U.toast("Annonce épinglée au tableau de bord", "ok");
+    });
+
+    z.querySelector('[data-a="a-oter"]').addEventListener("click", async () => {
+      if (!(brouillon.settings.annonce || {}).texte) {
+        return U.toast("Il n'y a pas d'annonce à retirer", "info");
+      }
+      const ok = await U.confirmer({
+        titre: "Retirer l'annonce",
+        message: "Elle disparaîtra du tableau de bord de tout le monde.",
+        confirmer: "Retirer", danger: true
+      });
+      if (!ok) return;
+      brouillon.settings.annonce = { texte: "", titre: "", ton: "info",
+                                     depuis: "", par: "", ateliers: [] };
+      valider();
+      U.toast("Annonce retirée", "ok");
     });
 
     z.querySelector('[data-a="reset"]').addEventListener("click", async () => {

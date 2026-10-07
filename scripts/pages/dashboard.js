@@ -26,6 +26,7 @@
       ]);
 
       hote.innerHTML =
+        annonceEnTete() +
         salutation(session) +
         moi(session) +
         chiffres() +
@@ -46,6 +47,42 @@
   function chargement() {
     return '<div class="grille grille--sm">' +
       Array(4).fill('<div class="squelette squelette--tuile"></div>').join("") + "</div>";
+  }
+
+  /* ---- L'annonce épinglée ------------------------------------------------------
+     Elle tient le haut de la page et n'a pas de croix : seul celui qui l'a
+     posée la retire, depuis l'administration ou d'ici. Une annonce qu'on peut
+     écarter d'un clic n'est lue que par ceux qui l'auraient lue de toute
+     façon. */
+
+  function annonceEnTete() {
+    const a = MNStore.annonce();
+    if (!a) return "";
+    const peutOter = V2Shell.peut("admin", "items");
+    return '<section class="annonce annonce--' + U.esc(a.ton) + '">' +
+      '<span class="annonce__ico">' + U.icone(a.ton === "alerte" ? "alerte" : "info") + "</span>" +
+      '<div class="annonce__corps">' +
+        (a.titre ? "<b>" + U.esc(a.titre) + "</b>" : "") +
+        enParagraphes(a.texte) +
+        '<p class="annonce__pied">' +
+          (a.par ? "Par " + U.esc(a.par) : "") +
+          (a.depuis
+            ? (a.par ? ", le " : "Le ") + U.esc(new Date(a.depuis).toLocaleString("fr-FR",
+                { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))
+            : "") +
+        "</p>" +
+      "</div>" +
+      (peutOter
+        ? U.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
+                         titre: "Retirer l'annonce", action: "a-oter" })
+        : "") +
+    "</section>";
+  }
+
+  /** Les retours à la ligne de l'annonce deviennent des paragraphes. */
+  function enParagraphes(t) {
+    return String(t || "").split(/\n+/).map(l => l.trim()).filter(Boolean)
+      .map(l => "<p>" + U.esc(l) + "</p>").join("");
   }
 
   function salutation(s) {
@@ -208,6 +245,25 @@
   }
 
   function brancher(hote) {
+    /* Retirer l'annonce depuis la page où on la lit : c'est là qu'on se dit
+       qu'elle n'a plus lieu d'être. */
+    const oter = hote.querySelector('[data-a="a-oter"]');
+    if (oter) oter.addEventListener("click", async () => {
+      const ok = await U.confirmer({
+        titre: "Retirer l'annonce",
+        message: "Elle disparaîtra du tableau de bord de tout le monde.",
+        confirmer: "Retirer", danger: true
+      });
+      if (!ok) return;
+      const c = MNStore.clone(MNStore.catalog());
+      c.settings.annonce = { texte: "", titre: "", ton: "info",
+                             depuis: "", par: "", ateliers: [] };
+      MNStore.saveDraft(c);
+      const vue = hote.querySelector(".annonce");
+      if (vue) vue.remove();
+      U.toast("Annonce retirée", "ok");
+    });
+
     /* Les durées de service avancent : on les rafraîchit sans redessiner. */
     setInterval(() => {
       hote.querySelectorAll("[data-depuis]").forEach(n => {

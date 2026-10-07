@@ -690,6 +690,20 @@ window.MNStore = (function () {
 
   const MAINTENANCE_OFF = { actif: false, message: "", depuis: "", par: "" };
 
+  /**
+   * L'annonce épinglée pour un garage, ou null s'il n'y en a pas.
+   *
+   * La question se pose au tableau de bord et à l'administration : la
+   * réponse se calcule ici, une fois.
+   *
+   * @param {string} [ou] le garage ; celui où l'on travaille par défaut
+   */
+  function annonce(ou) {
+    const a = (settings() || {}).annonce;
+    if (!a || !String(a.texte || "").trim()) return null;
+    return estDeAtelier(a, ou || atelier()) ? a : null;
+  }
+
   function maintenance() {
     const c = _published || _catalog;
     return (c && c.settings && c.settings.maintenance) || MAINTENANCE_OFF;
@@ -870,6 +884,23 @@ window.MNStore = (function () {
         });
         return o;
       })(s.minimum),
+      /* L'annonce épinglée en haut du tableau de bord. Sans texte, il n'y a
+         pas d'annonce : on ne garde pas une coquille vide qui ferait croire
+         à un réglage posé. */
+      annonce: (function (a) {
+        a = a && typeof a === "object" ? a : {};
+        return {
+          texte: String(a.texte || "").slice(0, 2000),
+          titre: String(a.titre || "").slice(0, 80),
+          /* Deux tons seulement : une information, ou quelque chose qui
+             presse. Trois nuances de gravité ne se distinguent plus. */
+          ton: a.ton === "alerte" ? "alerte" : "info",
+          depuis: String(a.depuis || ""),
+          par: String(a.par || "").slice(0, 60),
+          /* Sans mention, elle vaut pour les deux garages. */
+          ateliers: normAteliers(a.ateliers, TOUS_ATELIERS)
+        };
+      })(s.annonce),
       /* Le site fermé pour maintenance. La normalisation ne garde que ce
          qu'elle connaît : sans cette entrée, l'état serait effacé au premier
          chargement. Il ne se change QUE par l'interrupteur
@@ -1855,6 +1886,7 @@ window.MNStore = (function () {
     ateliersDe, estDeAtelier, usersDeAtelier, rolesDeAtelier, normAteliers,
     setAtelier, atelier, roleIdDe, estMasqueIci, estMasquePartout,
     minimumDe, minimumPour, livretDe,
+    annonce,
     maintenance, gradeDeTete, estCreateur, fermePour, surveillerMaintenance,
     memeGroupe, membresDuGroupe, blacklistDuGroupe, groupesConnus,
     memeNom, soucisHomonyme,
