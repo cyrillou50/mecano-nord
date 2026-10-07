@@ -503,6 +503,26 @@ pas. `setContrat` compare donc ce qu'il a envoyé à ce que le serveur renvoie
 et signale `tropAncien` : la page le dit, au lieu de laisser croire que la
 saisie est passée.
 
+## Une période, pas une date de départ
+
+Un évènement du calendrier a un `jour` et parfois une `fin`. Le tableau de
+bord ne regardait que `jour` : un salon du 6 au 8 octobre s'affichait le 6,
+puis **disparaissait le 7** — précisément quand il devenait utile.
+
+La règle, pour tout ce qui a une durée :
+
+> **« Se passe-t-il pendant la fenêtre qui m'intéresse ? »** — donc
+> `debut <= finFenetre && (fin || debut) >= debutFenetre`. Jamais
+> `debut >= debutFenetre`, qui ne retient que ce qui *commence* là.
+
+Les congés suivaient déjà cette règle (`c.to >= auj && c.from <= dans7`) ;
+les évènements, non. C'est le genre d'écart qui ne se voit pas tant qu'on
+teste avec des évènements d'un seul jour.
+
+`banc-jourj.html` le garde : son jeu d'essai contient un évènement **commencé
+hier et fini demain**, et vérifie qu'il apparaît aujourd'hui, marqué « en
+cours », dans la carte du jour comme dans celle des sept jours.
+
 ## L'annonce épinglée
 
 Même patron que la maintenance : un objet dans `settings`, reconstruit par

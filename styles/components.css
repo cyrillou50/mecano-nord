@@ -2939,3 +2939,17 @@ button.plan__l:hover .plan__c--jour { color: var(--c-action-doux); }
 @media (max-width: 700px) {
   .annonce { padding: var(--e-3); }
 }
+
+/* ---- Ce qui se passe aujourd'hui ---------------------------------------------
+   Juste sous le bonjour, et seulement quand il y a quelque chose : une carte
+   « rien aujourd'hui » n'apprend rien à personne et pousse le reste vers le
+   bas pour rien. */
+
+.jourj { border-color: rgb(var(--accent-rgb) / .35); }
+.jourj .carte__tete h3 { color: var(--c-action-doux); }
+.jourj__ligne { gap: var(--e-3); }
+.jourj__h {
+  flex: none; min-width: 44px;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--t-sm); color: var(--c-faible);
+}

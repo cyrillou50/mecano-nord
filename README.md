@@ -58,6 +58,30 @@ La toute première personne qui se connecte devient automatiquement **patron**
 | **Le site** | Nom de l'entreprise, slogan, **logo**, réglages de connexion |
 | **Publier** | Envoyer les modifications en ligne |
 
+### Ce qui se passe aujourd'hui
+
+Quand un évènement du calendrier tombe **le jour même**, une carte
+**Aujourd'hui** apparaît en haut du tableau de bord, juste sous le bonjour —
+avant tout le reste, et sans qu'on ait à descendre la page.
+
+Elle réunit, rangés par heure :
+
+- les évènements du jour, avec leur heure ;
+- ceux qui **courent** sur plusieurs jours et traversent aujourd'hui, marqués
+  *en cours* ;
+- qui est **en congés** aujourd'hui.
+
+Elle n'apparaît que s'il y a quelque chose : une carte « rien aujourd'hui »
+n'apprend rien et pousse le reste vers le bas pour rien.
+
+Dans la carte *Les sept prochains jours*, juste en dessous, les lignes du jour
+même portent désormais l'étiquette **Aujourd'hui** au lieu d'une date comme
+une autre.
+
+> **Un évènement de plusieurs jours ne disparaît plus une fois commencé.** Le
+> tableau de bord ne regardait que la date de début : un salon du 6 au 8
+> octobre s'effaçait le 7. Il regarde maintenant la période entière.
+
 ### Annoncer quelque chose à toute l'équipe
 
 **Admin → Le site → Annonce épinglée.** Tu écris un texte, tu choisis le ton

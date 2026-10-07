@@ -28,6 +28,7 @@
       hote.innerHTML =
         annonceEnTete() +
         salutation(session) +
+        aujourdhui() +
         moi(session) +
         chiffres() +
         '<div class="cols-2" style="margin-top:var(--e-4)">' +
@@ -188,6 +189,60 @@
   }
 
   /** Les sept prochains jours : évènements et congés, mêlés et datés. */
+  /* ---- Le jour même ------------------------------------------------------------
+     Ce qui se passe aujourd'hui tenait dans la carte des sept jours, tout en
+     bas de la page et sous la ligne de flottaison : le jour J arrivait sans
+     que personne ne le voie. Il monte donc en haut, juste sous le bonjour, et
+     n'apparaît que s'il y a quelque chose — une carte « rien aujourd'hui »
+     n'apprend rien à personne.
+
+     On regarde la période, pas le jour de départ : un évènement commencé hier
+     et qui court jusqu'à demain se passe aussi aujourd'hui. */
+
+  /** Ce qui court aujourd'hui : évènements en cours et absents du jour. */
+  function ceQuiSePasseAujourdhui() {
+    const auj = MNStore.jourLocal();
+
+    const evs = MNAgenda.events()
+      .filter(e => e.jour <= auj && (e.fin || e.jour) >= auj)
+      .map(e => ({
+        quoi: e.titre,
+        heure: e.heure,
+        /* Un évènement de plusieurs jours : on dit où l'on en est. */
+        duree: e.fin && e.fin !== e.jour
+          ? (e.jour < auj ? "en cours" : "jusqu'au " + jourCourt(e.fin))
+          : ""
+      }))
+      .sort((a, b) => (a.heure || "99:99").localeCompare(b.heure || "99:99"));
+
+    let absents = [];
+    try {
+      absents = MNDuty.conges(true)
+        .filter(c => c.from <= auj && c.to >= auj)
+        .map(c => ({ quoi: c.pseudo + " est en congés", heure: "", duree: "" }));
+    } catch (_) { /* service indisponible : les évènements restent utiles */ }
+
+    return evs.concat(absents);
+  }
+
+  function aujourdhui() {
+    const tout = ceQuiSePasseAujourdhui();
+    if (!tout.length) return "";
+
+    return '<div style="margin-bottom:var(--e-4)">' + U.carte({
+      titre: "Aujourd'hui",
+      classe: "jourj",
+      actions: U.bouton("Calendrier", { href: "calendrier.html",
+                                        variante: "fantome", taille: "sm" }),
+      corps: '<div class="pile pile--sm">' + tout.map(x =>
+        '<div class="rang jourj__ligne">' +
+          '<span class="jourj__h">' + U.esc(x.heure || "—") + "</span>" +
+          "<span>" + U.esc(x.quoi) + "</span>" +
+          (x.duree ? '<span class="pousse muet txt-sm">' + U.esc(x.duree) + "</span>" : "") +
+        "</div>").join("") + "</div>"
+    }) + "</div>";
+  }
+
   function aVenir() {
     const auj = MNStore.jourLocal();
     const dans7 = (function () {
@@ -195,9 +250,12 @@
       return MNStore.jourLocal(d);
     })();
 
+    /* On garde ce qui CHEVAUCHE la semaine, pas seulement ce qui y commence :
+       un évènement de trois jours entamé hier se passe encore demain. */
     const evs = MNAgenda.events()
-      .filter(e => e.jour >= auj && e.jour <= dans7)
-      .map(e => ({ jour: e.jour, quoi: e.titre, ton: "action", heure: e.heure }));
+      .filter(e => e.jour <= dans7 && (e.fin || e.jour) >= auj)
+      .map(e => ({ jour: e.jour < auj ? auj : e.jour, quoi: e.titre,
+                   ton: "action", heure: e.heure }));
 
     let cgs = [];
     try {
@@ -215,7 +273,8 @@
       corps: tout.length
         ? '<div class="pile pile--sm">' + tout.slice(0, 8).map(x =>
             '<div class="rang">' +
-              U.etiquette(jourCourt(x.jour), x.ton) +
+              U.etiquette(x.jour === auj ? "Aujourd'hui" : jourCourt(x.jour),
+                          x.jour === auj ? "alerte" : x.ton) +
               "<span>" + U.esc(x.quoi) + "</span>" +
               (x.heure ? '<span class="pousse muet txt-sm nombre">' + U.esc(x.heure) + "</span>" : "") +
             "</div>").join("") + "</div>"
