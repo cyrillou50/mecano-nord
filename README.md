@@ -77,10 +77,6 @@ Kit de Réparation
 Article	Quantité	En échange de
 Kit de réparation	100
 
-LE CLIENT
-
-Signature : ______________________
-
 POUR L’ATELIER
 
 Signature : Hood Diaz
@@ -89,10 +85,13 @@ Signature : Hood Diaz
 Les colonnes sont séparées par des **tabulations** : la fenêtre du jeu les
 aligne toute seule.
 
-> **Rien de plus que ça.** Pas même le nom de l'atelier : trois lignes en
-> haut, et c'est la dernière signature qui tombe hors de la feuille en bas.
-> Les notes, le temps de fabrication et ce que le client apporte n'y sont pas
-> non plus — tout cela se lit sur la fiche, qui n'a pas de bord.
+> **Rien de plus que ça.** Ni le nom de l'atelier en tête, ni la ligne de
+> signature du client : chaque ligne en trop est une ligne qui tombe hors de
+> la feuille en bas. Les notes, le temps de fabrication et ce que le client
+> apporte n'y sont pas non plus — tout cela se lit sur la fiche, qui n'a pas
+> de bord.
+>
+> Avec qui le contrat est passé reste dit plus haut, à la ligne *Client*.
 
 Le message de confirmation donne le **nombre de caractères** copiés — c'est
 lui qui dit si le contrat tiendra, et il grandit avec le nombre d'articles.

@@ -660,8 +660,9 @@
       l.push("—");
     }
 
-    l.push("", "LE CLIENT", "", "Signature : ______________________",
-           "", "POUR L’ATELIER", "", "Signature : " + (k.creePar || ""));
+    /* Pas de ligne de signature pour le client : la feuille du jeu ne
+       s'allonge pas, et c'est l'atelier qui signe ce qu'il remet. */
+    l.push("", "POUR L’ATELIER", "", "Signature : " + (k.creePar || ""));
 
     return l.join("\n");
   }
