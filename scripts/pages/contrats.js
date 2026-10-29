@@ -634,12 +634,12 @@
      le client apporte : tout cela se lit sur la fiche, qui n'a pas de bord. */
 
   function texteDuJeu(k) {
-    const b = MNStore.brand();
     const type = MNStore.contractTypeById(k.type);
     const l = [];
 
-    l.push(String(b.name || "Atelier").toUpperCase(), "", "",
-           "Contrat n° " + (k.ref || "—"), "",
+    /* Pas de nom d'atelier en tête : trois lignes en haut, c'est la dernière
+       signature qui tombe hors de la feuille en bas. */
+    l.push("Contrat n° " + (k.ref || "—"), "",
            "STATUT : " + String(ETATS[k.etat] || "").toUpperCase(),
            k.titre || "Sans titre",
            "- Client : " + (k.client || "—"),
