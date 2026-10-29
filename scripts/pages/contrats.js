@@ -635,11 +635,13 @@
 
   function texteDuJeu(k) {
     const type = MNStore.contractTypeById(k.type);
+    const garage = MNStore.nomAtelier(k.atelier) || MNStore.brand().name || "Atelier";
     const l = [];
 
-    /* Pas de nom d'atelier en tête : trois lignes en haut, c'est la dernière
-       signature qui tombe hors de la feuille en bas. */
-    l.push("Contrat n° " + (k.ref || "—"), "",
+    /* Une seule ligne vide sous le nom : elle suffit à le détacher, et la
+       feuille du jeu ne s'allonge pas d'autant. */
+    l.push(String(garage).toUpperCase(), "",
+           "Contrat n° " + (k.ref || "—"), "",
            "STATUT : " + String(ETATS[k.etat] || "").toUpperCase(),
            k.titre || "Sans titre",
            "- Client : " + (k.client || "—"),

@@ -64,6 +64,8 @@ Sur un contrat ouvert, le bouton **Copier** met le contrat dans le
 presse-papiers **en texte brut**, prêt à coller dans une fenêtre du jeu :
 
 ```
+MÉCANO NORD
+
 Contrat n° CT-20261029-1436
 
 STATUT : TERMINÉ
@@ -85,13 +87,16 @@ Signature : Hood Diaz
 Les colonnes sont séparées par des **tabulations** : la fenêtre du jeu les
 aligne toute seule.
 
-> **Rien de plus que ça.** Ni le nom de l'atelier en tête, ni la ligne de
-> signature du client : chaque ligne en trop est une ligne qui tombe hors de
-> la feuille en bas. Les notes, le temps de fabrication et ce que le client
-> apporte n'y sont pas non plus — tout cela se lit sur la fiche, qui n'a pas
-> de bord.
+En tête, le **garage qui a signé** — un contrat du Sud consulté depuis le
+Nord reste un contrat du Sud.
+
+> **Rien de plus que ça.** Pas de ligne de signature pour le client, pas de
+> notes, pas de temps de fabrication, pas de ce que le client apporte :
+> chaque ligne en trop est une ligne qui tombe hors de la feuille en bas, et
+> tout cela se lit sur la fiche, qui n'a pas de bord.
 >
-> Avec qui le contrat est passé reste dit plus haut, à la ligne *Client*.
+> Avec qui le contrat est passé se lit à la ligne *Client*, et c'est
+> l'atelier qui signe ce qu'il remet.
 
 Le message de confirmation donne le **nombre de caractères** copiés — c'est
 lui qui dit si le contrat tiendra, et il grandit avec le nombre d'articles.
