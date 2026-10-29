@@ -58,6 +58,47 @@ La toute première personne qui se connecte devient automatiquement **patron**
 | **Le site** | Nom de l'entreprise, slogan, **logo**, réglages de connexion |
 | **Publier** | Envoyer les modifications en ligne |
 
+### Coller un contrat en jeu
+
+Sur un contrat ouvert, le bouton **Copier** met le contrat dans le
+presse-papiers **en texte brut**, prêt à coller dans une fenêtre du jeu :
+
+```
+MÉCANO NORD
+
+
+Contrat n° CT-20261029-1436
+
+STATUT : TERMINÉ
+Kit de Réparation
+- Client : Brokers
+- Établi par : Hood Diaz
+- Le : 29/10/2026
+- Type : Kit de réparation
+- Expire le : 5 novembre 2026
+
+Article	Quantité	En échange de
+Kit de réparation	100
+
+LE CLIENT
+
+Signature : ______________________
+
+POUR L’ATELIER
+
+Signature : Hood Diaz
+```
+
+Les colonnes sont séparées par des **tabulations** : la fenêtre du jeu les
+aligne toute seule.
+
+> **Rien de plus que ça.** Les notes, le temps de fabrication et ce que le
+> client apporte n'y sont pas : chaque ligne en trop est une ligne qui
+> dépasse de la fenêtre. Tout cela se lit sur la fiche, qui n'a pas de bord.
+
+Le message de confirmation donne le **nombre de caractères** copiés — c'est
+lui qui dit si le contrat tiendra, et il grandit avec le nombre d'articles.
+
 ### Ce qui se passe aujourd'hui
 
 Quand un évènement du calendrier tombe **le jour même**, une carte

@@ -2,7 +2,8 @@
    Contrats — le registre à gauche, le contrat ouvert à droite.
 
    Reprise fidèle de la V1 : trois droits distincts, troc en ressources (il
-   n'y a pas d'argent), type, expiration, et la sortie papier manuscrite.
+   n'y a pas d'argent), type et expiration. La sortie papier a laissé la place
+   à un texte qu'on colle directement dans une fenêtre du jeu.
 
    Ce qui change : les lignes du contrat se saisissent dans un tableau qui se
    retourne en fiches sur téléphone, au lieu d'une grille à colonnes fixes qui
@@ -193,7 +194,9 @@
       actions:
         U.etiquette(ETATS[k.etat], TON[k.etat]) +
         (type ? U.etiquette(type.name) : "") +
-        U.bouton("PDF", { variante: "fantome", taille: "sm", icone: "contrat", action: "pdf" }) +
+        U.bouton("Copier", { variante: "fantome", taille: "sm", icone: "recu",
+                             titre: "Copier le contrat pour le coller en jeu",
+                             action: "jeu" }) +
         (peutEcrire ? U.bouton("Modifier",
           { variante: "fantome", taille: "sm", icone: "crayon", action: "mod" }) : "") +
         (peutSupprimer ? U.bouton("", { icone: "poubelle", variante: "fantome", taille: "sm",
@@ -236,8 +239,7 @@
 
         /* Ce que le client doit apporter, et si l'échange a eu lieu : les deux
            questions qu'on vient poser à un contrat. Ce que l'atelier sort du
-           stock se relit sur la ligne de l'objet, et reste imprimé sur le
-           contrat papier. */
+           stock se relit sur la ligne de l'objet. */
         '<div class="cols-2" style="margin-top:var(--e-4)">' +
           versant("Le client apporte", t.demande, "Aucune contrepartie convenue.") +
           panneauVente(k) +
@@ -297,7 +299,7 @@
 
   function brancherFiche(k) {
     const b = a => hote.querySelector('[data-a="' + a + '"]');
-    b("pdf").addEventListener("click", () => imprimer(k));
+    b("jeu").addEventListener("click", () => copierPourLeJeu(k));
     if (b("mod")) b("mod").addEventListener("click", () => editer(k));
     if (b("sup")) b("sup").addEventListener("click", () => supprimer(k));
     if (b("vente")) b("vente").addEventListener("click", () => basculerVente(k));
@@ -623,113 +625,70 @@
       "-" + p(d.getHours()) + p(d.getMinutes());
   };
 
-  /* ---- Sortie papier -----------------------------------------------------------------
-     Une fenêtre autonome plutôt qu'une feuille d'impression : rien de
-     l'application ne peut déteindre dessus, et « Enregistrer au format PDF »
-     de la boîte d'impression suffit. Aucune bibliothèque. */
+  /* ---- Coller en jeu -----------------------------------------------------------
+     Le contrat tel qu'on le colle dans une fenêtre du jeu : du texte brut,
+     des tabulations pour le tableau, et rien de plus.
 
-  function imprimer(k) {
-    const t = totaux(k);
+     Chaque ligne en trop est une ligne qui dépasse de la fenêtre. C'est
+     pourquoi on n'y met ni les notes, ni le temps de fabrication, ni ce que
+     le client apporte : tout cela se lit sur la fiche, qui n'a pas de bord. */
+
+  function texteDuJeu(k) {
     const b = MNStore.brand();
     const type = MNStore.contractTypeById(k.type);
+    const l = [];
 
-    const tas = l => l.length
-      ? l.map(r => U.esc(r.resource.name) + " ×" + MNStore.nombre(r.qty)).join(" · ")
-      : "rien";
+    l.push(String(b.name || "Atelier").toUpperCase(), "", "",
+           "Contrat n° " + (k.ref || "—"), "",
+           "STATUT : " + String(ETATS[k.etat] || "").toUpperCase(),
+           k.titre || "Sans titre",
+           "- Client : " + (k.client || "—"),
+           "- Établi par : " + (k.creePar || "—"),
+           "- Le : " + (dateCourte(k.creeLe) || dateCourte(new Date().toISOString())));
+    if (type) l.push("- Type : " + type.name);
+    if (k.expire) l.push("- Expire le : " + dateJour(k.expire));
 
-    const doc =
-      '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">' +
-      "<title>" + U.esc(k.ref || "Contrat") + " — " + U.esc(k.titre || "") + "</title>" +
-      '<link rel="preconnect" href="https://fonts.googleapis.com">' +
-      '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
-      '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?' +
-        'family=Caveat:wght@400;600;700&family=Special+Elite&display=swap">' +
-      "<style>" + PAPIER + "</style></head><body>" +
-      '<div class="feuille">' +
-        '<div class="tampon">' + U.esc(ETATS[k.etat]) + "</div>" +
-        '<header class="tete"><h1>' + U.esc(b.name) + "</h1>" +
-          '<p class="sous">' + U.esc(b.tagline) + "</p>" +
-          '<p class="ref">Contrat n° ' + U.esc(k.ref || "—") + "</p></header>" +
-        '<h2 class="objet">' + U.esc(k.titre || "Sans titre") + "</h2>" +
-        '<div class="parties">' +
-          "<p><span>Client</span> " + U.esc(k.client || "—") + "</p>" +
-          "<p><span>Établi par</span> " + U.esc(k.creePar || "—") + "</p>" +
-          "<p><span>Le</span> " + U.esc(dateCourte(k.creeLe) || dateCourte(new Date().toISOString())) + "</p>" +
-          (type ? "<p><span>Type</span> " + U.esc(type.name) + "</p>" : "") +
-          (k.expire ? "<p><span>Expire le</span> " + U.esc(dateJour(k.expire)) +
-            (MNStore.contratExpire(k) ? " (dépassée)" : "") + "</p>" : "") +
-        "</div>" +
-        (k.lignes.length
-          ? "<table><thead><tr><th>Ce que l'atelier fournit</th><th class=\"n\">Qté</th>" +
-            "<th class=\"n\">En échange de</th></tr></thead><tbody>" +
-            k.lignes.map(l => "<tr><td>" + U.esc(l.name || "—") + "</td>" +
-              '<td class="n">' + l.qty + "</td>" +
-              '<td class="n">' + U.esc(troc(l, l.qty)) + "</td></tr>").join("") +
-            "</tbody></table>"
-          : '<p class="vide">Aucune prestation portée à ce contrat.</p>') +
-        '<div class="troc">' +
-          "<div><h3>Le client apporte</h3><p>" + tas(t.demande) + "</p></div>" +
-        "</div>" +
-        (t.secondes ? '<div class="bloc"><h3>Temps de fabrication</h3><p>' +
-          U.esc(U.duree(t.secondes)) + "</p></div>" : "") +
-        (k.note ? '<div class="bloc"><h3>Notes</h3><p>' + U.esc(k.note) + "</p></div>" : "") +
-        '<div class="signatures"><div><span>Le client</span></div>' +
-          "<div><span>Pour l'atelier</span><i>" + U.esc(k.creePar || "") + "</i></div></div>" +
-      "</div>" +
-      "<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script>" +
-      "</body></html>";
+    l.push("", "Article\tQuantité\tEn échange de");
+    if (k.lignes.length) {
+      k.lignes.forEach(x => {
+        /* La contrepartie n'occupe sa colonne que s'il y en a une : une
+           tabulation suivie de rien se voit à l'écran. */
+        const e = troc(x, x.qty);
+        l.push((x.name || "—") + "\t" + x.qty + (e && e !== "—" ? "\t" + e : ""));
+      });
+    } else {
+      l.push("—");
+    }
 
-    const w = window.open("", "_blank");
-    if (!w) return U.toast("Ton navigateur a bloqué la fenêtre. Autorise les pop-ups.", "err");
-    w.document.open(); w.document.write(doc); w.document.close();
+    l.push("", "LE CLIENT", "", "Signature : ______________________",
+           "", "POUR L’ATELIER", "", "Signature : " + (k.creePar || ""));
+
+    return l.join("\n");
   }
 
-  /* Papier vieilli, encre manuscrite : tout est dessiné en CSS, aucune image
-     à charger ni à héberger. */
-  const PAPIER = [
-    "*{box-sizing:border-box}html,body{margin:0;padding:0;background:#3a352c}",
-    "body{font-family:'Caveat',cursive;color:#241d14;padding:28px}",
-    ".feuille{position:relative;max-width:760px;margin:0 auto;padding:52px 56px 64px;",
-    "background:#e8dcc0;background-image:",
-    "radial-gradient(ellipse at 12% 8%,rgba(120,90,40,.20),transparent 42%),",
-    "radial-gradient(ellipse at 88% 22%,rgba(90,70,30,.16),transparent 38%),",
-    "radial-gradient(circle at 74% 82%,rgba(110,80,35,.22),transparent 26%);",
-    "box-shadow:0 2px 0 rgba(0,0,0,.25),0 18px 50px rgba(0,0,0,.55)}",
-    ".feuille::after{content:'';position:absolute;inset:0;pointer-events:none;",
-    "box-shadow:inset 0 0 60px rgba(70,50,20,.35)}",
-    ".tampon{position:absolute;top:38px;right:44px;font-family:'Special Elite',monospace;",
-    "font-size:15px;letter-spacing:.22em;text-transform:uppercase;color:#8d2b2b;",
-    "border:3px double #8d2b2b;padding:7px 14px;transform:rotate(-9deg);opacity:.72}",
-    ".tete{text-align:center;border-bottom:2px solid #4a3c28;padding-bottom:14px;margin-bottom:22px}",
-    ".tete h1{font-family:'Special Elite',monospace;font-size:27px;margin:0;",
-    "letter-spacing:.12em;text-transform:uppercase}",
-    ".tete .sous{margin:4px 0 0;font-size:17px;opacity:.7}",
-    ".tete .ref{font-family:'Special Elite',monospace;font-size:12px;margin:10px 0 0;",
-    "letter-spacing:.16em;opacity:.75}",
-    ".objet{font-size:31px;margin:0 0 16px;font-weight:700;text-align:center;",
-    "text-decoration:underline;text-underline-offset:5px}",
-    ".parties{display:flex;flex-wrap:wrap;gap:6px 30px;font-size:20px;margin-bottom:22px}",
-    ".parties p{margin:0}.parties span{font-family:'Special Elite',monospace;font-size:11px;",
-    "letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-right:6px}",
-    "table{width:100%;border-collapse:collapse;margin:0 0 14px;font-size:20px}",
-    "th{font-family:'Special Elite',monospace;font-size:11px;letter-spacing:.13em;",
-    "text-transform:uppercase;text-align:left;border-bottom:2px solid #4a3c28;padding:6px 8px;opacity:.8}",
-    "td{padding:7px 8px;border-bottom:1px dashed rgba(74,60,40,.45)}",
-    ".n{text-align:right;white-space:nowrap}",
-    ".troc{display:flex;gap:34px;margin:22px 0 24px;border-top:2px solid #4a3c28;",
-    "border-bottom:2px solid #4a3c28;padding:14px 0}",
-    ".troc>div{flex:1}.troc p{margin:0;font-size:21px}",
-    ".troc h3,.bloc h3{font-family:'Special Elite',monospace;font-size:11px;letter-spacing:.14em;",
-    "text-transform:uppercase;margin:0 0 5px;opacity:.7}",
-    ".bloc{margin-bottom:20px}.bloc p{margin:0;font-size:19px;white-space:pre-wrap}",
-    ".vide{font-size:19px;opacity:.7}",
-    ".signatures{display:flex;gap:40px;margin-top:52px}",
-    ".signatures div{flex:1;border-top:1px solid #4a3c28;padding-top:6px}",
-    ".signatures span{font-family:'Special Elite',monospace;font-size:10px;",
-    "letter-spacing:.14em;text-transform:uppercase;opacity:.65}",
-    ".signatures i{display:block;font-style:normal;font-size:26px;margin-top:8px;transform:rotate(-3deg)}",
-    /* À l'impression le fond doit sortir, sinon il ne reste qu'un tableau blanc. */
-    "@media print{html,body{background:#fff;padding:0}.feuille{max-width:none;margin:0;box-shadow:none}",
-    "*{-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{margin:12mm}}"
-  ].join("");
+  /** Copie un texte, avec le vieux chemin en secours sur les navigateurs sans
+      presse-papiers moderne. */
+  function copier(texte, message) {
+    const dire = ok => U.toast(ok ? message : "Copie impossible", ok ? "ok" : "err");
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(texte).then(() => dire(true), () => dire(false));
+    }
+    const n = document.createElement("textarea");
+    n.value = texte;
+    n.style.position = "fixed";
+    n.style.opacity = "0";
+    document.body.appendChild(n);
+    n.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (_) { ok = false; }
+    n.remove();
+    dire(ok);
+  }
+
+  /* Le nombre de caractères est dit à chaque fois : c'est lui qui décide si
+     le contrat tiendra dans la fenêtre du jeu, et on ne le devine pas. */
+  function copierPourLeJeu(k) {
+    const t = texteDuJeu(k);
+    copier(t, "Contrat copié — " + t.length + " caractères");
+  }
 })();
