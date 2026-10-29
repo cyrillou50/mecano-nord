@@ -373,6 +373,47 @@
       i.enabled && MNStore.peutVendre((moi || {}).roleId, i.id));
     const ress = MNStore.catalog().resources;
 
+    /* Le nom d'une catégorie, précédé de celle qui la contient quand il y en
+       a une : « Carrosserie » seul ne dit pas de quel rayon on parle. */
+    const nomCat = id => {
+      const k = MNStore.categoryById(id);
+      if (!k) return "Sans catégorie";
+      const p = k.parent ? MNStore.categoryById(k.parent) : null;
+      return p ? p.name + " › " + k.name : k.name;
+    };
+
+    /* Les objets rangés par catégorie, dans l'ordre du catalogue. */
+    function parCategorie() {
+      const g = [];
+      objets.forEach(o => {
+        let b = g.find(x => x.id === o.category);
+        if (!b) { b = { id: o.category, nom: nomCat(o.category), objets: [] }; g.push(b); }
+        b.objets.push(o);
+      });
+      return g;
+    }
+
+    /** Le menu des objets, groupé par catégorie. */
+    function choixObjet(idChoisi) {
+      return '<select class="liste" data-f="obj">' + parCategorie().map(b =>
+        '<optgroup label="' + U.esc(b.nom) + '">' + b.objets.map(o =>
+          '<option value="' + U.esc(o.id) + '"' +
+          (o.id === idChoisi ? " selected" : "") + ">" + U.esc(o.name) +
+          "</option>").join("") + "</optgroup>").join("") + "</select>";
+    }
+
+    /**
+     * Ce que coûte un objet, repris du catalogue — PAR UNITÉ, comme le reste
+     * de la ligne : la quantité multiplie, elle n'est pas comprise ici.
+     */
+    function ressourcesDe(itemId) {
+      const o = objets.find(x => x.id === itemId);
+      const cost = (o && o.cost) || {};
+      return Object.keys(cost)
+        .filter(id => MNStore.resourceById(id) && cost[id] > 0)
+        .map(id => ({ resId: id, qty: cost[id] }));
+    }
+
     const corps = document.createElement("div");
     corps.className = "pile";
     corps.innerHTML =
@@ -431,9 +472,7 @@
             '<div class="k-ligne" data-i="' + i + '">' +
               '<div class="k-ligne__haut">' +
                 (l.itemId
-                  ? '<select class="liste" data-f="obj">' + objets.map(o =>
-                      '<option value="' + U.esc(o.id) + '"' + (o.id === l.itemId ? " selected" : "") +
-                      ">" + U.esc(o.name) + "</option>").join("") + "</select>"
+                  ? choixObjet(l.itemId)
                   : '<input class="saisie" data-f="nom" maxlength="120" value="' +
                     U.esc(l.name) + '" placeholder="Intitulé libre">') +
                 '<input class="saisie saisie--nombre" data-f="qty" inputmode="numeric" ' +
@@ -461,6 +500,14 @@
                 '<div class="rang" style="margin-top:var(--e-2)">' +
                   U.bouton("Ressource", { variante: "fantome", taille: "sm",
                                           icone: "plus", action: "addres" }) +
+                  /* Après une retouche à la main, de quoi revenir à ce que
+                     dit le catalogue sans avoir à changer d'objet. */
+                  (l.itemId && ressourcesDe(l.itemId).length
+                    ? U.bouton("Reprendre du catalogue",
+                        { variante: "fantome", taille: "sm", icone: "rafraichir",
+                          titre: "Remettre les ressources que coûte cet objet",
+                          action: "recalc" })
+                    : "") +
                   '<b class="pousse nombre">' + U.esc(troc(l, l.qty)) + "</b>" +
                 "</div>" +
               "</div>" +
@@ -483,13 +530,22 @@
           const o = objets.find(x => x.id === ob.value);
           lignes[i].itemId = ob.value;
           lignes[i].name = o ? o.name : "";
-          majApercu();
+          /* Les ressources suivent l'objet : celles d'avant étaient celles
+             d'un autre, les garder n'aurait aucun sens. */
+          lignes[i].demande = ressourcesDe(ob.value);
+          peindre();
         });
         const nm = row.querySelector('[data-f="nom"]');
         if (nm) nm.addEventListener("input", () => { lignes[i].name = nm.value; });
 
         row.querySelector('[data-a="rm"]').addEventListener("click", () => {
           lignes.splice(i, 1); peindre();
+        });
+        const rc = row.querySelector('[data-a="recalc"]');
+        if (rc) rc.addEventListener("click", () => {
+          lignes[i].demande = ressourcesDe(lignes[i].itemId);
+          peindre();
+          U.toast("Ressources reprises du catalogue", "ok");
         });
         row.querySelector('[data-a="addres"]').addEventListener("click", () => {
           if (!ress.length) return U.toast("Aucune ressource au catalogue", "err");
@@ -539,7 +595,8 @@
 
     corps.querySelector('[data-a="add-obj"]').addEventListener("click", () => {
       if (!objets.length) return U.toast("Aucun objet au catalogue", "err");
-      lignes.push({ itemId: objets[0].id, name: objets[0].name, qty: 1, demande: [] });
+      lignes.push({ itemId: objets[0].id, name: objets[0].name, qty: 1,
+                    demande: ressourcesDe(objets[0].id) });
       peindre();
     });
     corps.querySelector('[data-a="add-lib"]').addEventListener("click", () => {

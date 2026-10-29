@@ -58,6 +58,27 @@ La toute première personne qui se connecte devient automatiquement **patron**
 | **Le site** | Nom de l'entreprise, slogan, **logo**, réglages de connexion |
 | **Publier** | Envoyer les modifications en ligne |
 
+### Monter un contrat sans compter à la main
+
+Dans l'éditeur d'un contrat, **Ajouter un objet** propose le catalogue
+**rangé par catégorie** — « Customisation › Carrosserie », « Dépannage ›
+Consommable »… — au lieu d'une liste de quarante entrées à plat.
+
+Et surtout : **choisir un objet remplit tout seul ce que le client apporte**,
+repris du coût en ressources inscrit au catalogue. Un *Kit accessoires*
+amène Ferraille ×60, Pièce détachée ×90 et Plastique ×75, par unité. Mets 100
+en quantité, le total se calcule : ×6 000, ×9 000, ×7 500.
+
+Tu restes libre de corriger : chaque ressource se modifie, s'enlève, et le
+bouton **+ Ressource** en ajoute une. Après une retouche, **Reprendre du
+catalogue** remet ce que l'objet coûte vraiment.
+
+> **Changer d'objet remplace les ressources**, il ne les additionne pas :
+> celles d'avant étaient celles d'un autre objet.
+
+La **Ligne libre** reste entièrement manuelle : elle sert justement à ce qui
+n'est pas au catalogue.
+
 ### Coller un contrat en jeu
 
 Sur un contrat ouvert, le bouton **Copier** met le contrat dans le
