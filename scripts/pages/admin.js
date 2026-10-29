@@ -1176,6 +1176,10 @@
                   (t.jours
                     ? U.etiquette("valable " + t.jours + " jour" + (t.jours > 1 ? "s" : ""))
                     : "<i>sans durée proposée</i>") +
+                  ((t.objets || []).length
+                    ? " " + U.etiquette(t.objets.length + " objet" +
+                        (t.objets.length > 1 ? "s" : ""), "action")
+                    : " <i>tout le catalogue</i>") +
                 "</div></div>" +
               '<div class="ad-actes">' +
                 U.bouton("", { icone: "crayon", variante: "fantome", taille: "sm",
@@ -1202,9 +1206,120 @@
     }, dIci(brouillon.contractTypes || []));
   }
 
+  /* ---- Les objets qu'un type de contrat propose ---------------------------------
+     Une liste à cocher, groupée par catégorie : quarante objets à plat ne se
+     choisissent pas. Rien de coché = le type les propose tous, et c'est dit
+     en toutes lettres sous la liste — une liste vide se lirait autrement
+     comme « ce type ne propose rien ». */
+
+  function panneauObjetsType() {
+    return '<div class="champ">' +
+      '<span class="champ__label">Objets proposés par ce type</span>' +
+      '<input class="saisie" id="t-q" type="search" spellcheck="false" ' +
+        'placeholder="Chercher un objet" aria-label="Chercher un objet">' +
+      '<div class="ad-coches ad-coches--hautes" id="t-objets" ' +
+        'style="margin-top:var(--e-2)"></div>' +
+      '<p class="champ__aide" id="t-bilan"></p>' +
+    "</div>";
+  }
+
+  /** Branche la liste. Rend une fonction qui donne les objets retenus. */
+  function brancherObjetsType(corps, choisis) {
+    const pris = (choisis || []).slice();
+    const zone = corps.querySelector("#t-objets");
+    const q = corps.querySelector("#t-q");
+    const bilan = corps.querySelector("#t-bilan");
+
+    const nomCat = id => {
+      const k = brouillon.categories.find(x => x.id === id);
+      if (!k) return "Sans catégorie";
+      const p = k.parent ? brouillon.categories.find(x => x.id === k.parent) : null;
+      return p ? p.name + " › " + k.name : k.name;
+    };
+
+    function majBilan() {
+      bilan.textContent = pris.length
+        ? pris.length + " objet" + (pris.length > 1 ? "s" : "") + " proposé" +
+          (pris.length > 1 ? "s" : "") + " par ce type."
+        : "Rien de coché : ce type propose tout le catalogue.";
+    }
+
+    function peindre() {
+      const f = q.value.trim().toLowerCase();
+      const vus = brouillon.items.filter(it =>
+        !f || it.name.toLowerCase().indexOf(f) !== -1 ||
+        nomCat(it.category).toLowerCase().indexOf(f) !== -1);
+
+      const groupes = [];
+      vus.forEach(it => {
+        let g = groupes.find(x => x.id === it.category);
+        if (!g) {
+          g = { id: it.category, nom: nomCat(it.category), objets: [] };
+          groupes.push(g);
+        }
+        g.objets.push(it);
+      });
+
+      zone.innerHTML = groupes.length
+        ? groupes.map(g =>
+            '<button type="button" class="ad-coche ad-coche--tete" data-tout="' +
+              U.esc(g.id) + '" title="Tout cocher ou tout décocher">' +
+              '<span class="ad-coche__case">' + U.icone("check") + "</span>" +
+              "<span><b>" + U.esc(g.nom) + "</b></span></button>" +
+            g.objets.map(it => {
+              /* Le garage distingue deux objets de même nom. */
+              const ou = it.ateliers || [];
+              const dits = [];
+              if (ou.length === 1) dits.push(MNStore.nomAtelier(ou[0]));
+              if (!it.enabled) dits.push("désactivé au catalogue");
+              return '<button type="button" class="ad-coche ad-coche--objet' +
+                (pris.indexOf(it.id) !== -1 ? " est-cochee" : "") +
+                '" data-o="' + U.esc(it.id) + '">' +
+                '<span class="ad-coche__case">' + U.icone("check") + "</span>" +
+                "<span><b>" + U.esc(it.name) + "</b>" +
+                (dits.length ? "<i>" + U.esc(dits.join(" · ")) + "</i>" : "") +
+                "</span></button>";
+            }).join("")).join("")
+        : '<p class="champ__aide" style="padding:var(--e-2)">Aucun objet ne correspond.</p>';
+
+      zone.querySelectorAll("[data-o]").forEach(b => b.addEventListener("click", () => {
+        const i = pris.indexOf(b.dataset.o);
+        if (i === -1) pris.push(b.dataset.o); else pris.splice(i, 1);
+        /* On bascule la case sur place : tout repeindre remonterait la liste
+           en haut, et cocher trois objets d'affilée deviendrait pénible. */
+        b.classList.toggle("est-cochee", i === -1);
+        majBilan();
+      }));
+
+      /* Un en-tête coche ou décoche toute sa catégorie d'un geste. */
+      zone.querySelectorAll("[data-tout]").forEach(b => b.addEventListener("click", () => {
+        const g = groupes.find(x => x.id === b.dataset.tout);
+        if (!g) return;
+        const manque = g.objets.some(it => pris.indexOf(it.id) === -1);
+        g.objets.forEach(it => {
+          const i = pris.indexOf(it.id);
+          if (manque && i === -1) pris.push(it.id);
+          if (!manque && i !== -1) pris.splice(i, 1);
+        });
+        const ou = zone.scrollTop;
+        peindre();
+        zone.scrollTop = ou;
+      }));
+
+      majBilan();
+    }
+
+    q.addEventListener("input", peindre);
+    peindre();
+
+    return () => pris.slice();
+  }
+
   function editerCtype(t) {
     const neuf = !t;
     const cur = t || { name: "", icon: "i-box", jours: 0 };
+
+    let objetsRetenus = () => (cur.objets || []).slice();
 
     petitEditeur({
       titre: neuf ? "Nouveau type de contrat" : "Modifier le type",
@@ -1212,16 +1327,19 @@
       extra: U.champ({ id: "t-jours", label: "Durée de validité proposée (jours)",
         type: "number", min: 0, plafond: 3650, valeur: Number(cur.jours || 0),
         aide: "<b>0 = aucune.</b> Sinon, choisir ce type à la création remplit la " +
-              "date d'expiration du contrat." }),
+              "date d'expiration du contrat." }) +
+        panneauObjetsType(),
+      surMontage: corps => { objetsRetenus = brancherObjetsType(corps, cur.objets || []); },
       surEnregistrement: (nom, icone, fermer, couleur, k) => {
         const jours = borne(k.querySelector("#t-jours").value, 3650);
+        const objets = objetsRetenus();
         if (!brouillon.contractTypes) brouillon.contractTypes = [];
         if (neuf) {
           brouillon.contractTypes.push({
             id: MNStore.uniqueId(nom, brouillon.contractTypes.map(x => x.id)),
-            name: nom, icon: icone, jours
+            name: nom, icon: icone, jours, objets
           });
-        } else { t.name = nom; t.icon = icone; t.jours = jours; }
+        } else { t.name = nom; t.icon = icone; t.jours = jours; t.objets = objets; }
         valider(); fermer();
         U.toast(neuf ? "Type créé" : "Type mis à jour", "ok");
       }
@@ -3201,6 +3319,9 @@
       (o.extra || "");
 
     brancherIcone(corps, "s-ico");
+    /* Les champs propres à l'appelant ont parfois besoin d'écouter : on lui
+       rend la main avant d'ouvrir la fenêtre. */
+    if (o.surMontage) o.surMontage(corps);
     const col = corps.querySelector("#s-couleur");
     if (col) col.addEventListener("input", () => {
       corps.querySelector("#s-ico-vue").style.color = col.value;

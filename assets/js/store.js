@@ -1083,6 +1083,7 @@ window.MNStore = (function () {
        reste. Les contrats, eux, restent côté serveur — seul l'identifiant du
        type les relie ici. */
     const seenT = [];
+    const idsDuCatalogue = c.items.map(x => x.id);
     c.contractTypes = (Array.isArray(c.contractTypes) ? c.contractTypes : []).map(t => {
       const id = uniqueId(t.id || t.name, seenT); seenT.push(id);
       return {
@@ -1092,7 +1093,12 @@ window.MNStore = (function () {
         /* Sans mention, un type est proposé dans les deux garages. */
         ateliers: normAteliers(t.ateliers, TOUS_ATELIERS),
         /* Durée de validité proposée à la création, en jours. 0 = aucune. */
-        jours: Math.max(0, Math.min(3650, Math.round(Number(t.jours) || 0)))
+        jours: Math.max(0, Math.min(3650, Math.round(Number(t.jours) || 0))),
+        /* Les objets que ce type propose à la rédaction. Vide = tous : un
+           type qui ne dit rien ne restreint rien. Un objet supprimé du
+           catalogue s'en va aussi d'ici. */
+        objets: (Array.isArray(t.objets) ? t.objets : [])
+          .map(String).filter(id => idsDuCatalogue.indexOf(id) !== -1)
       };
     });
     if (!c.contractTypes.length) {
@@ -1730,6 +1736,21 @@ window.MNStore = (function () {
   /** Le serveur peut-il héberger les images ? */
   const imagesHebergees = () => !!api("images");
 
+  /**
+   * Les objets qu'un type de contrat propose à la rédaction.
+   *
+   * Sans type, ou avec un type qui n'a rien choisi, on les propose tous :
+   * une liste vide veut dire « pas de restriction », pas « rien ».
+   *
+   * @param {string} [typeId]
+   */
+  function objetsPourType(typeId) {
+    const tous = _catalog.items || [];
+    const t = typeId ? (_catalog.contractTypes || []).find(x => x.id === typeId) : null;
+    const l = (t && t.objets) || [];
+    return l.length ? tous.filter(i => l.indexOf(i.id) !== -1) : tous;
+  }
+
   const roleById = id => (_catalog.roles || []).find(r => r.id === id) || null;
   const SANS_ROLE = { id: "", name: "Sans rôle", color: "#6a6280", perms: [] };
 
@@ -1903,6 +1924,7 @@ window.MNStore = (function () {
        même si l'autre garage ne le propose pas. */
     contractTypes: () => (_catalog.contractTypes || []).filter(t => estDeAtelier(t, _atelier)),
     contractTypeById: id => (_catalog.contractTypes || []).find(t => t.id === id) || null,
+    objetsPourType,
     vehicleById, vehicleCatById,
     IMG_TAG, imageName, imageUrl, imagesHebergees, photoUrl, photoDeId,
     NA, CARBURANTS, statsVehicule,

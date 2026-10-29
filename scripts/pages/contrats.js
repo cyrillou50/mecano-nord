@@ -367,10 +367,13 @@
     let lignes = MNStore.clone(cur.lignes).map(l =>
       Object.assign({ demande: [] }, l, { demande: (l.demande || []).slice() }));
 
-    /* Même règle qu'à la facturation : on ne s'engage pas par contrat sur un
-       objet qu'on n'a pas le droit de vendre. */
-    const objets = MNStore.catalog().items.filter(i =>
+    /* Deux filtres, dans cet ordre : ce que le TYPE propose, et parmi cela
+       ce que le GRADE a le droit de vendre. Le type change ? la liste suit,
+       d'où la fonction plutôt qu'une constante. */
+    let typeChoisi = cur.type;
+    const objetsDuType = () => MNStore.objetsPourType(typeChoisi).filter(i =>
       i.enabled && MNStore.peutVendre((moi || {}).roleId, i.id));
+    let objets = objetsDuType();
     const ress = MNStore.catalog().resources;
 
     /* Le nom d'une catégorie, précédé de celle qui la contient quand il y en
@@ -395,7 +398,18 @@
 
     /** Le menu des objets, groupé par catégorie. */
     function choixObjet(idChoisi) {
-      return '<select class="liste" data-f="obj">' + parCategorie().map(b =>
+      /* Une ligne déjà écrite peut porter un objet que le type ne propose
+         plus. On le garde dans le menu, signalé, plutôt que de le remplacer
+         en douce par le premier de la liste — un contrat signé ne se
+         réécrit pas tout seul. */
+      const hors = idChoisi && !objets.some(o => o.id === idChoisi)
+        ? MNStore.itemById(idChoisi) : null;
+      return '<select class="liste" data-f="obj">' +
+        (hors
+          ? '<optgroup label="Hors de ce type"><option value="' + U.esc(hors.id) +
+            '" selected>' + U.esc(hors.name) + "</option></optgroup>"
+          : "") +
+        parCategorie().map(b =>
         '<optgroup label="' + U.esc(b.nom) + '">' + b.objets.map(o =>
           '<option value="' + U.esc(o.id) + '"' +
           (o.id === idChoisi ? " selected" : "") + ">" + U.esc(o.name) +
@@ -407,7 +421,9 @@
      * de la ligne : la quantité multiplie, elle n'est pas comprise ici.
      */
     function ressourcesDe(itemId) {
-      const o = objets.find(x => x.id === itemId);
+      /* Au catalogue, pas dans la liste proposée : un objet hors du type
+         garde son coût. */
+      const o = MNStore.itemById(itemId);
       const cost = (o && o.cost) || {};
       return Object.keys(cost)
         .filter(id => MNStore.resourceById(id) && cost[id] > 0)
@@ -527,7 +543,7 @@
         });
         const ob = row.querySelector('[data-f="obj"]');
         if (ob) ob.addEventListener("change", () => {
-          const o = objets.find(x => x.id === ob.value);
+          const o = MNStore.itemById(ob.value);
           lignes[i].itemId = ob.value;
           lignes[i].name = o ? o.name : "";
           /* Les ressources suivent l'objet : celles d'avant étaient celles
@@ -594,7 +610,12 @@
     }
 
     corps.querySelector('[data-a="add-obj"]').addEventListener("click", () => {
-      if (!objets.length) return U.toast("Aucun objet au catalogue", "err");
+      if (!objets.length) {
+        const t = MNStore.contractTypeById(typeChoisi);
+        return U.toast(t && (t.objets || []).length
+          ? "Le type « " + t.name + " » ne propose aucun objet que tu puisses vendre"
+          : "Aucun objet au catalogue", "err");
+      }
       lignes.push({ itemId: objets[0].id, name: objets[0].name, qty: 1,
                     demande: ressourcesDe(objets[0].id) });
       peindre();
@@ -621,7 +642,13 @@
     };
     chExp.addEventListener("input", () => { dateTouchee = true; majAide(); });
     corps.querySelector("#k-ty").addEventListener("change", e => {
-      const t = MNStore.contractTypeById(e.target.value);
+      /* Le type décide de ce qu'on peut mettre sur ce contrat : la liste des
+         objets se refait avant tout le reste. */
+      typeChoisi = e.target.value;
+      objets = objetsDuType();
+      peindre();
+
+      const t = MNStore.contractTypeById(typeChoisi);
       if (!t || !t.jours || dateTouchee) return;
       const d = new Date(); d.setDate(d.getDate() + t.jours);
       chExp.value = MNStore.jourLocal(d);

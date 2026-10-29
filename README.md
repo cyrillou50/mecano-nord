@@ -58,6 +58,30 @@ La toute première personne qui se connecte devient automatiquement **patron**
 | **Le site** | Nom de l'entreprise, slogan, **logo**, réglages de connexion |
 | **Publier** | Envoyer les modifications en ligne |
 
+### Choisir quels objets chaque type de contrat propose
+
+**Admin → Types de contrat → Modifier.** Sous la durée, la liste **Objets
+proposés par ce type** montre tout le catalogue, groupé par catégorie, avec
+un champ de recherche. Tu coches ce que ce type a le droit de porter.
+
+Un clic sur le nom d'une **catégorie** coche ou décoche tout son contenu d'un
+geste.
+
+Ensuite, dans l'éditeur d'un contrat, choisir ce type **réduit le menu des
+objets** à ceux-là. Changer de type refait la liste aussitôt.
+
+> **Rien de coché = tout le catalogue.** Une liste vide veut dire « ce type
+> ne restreint rien », pas « ce type ne propose rien » — sinon un type créé
+> à la hâte rendrait l'éditeur inutilisable. La liste des types l'affiche en
+> clair : *« 4 objets »* ou *« tout le catalogue »*.
+
+Deux filtres se succèdent, dans cet ordre : ce que **le type** propose, puis
+parmi cela ce que **ton grade** a le droit de vendre.
+
+> Un contrat déjà écrit qui porte un objet que son type ne propose plus
+> **garde cet objet**, rangé dans un groupe *Hors de ce type*. Un contrat
+> signé ne se réécrit pas tout seul parce qu'un réglage a changé.
+
 ### Monter un contrat sans compter à la main
 
 Dans l'éditeur d'un contrat, **Ajouter un objet** propose le catalogue
